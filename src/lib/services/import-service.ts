@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { and, asc, desc, eq } from 'drizzle-orm';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import type { PDFDocumentLoadingTask } from 'pdfjs-dist/types/src/display/api';
 
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
 import { importArtifacts, importOperations } from '@/lib/db/schema';
@@ -159,8 +159,12 @@ function boundedPdfText(value: string): string {
 }
 
 async function extractPdfText(bytes: Uint8Array): Promise<{ text: string; pages: number }> {
-  let task: ReturnType<typeof getDocument> | undefined;
+  let task: PDFDocumentLoadingTask | undefined;
   try {
+    // PDF.js initializes Node canvas globals while its module is evaluated. Keep
+    // that Node-only work on the PDF path so a regular image import never loads
+    // the PDF renderer (or fails because a PDF-only runtime dependency is absent).
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
     task = getDocument({
       data: new Uint8Array(bytes),
       disableFontFace: true,

@@ -22,6 +22,8 @@ describe('local OCR Docker packaging', () => {
     expect(dockerfile).not.toContain('/data/ocr-models');
     expect(dockerfile).toContain('/app/node_modules/drizzle-orm ./node_modules/drizzle-orm');
     expect(dockerfile).toContain('/app/node_modules/openai ./node_modules/openai');
+    expect(dockerfile).toContain('/app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist');
+    expect(dockerfile).toContain('/app/node_modules/@napi-rs ./node_modules/@napi-rs');
     expect(dockerignore.split(/\r?\n/u)).toContain('.api_keys');
   });
 });

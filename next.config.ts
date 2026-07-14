@@ -21,9 +21,17 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
-  // Tesseract starts a Node worker from its installed files, so these packages
-  // must remain external and be copied with the standalone server output.
-  serverExternalPackages: ['tar', 'tesseract.js', 'tesseract.js-core', '@tesseract.js-data/eng'],
+  // Tesseract starts a Node worker and PDF.js loads its Node canvas bridge from
+  // installed files. Keep these Node-only packages external and copy them with
+  // the standalone server output.
+  serverExternalPackages: [
+    'tar',
+    'tesseract.js',
+    'tesseract.js-core',
+    '@tesseract.js-data/eng',
+    'pdfjs-dist',
+    '@napi-rs/canvas',
+  ],
   async headers() {
     return [
       {

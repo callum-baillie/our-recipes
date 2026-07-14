@@ -63,6 +63,41 @@ describe('document import service', () => {
     vi.unstubAllEnvs();
   });
 
+  it('does not initialize the PDF runtime when creating an image review draft', async () => {
+    const profile = completeSetup({
+      householdName: 'Sunday suppers',
+      appName: 'Our Recipes',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'metric',
+        temperatureUnit: 'C',
+        locale: 'en-GB',
+        timezone: 'Europe/London',
+      },
+    }).profiles[0]!;
+    const scan = await sharp({
+      create: { width: 4, height: 4, channels: 3, background: '#f5ecd6' },
+    })
+      .png()
+      .toBuffer();
+
+    expect(globalThis.DOMMatrix).toBeUndefined();
+    await expect(
+      createImportOperation({
+        actorProfileId: profile.id,
+        sourceName: 'recipe.png',
+        bytes: scan,
+        manualTranscription:
+          'Lemon pasta\nIngredients\n2 tbsp olive oil\nMethod\n1. Toss the pasta with lemon.',
+      }),
+    ).resolves.toMatchObject({
+      operation: { extractionMethod: 'manual-transcription', mediaType: 'image/webp' },
+    });
+    expect(globalThis.DOMMatrix).toBeUndefined();
+  });
+
   it('extracts an embedded-text PDF, retains local provenance, and confirms only once', async () => {
     const profile = completeSetup({
       householdName: 'Sunday suppers',

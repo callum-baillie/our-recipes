@@ -40,6 +40,10 @@ COPY --chown=recipes:recipes scripts/container-entrypoint.sh ./scripts/container
 # optional provider imports must be present beside the standalone runtime.
 COPY --from=builder --chown=recipes:recipes /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 COPY --from=builder --chown=recipes:recipes /app/node_modules/openai ./node_modules/openai
+# PDF.js parses recipe PDFs through its Node legacy build. Its optional canvas
+# bridge provides DOMMatrix and must ship beside the standalone server.
+COPY --from=builder --chown=recipes:recipes /app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist
+COPY --from=builder --chown=recipes:recipes /app/node_modules/@napi-rs ./node_modules/@napi-rs
 # Tesseract starts its Node worker from installed package files and loads this
 # pinned English model through a local filesystem path. It is immutable image
 # content, deliberately outside the household data volume.
