@@ -1,0 +1,1202 @@
+openapi: 3.1.0
+info:
+  title: Our Recipes API
+  version: 0.1.0
+  description: Local household foundation API. Profiles are not authentication.
+  license:
+    name: Private household use — see repository license decision before redistribution
+servers:
+  - url: /api/v1
+security: []
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Report application readiness
+      responses:
+        '200':
+          description: Application is reachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version, setupComplete]
+                properties:
+                  status: { type: string, const: ok }
+                  version: { type: string, const: v1 }
+                  setupComplete: { type: boolean }
+        '503': { description: Storage is unavailable }
+  /ai/status:
+    get:
+      operationId: getAiStatus
+      summary: Report the non-secret AI connection state
+      responses:
+        '200':
+          description: AI readiness status without credentials or provider output
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: object
+                    required: [provider, state, enabled, message, supportedOperationKinds]
+                    properties:
+                      provider: { type: string, const: OpenAI }
+                      state: { type: string, enum: [unconfigured, configured] }
+                      enabled: { type: boolean }
+                      message: { type: string }
+                      supportedOperationKinds:
+                        type: array
+                        items:
+                          type: string
+                          enum: [text-normalization, vision-extraction, image-generation]
+  /ai/reviews:
+    post:
+      operationId: createAiReview
+      summary: Explicitly request a review-only OpenAI recipe suggestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiReviewRequest' }
+      responses:
+        '200': { description: Editable review candidate and content-free audit summary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile selection required }
+        '422': { description: Source was not a valid bounded AI review input }
+        '429': { description: Per-profile AI rate limit exceeded }
+        '503': { description: OpenAI is not configured on this server }
+  /setup:
+    post:
+      operationId: completeSetup
+      summary: Create the household and first profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetupInput' }
+      responses:
+        '201': { description: Household created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Household already exists }
+  /profiles:
+    get:
+      operationId: listProfiles
+      summary: List household profiles
+      responses:
+        '200': { description: Profile list }
+        '503': { description: Storage is unavailable }
+    post:
+      operationId: addProfile
+      summary: Add a household profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileInput' }
+      responses:
+        '201': { description: Profile created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+  /profiles/{profileId}/active:
+    patch:
+      operationId: setActiveProfile
+      summary: Select the active non-auth profile
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Active profile cookie set }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Profile not found }
+  /profiles/{profileId}:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateProfile
+      summary: Update a household profile’s preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileInput' }
+      responses:
+        '200': { description: Profile updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Profile not found }
+    post:
+      operationId: setProfileArchiveState
+      summary: Archive or restore a profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileArchiveInput' }
+      responses:
+        '200': { description: Profile archive state updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Profile not found }
+        '409': { description: Profile archive is unsafe or active }
+  /tags:
+    get:
+      operationId: listTags
+      summary: List canonical household tags with usage counts
+      responses:
+        '200': { description: Tag list }
+        '503': { description: Tag storage is unavailable }
+    post:
+      operationId: createTag
+      summary: Create a canonical household tag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagInput' }
+      responses:
+        '201': { description: Tag created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Tag already exists }
+  /tags/{tagName}:
+    parameters:
+      - name: tagName
+        in: path
+        required: true
+        schema: { type: string, maxLength: 40 }
+    patch:
+      operationId: updateTag
+      summary: Rename or recolor a tag while preserving recipe associations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagInput' }
+      responses:
+        '200': { description: Tag updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Tag not found }
+        '409': { description: Target tag exists; use merge }
+    delete:
+      operationId: deleteTag
+      summary: Remove a tag association from every recipe
+      responses:
+        '204': { description: Tag removed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Tag not found }
+  /tags/{tagName}/merge:
+    post:
+      operationId: mergeTag
+      summary: Merge a source tag into a target tag
+      parameters:
+        - name: tagName
+          in: path
+          required: true
+          schema: { type: string, maxLength: 40 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagMergeInput' }
+      responses:
+        '200': { description: Tags merged }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Source tag not found }
+  /collections:
+    get:
+      operationId: listCollections
+      summary: List manually ordered household collections with optional local-photo covers
+      responses:
+        '200': { description: Collection list }
+        '503': { description: Collection storage is unavailable }
+    post:
+      operationId: createCollection
+      summary: Create a curated household collection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CollectionInput' }
+      responses:
+        '201': { description: Collection created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile is missing or collection name conflicts }
+  /collections/order:
+    post:
+      operationId: reorderCollections
+      summary: Replace the manual order of all household collections
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CollectionOrderInput' }
+      responses:
+        '200': { description: Collection order saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile is missing or the list is stale }
+  /collections/{collectionId}:
+    parameters:
+      - name: collectionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getCollection
+      summary: Read one collection with its ordered recipes and selectable saved-photo covers
+      responses:
+        '200': { description: Collection detail }
+        '404': { description: Collection not found }
+    patch:
+      operationId: updateCollection
+      summary: Update collection details or choose a cover from one of its saved recipe photos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CollectionInput' }
+      responses:
+        '200': { description: Collection updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Collection not found }
+        '409': { description: Active profile is missing or collection name conflicts }
+    delete:
+      operationId: deleteCollection
+      summary: Remove a collection without deleting any recipe or photo
+      responses:
+        '204': { description: Collection removed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Collection not found }
+  /collections/{collectionId}/recipes:
+    put:
+      operationId: replaceCollectionRecipes
+      summary: Replace a collection’s ordered recipe membership
+      parameters:
+        - name: collectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CollectionRecipesInput' }
+      responses:
+        '200': { description: Collection membership saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Collection not found }
+        '409': { description: Active profile is missing }
+  /recipes:
+    get:
+      operationId: listRecipes
+      summary: Search a paginated, lifecycle-aware shared recipe library
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: creator
+          in: query
+          schema: { type: string, format: uuid }
+        - name: tag
+          in: query
+          schema: { type: string, maxLength: 40 }
+        - name: collection
+          in: query
+          schema: { type: string, format: uuid }
+        - name: category
+          in: query
+          schema: { type: string, maxLength: 80 }
+        - name: cuisine
+          in: query
+          schema: { type: string, maxLength: 80 }
+        - name: maxTotalMinutes
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 30240 }
+        - name: favorite
+          in: query
+          schema: { type: boolean }
+        - name: cooked
+          in: query
+          schema: { type: boolean }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, archived, trash, all], default: active }
+        - name: sort
+          in: query
+          schema:
+            {
+              type: string,
+              enum:
+                [
+                  recently-added,
+                  recently-updated,
+                  alphabetical,
+                  most-recently-cooked,
+                  shortest-time,
+                ],
+            }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        '200': { description: Recipe cards }
+        '400': { description: Invalid search query }
+    post:
+      operationId: createRecipe
+      summary: Create a structured recipe and first revision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeInput' }
+      responses:
+        '201': { description: Recipe created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required }
+  /recipes/{recipeId}:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getRecipe
+      summary: Read a structured recipe card and revision metadata
+      responses:
+        '200': { description: Recipe card }
+        '404': { description: Recipe not found }
+    put:
+      operationId: updateRecipe
+      summary: Replace the current recipe card and append a revision when its expected revision matches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeUpdateInput' }
+      responses:
+        '200': { description: New recipe revision saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required or recipe revision conflict }
+  /recipes/{recipeId}/export:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: exportRecipeJsonLd
+      summary: Download a deterministic Schema.org Recipe JSON-LD document
+      responses:
+        '200':
+          description: Portable recipe JSON-LD without household-private fields
+          content:
+            application/ld+json:
+              schema: { type: object }
+        '404': { description: Recipe not found }
+  /recipes/{recipeId}/export/markdown:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: exportRecipeMarkdown
+      summary: Download a deterministic portable Markdown recipe without profile-private preferences
+      responses:
+        '200':
+          description: Portable Markdown recipe
+          content:
+            text/markdown:
+              schema: { type: string }
+        '404': { description: Recipe not found }
+  /recipes/{recipeId}/preference:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      operationId: setRecipePreference
+      summary: Save the active profile’s private rating and note without changing the shared recipe revision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipePreferenceInput' }
+      responses:
+        '200': { description: Private profile preference saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required }
+  /recipes/{recipeId}/revisions/{revision}/restore:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: revision
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    post:
+      operationId: restoreRecipeRevision
+      summary: Restore a saved shared recipe snapshot by appending a new revision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeRevisionRestoreInput' }
+      responses:
+        '200': { description: Restored recipe saved as a new revision }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe or saved revision not found }
+        '409': { description: Profile selection required or recipe revision conflict }
+  /recipes/{recipeId}/duplicate:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: duplicateRecipe
+      summary: Create an active editable copy of a current recipe
+      responses:
+        '201': { description: Recipe copy created }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required }
+  /recipes/{recipeId}/status:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateRecipeStatus
+      summary: Update a recipe lifecycle state with revision protection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeStatusInput' }
+      responses:
+        '200': { description: New lifecycle revision saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required or recipe revision conflict }
+  /recipes/{recipeId}/images:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createRecipeImage
+      summary: Add a bounded local recipe photo and return normalized media metadata
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, or WebP source image, 10 MB maximum.
+                altText:
+                  type: string
+                  maxLength: 180
+      responses:
+        '201': { description: Normalized photo metadata created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required }
+        '413': { description: Image exceeds the byte limit }
+  /recipes/{recipeId}/images/{imageId}:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: imageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getRecipeImage
+      summary: Read a normalized local WebP recipe photo
+      responses:
+        '200':
+          description: Normalized image bytes
+          content:
+            image/webp:
+              schema: { type: string, format: binary }
+        '404': { description: Recipe photo not found }
+    delete:
+      operationId: deleteRecipeImage
+      summary: Remove a local recipe photo and its media metadata
+      responses:
+        '204': { description: Recipe photo removed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe photo not found }
+        '409': { description: Profile selection required }
+  /recipes/{recipeId}/images/generate:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: generateRecipeImage
+      summary: Explicitly generate and locally store one recipe serving image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiImageGenerationRequest' }
+      responses:
+        '201': { description: Local generated image ID and content-free audit summary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Active profile selection required }
+        '422': { description: Generated result could not be stored safely }
+        '429': { description: Per-profile AI rate limit exceeded }
+        '503': { description: OpenAI is not configured on this server }
+  /meal-plan:
+    get:
+      operationId: listMealPlan
+      summary: Read planned meals for an inclusive date range
+      responses:
+        '200': { description: Planned meals }
+        '400': { description: Invalid week range }
+    post:
+      operationId: addMealPlanEntry
+      summary: Add an existing recipe to a date and meal
+      responses:
+        '201': { description: Planned meal created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+  /meal-plan/{entryId}:
+    parameters:
+      - name: entryId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: deleteMealPlanEntry
+      summary: Remove one planned recipe or free-form meal
+      responses:
+        '204': { description: Planned meal removed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Planned meal not found }
+  /meal-plan/duplicate:
+    post:
+      operationId: duplicateMealPlanWeek
+      summary: Copy one planned week into a destination week
+      responses:
+        '201': { description: Independent copied meal entries }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required }
+  /meal-plan/export:
+    get:
+      operationId: exportMealPlanCalendar
+      summary: Download a deterministic local ICS calendar for an inclusive date range
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: end
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Calendar export with attachment and no-store headers
+          content:
+            text/calendar:
+              schema: { type: string }
+        '400': { description: Invalid week range }
+  /shopping-lists:
+    get:
+      operationId: listShoppingLists
+      summary: List previously generated editable shopping lists
+      responses:
+        '200': { description: Shopping lists }
+        '400': { description: Invalid request }
+    post:
+      operationId: generateShoppingList
+      summary: Generate a new editable list from a plan week
+      responses:
+        '201': { description: Shopping list created }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Plan contains no meals }
+  /shopping-lists/{listId}:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getShoppingList
+      summary: Read an editable list with household aisle definitions in saved order
+      responses:
+        '200': { description: Shopping list and aisle catalog }
+        '404': { description: Shopping list not found }
+    patch:
+      operationId: reorderShoppingListItems
+      summary: Replace the complete explicit order for the current list items
+      responses:
+        '200': { description: List order saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: List changed since it was read }
+  /shopping-lists/{listId}/items:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: addShoppingListItem
+      summary: Add a bounded manual item with an optional household aisle assignment
+      responses:
+        '201': { description: Shopping item created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Shopping list not found }
+  /shopping-lists/{listId}/items/{itemId}:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateShoppingListItem
+      summary: Edit, check, or reassign one shopping-list item
+      responses:
+        '200': { description: Shopping item saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Shopping item not found }
+    delete:
+      operationId: deleteShoppingListItem
+      summary: Remove one shopping-list item
+      responses:
+        '204': { description: Shopping item removed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Shopping item not found }
+  /shopping-lists/aisles:
+    get:
+      operationId: listShoppingAisles
+      summary: List household store aisles in durable display order
+      responses:
+        '200': { description: Ordered shopping aisles }
+    post:
+      operationId: createShoppingAisle
+      summary: Create a bounded unique household store aisle
+      responses:
+        '201': { description: Shopping aisle created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required or aisle already exists }
+    patch:
+      operationId: reorderShoppingAisles
+      summary: Replace the complete current household aisle order
+      responses:
+        '200': { description: Ordered shopping aisles }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required or aisle order changed }
+  /shopping-lists/aisles/{aisleId}:
+    parameters:
+      - name: aisleId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: deleteShoppingAisle
+      summary: Remove an aisle and leave its shopping items unassigned
+      responses:
+        '204': { description: Shopping aisle removed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Shopping aisle not found }
+        '409': { description: Profile selection required }
+  /cook-sessions:
+    post:
+      operationId: startCookSession
+      summary: Start a per-profile cooking session
+      responses:
+        '201': { description: Cooking session started }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+  /capture-drafts:
+    post:
+      operationId: createCaptureDraft
+      summary: Create a non-persistent text draft or list/select deterministic Recipe candidates from a hardened public URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CaptureDraftRequest' }
+      responses:
+        '200':
+          { description: Review draft or URL Recipe candidates returned without creating a recipe }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '422': { description: URL source rejected by capture safety controls }
+  /jsonld-drafts:
+    post:
+      operationId: createJsonLdDraft
+      summary: Find or select a locally parsed Schema.org Recipe candidate from pasted JSON-LD
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JsonLdDraftRequest' }
+      responses:
+        '200': { description: Candidate summaries or the explicitly selected editable review draft }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile selection required }
+        '413': { description: Pasted JSON-LD exceeds 1 MB }
+        '422':
+          {
+            description: 'JSON-LD is invalid, lacks a Recipe candidate, or selected candidate is incompatible.',
+          }
+  /jsonld-drafts/confirm:
+    post:
+      operationId: confirmJsonLdDraft
+      summary: Create a recipe only after explicit review of a JSON-LD candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportConfirmationInput' }
+      responses:
+        '201': { description: Reviewed portable recipe created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile selection required }
+  /imports:
+    post:
+      operationId: createDocumentImport
+      summary: Create a review-only local one-PDF or ordered scan-set import operation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  minItems: 1
+                  maxItems: 4
+                  items:
+                    type: string
+                    format: binary
+                  description: Exactly one PDF or one to four JPEG, PNG, or WebP scans; 15 MB combined maximum. Browser HEIC/HEIF conversion must produce JPEG before upload.
+                transcription:
+                  type: string
+                  minLength: 20
+                  maxLength: 100000
+                  description: Optional combined text for scan sets. Clear English scans otherwise use a pinned local review-only OCR model; textless PDFs and blank/low-confidence OCR still require this field.
+                clientConversions:
+                  type: string
+                  description: Optional JSON array recording browser-only HEIC/HEIF-to-JPEG name mapping; raw HEIC/HEIF is never accepted by this endpoint.
+      responses:
+        '201':
+          { description: Provenance operation and review draft created without creating a recipe }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile selection required }
+        '413': { description: Multipart document exceeds the byte limit }
+        '422':
+          {
+            description: 'Source type, parser, transcription, bounded local OCR, or process rate limit rejected the import. `ocr_busy` is retryable; local OCR never creates a recipe without confirmation.',
+          }
+  /imports/{importId}:
+    parameters:
+      - name: importId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getDocumentImport
+      summary: Read local import provenance and its reproducible review draft
+      responses:
+        '200': { description: Import operation and review draft }
+        '404': { description: Import draft not found }
+  /imports/{importId}/file:
+    parameters:
+      - name: importId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getDocumentImportArtifact
+      summary: Read a normalized scan or download the accepted PDF artifact
+      responses:
+        '200':
+          description: Local normalized artifact bytes
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        '404': { description: Import artifact not found }
+  /imports/{importId}/files/{artifactId}:
+    parameters:
+      - name: importId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: artifactId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getDocumentImportArtifactById
+      summary: Read one import-scoped normalized scan artifact
+      responses:
+        '200':
+          description: Private normalized scan bytes
+          content:
+            image/webp:
+              schema: { type: string, format: binary }
+        '404': { description: Import artifact not found }
+  /imports/{importId}/confirm:
+    parameters:
+      - name: importId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: confirmDocumentImport
+      summary: Create a recipe only after explicit review of one import operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportConfirmationInput' }
+      responses:
+        '201': { description: Reviewed recipe created and linked to the import operation }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Import draft not found }
+        '409': { description: Active profile selection required or import already confirmed }
+  /backups:
+    get:
+      operationId: listBackups
+      summary: List server-created local backup bundles
+      responses:
+        '200': { description: Local backup list }
+        '400': { description: Invalid backup request }
+        '503': { description: Backup storage is unavailable }
+    post:
+      operationId: createBackup
+      summary: Create a consistent local database and media backup
+      responses:
+        '201': { description: Backup bundle created }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required or database path is not restorable }
+  /backups/{backupId}:
+    parameters:
+      - name: backupId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: previewBackup
+      summary: Validate a local backup and return its recovery manifest preview
+      responses:
+        '200': { description: Validated backup preview }
+        '404': { description: Backup not found }
+        '422': { description: Backup archive or manifest failed validation }
+  /backups/{backupId}/download:
+    parameters:
+      - name: backupId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: downloadBackup
+      summary: Download a listed local backup bundle
+      responses:
+        '200':
+          description: Gzip-compressed backup bundle
+          content:
+            application/gzip:
+              schema: { type: string, format: binary }
+        '404': { description: Backup not found }
+        '409': { description: Profile selection required }
+  /backups/{backupId}/restore:
+    parameters:
+      - name: backupId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: restoreBackup
+      summary: Replace household data with a validated local backup after explicit confirmation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestoreConfirmation' }
+      responses:
+        '200': { description: Backup restored and safety backup created }
+        '400': { description: RESTORE confirmation missing }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Backup not found }
+        '409': { description: Profile selection required or restore refused }
+        '422': { description: Backup archive or manifest failed validation }
+  /exports/recipes:
+    get:
+      operationId: exportPortableRecipeArchive
+      summary: Download a server-generated portable full-recipe archive
+      description: >-
+        Streams generated Schema.org JSON-LD and referenced normalized WebP files
+        with a checksum manifest. This output-only endpoint accepts no archive
+        bytes, paths, files, or restore input.
+      responses:
+        '200':
+          description: Gzip-compressed portable recipe archive
+          content:
+            application/gzip:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required }
+        '422': { description: The bounded generated export could not be created safely }
+  /cook-sessions/{sessionId}/complete:
+    post:
+      operationId: completeCookSession
+      summary: Mark the current profile's cooking session complete
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Cooking session completed }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Cooking session not found }
+components:
+  schemas:
+    ProfileInput:
+      type: object
+      required: [displayName, color, units, temperatureUnit, locale, timezone]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        color: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+        avatarUrl: { type: string, format: uri }
+        units: { type: string, enum: [metric, imperial] }
+        temperatureUnit: { type: string, enum: [C, F] }
+        locale: { type: string }
+        timezone: { type: string }
+    ProfileArchiveInput:
+      type: object
+      required: [archived]
+      properties:
+        archived: { type: boolean }
+    TagInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40 }
+        color: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+    TagMergeInput:
+      type: object
+      required: [targetName]
+      properties:
+        targetName: { type: string, minLength: 1, maxLength: 40 }
+        targetColor: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+    CollectionInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string, maxLength: 800 }
+        coverImageId:
+          oneOf:
+            - { type: string, format: uuid }
+            - { type: string, maxLength: 0 }
+    CollectionOrderInput:
+      type: object
+      required: [collectionIds]
+      properties:
+        collectionIds:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { type: string, format: uuid }
+    CollectionRecipesInput:
+      type: object
+      required: [recipeIds]
+      properties:
+        recipeIds:
+          type: array
+          maxItems: 2000
+          items: { type: string, format: uuid }
+    CaptureDraftRequest:
+      oneOf:
+        - type: object
+          required: [kind, text]
+          properties:
+            kind: { type: string, const: text }
+            text: { type: string, minLength: 20, maxLength: 100000 }
+        - type: object
+          required: [kind, url]
+          properties:
+            kind: { type: string, const: url }
+            url: { type: string, format: uri, maxLength: 2048 }
+            candidateIndex:
+              type: integer
+              minimum: 0
+              maximum: 19
+              description: Omit to list candidates; supply a displayed index for one editable review draft.
+    ImportConfirmationInput:
+      type: object
+      required: [recipe]
+      properties:
+        recipe: { $ref: '#/components/schemas/RecipeInput' }
+    AiReviewRequest:
+      oneOf:
+        - type: object
+          required: [confirm, kind, sourceText, sourceLabel]
+          properties:
+            confirm: { type: boolean, const: true }
+            kind: { type: string, const: text-normalization }
+            sourceText: { type: string, minLength: 20, maxLength: 30000 }
+            sourceLabel: { type: string, minLength: 1, maxLength: 160 }
+        - type: object
+          required: [confirm, kind, importId]
+          properties:
+            confirm: { type: boolean, const: true }
+            kind: { type: string, const: vision-extraction }
+            importId: { type: string, format: uuid }
+    AiImageGenerationRequest:
+      type: object
+      required: [confirm]
+      properties:
+        confirm: { type: boolean, const: true }
+    JsonLdDraftRequest:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+          minLength: 2
+          maxLength: 1000000
+          description: Pasted JSON-LD only. URLs, files, and archives are not accepted.
+        candidateIndex:
+          type: integer
+          minimum: 0
+          maximum: 19
+          description: Omit to list candidates; supply a displayed index to create an editable draft.
+    SetupInput:
+      type: object
+      required: [householdName, appName, profile]
+      properties:
+        householdName: { type: string, minLength: 1, maxLength: 80 }
+        appName: { type: string, minLength: 1, maxLength: 80 }
+        profile: { $ref: '#/components/schemas/ProfileInput' }
+    RecipeInput:
+      type: object
+      required:
+        [title, servings, prepMinutes, cookMinutes, tags, ingredientGroups, instructionSections]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        summary: { type: string, maxLength: 800 }
+        status: { type: string, enum: [active, archived, trash], default: active }
+        servings: { type: string, minLength: 1, maxLength: 80 }
+        prepMinutes: { type: integer, minimum: 0 }
+        cookMinutes: { type: integer, minimum: 0 }
+        restMinutes: { type: integer, minimum: 0, default: 0 }
+        difficulty: { type: string, maxLength: 40 }
+        cuisine: { type: string, maxLength: 80 }
+        category: { type: string, maxLength: 80 }
+        tips: { type: string, maxLength: 2000 }
+        sharedNotes: { type: string, maxLength: 2000 }
+        sourceName: { type: string }
+        sourceUrl: { type: string, format: uri }
+        originalAuthor: { type: string, maxLength: 160 }
+        cookingMethod: { type: string, maxLength: 80 }
+        equipment:
+          type: array
+          maxItems: 30
+          items: { type: string, maxLength: 120 }
+        nutritionCalories: { type: number, minimum: 0 }
+        nutritionProteinGrams: { type: number, minimum: 0 }
+        nutritionCarbohydrateGrams: { type: number, minimum: 0 }
+        nutritionFatGrams: { type: number, minimum: 0 }
+        nutritionFiberGrams: { type: number, minimum: 0 }
+        tags: { type: array, items: { type: string } }
+        ingredientGroups: { type: array, items: { type: object } }
+        instructionSections: { type: array, items: { type: object } }
+    RecipeUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/RecipeInput'
+        - type: object
+          required: [expectedRevision]
+          properties:
+            expectedRevision: { type: integer, minimum: 1 }
+    RecipeStatusInput:
+      type: object
+      required: [status, expectedRevision]
+      properties:
+        status: { type: string, enum: [active, archived, trash] }
+        expectedRevision: { type: integer, minimum: 1 }
+    RecipePreferenceInput:
+      type: object
+      properties:
+        rating:
+          oneOf:
+            - { type: integer, minimum: 1, maximum: 5 }
+            - { type: 'null' }
+        note: { type: string, maxLength: 2000 }
+    RecipeRevisionRestoreInput:
+      type: object
+      required: [expectedRevision]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+    RestoreConfirmation:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation: { type: string, const: RESTORE }
+  responses:
+    InvalidRequest: { description: Input did not meet the contract }
+    UntrustedOrigin: { description: The browser origin was not explicitly trusted }

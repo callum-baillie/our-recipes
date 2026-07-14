@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Our Recipes</Name>
+  <Repository>ghcr.io/callum-baillie/our-recipes:latest</Repository>
+  <Registry>https://github.com/callum-baillie/our-recipes</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/callum-baillie/our-recipes/issues</Support>
+  <Overview>A private, self-hosted household recipe manager. Profiles are not authentication; keep it on a trusted local network.</Overview>
+  <Category>Productivity: Tools</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/callum-baillie/our-recipes/main/unraid/our-recipes.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/callum-baillie/our-recipes/main/public/icons/our-recipes-mark.svg</Icon>
+  <Config Name="Web port" Target="3000" Default="3000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Persistent data" Target="/data" Default="/mnt/user/appdata/our-recipes" Mode="rw" Description="SQLite, media, and backups" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/our-recipes</Config>
+  <Config Name="Cookie secret" Target="COOKIE_SECRET" Default="" Mode="" Description="At least 32 random characters" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="App origin" Target="APP_ORIGIN" Default="http://recipes.lan:3000" Mode="" Description="Exact browser-visible LAN origin" Type="Variable" Display="always" Required="true" Mask="false">http://recipes.lan:3000</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Los_Angeles" Mode="" Description="Container timezone" Type="Variable" Display="always" Required="false" Mask="false">America/Los_Angeles</Config>
+  <Config Name="Backup interval" Target="BACKUP_INTERVAL_HOURS" Default="24" Mode="" Description="Local in-process backup interval in hours" Type="Variable" Display="always" Required="false" Mask="false">24</Config>
+  <Config Name="Backup retention" Target="BACKUP_RETENTION_DAYS" Default="30" Mode="" Description="Local backup retention in days" Type="Variable" Display="always" Required="false" Mask="false">30</Config>
+  <Config Name="OpenAI API key" Target="OPENAI_API_KEY" Default="" Mode="" Description="Optional. Enables only explicitly requested review and image actions." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>

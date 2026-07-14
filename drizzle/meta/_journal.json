@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "1",
+      "when": 1783900000000,
+      "tag": "0000_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "1",
+      "when": 1783905000000,
+      "tag": "0001_recipe_domain",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "1",
+      "when": 1783910000000,
+      "tag": "0002_planning_shopping",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "1",
+      "when": 1783915000000,
+      "tag": "0003_cooking_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "1",
+      "when": 1783920000000,
+      "tag": "0004_recipe_images",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "1",
+      "when": 1783925000000,
+      "tag": "0005_manual_recipe_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "1",
+      "when": 1783930000000,
+      "tag": "0006_household_organization",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "1",
+      "when": 1783935000000,
+      "tag": "0007_curated_collections",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "1",
+      "when": 1783940000000,
+      "tag": "0008_document_imports",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "1",
+      "when": 1783945000000,
+      "tag": "0009_rich_recipe_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "1",
+      "when": 1783950000000,
+      "tag": "0010_planning_grocery_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "1",
+      "when": 1783955000000,
+      "tag": "0011_multi_image_imports",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "1",
+      "when": 1783960000000,
+      "tag": "0012_local_ocr_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "1",
+      "when": 1783974000000,
+      "tag": "0013_ai_operation_audits",
+      "breakpoints": true
+    }
+  ]
+}

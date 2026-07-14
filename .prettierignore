@@ -1,0 +1,10 @@
+node_modules/
+.next/
+coverage/
+playwright-report/
+test-results/
+.data/
+tests/.tmp/
+docs/goals/
+docs/goals/**
+docs/design/*.png

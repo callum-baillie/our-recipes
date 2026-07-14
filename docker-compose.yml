@@ -1,0 +1,20 @@
+services:
+  our-recipes:
+    build:
+      context: .
+    image: our-recipes:local
+    container_name: our-recipes
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      DATA_DIR: /data
+      DATABASE_URL: /data/our-recipes.db
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      COOKIE_SECRET: ${COOKIE_SECRET:?Set a unique secret of at least 32 characters}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ./data:/data

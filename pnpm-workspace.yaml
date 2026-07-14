@@ -1,0 +1,22 @@
+packages:
+  - '.'
+
+overrides:
+  'next>postcss': 8.5.17
+
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  sharp: true
+  # This package's only install hook is OpenCollective messaging; the shipped
+  # OCR runtime/model need no build step, so keep clean installs non-interactive.
+  tesseract.js: false
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - tar@7.5.20
+
+# Avoid the Windows virtual-store linking path that lost package manifests during
+# two clean installations. This changes local install mechanics only.
+nodeLinker: hoisted
+packageImportMethod: copy
