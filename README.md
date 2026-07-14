@@ -6,11 +6,11 @@ Our Recipes is a self-hosted recipe manager for one trusted household. It curren
 
 ## Release status
 
-**v0.1.0-beta.1** is an early beta release. It is suitable for a trusted household that keeps regular backups, but it is not an authentication boundary and should not be exposed directly to the public internet. Please report issues in the [GitHub issue tracker](https://github.com/callum-baillie/our-recipes/issues).
+**v0.1.0-beta.2** is an early beta release. It is suitable for a trusted household that keeps regular backups, but it is not an authentication boundary and should not be exposed directly to the public internet. Please report issues in the [GitHub issue tracker](https://github.com/callum-baillie/our-recipes/issues).
 
 ## Install with Docker
 
-The published image is `ghcr.io/callum-baillie/our-recipes:latest`. It runs as UID/GID `1001` and needs one durable host directory for SQLite, photos, and backups.
+The published image is `ghcr.io/callum-baillie/our-recipes:latest`. Its entrypoint initializes the mounted data directory, then runs the application as non-root UID/GID `1001`; it needs one durable host directory for SQLite, photos, and backups.
 
 ```sh
 mkdir -p ./our-recipes-data
@@ -28,10 +28,10 @@ Open `http://localhost:3000`, complete the first-run household setup, then use t
 
 ## Unraid install
 
-1. Create `/mnt/user/appdata/our-recipes` and make it writable by container UID/GID `1001`.
-2. In **Docker → Add Container**, set the repository to `ghcr.io/callum-baillie/our-recipes:latest` (keep the `latest` tag), map host port `3000` to container port `3000`, and map `/mnt/user/appdata/our-recipes` to container `/data`.
-3. Add `COOKIE_SECRET` (a unique value of at least 32 characters), `APP_ORIGIN` (for example `http://tower.local:3000`), and `TZ`. `OPENAI_API_KEY` is optional and should be added only when you intentionally enable an AI action.
-4. Apply the container, visit its WebUI, complete household setup, and confirm `http://tower.local:3000/api/v1/health` reports `{"status":"ok"}`.
+1. Create `/mnt/user/appdata/our-recipes`. On first startup the image adjusts this app-specific directory for its non-root runtime user; do not bind it to a shared media directory.
+2. In **Docker → Add Container**, set the repository to `ghcr.io/callum-baillie/our-recipes:latest` (keep the `latest` tag), map an unused host port such as `4123` to container port `3000`, and map `/mnt/user/appdata/our-recipes` to container `/data`.
+3. Add `COOKIE_SECRET` (a unique value of at least 32 characters), `APP_ORIGIN` (for example `http://tower.local:4123`, matching the chosen host port), and `TZ`. `OPENAI_API_KEY` is optional and should be added only when you intentionally enable an AI action.
+4. Apply the container, visit its WebUI, complete household setup, and confirm `http://tower.local:4123/api/v1/health` reports `{"status":"ok"}`.
 
 You can also import [the Unraid template](unraid/our-recipes.xml). Keep `/data` persistent: it contains the database, images, and backup bundles. The dedicated [Unraid guide](docs/deployment-unraid.md) covers upgrades and host-specific checks.
 

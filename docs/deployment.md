@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Docker Engine with a current BuildKit-capable builder.
-- A host directory dedicated to the container's `/data` volume and writable by UID/GID `1001`.
+- A host directory dedicated to the container's `/data` volume. The image initializes ownership of this app-specific directory at startup, then runs the application as UID/GID `1001`.
 - A unique `COOKIE_SECRET` of at least 32 characters and an exact `APP_ORIGIN` matching the household browser URL.
 - Optional `OPENAI_API_KEY` only when the household intentionally enables review suggestions or generated serving images. Never put `.api_keys` in a bind mount, image, or backup.
 
@@ -19,7 +19,7 @@ docker compose ps
 curl http://127.0.0.1:3000/api/v1/health
 ```
 
-The image runs as UID/GID `1001`, binds port `3000` inside the container, and stores SQLite, images, backups, migration locks, and safe backup configuration below `/data`. The runner executes `scripts/container-migrate.mjs` before `server.js`; the script holds a migration lock and takes a pre-migration SQLite safety copy when a database already exists.
+The image briefly starts its entrypoint as root to initialize ownership of the dedicated `/data` mount, then drops to UID/GID `1001`, binds the app to port `3000` inside the container, and stores SQLite, images, backups, migration locks, and safe backup configuration below `/data`. The runner executes `scripts/container-migrate.mjs` before `server.js`; the script holds a migration lock and takes a pre-migration SQLite safety copy when a database already exists.
 
 ## Health and persistence proof
 
