@@ -56,7 +56,7 @@ test('first-run setup and household organization have no automatically detectabl
     buffer: handwrittenRecipe,
   });
   await page
-    .getByLabel('Manual transcription or local OCR')
+    .getByLabel('Manual transcription (optional)')
     .fill(
       'Lemon pasta\nIngredients\n2 tbsp olive oil\n1 lemon\nMethod\n1. Toss the pasta with lemon and oil.',
     );
