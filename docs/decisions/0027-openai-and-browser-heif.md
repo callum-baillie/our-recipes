@@ -23,9 +23,15 @@ byte-validated JPEG, PNG, and WebP.
   operations accept only bounded text or previously normalized scan artifacts,
   require explicit confirmation, use a four-action-per-profile ten-minute
   process limit, and write a no-raw-content audit row.
-- Use browser-only `@discourse/heic` WASM conversion for HEIC/HEIF selections.
-  It creates an in-memory JPEG before `FormData`; raw HEIC/HEIF bytes never
-  reach the server. The existing byte-derived server gate stays unchanged.
+- Use native browser image decoding for HEIC/HEIF when the client can decode
+  the selection, then fall back to browser-only `@discourse/heic` WASM.
+  Conversion has fixed dimension, output-size, and 30-second limits. It creates
+  an in-memory JPEG before `FormData`; raw HEIC/HEIF bytes never reach the
+  server. The existing byte-derived server gate stays unchanged.
+- Model mobile selection as explicit idle, preparing, ready, error, and
+  submitting states. Capture both Safari `input` and `change` paths, deduplicate
+  the resulting event pair, and always pair a non-ready state with visible
+  progress or a recovery action.
 - Keep generated images review-safe: an explicit image-generation click is the
   only trigger; the returned bytes go through the existing local image pipeline
   and only the local image ID is retained in the audit record.
@@ -37,6 +43,9 @@ byte-validated JPEG, PNG, and WebP.
 - The Chromium acceptance flow converts real small HEIC and HEIF codec fixtures
   before the existing import route accepts the resulting JPEGs. Fixture source
   and upstream license notice are recorded next to the test data.
+- Unit coverage includes blank-MIME iPhone file names and the bounded client
+  timeout. Chromium mobile emulation covers responsive behavior, not Safari's
+  WebKit decoder; final Safari acceptance remains a real-device check.
 - A paid live provider call remains deliberately unverified and requires a
   separate explicit operator approval. Docker validation may prove packaging
   and persistence but cannot prove provider billing or account configuration.

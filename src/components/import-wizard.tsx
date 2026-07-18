@@ -1,10 +1,15 @@
 'use client';
 
-import { FileText, LoaderCircle, ScanText, ShieldCheck, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Cloud, FileCheck2, LoaderCircle, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
+import { useRef, useState, type FormEvent } from 'react';
 
 import { ImportReviewForm } from '@/components/import-review-form';
 import { JsonLdImportWizard } from '@/components/import-jsonld-wizard';
+import {
+  ImportUploadPanel,
+  type ImportPreparationPhase,
+  type ImportSelectionItem,
+} from '@/components/import-upload-panel';
 import {
   ClientHeicConversionError,
   convertHeicFilesInBrowser,
@@ -18,67 +23,225 @@ type CreatedImport = {
   draft: ImportReviewDraft;
 };
 
+type FilePreparation = {
+  phase: ImportPreparationPhase;
+  sourceFiles: File[];
+  preparedFiles: File[];
+  conversions: ClientImageConversion[];
+  canRetry: boolean;
+};
+
+const EMPTY_PREPARATION: FilePreparation = {
+  phase: 'idle',
+  sourceFiles: [],
+  preparedFiles: [],
+  conversions: [],
+  canRetry: false,
+};
+const MAX_IMPORT_FILES = 4;
+const MAX_IMPORT_BYTES = 15 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+
+function fileSelectionSignature(files: File[]): string {
+  return files
+    .map((file) => `${file.name}:${file.size}:${file.lastModified}:${file.type}`)
+    .join('|');
+}
+
+function isImageFile(file: Pick<File, 'name' | 'type'>): boolean {
+  return (
+    SUPPORTED_IMAGE_TYPES.has(file.type.toLowerCase()) ||
+    /\.(?:jpe?g|png|webp|heic|heif)$/iu.test(file.name)
+  );
+}
+
+function isPdfFile(file: Pick<File, 'name' | 'type'>): boolean {
+  return file.type.toLowerCase() === 'application/pdf' || /\.pdf$/iu.test(file.name);
+}
+
+function validateSelection(files: File[]): string | null {
+  if (files.length > MAX_IMPORT_FILES) return 'Choose one PDF or up to four recipe scans.';
+  if (files.some((file) => !isImageFile(file) && !isPdfFile(file))) {
+    return 'Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.';
+  }
+  const pdfCount = files.filter(isPdfFile).length;
+  if (pdfCount > 0 && (pdfCount !== 1 || files.length !== 1)) {
+    return 'Choose one PDF by itself, or choose up to four image scans.';
+  }
+  const totalBytes = files.reduce((total, file) => total + file.size, 0);
+  if (totalBytes > MAX_IMPORT_BYTES) return 'Your selected files exceed the 15 MB total limit.';
+  return null;
+}
+
+function selectionItems(preparation: FilePreparation): ImportSelectionItem[] {
+  return preparation.sourceFiles.map((sourceFile, index) => {
+    const preparedFile = preparation.preparedFiles[index] ?? sourceFile;
+    return {
+      key: `${sourceFile.name}:${sourceFile.size}:${sourceFile.lastModified}:${index}`,
+      sourceName: sourceFile.name,
+      preparedName: preparedFile.name,
+      sourceSize: sourceFile.size,
+      preparedSize: preparedFile.size,
+      converted: preparedFile.name !== sourceFile.name || preparedFile.type !== sourceFile.type,
+      isImage: isImageFile(sourceFile),
+      isPdf: isPdfFile(sourceFile),
+    };
+  });
+}
+
 export function ImportWizard() {
-  const [files, setFiles] = useState<File[]>([]);
-  const [clientConversions, setClientConversions] = useState<ClientImageConversion[]>([]);
+  const [preparation, setPreparation] = useState<FilePreparation>(EMPTY_PREPARATION);
   const [transcription, setTranscription] = useState('');
   const [autoOpenAiVision, setAutoOpenAiVision] = useState(true);
   const [created, setCreated] = useState<CreatedImport | null>(null);
-  const [pending, setPending] = useState(false);
-  const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiPending, setAiPending] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const preparationAttemptRef = useRef(0);
+  const lastSelectionSignatureRef = useRef('');
   const hasOnlyImageScans =
-    files.length > 0 && files.every((file) => file.type.startsWith('image/'));
+    preparation.preparedFiles.length > 0 && preparation.preparedFiles.every(isImageFile);
   const shouldAutoOpenAiVision =
     autoOpenAiVision && hasOnlyImageScans && transcription.trim().length === 0;
+  const items = selectionItems(preparation);
 
-  async function chooseFiles(selected: File[]) {
-    setConverting(true);
+  async function prepareFiles(selected: File[]) {
+    if (!selected.length) {
+      setPreparation(EMPTY_PREPARATION);
+      return;
+    }
+
+    const selectionError = validateSelection(selected);
+    if (selectionError) {
+      preparationAttemptRef.current += 1;
+      setPreparation({
+        phase: 'error',
+        sourceFiles: selected,
+        preparedFiles: [],
+        conversions: [],
+        canRetry: false,
+      });
+      setError(selectionError);
+      return;
+    }
+
+    const attempt = preparationAttemptRef.current + 1;
+    preparationAttemptRef.current = attempt;
+    setPreparation({
+      phase: 'preparing',
+      sourceFiles: selected,
+      preparedFiles: [],
+      conversions: [],
+      canRetry: true,
+    });
     setError(null);
     try {
-      const converted = await convertHeicFilesInBrowser(selected, 15 * 1024 * 1024);
-      setFiles(converted.files);
-      setClientConversions(converted.conversions);
-    } catch (error) {
-      setFiles([]);
-      setClientConversions([]);
+      const converted = await convertHeicFilesInBrowser(selected, MAX_IMPORT_BYTES);
+      if (preparationAttemptRef.current !== attempt) return;
+      setPreparation({
+        phase: 'ready',
+        sourceFiles: selected,
+        preparedFiles: converted.files,
+        conversions: converted.conversions,
+        canRetry: false,
+      });
+    } catch (caughtError) {
+      if (preparationAttemptRef.current !== attempt) return;
+      setPreparation({
+        phase: 'error',
+        sourceFiles: selected,
+        preparedFiles: [],
+        conversions: [],
+        canRetry: true,
+      });
       setError(
-        error instanceof ClientHeicConversionError
-          ? error.message
-          : 'We could not prepare those files safely in this browser.',
+        caughtError instanceof ClientHeicConversionError
+          ? caughtError.message
+          : 'We could not prepare those files safely in this browser. Try again or choose JPEG, PNG, WebP, or PDF.',
       );
-    } finally {
-      setConverting(false);
     }
   }
 
+  function handleFileInput(event: FormEvent<HTMLInputElement>) {
+    const selected = Array.from(event.currentTarget.files ?? []);
+    if (!selected.length) return;
+    const signature = fileSelectionSignature(selected);
+    if (lastSelectionSignatureRef.current === signature) return;
+    lastSelectionSignatureRef.current = signature;
+    void prepareFiles(selected);
+  }
+
+  function prepareForFilePicker() {
+    lastSelectionSignatureRef.current = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function openFilePicker() {
+    prepareForFilePicker();
+    fileInputRef.current?.click();
+  }
+
+  function removeFile(index: number) {
+    const remaining = preparation.sourceFiles.filter(
+      (_, candidateIndex) => candidateIndex !== index,
+    );
+    lastSelectionSignatureRef.current = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!remaining.length) {
+      preparationAttemptRef.current += 1;
+      setPreparation(EMPTY_PREPARATION);
+      setError(null);
+      return;
+    }
+    void prepareFiles(remaining);
+  }
+
   async function createDraft() {
-    if (files.length === 0) return;
-    setPending(true);
+    if (preparation.phase !== 'ready' || preparation.preparedFiles.length === 0) {
+      openFilePicker();
+      return;
+    }
+    const readyPreparation = preparation;
+    setPreparation((current) => ({ ...current, phase: 'submitting' }));
     setError(null);
     setAiVersion(0);
     const formData = new FormData();
-    files.forEach((file) => formData.append('files', file));
+    readyPreparation.preparedFiles.forEach((file) => formData.append('files', file));
     formData.set('transcription', transcription);
     formData.set('autoOpenAiVision', String(shouldAutoOpenAiVision));
-    if (clientConversions.length)
-      formData.set('clientConversions', JSON.stringify(clientConversions));
-    const response = await fetch('/api/v1/imports', { method: 'POST', body: formData });
-    const body = (await response.json().catch(() => null)) as
-      (CreatedImport & { error?: undefined }) | { error?: { message?: string } } | null;
-    setPending(false);
-    if (!response.ok || !body || !('operation' in body) || !('draft' in body)) {
+    if (readyPreparation.conversions.length)
+      formData.set('clientConversions', JSON.stringify(readyPreparation.conversions));
+
+    try {
+      const response = await fetch('/api/v1/imports', { method: 'POST', body: formData });
+      const body = (await response.json().catch(() => null)) as
+        (CreatedImport & { error?: undefined }) | { error?: { message?: string } } | null;
+      if (!response.ok || !body || !('operation' in body) || !('draft' in body)) {
+        setPreparation(readyPreparation);
+        setError(
+          (body && 'error' in body ? body.error?.message : undefined) ??
+            'We could not create a safe review draft from this file.',
+        );
+        return;
+      }
+      setCreated(body);
+      if (body.operation.extractionMethod === 'openai-vision-pending') {
+        await askOpenAiToReview(body);
+      }
+    } catch {
+      setPreparation(readyPreparation);
       setError(
-        (body && 'error' in body ? body.error?.message : undefined) ??
-          'We could not create a safe review draft from this file.',
+        'The local app could not start this review. Check the connection and try again; your selected files remain on this device.',
       );
-      return;
-    }
-    setCreated(body);
-    if (body.operation.extractionMethod === 'openai-vision-pending') {
-      await askOpenAiToReview(body);
     }
   }
 
@@ -96,39 +259,44 @@ export function ImportWizard() {
             sourceText: draft.originalText.slice(0, 30_000),
             sourceLabel: draft.provenance.sourceName,
           };
-    const response = await fetch('/api/v1/ai/reviews', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      candidate?: AiRecipeCandidate;
-      error?: { message?: string };
-    } | null;
-    setAiPending(false);
-    if (!response.ok || !body?.candidate) {
-      setError(body?.error?.message ?? 'OpenAI could not create a review draft.');
-      return;
-    }
-    setCreated((current) =>
-      current?.operation.id === operation.id
-        ? {
-            ...current,
-            draft: {
-              ...current.draft,
-              recipe: body.candidate!.recipe,
-              provenance: {
-                ...current.draft.provenance,
-                warnings: [
-                  ...current.draft.provenance.warnings,
-                  'OpenAI suggested this review draft. Check every field before saving.',
-                ],
+    try {
+      const response = await fetch('/api/v1/ai/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        candidate?: AiRecipeCandidate;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.candidate) {
+        setError(body?.error?.message ?? 'OpenAI could not create a review draft.');
+        return;
+      }
+      setCreated((current) =>
+        current?.operation.id === operation.id
+          ? {
+              ...current,
+              draft: {
+                ...current.draft,
+                recipe: body.candidate!.recipe,
+                provenance: {
+                  ...current.draft.provenance,
+                  warnings: [
+                    ...current.draft.provenance.warnings,
+                    'OpenAI suggested this review draft. Check every field before saving.',
+                  ],
+                },
               },
-            },
-          }
-        : current,
-    );
-    setAiVersion((version) => version + 1);
+            }
+          : current,
+      );
+      setAiVersion((version) => version + 1);
+    } catch {
+      setError('OpenAI could not be reached. Your local import is still available to retry.');
+    } finally {
+      setAiPending(false);
+    }
   }
 
   function returnToImport() {
@@ -293,100 +461,61 @@ export function ImportWizard() {
 
   return (
     <section className="import-layout">
-      <div className="import-intro">
-        <p className="eyebrow">LOCAL IMPORT</p>
-        <h1>Bring a recipe in, carefully.</h1>
+      <aside className="import-intro">
+        <h1>Bring a recipe in.</h1>
         <p>
-          Import a recipe document, scan, or portable Schema.org JSON-LD. Your cookbook stays
-          untouched until you review and confirm every field.
+          We prepare the source carefully and show you an editable recipe. Nothing is saved until
+          you review and confirm it.
         </p>
-      </div>
-      <div className="import-options">
-        <div className="import-card">
-          <p className="eyebrow">DOCUMENT OR SCAN</p>
-          <label className="import-file-input">
+        <div className="import-trust-list">
+          <div>
+            <LockKeyhole size={22} aria-hidden="true" />
             <span>
-              <FileText size={18} aria-hidden="true" /> Recipe document or scan
+              <strong>Prepared locally</strong>
+              <small>Files are checked and iPhone photos are converted on this device.</small>
             </span>
-            <input
-              type="file"
-              multiple
-              accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-              onChange={(event) => void chooseFiles(Array.from(event.target.files ?? []))}
-            />
-            <small>
-              {files.length === 1
-                ? `${files[0]!.name} · ${(files[0]!.size / 1024 / 1024).toFixed(1)} MB`
-                : files.length > 1
-                  ? `${files.length} recipe scans · ${(files.reduce((total, file) => total + file.size, 0) / 1024 / 1024).toFixed(1)} MB total`
-                  : 'One PDF or up to four JPEG, PNG, WebP, HEIC, or HEIF scans — 15 MB total.'}
-            </small>
-          </label>
-          {clientConversions.length > 0 && (
-            <p className="import-safety" role="status">
-              HEIC/HEIF was converted to JPEG in this browser. The original file was not uploaded.
-            </p>
-          )}
-          <label>
+          </div>
+          <div>
+            <Cloud size={22} aria-hidden="true" />
             <span>
-              <ScanText size={18} aria-hidden="true" /> Manual transcription (optional)
+              <strong>Request only when you choose</strong>
+              <small>OpenAI receives prepared scans only after the review action.</small>
             </span>
-            <textarea
-              rows={9}
-              value={transcription}
-              onChange={(event) => setTranscription(event.target.value)}
-              placeholder={
-                'Optional for a clear English scan; type or paste text when you want to use your own transcription.\n\nTomato soup\nIngredients\n2 tbsp olive oil\n...'
-              }
-            />
-            <small>
-              Paste text if you have it. Textless PDFs still need a manual transcription.
-            </small>
-          </label>
-          <label className="import-vision-choice">
+          </div>
+          <div>
+            <FileCheck2 size={22} aria-hidden="true" />
             <span>
-              <input
-                type="checkbox"
-                checked={autoOpenAiVision}
-                onChange={(event) => setAutoOpenAiVision(event.target.checked)}
-              />{' '}
-              <Sparkles size={18} aria-hidden="true" /> Use OpenAI vision for scan images
+              <strong>Nothing saved until you confirm</strong>
+              <small>The result stays editable before it joins your library.</small>
             </span>
-            <small>
-              When no transcription is supplied, creating the review draft sends normalized scan
-              images to OpenAI. This is a paid request, starts only when you press the button below,
-              and never saves a recipe automatically.
-            </small>
-          </label>
-          <p className="import-safety">
-            <ShieldCheck size={16} aria-hidden="true" /> We derive each file type from its bytes,
-            cap total bytes plus page and pixel counts, strip scan metadata, and keep local ordered
-            provenance.
-          </p>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => void createDraft()}
-            disabled={files.length === 0 || pending || converting}
-          >
-            {pending || converting ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <ShieldCheck size={17} aria-hidden="true" />
-            )}
-            {converting
-              ? 'Preparing local conversion'
-              : shouldAutoOpenAiVision
-                ? 'Create OpenAI review draft'
-                : 'Create review draft'}
-          </button>
+          </div>
         </div>
-        <JsonLdImportWizard />
+      </aside>
+      <div className="import-options">
+        <ImportUploadPanel
+          phase={preparation.phase}
+          items={items}
+          inputRef={fileInputRef}
+          error={error}
+          transcription={transcription}
+          autoOpenAiVision={autoOpenAiVision}
+          canUseVision={hasOnlyImageScans}
+          willUseVision={shouldAutoOpenAiVision}
+          canRetryPreparation={preparation.canRetry}
+          onInputClick={prepareForFilePicker}
+          onFileInput={handleFileInput}
+          onChooseFiles={openFilePicker}
+          onDropFiles={(selected) => {
+            lastSelectionSignatureRef.current = fileSelectionSignature(selected);
+            void prepareFiles(selected);
+          }}
+          onRemoveFile={removeFile}
+          onRetry={() => void prepareFiles(preparation.sourceFiles)}
+          onPrimaryAction={() => void createDraft()}
+          onTranscriptionChange={setTranscription}
+          onVisionChange={setAutoOpenAiVision}
+        />
+        <JsonLdImportWizard collapsedByDefault />
       </div>
     </section>
   );

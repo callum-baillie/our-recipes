@@ -86,7 +86,7 @@ test('a fresh household can complete the supported local release acceptance work
   await weeknightTag.getByRole('button', { name: 'Remove' }).click();
   await expect(page.getByText('weeknight', { exact: true })).not.toBeVisible();
   await page.goto('/import');
-  await expect(page.getByRole('heading', { name: 'Bring a recipe in, carefully.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bring a recipe in.' })).toBeVisible();
   let visionRequest: unknown;
   await page.route('**/api/v1/ai/reviews', async (route) => {
     visionRequest = route.request().postDataJSON();
@@ -121,7 +121,17 @@ test('a fresh household can complete the supported local release acceptance work
       }),
     });
   });
-  await page.getByLabel('Recipe document or scan').setInputFiles([
+  const recipeDocumentInput = page.getByLabel('Recipe document or scan');
+  await recipeDocumentInput.setInputFiles({
+    name: 'unsupported.gif',
+    mimeType: 'image/gif',
+    buffer: Buffer.from('GIF89a'),
+  });
+  await expect(page.getByText('Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.')).toBeVisible();
+  await expect(page.getByText(/PDFs use local text extraction first/)).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Choose another file' })).toBeEnabled();
+
+  await recipeDocumentInput.setInputFiles([
     {
       name: HEIC_FIXTURES.heic.name,
       mimeType: HEIC_FIXTURES.heic.mimeType,
@@ -133,10 +143,10 @@ test('a fresh household can complete the supported local release acceptance work
       buffer: Buffer.from(HEIC_FIXTURES.heif.data, 'base64'),
     },
   ]);
-  await expect(page.getByRole('status')).toContainText(
-    'HEIC/HEIF was converted to JPEG in this browser. The original file was not uploaded.',
-  );
-  await page.getByRole('button', { name: 'Create OpenAI review draft' }).click();
+  await expect(page.getByText('iPhone photos were prepared as JPEG on this device.')).toBeVisible();
+  const createVisionReview = page.getByRole('button', { name: 'Create OpenAI review draft' });
+  await expect(createVisionReview).toBeEnabled();
+  await createVisionReview.click();
   await expect(page.getByText('Review before saving')).toBeVisible();
   await expect
     .poll(() => visionRequest)
@@ -157,6 +167,7 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'Lemon pasta' })).toBeVisible();
   await page.unroute('**/api/v1/ai/reviews');
   await page.goto('/import');
+  await page.getByRole('button', { name: /Paste Schema\.org JSON-LD/ }).click();
   await page.getByLabel('Schema.org JSON-LD').fill(
     JSON.stringify({
       '@context': 'https://schema.org',

@@ -1,6 +1,6 @@
 'use client';
 
-import { Braces, ChevronLeft, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { Braces, ChevronDown, ChevronLeft, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
 import { ImportReviewForm } from '@/components/import-review-form';
@@ -13,10 +13,15 @@ type Draft = {
   warnings: string[];
 };
 
-export function JsonLdImportWizard() {
+export function JsonLdImportWizard({
+  collapsedByDefault = false,
+}: {
+  collapsedByDefault?: boolean;
+}) {
   const [source, setSource] = useState('');
   const [candidates, setCandidates] = useState<JsonLdCandidate[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [expanded, setExpanded] = useState(!collapsedByDefault);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +52,21 @@ export function JsonLdImportWizard() {
       return;
     }
     setError('The local JSON-LD response did not contain a recipe review draft.');
+  }
+
+  if (!expanded && !draft) {
+    return (
+      <section className="jsonld-import-entry" aria-label="Schema.org JSON-LD import">
+        <button type="button" onClick={() => setExpanded(true)}>
+          <Braces size={24} aria-hidden="true" />
+          <span>
+            <strong>Paste Schema.org JSON-LD</strong>
+            <small>Already have structured recipe data? Paste it here.</small>
+          </span>
+          <ChevronDown size={21} aria-hidden="true" />
+        </button>
+      </section>
+    );
   }
 
   if (draft) {
@@ -134,6 +154,11 @@ export function JsonLdImportWizard() {
             {pending ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}
             Find Recipe candidates
           </button>
+          {collapsedByDefault && !source && (
+            <button className="text-button" type="button" onClick={() => setExpanded(false)}>
+              <ChevronLeft size={16} aria-hidden="true" /> Hide JSON-LD import
+            </button>
+          )}
         </>
       ) : (
         <div className="jsonld-candidates" aria-live="polite">

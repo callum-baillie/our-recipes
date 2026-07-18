@@ -55,6 +55,8 @@ test('first-run setup and household organization have no automatically detectabl
     mimeType: 'image/png',
     buffer: handwrittenRecipe,
   });
+  await expect(page.getByRole('button', { name: 'Create OpenAI review draft' })).toBeEnabled();
+  await page.getByText('Add your own transcription').click();
   await page
     .getByLabel('Manual transcription (optional)')
     .fill(
@@ -66,6 +68,7 @@ test('first-run setup and household organization have no automatically detectabl
   expect(importReviewResults.violations).toEqual([]);
 
   await page.goto('/import');
+  await page.getByRole('button', { name: /Paste Schema\.org JSON-LD/ }).click();
   await page.getByLabel('Schema.org JSON-LD').fill(
     JSON.stringify({
       '@context': 'https://schema.org',

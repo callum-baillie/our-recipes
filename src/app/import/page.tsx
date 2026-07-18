@@ -7,14 +7,14 @@ export const runtime = 'nodejs';
 
 export default function ImportPage() {
   return (
-    <main className="recipe-page">
-      <header className="recipe-header">
+    <main className="recipe-page import-page">
+      <header className="recipe-header import-page-header">
         <Link className="wordmark" href="/">
           <span className="wordmark-mark">✦</span>
           <span>Our Recipes</span>
         </Link>
         <Link className="quiet-link" href="/recipes">
-          Recipe library
+          ← Back to library
         </Link>
       </header>
       <ImportWizard />

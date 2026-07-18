@@ -2342,7 +2342,20 @@ small {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-.import-layout,
+.import-page {
+  padding-bottom: max(4rem, env(safe-area-inset-bottom));
+}
+.import-page-header {
+  max-width: 82rem;
+}
+.import-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.34fr) minmax(0, 1fr);
+  gap: clamp(2.5rem, 5vw, 5rem);
+  align-items: start;
+  width: min(100%, 82rem);
+  margin: clamp(2.25rem, 5vw, 4.25rem) auto;
+}
 .import-review-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(22rem, 1.1fr);
@@ -2351,35 +2364,447 @@ small {
   width: min(100%, 72rem);
   margin: 4.5rem auto;
 }
+.import-intro {
+  position: sticky;
+  top: 1.5rem;
+  padding: 1.25rem 0;
+}
 .import-intro h1,
 .import-provenance h1 {
-  max-width: 11ch;
+  max-width: 9ch;
   margin: 0;
-  font-size: clamp(2.6rem, 6vw, 5.5rem);
+  font-size: clamp(2.8rem, 5.5vw, 5rem);
   line-height: 0.94;
 }
-.import-intro > p:not(.eyebrow),
+.import-intro > p,
 .import-provenance > div > p:not(.eyebrow) {
-  max-width: 32rem;
+  max-width: 31rem;
   color: var(--muted);
   line-height: 1.65;
+}
+.import-intro > p {
+  margin: 1.2rem 0 0;
 }
 .import-provenance > div > p:not(.eyebrow) {
   color: var(--notice-ink);
 }
+.import-trust-list {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+}
+.import-trust-list > div {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+.import-trust-list svg {
+  margin-top: 0.1rem;
+  color: var(--leaf);
+}
+.import-trust-list span {
+  display: grid;
+  gap: 0.2rem;
+}
+.import-trust-list strong {
+  font-family: Georgia, serif;
+  font-size: 1rem;
+}
+.import-trust-list small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.import-options {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.import-workspace-card,
 .import-card,
 .import-review-form {
   display: grid;
   gap: 1rem;
-  padding: clamp(1.2rem, 3vw, 2rem);
+  padding: clamp(1.15rem, 3vw, 2rem);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 0.65rem;
   background: var(--linen);
   box-shadow: var(--shadow);
 }
-.import-options {
+.import-progress {
   display: grid;
-  gap: 1.25rem;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 0 0.35rem;
+  padding: 0;
+  list-style: none;
+}
+.import-progress li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.import-progress li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 1rem;
+  left: calc(50% + 1.2rem);
+  width: calc(100% - 2.4rem);
+  height: 1px;
+  background: var(--line);
+}
+.import-progress li.complete:not(:last-child)::after {
+  background: var(--leaf);
+}
+.import-progress-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--linen);
+  font-family: Georgia, serif;
+  font-size: 1rem;
+}
+.import-progress li.active,
+.import-progress li.complete {
+  color: var(--leaf);
+}
+.import-progress li.active .import-progress-marker,
+.import-progress li.complete .import-progress-marker {
+  color: white;
+  border-color: var(--leaf);
+  background: var(--leaf);
+}
+.import-upload-dropzone {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  min-height: 8.5rem;
+  padding: clamp(1rem, 3vw, 1.65rem);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--leaf-pale) 48%, var(--linen));
+}
+.import-upload-dropzone.has-selection {
+  min-height: auto;
+}
+.import-upload-icon {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  color: var(--leaf);
+  border-radius: 50%;
+  background: var(--leaf-pale);
+}
+.import-upload-dropzone h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.8vw, 2rem);
+  line-height: 1;
+}
+.import-upload-dropzone p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.import-upload-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  color: white;
+  border-radius: 0.35rem;
+  background: var(--tomato);
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgb(168 80 50 / 16%);
+}
+.import-upload-trigger:hover {
+  background: var(--tomato-dark);
+}
+.import-selection {
+  display: grid;
+  gap: 0.6rem;
+}
+.import-selection-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.import-selection-heading h2 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+}
+.import-selection-heading span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.import-selection ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  list-style: none;
+}
+.import-selection li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 4.5rem;
+  padding: 0.75rem;
+  background: var(--field);
+}
+.import-selection li + li {
+  border-top: 1px solid var(--line);
+}
+.import-file-icon {
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  color: var(--leaf);
+  border-radius: 0.35rem;
+  background: var(--leaf-pale);
+}
+.import-file-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.import-file-copy strong,
+.import-file-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-file-copy strong {
+  font-size: 0.9rem;
+}
+.import-file-copy small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.import-file-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--leaf);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+.import-file-state.error {
+  color: var(--tomato-dark);
+}
+.import-remove-file {
+  width: 2.75rem;
+  min-height: 2.75rem;
+  color: var(--tomato-dark);
+}
+.import-readiness {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  color: var(--notice-ink);
+  border: 1px solid var(--notice-border);
+  border-radius: 0.45rem;
+  background: var(--leaf-pale);
+}
+.import-readiness.preparing {
+  background: var(--paper);
+}
+.import-readiness.error {
+  color: var(--warning-ink);
+  border-color: var(--warning-border);
+  background: var(--warning-surface);
+}
+.import-readiness > div {
+  display: grid;
+  gap: 0.2rem;
+}
+.import-readiness strong {
+  font-family: Georgia, serif;
+  font-size: 1.05rem;
+}
+.import-readiness span {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.import-transcription {
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--field);
+}
+.import-transcription summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 4rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  list-style-position: outside;
+}
+.import-transcription summary > span,
+.import-transcription label {
+  display: grid;
+  gap: 0.2rem;
+}
+.import-transcription summary strong {
+  font-family: Georgia, serif;
+  font-size: 1rem;
+}
+.import-transcription summary small,
+.import-transcription label small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.import-transcription label {
+  padding: 0 1rem 1rem;
+}
+.import-transcription textarea {
+  width: 100%;
+}
+.import-vision-choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+  min-height: 5rem;
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--field);
+}
+.import-vision-choice > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.import-vision-check {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: transparent;
+  border: 2px solid var(--line-strong);
+  border-radius: 0.3rem;
+  background: var(--linen);
+}
+.import-vision-choice > input:checked + .import-vision-check {
+  color: white;
+  border-color: var(--leaf);
+  background: var(--leaf);
+}
+.import-vision-choice > input:focus-visible + .import-vision-check {
+  outline: 3px solid color-mix(in srgb, var(--tomato) 40%, transparent);
+  outline-offset: 2px;
+}
+.import-vision-choice > span:last-child,
+.import-vision-choice strong {
+  display: grid;
+  gap: 0.25rem;
+}
+.import-vision-choice strong {
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
+  align-items: center;
+  font-family: Georgia, serif;
+  font-size: 1.05rem;
+}
+.import-vision-choice small {
+  color: var(--muted);
+  font-size: 0.79rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.import-pdf-note,
+.import-private-note {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.import-pdf-note svg,
+.import-private-note svg {
+  flex: none;
+  margin-top: 0.1rem;
+  color: var(--leaf);
+}
+.import-primary-action {
+  width: 100%;
+  min-height: 3.6rem;
+  font-family: Georgia, serif;
+  font-size: 1.05rem;
+}
+.import-primary-action:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--tomato) 72%, var(--paper));
+}
+.import-form-error {
+  border: 1px solid var(--warning-border);
+}
+.jsonld-import-entry {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--linen);
+}
+.jsonld-import-entry > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+  width: 100%;
+  min-height: 4.4rem;
+  padding: 0.85rem 1rem;
+  color: var(--ink);
+  text-align: left;
+  border: 0;
+  background: transparent;
+}
+.jsonld-import-entry > button > svg {
+  color: var(--leaf);
+}
+.jsonld-import-entry > button > span {
+  display: grid;
+  gap: 0.15rem;
+}
+.jsonld-import-entry strong {
+  font-family: Georgia, serif;
+  font-size: 1rem;
+}
+.jsonld-import-entry small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 .jsonld-import-card h2 {
   margin: 0;
@@ -2753,8 +3178,113 @@ small {
     grid-template-columns: 1fr;
     margin: 2.5rem auto;
   }
+  .import-intro {
+    position: static;
+    padding: 0;
+  }
+  .import-intro h1 {
+    max-width: 12ch;
+  }
+  .import-trust-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 1.5rem;
+  }
 }
 @media (max-width: 600px) {
+  .import-page {
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+  .import-page-header {
+    flex-direction: row;
+    gap: 1rem;
+    min-height: 4.5rem;
+  }
+  .import-page-header .quiet-link {
+    text-align: right;
+  }
+  .import-layout,
+  .import-review-layout {
+    gap: 1.35rem;
+    margin: 1.65rem auto;
+  }
+  .import-intro h1 {
+    font-size: clamp(2.65rem, 14vw, 3.6rem);
+  }
+  .import-intro > p {
+    margin-top: 0.85rem;
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+  .import-trust-list {
+    display: none;
+  }
+  .import-workspace-card,
+  .import-card,
+  .import-review-form {
+    gap: 0.85rem;
+    padding: 0.85rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 28px rgb(65 52 33 / 9%);
+  }
+  .import-progress {
+    margin-bottom: 0.15rem;
+  }
+  .import-progress li {
+    font-size: 0.72rem;
+  }
+  .import-upload-dropzone,
+  .import-upload-dropzone.has-selection {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.75rem;
+    min-height: auto;
+    padding: 0.9rem;
+  }
+  .import-upload-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .import-upload-dropzone h2 {
+    font-size: 1.28rem;
+  }
+  .import-upload-trigger {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 3.25rem;
+  }
+  .import-selection li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    min-height: 4.75rem;
+  }
+  .import-file-state {
+    grid-column: 2;
+    width: fit-content;
+  }
+  .import-remove-file {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+  .import-readiness {
+    align-items: start;
+  }
+  .import-transcription summary,
+  .jsonld-import-entry > button {
+    min-height: 4.6rem;
+  }
+  .import-vision-choice {
+    align-items: start;
+    min-height: 5.5rem;
+  }
+  .import-primary-action {
+    min-height: 3.75rem;
+    font-size: 1.08rem;
+  }
+  .import-private-note {
+    padding: 0 0.2rem;
+    font-size: 0.76rem;
+  }
   .import-field-grid {
     grid-template-columns: 1fr;
   }
