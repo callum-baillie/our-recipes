@@ -832,7 +832,11 @@ paths:
                   type: string
                   minLength: 20
                   maxLength: 100000
-                  description: Optional combined text for scan sets. Clear English scans otherwise use a pinned local review-only OCR model; textless PDFs and blank/low-confidence OCR still require this field.
+                  description: Optional combined text for scan sets. Textless PDFs require this field.
+                autoOpenAiVision:
+                  type: string
+                  enum: ['true']
+                  description: Optional UI hint. With image scans and no transcription, creates a local pending operation for the separately explicit OpenAI vision review; it does not itself call a provider.
                 clientConversions:
                   type: string
                   description: Optional JSON array recording browser-only HEIC/HEIF-to-JPEG name mapping; raw HEIC/HEIF is never accepted by this endpoint.
@@ -845,7 +849,7 @@ paths:
         '413': { description: Multipart document exceeds the byte limit }
         '422':
           {
-            description: 'Source type, parser, transcription, bounded local OCR, or process rate limit rejected the import. `ocr_busy` is retryable; local OCR never creates a recipe without confirmation.',
+            description: 'Source type, parser, transcription, bounded local OCR, or process rate limit rejected the import. `ocr_busy` is retryable; no import path creates a recipe without confirmation.',
           }
   /imports/{importId}:
     parameters:

@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       ),
       manualTranscription: typeof transcription === 'string' ? transcription : undefined,
       clientConversions: parseClientConversions(formData.get('clientConversions')),
+      autoOpenAiVision: formData.get('autoOpenAiVision') === 'true',
     });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {

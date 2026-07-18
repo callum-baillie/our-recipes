@@ -22,12 +22,17 @@ export function ImportWizard() {
   const [files, setFiles] = useState<File[]>([]);
   const [clientConversions, setClientConversions] = useState<ClientImageConversion[]>([]);
   const [transcription, setTranscription] = useState('');
+  const [autoOpenAiVision, setAutoOpenAiVision] = useState(true);
   const [created, setCreated] = useState<CreatedImport | null>(null);
   const [pending, setPending] = useState(false);
   const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiPending, setAiPending] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
+  const hasOnlyImageScans =
+    files.length > 0 && files.every((file) => file.type.startsWith('image/'));
+  const shouldAutoOpenAiVision =
+    autoOpenAiVision && hasOnlyImageScans && transcription.trim().length === 0;
 
   async function chooseFiles(selected: File[]) {
     setConverting(true);
@@ -53,9 +58,11 @@ export function ImportWizard() {
     if (files.length === 0) return;
     setPending(true);
     setError(null);
+    setAiVersion(0);
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
     formData.set('transcription', transcription);
+    formData.set('autoOpenAiVision', String(shouldAutoOpenAiVision));
     if (clientConversions.length)
       formData.set('clientConversions', JSON.stringify(clientConversions));
     const response = await fetch('/api/v1/imports', { method: 'POST', body: formData });
@@ -70,11 +77,14 @@ export function ImportWizard() {
       return;
     }
     setCreated(body);
+    if (body.operation.extractionMethod === 'openai-vision-pending') {
+      await askOpenAiToReview(body);
+    }
   }
 
-  async function askOpenAiToReview() {
-    if (!created) return;
-    const { operation, draft } = created;
+  async function askOpenAiToReview(imported = created) {
+    if (!imported) return;
+    const { operation, draft } = imported;
     setAiPending(true);
     setError(null);
     const payload =
@@ -101,7 +111,7 @@ export function ImportWizard() {
       return;
     }
     setCreated((current) =>
-      current
+      current?.operation.id === operation.id
         ? {
             ...current,
             draft: {
@@ -121,8 +131,16 @@ export function ImportWizard() {
     setAiVersion((version) => version + 1);
   }
 
+  function returnToImport() {
+    setCreated(null);
+    setAiVersion(0);
+    setError(null);
+  }
+
   if (created) {
     const { operation, draft } = created;
+    const awaitingAutomaticVision =
+      operation.extractionMethod === 'openai-vision-pending' && aiVersion === 0;
     return (
       <section className="import-review-layout">
         <aside className="import-provenance">
@@ -143,7 +161,9 @@ export function ImportWizard() {
                     ? 'Local PDF text extraction'
                     : draft.provenance.extractionMethod === 'local-ocr'
                       ? 'Local English scan OCR'
-                      : 'Manual transcription'}
+                      : draft.provenance.extractionMethod === 'openai-vision-pending'
+                        ? 'OpenAI vision review'
+                        : 'Manual transcription'}
                 </dd>
               </div>
               {draft.provenance.ocrProvenance && (
@@ -190,39 +210,82 @@ export function ImportWizard() {
               ))}
             </aside>
           )}
-          <details className="import-original-text">
-            <summary>View extracted or transcribed source text</summary>
-            <pre>{draft.originalText}</pre>
-          </details>
-          <aside className="import-warnings" aria-label="Optional OpenAI review">
-            <p>
-              Optional: this sends{' '}
-              {operation.kind === 'image' ? 'normalized scans' : 'the displayed source text'} to
-              OpenAI for a structured review suggestion. It uses a paid API only after you press the
-              button, and it never saves a recipe on its own.
-            </p>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => void askOpenAiToReview()}
-              disabled={
-                aiPending || (operation.kind === 'pdf' && draft.originalText.trim().length < 20)
-              }
-            >
-              {aiPending ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
-              Use OpenAI for a review suggestion
-            </button>
-          </aside>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
+          {awaitingAutomaticVision ? (
+            <aside className="import-warnings" aria-label="OpenAI vision review">
+              {aiPending ? (
+                <p role="status">
+                  <LoaderCircle className="spin" size={16} aria-hidden="true" /> OpenAI is reading
+                  the normalized scan. The recipe will remain a review draft.
+                </p>
+              ) : (
+                <>
+                  <p className="form-error" role="alert">
+                    {error ?? 'OpenAI could not create a review draft from this scan.'}
+                  </p>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => void askOpenAiToReview()}
+                  >
+                    <Sparkles size={16} /> Try OpenAI again
+                  </button>
+                  <button className="text-button" type="button" onClick={returnToImport}>
+                    Use a manual transcription instead
+                  </button>
+                </>
+              )}
+            </aside>
+          ) : (
+            <>
+              <details className="import-original-text">
+                <summary>View extracted or transcribed source text</summary>
+                <pre>{draft.originalText}</pre>
+              </details>
+              {operation.extractionMethod === 'openai-vision-pending' ? (
+                <aside className="import-warnings" aria-label="OpenAI vision review">
+                  <p>
+                    OpenAI read the normalized scans at your request. Check every field before
+                    saving; this suggestion has not created a recipe.
+                  </p>
+                </aside>
+              ) : (
+                <aside className="import-warnings" aria-label="Optional OpenAI review">
+                  <p>
+                    Optional: this sends{' '}
+                    {operation.kind === 'image' ? 'normalized scans' : 'the displayed source text'}{' '}
+                    to OpenAI for a structured review suggestion. It uses a paid API only after you
+                    press the button, and it never saves a recipe on its own.
+                  </p>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => void askOpenAiToReview()}
+                    disabled={
+                      aiPending ||
+                      (operation.kind === 'pdf' && draft.originalText.trim().length < 20)
+                    }
+                  >
+                    {aiPending ? (
+                      <LoaderCircle className="spin" size={16} />
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
+                    Use OpenAI for a review suggestion
+                  </button>
+                </aside>
+              )}
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <ImportReviewForm
+                key={`${operation.id}-${aiVersion}`}
+                importId={operation.id}
+                initial={draft.recipe}
+              />
+            </>
           )}
-          <ImportReviewForm
-            key={`${operation.id}-${aiVersion}`}
-            importId={operation.id}
-            initial={draft.recipe}
-          />
         </div>
       </section>
     );
@@ -266,7 +329,7 @@ export function ImportWizard() {
           )}
           <label>
             <span>
-              <ScanText size={18} aria-hidden="true" /> Manual transcription or local OCR
+              <ScanText size={18} aria-hidden="true" /> Manual transcription (optional)
             </span>
             <textarea
               rows={9}
@@ -277,9 +340,22 @@ export function ImportWizard() {
               }
             />
             <small>
-              Clear English scans get a local OCR suggestion. If OCR is blank or uncertain, add the
-              combined recipe text yourself. Textless PDFs still need a manual transcription; no
-              file or text is sent to a network service.
+              Paste text if you have it. Textless PDFs still need a manual transcription.
+            </small>
+          </label>
+          <label className="import-vision-choice">
+            <span>
+              <input
+                type="checkbox"
+                checked={autoOpenAiVision}
+                onChange={(event) => setAutoOpenAiVision(event.target.checked)}
+              />{' '}
+              <Sparkles size={18} aria-hidden="true" /> Use OpenAI vision for scan images
+            </span>
+            <small>
+              When no transcription is supplied, creating the review draft sends normalized scan
+              images to OpenAI. This is a paid request, starts only when you press the button below,
+              and never saves a recipe automatically.
             </small>
           </label>
           <p className="import-safety">
@@ -303,7 +379,11 @@ export function ImportWizard() {
             ) : (
               <ShieldCheck size={17} aria-hidden="true" />
             )}
-            {converting ? 'Preparing local conversion' : 'Create review draft'}
+            {converting
+              ? 'Preparing local conversion'
+              : shouldAutoOpenAiVision
+                ? 'Create OpenAI review draft'
+                : 'Create review draft'}
           </button>
         </div>
         <JsonLdImportWizard />

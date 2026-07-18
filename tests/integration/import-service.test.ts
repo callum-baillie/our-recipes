@@ -149,7 +149,7 @@ describe('document import service', () => {
     expect(getHouseholdState().profiles).toHaveLength(1);
   });
 
-  it('normalizes a scan locally and rejects it without an explicit transcription', async () => {
+  it('creates a safe OpenAI vision-pending scan review without a transcription', async () => {
     const profile = completeSetup({
       householdName: 'Sunday suppers',
       appName: 'Our Recipes',
@@ -168,7 +168,7 @@ describe('document import service', () => {
     })
       .png()
       .toBuffer();
-    setImportScanOcrRecognizerForTests(async () => ({
+    const recognizer = vi.fn(async () => ({
       text: '',
       provenance: {
         modelId: 'tesseract-eng-4.0.0',
@@ -178,10 +178,25 @@ describe('document import service', () => {
         aggregateConfidence: null,
       },
     }));
+    setImportScanOcrRecognizerForTests(recognizer);
 
-    await expect(
-      createImportOperation({ actorProfileId: profile.id, sourceName: 'recipe.png', bytes: scan }),
-    ).rejects.toMatchObject({ code: 'text_required' });
+    const pendingVision = await createImportOperation({
+      actorProfileId: profile.id,
+      sourceName: 'recipe.png',
+      bytes: scan,
+      autoOpenAiVision: true,
+    });
+    expect(pendingVision.operation).toMatchObject({
+      extractionMethod: 'openai-vision-pending',
+      extractedText: '',
+      mediaType: 'image/webp',
+    });
+    expect(pendingVision.draft.recipe.title).toBe('Untitled recipe');
+    expect(pendingVision.operation.warnings.join(' ')).toContain('OpenAI vision review');
+    expect(recognizer).not.toHaveBeenCalled();
+    await expect(getImportArtifact(pendingVision.operation.id)).resolves.toMatchObject({
+      mediaType: 'image/webp',
+    });
 
     const created = await createImportOperation({
       actorProfileId: profile.id,

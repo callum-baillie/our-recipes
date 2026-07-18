@@ -258,6 +258,7 @@ export async function createImportOperation(input: {
   bytes?: Uint8Array;
   manualTranscription?: string;
   clientConversions?: ImportClientConversion[];
+  autoOpenAiVision?: boolean;
 }): Promise<{ operation: ImportOperation; draft: ImportReviewDraft }> {
   ensureDatabase();
   const sources =
@@ -325,6 +326,12 @@ export async function createImportOperation(input: {
       extractionMethod = 'manual-transcription';
       warnings.push(
         'This scan uses your manual transcription. No file or text was sent to a network service.',
+      );
+    } else if (input.autoOpenAiVision) {
+      extractedText = '';
+      extractionMethod = 'openai-vision-pending';
+      warnings.push(
+        'This scan is ready for an OpenAI vision review. The normalized scan stays local until the explicit review action starts.',
       );
     } else {
       try {

@@ -150,8 +150,9 @@ describe('review-first AI operation service', () => {
       actorProfileId: profile.id,
       sourceName: 'tomato-notes.png',
       bytes: scan,
-      manualTranscription: 'Tomato soup\nIngredients\n2 tomatoes\nMethod\n1. Simmer gently.',
+      autoOpenAiVision: true,
     });
+    expect(imported.operation.extractionMethod).toBe('openai-vision-pending');
     const visionReview = await createAiReviewCandidate({
       actorProfileId: profile.id,
       action: { confirm: true, kind: 'vision-extraction', importId: imported.operation.id },

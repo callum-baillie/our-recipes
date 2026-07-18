@@ -203,7 +203,7 @@ export const importOperations = sqliteTable('import_operations', {
   mediaType: text('media_type').notNull(),
   sourceSha256: text('source_sha256').notNull(),
   extractionMethod: text('extraction_method', {
-    enum: ['pdf-text', 'manual-transcription', 'local-ocr'],
+    enum: ['pdf-text', 'manual-transcription', 'local-ocr', 'openai-vision-pending'],
   }).notNull(),
   extractedText: text('extracted_text').notNull(),
   ocrProvenance: text('ocr_provenance'),

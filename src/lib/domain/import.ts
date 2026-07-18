@@ -25,7 +25,8 @@ export const importClientConversionsSchema = z
   .max(MAX_IMPORT_FILES);
 
 export type ImportKind = 'pdf' | 'image';
-export type ImportExtractionMethod = 'pdf-text' | 'manual-transcription' | 'local-ocr';
+export type ImportExtractionMethod =
+  'pdf-text' | 'manual-transcription' | 'local-ocr' | 'openai-vision-pending';
 export type ImportStatus = 'review' | 'confirmed';
 export type ImportClientConversion = z.infer<typeof importClientConversionSchema>;
 

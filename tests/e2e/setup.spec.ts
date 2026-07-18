@@ -87,6 +87,40 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByText('weeknight', { exact: true })).not.toBeVisible();
   await page.goto('/import');
   await expect(page.getByRole('heading', { name: 'Bring a recipe in, carefully.' })).toBeVisible();
+  let visionRequest: unknown;
+  await page.route('**/api/v1/ai/reviews', async (route) => {
+    visionRequest = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        candidate: {
+          recipe: {
+            title: 'Lemon pasta',
+            summary: '',
+            servings: '4 servings',
+            prepMinutes: 10,
+            cookMinutes: 25,
+            sourceName: '',
+            sourceUrl: '',
+            tags: [],
+            ingredientGroups: [
+              {
+                name: '',
+                ingredients: [
+                  { quantity: 2, unit: 'tbsp', item: 'olive oil', note: '' },
+                  { quantity: 1, unit: '', item: 'lemon', note: '' },
+                ],
+              },
+            ],
+            instructionSections: [{ title: '', steps: ['Toss the pasta with lemon and oil.'] }],
+          },
+          confidence: 0.8,
+          warnings: [],
+          uncertainSegments: [],
+        },
+      }),
+    });
+  });
   await page.getByLabel('Recipe document or scan').setInputFiles([
     {
       name: HEIC_FIXTURES.heic.name,
@@ -102,14 +136,16 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('status')).toContainText(
     'HEIC/HEIF was converted to JPEG in this browser. The original file was not uploaded.',
   );
-  await page
-    .getByLabel('Manual transcription or local OCR')
-    .fill(
-      'Lemon pasta\nIngredients\n2 tbsp olive oil\n1 lemon\nMethod\n1. Toss the pasta with lemon and oil.',
-    );
-  await page.getByRole('button', { name: 'Create review draft' }).click();
+  await page.getByRole('button', { name: 'Create OpenAI review draft' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
-  await expect(page.getByText(/No file or text was sent to a network service/)).toBeVisible();
+  await expect
+    .poll(() => visionRequest)
+    .toMatchObject({
+      confirm: true,
+      kind: 'vision-extraction',
+      importId: expect.any(String),
+    });
+  await expect(page.getByText(/OpenAI read the normalized scans at your request/)).toBeVisible();
   const normalizedScans = page.getByRole('img', { name: /Normalized scan imported from/ });
   await expect(normalizedScans).toHaveCount(2);
   const normalizedScan = normalizedScans.first();
@@ -119,6 +155,7 @@ test('a fresh household can complete the supported local release acceptance work
     .toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Lemon pasta' })).toBeVisible();
+  await page.unroute('**/api/v1/ai/reviews');
   await page.goto('/import');
   await page.getByLabel('Schema.org JSON-LD').fill(
     JSON.stringify({
