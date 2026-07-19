@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
 
+import packageJson from '../../package.json';
 import { HEIC_FIXTURES } from './fixtures/heic-fixtures';
 
 test('portable recipe export requires an active local profile and a trusted explicit origin', async ({
@@ -584,7 +585,9 @@ test('a fresh household can complete the supported local release acceptance work
   expect(workerResponse.ok()).toBe(true);
   expect(workerResponse.headers()['cache-control']).toBe('no-cache, no-store, must-revalidate');
   expect(workerResponse.headers()['service-worker-allowed']).toBe('/');
-  await expect(workerResponse.text()).resolves.toContain("const APP_VERSION = '0.1.0-beta.10';");
+  await expect(workerResponse.text()).resolves.toContain(
+    `const APP_VERSION = '${packageJson.version}';`,
+  );
   await page.goto(recipeUrl);
   await page.waitForFunction(async () => {
     if (!('serviceWorker' in navigator)) return false;
