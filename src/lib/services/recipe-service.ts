@@ -27,6 +27,8 @@ import {
   type RecipePreferenceInput,
 } from '@/lib/domain/recipe';
 import type { TagInput } from '@/lib/domain/tag';
+import type { AiNutritionEstimate } from '@/lib/domain/ai';
+import { parseServingCount } from '@/lib/domain/ingredient-scaling';
 
 export type RecipeRecord = typeof recipes.$inferSelect;
 export type RecipeListItem = Pick<
@@ -50,6 +52,12 @@ export type RecipeListItem = Pick<
   isFavorite: boolean;
   personalRating: number | null;
   lastCookedAt: Date | null;
+  image: {
+    id: string;
+    altText: string;
+    width: number;
+    height: number;
+  } | null;
 };
 
 export type RecipeLibraryResult = {
@@ -396,7 +404,7 @@ function getTagOrThrow(name: string) {
 function refreshTagSearch(recipeIds: string[]): void {
   recipeIds.forEach((recipeId) => {
     const recipe = getRecipe(recipeId);
-    if (recipe) indexRecipe(recipeId, payloadFromRecipe(recipe));
+    if (recipe) indexRecipe(recipeId, recipePayloadFromDetail(recipe));
   });
 }
 
@@ -519,8 +527,14 @@ export function listRecipeLibrary(
     const collectionIds = idsForCollection(query.collection);
     conditions.push(collectionIds.length ? inArray(recipes.id, collectionIds) : noRowsCondition());
   }
-  if (query.category) conditions.push(eq(recipes.category, query.category));
-  if (query.cuisine) conditions.push(eq(recipes.cuisine, query.cuisine));
+  if (query.category)
+    conditions.push(
+      sql`instr(',' || replace(lower(${recipes.category}), ', ', ',') || ',', ',' || lower(${query.category}) || ',') > 0`,
+    );
+  if (query.cuisine)
+    conditions.push(
+      sql`instr(',' || replace(lower(${recipes.cuisine}), ', ', ',') || ',', ',' || lower(${query.cuisine}) || ',') > 0`,
+    );
   if (query.maxTotalMinutes)
     conditions.push(
       lte(
@@ -583,6 +597,26 @@ export function listRecipeLibrary(
             orderedRows.map((recipe) => recipe.id),
           ),
         )
+        .all()
+    : [];
+  const imageRows = orderedRows.length
+    ? db
+        .select({
+          id: recipeImages.id,
+          recipeId: recipeImages.recipeId,
+          altText: recipeImages.altText,
+          width: recipeImages.width,
+          height: recipeImages.height,
+          createdAt: recipeImages.createdAt,
+        })
+        .from(recipeImages)
+        .where(
+          inArray(
+            recipeImages.recipeId,
+            orderedRows.map((recipe) => recipe.id),
+          ),
+        )
+        .orderBy(asc(recipeImages.createdAt), asc(recipeImages.id))
         .all()
     : [];
   const profileRows = orderedRows.length
@@ -667,6 +701,7 @@ export function listRecipeLibrary(
       isFavorite: favoriteIds.has(recipe.id),
       personalRating: ratingsByRecipe.get(recipe.id) ?? null,
       lastCookedAt: lastCookedByRecipe.get(recipe.id) ?? null,
+      image: imageRows.find((image) => image.recipeId === recipe.id) ?? null,
     })),
     total,
     page,
@@ -753,8 +788,14 @@ export function createRecipe(input: RecipeInput, actorProfileId: string): Recipe
         nutritionCarbohydrateGrams:
           payload.nutritionCarbohydrateGrams === '' ? null : payload.nutritionCarbohydrateGrams,
         nutritionFatGrams: payload.nutritionFatGrams === '' ? null : payload.nutritionFatGrams,
+        nutritionSaturatedFatGrams:
+          payload.nutritionSaturatedFatGrams === '' ? null : payload.nutritionSaturatedFatGrams,
         nutritionFiberGrams:
           payload.nutritionFiberGrams === '' ? null : payload.nutritionFiberGrams,
+        nutritionSugarGrams:
+          payload.nutritionSugarGrams === '' ? null : payload.nutritionSugarGrams,
+        nutritionSodiumMilligrams:
+          payload.nutritionSodiumMilligrams === '' ? null : payload.nutritionSodiumMilligrams,
         createdByProfileId: actorProfileId,
         lastEditedByProfileId: actorProfileId,
         currentRevision: 1,
@@ -819,8 +860,14 @@ export function updateRecipe(
         nutritionCarbohydrateGrams:
           payload.nutritionCarbohydrateGrams === '' ? null : payload.nutritionCarbohydrateGrams,
         nutritionFatGrams: payload.nutritionFatGrams === '' ? null : payload.nutritionFatGrams,
+        nutritionSaturatedFatGrams:
+          payload.nutritionSaturatedFatGrams === '' ? null : payload.nutritionSaturatedFatGrams,
         nutritionFiberGrams:
           payload.nutritionFiberGrams === '' ? null : payload.nutritionFiberGrams,
+        nutritionSugarGrams:
+          payload.nutritionSugarGrams === '' ? null : payload.nutritionSugarGrams,
+        nutritionSodiumMilligrams:
+          payload.nutritionSodiumMilligrams === '' ? null : payload.nutritionSodiumMilligrams,
         lastEditedByProfileId: actorProfileId,
         currentRevision: revision,
         updatedAt: now,
@@ -848,7 +895,50 @@ export function updateRecipe(
   return getRecipe(recipeId) as RecipeDetail;
 }
 
-function payloadFromRecipe(recipe: RecipeDetail): RecipePayload {
+export function updateRecipeTags(
+  recipeId: string,
+  tagNames: string[],
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeDetail {
+  const recipe = getRecipe(recipeId);
+  if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
+  return updateRecipe(
+    recipeId,
+    { ...recipePayloadFromDetail(recipe), tags: tagNames },
+    actorProfileId,
+    expectedRevision,
+  );
+}
+
+export function updateRecipeNutritionEstimate(
+  recipeId: string,
+  estimate: AiNutritionEstimate,
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeDetail {
+  const recipe = getRecipe(recipeId);
+  if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
+  return updateRecipe(
+    recipeId,
+    {
+      ...recipePayloadFromDetail(recipe),
+      servings: parseServingCount(recipe.servings) === null ? estimate.servings : recipe.servings,
+      nutritionCalories: estimate.nutritionCalories,
+      nutritionProteinGrams: estimate.nutritionProteinGrams,
+      nutritionCarbohydrateGrams: estimate.nutritionCarbohydrateGrams,
+      nutritionFatGrams: estimate.nutritionFatGrams,
+      nutritionSaturatedFatGrams: estimate.nutritionSaturatedFatGrams,
+      nutritionFiberGrams: estimate.nutritionFiberGrams,
+      nutritionSugarGrams: estimate.nutritionSugarGrams,
+      nutritionSodiumMilligrams: estimate.nutritionSodiumMilligrams,
+    },
+    actorProfileId,
+    expectedRevision,
+  );
+}
+
+export function recipePayloadFromDetail(recipe: RecipeDetail): RecipePayload {
   return {
     title: recipe.title,
     summary: recipe.summary,
@@ -871,7 +961,10 @@ function payloadFromRecipe(recipe: RecipeDetail): RecipePayload {
     nutritionProteinGrams: recipe.nutritionProteinGrams ?? '',
     nutritionCarbohydrateGrams: recipe.nutritionCarbohydrateGrams ?? '',
     nutritionFatGrams: recipe.nutritionFatGrams ?? '',
+    nutritionSaturatedFatGrams: recipe.nutritionSaturatedFatGrams ?? '',
     nutritionFiberGrams: recipe.nutritionFiberGrams ?? '',
+    nutritionSugarGrams: recipe.nutritionSugarGrams ?? '',
+    nutritionSodiumMilligrams: recipe.nutritionSodiumMilligrams ?? '',
     tags: recipe.tags,
     ingredientGroups: recipe.ingredientGroups.map((group) => ({
       name: group.name,
@@ -894,7 +987,7 @@ export function duplicateRecipe(recipeId: string, actorProfileId: string): Recip
   if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
   return createRecipe(
     {
-      ...payloadFromRecipe(recipe),
+      ...recipePayloadFromDetail(recipe),
       title: `Copy of ${recipe.title}`.slice(0, 160),
       status: 'active',
     },
@@ -916,7 +1009,7 @@ export function updateRecipeStatus(
     );
   return updateRecipe(
     recipeId,
-    { ...payloadFromRecipe(recipe), status },
+    { ...recipePayloadFromDetail(recipe), status },
     actorProfileId,
     expectedRevision,
   );
@@ -1021,10 +1114,17 @@ export function recipeAsMarkdown(recipe: RecipeDetail): string {
       ? null
       : `Carbohydrates: ${recipe.nutritionCarbohydrateGrams} g`,
     recipe.nutritionFatGrams === null ? null : `Fat: ${recipe.nutritionFatGrams} g`,
+    recipe.nutritionSaturatedFatGrams === null
+      ? null
+      : `Saturated fat: ${recipe.nutritionSaturatedFatGrams} g`,
     recipe.nutritionFiberGrams === null ? null : `Fiber: ${recipe.nutritionFiberGrams} g`,
+    recipe.nutritionSugarGrams === null ? null : `Sugar: ${recipe.nutritionSugarGrams} g`,
+    recipe.nutritionSodiumMilligrams === null
+      ? null
+      : `Sodium: ${recipe.nutritionSodiumMilligrams} mg`,
   ].filter((item): item is string => Boolean(item));
   if (nutrition.length)
-    lines.push('', '## Nutrition (as entered)', ...nutrition.map((item) => `- ${item}`));
+    lines.push('', '## Nutrition (per serving)', ...nutrition.map((item) => `- ${item}`));
   lines.push('', '## Ingredients');
   recipe.ingredientGroups.forEach((group) => {
     if (group.name) lines.push('', `### ${markdownInline(group.name)}`);

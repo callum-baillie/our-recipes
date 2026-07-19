@@ -12,7 +12,13 @@ const unconfiguredStatus = aiConnectionStatusSchema.parse({
   enabled: false,
   message:
     'OpenAI is not configured. Add a server-side key before any household action can use it.',
-  supportedOperationKinds: ['text-normalization', 'vision-extraction', 'image-generation'],
+  supportedOperationKinds: [
+    'text-normalization',
+    'vision-extraction',
+    'image-generation',
+    'nutrition-estimation',
+    'recipe-improvement',
+  ],
 });
 
 let providerForTests: AiProvider | null = null;
@@ -26,7 +32,13 @@ export function getAiReadiness(): AiConnectionStatus {
         enabled: true,
         message:
           'OpenAI is configured. Every review and generated image requires an explicit household action.',
-        supportedOperationKinds: ['text-normalization', 'vision-extraction', 'image-generation'],
+        supportedOperationKinds: [
+          'text-normalization',
+          'vision-extraction',
+          'image-generation',
+          'nutrition-estimation',
+          'recipe-improvement',
+        ],
       })
     : unconfiguredStatus;
 }

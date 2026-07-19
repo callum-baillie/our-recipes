@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import { households, profiles } from '@/lib/db/schema';
-import type { ProfileInput, SetupInput } from '@/lib/domain/setup';
+import type { HouseholdSettingsInput, ProfileInput, SetupInput } from '@/lib/domain/setup';
 
 export type HouseholdRecord = typeof households.$inferSelect;
 export type ProfileRecord = typeof profiles.$inferSelect;
@@ -68,6 +68,22 @@ export function completeSetup(input: SetupInput): HouseholdState {
       .run();
   });
   return getHouseholdState();
+}
+
+export function updateHouseholdSettings(input: HouseholdSettingsInput): HouseholdRecord {
+  ensureDatabase();
+  const db = getDatabase();
+  const household = db.select().from(households).limit(1).get();
+  if (!household) throw new ConflictError('Set up the household before changing app settings.');
+  db.update(households)
+    .set({
+      name: input.householdName,
+      appName: input.appName,
+      updatedAt: new Date(),
+    })
+    .where(eq(households.id, household.id))
+    .run();
+  return db.select().from(households).where(eq(households.id, household.id)).get()!;
 }
 
 export function addProfile(input: ProfileInput): ProfileRecord {

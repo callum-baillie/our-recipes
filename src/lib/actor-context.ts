@@ -1,13 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { getRuntimeConfig } from '@/lib/config';
-import { getProfile } from '@/lib/services/household-service';
+import { getProfile, listProfiles } from '@/lib/services/household-service';
 
 export const ACTIVE_PROFILE_COOKIE = 'our_recipes_active_profile';
 
 export type ActorContext = {
   profileId: string | null;
-  source: 'profile-cookie' | 'anonymous';
+  source: 'profile-cookie' | 'profile-default' | 'anonymous';
 };
 
 function sign(profileId: string): string {
@@ -33,6 +33,14 @@ export function parseSignedProfileValue(value: string | undefined): string | nul
 
 export function getActorContext(cookieValue: string | undefined): ActorContext {
   const profileId = parseSignedProfileValue(cookieValue);
-  if (!profileId || !getProfile(profileId)) return { profileId: null, source: 'anonymous' };
-  return { profileId, source: 'profile-cookie' };
+  if (profileId && getProfile(profileId)) return { profileId, source: 'profile-cookie' };
+
+  // Household profiles personalize audit/history records; they are not an
+  // authentication boundary. Match the profile visibly selected by the
+  // header when a browser has no valid cookie (for example, after changing
+  // hostnames between localhost and a LAN address).
+  const defaultProfile = listProfiles()[0];
+  return defaultProfile
+    ? { profileId: defaultProfile.id, source: 'profile-default' }
+    : { profileId: null, source: 'anonymous' };
 }

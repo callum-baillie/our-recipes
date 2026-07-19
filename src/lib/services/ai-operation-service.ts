@@ -5,7 +5,13 @@ import { eq } from 'drizzle-orm';
 
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
 import { aiOperationAudits } from '@/lib/db/schema';
-import type { AiOperationAudit, AiReviewAction, AiRecipeCandidate } from '@/lib/domain/ai';
+import type {
+  AiNutritionEstimate,
+  AiOperationAudit,
+  AiReviewAction,
+  AiRecipeCandidate,
+} from '@/lib/domain/ai';
+import type { RecipePayload } from '@/lib/domain/recipe';
 import {
   AiProviderRequestError,
   AiProviderUnavailableError,
@@ -15,7 +21,12 @@ import {
 import { getAiProvider, getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { getImportArtifact, getImportOperation } from '@/lib/services/import-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
-import { getRecipe, RecipeNotFoundError } from '@/lib/services/recipe-service';
+import {
+  getRecipe,
+  RecipeConflictError,
+  RecipeNotFoundError,
+  updateRecipeNutritionEstimate,
+} from '@/lib/services/recipe-service';
 
 const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1_000;
 const AI_RATE_LIMIT_MAXIMUM = 4;
@@ -173,6 +184,7 @@ export async function createAiReviewCandidate(input: {
         sourceDigest: audit.sourceDigest,
         sourceLabel,
         sourceText,
+        improve: input.action.improve,
       });
       return { candidate: publicCandidate(candidate, sourceLabel), audit: completeAudit(audit.id) };
     } catch (error) {
@@ -233,6 +245,7 @@ export async function createAiReviewCandidate(input: {
       imageDataUrls: files.map(
         (entry) => `data:${entry.file.mediaType};base64,${entry.file.bytes.toString('base64')}`,
       ),
+      improve: input.action.improve,
     });
     return {
       candidate: publicCandidate(candidate, loaded.operation.sourceName),
@@ -245,6 +258,63 @@ export async function createAiReviewCandidate(input: {
     throw new AiOperationError(
       'ai_request_failed',
       'OpenAI could not read those scans. Your source was not saved as a recipe.',
+    );
+  }
+}
+
+export async function improveAiRecipe(input: {
+  actorProfileId: string;
+  recipeId: string;
+  expectedRevision: number;
+  recipe: RecipePayload;
+}): Promise<{ candidate: AiRecipeCandidate; audit: AiOperationAudit }> {
+  ensureDatabase();
+  const savedRecipe = getRecipe(input.recipeId, input.actorProfileId);
+  if (!savedRecipe) throw new RecipeNotFoundError('That recipe no longer exists.');
+  if (savedRecipe.currentRevision !== input.expectedRevision) {
+    throw new RecipeConflictError(
+      'This recipe changed in another tab. Refresh the editor before using AI Improve.',
+    );
+  }
+  assertAiRateLimit(input.actorProfileId);
+  const provider = configuredProvider();
+  const audit = beginAudit({
+    kind: 'recipe-improvement',
+    sourceDigest: digest(JSON.stringify(input.recipe)),
+    sourceLabel: input.recipe.title.slice(0, 160),
+    profileId: input.actorProfileId,
+    recipeId: input.recipeId,
+    model: OPENAI_REVIEW_MODEL,
+  });
+  try {
+    const candidate = await provider.improveRecipe({ recipe: input.recipe });
+    return {
+      candidate: {
+        ...candidate,
+        recipe: {
+          ...candidate.recipe,
+          status: input.recipe.status,
+          sourceName: input.recipe.sourceName,
+          sourceUrl: input.recipe.sourceUrl,
+          originalAuthor: input.recipe.originalAuthor,
+          sharedNotes: input.recipe.sharedNotes,
+          // AI Improve may clarify every other part of the recipe, but the
+          // ingredient contract is deliberately immutable.
+          ingredientGroups: input.recipe.ingredientGroups,
+        },
+      },
+      audit: completeAudit(audit.id),
+    };
+  } catch (error) {
+    failAudit(audit.id);
+    if (error instanceof AiProviderUnavailableError) {
+      throw new AiOperationError('ai_not_configured', 'OpenAI is not configured for this server.');
+    }
+    throw new AiOperationError(
+      'ai_request_failed',
+      error instanceof AiProviderRequestError
+        ? error.message
+        : 'OpenAI could not prepare an improved recipe draft.',
     );
   }
 }
@@ -293,6 +363,75 @@ export async function generateAiRecipeImage(input: {
     throw new AiOperationError(
       'ai_request_failed',
       'The generated image could not be stored safely. Nothing was added to the recipe.',
+    );
+  }
+}
+
+export async function estimateAiRecipeNutrition(input: {
+  actorProfileId: string;
+  recipeId: string;
+  expectedRevision: number;
+}): Promise<{
+  recipe: NonNullable<ReturnType<typeof getRecipe>>;
+  estimate: AiNutritionEstimate;
+  audit: AiOperationAudit;
+}> {
+  ensureDatabase();
+  assertAiRateLimit(input.actorProfileId);
+  const provider = configuredProvider();
+  const recipe = getRecipe(input.recipeId, input.actorProfileId);
+  if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
+  if (recipe.currentRevision !== input.expectedRevision) {
+    throw new RecipeConflictError(
+      'This recipe changed in another tab. Refresh the card before estimating nutrition.',
+    );
+  }
+  const audit = beginAudit({
+    kind: 'nutrition-estimation',
+    sourceDigest: digest(
+      `${recipe.id}:${recipe.currentRevision}:${recipe.updatedAt.toISOString()}`,
+    ),
+    sourceLabel: recipe.title.slice(0, 160),
+    profileId: input.actorProfileId,
+    recipeId: recipe.id,
+    model: OPENAI_REVIEW_MODEL,
+  });
+  try {
+    const estimate = await provider.estimateRecipeNutrition({
+      recipeTitle: recipe.title,
+      recipeSummary: recipe.summary,
+      servings: recipe.servings,
+      ingredientGroups: recipe.ingredientGroups.map((group) => ({
+        name: group.name,
+        ingredients: group.ingredients.map(({ quantity, unit, item, note }) => ({
+          quantity,
+          unit,
+          item,
+          note,
+        })),
+      })),
+      instructionSteps: recipe.instructionSections.flatMap((section) =>
+        section.steps.map((step) => step.body),
+      ),
+    });
+    const updated = updateRecipeNutritionEstimate(
+      recipe.id,
+      estimate,
+      input.actorProfileId,
+      input.expectedRevision,
+    );
+    return { recipe: updated, estimate, audit: completeAudit(audit.id) };
+  } catch (error) {
+    failAudit(audit.id);
+    if (error instanceof AiProviderUnavailableError) {
+      throw new AiOperationError('ai_not_configured', 'OpenAI is not configured for this server.');
+    }
+    if (error instanceof RecipeNotFoundError || error instanceof RecipeConflictError) throw error;
+    throw new AiOperationError(
+      'ai_request_failed',
+      error instanceof AiProviderRequestError
+        ? error.message
+        : 'OpenAI returned an estimate, but it could not be saved safely.',
     );
   }
 }

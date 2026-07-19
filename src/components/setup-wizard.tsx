@@ -1,17 +1,19 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, ChevronRight, Leaf, LoaderCircle } from 'lucide-react';
+import { Check, ChevronRight, LoaderCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import { useToast } from '@/components/toast-provider';
 import { defaultProfileInput, setupSchema, type SetupInput } from '@/lib/domain/setup';
 
 const colors = ['#A85032', '#5B713E', '#D1863A', '#466F75', '#9B5C70'];
 
 export function SetupWizard() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState(defaultProfileInput.color);
   const form = useForm<SetupInput>({
@@ -25,21 +27,29 @@ export function SetupWizard() {
 
   async function submit(values: SetupInput) {
     setServerError(null);
-    const response = await fetch('/api/v1/setup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setServerError(
-        body?.error?.message ?? 'We could not save your kitchen yet. Please try again.',
-      );
-      return;
+    try {
+      const response = await fetch('/api/v1/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        const message =
+          body?.error?.message ?? 'We could not save your kitchen yet. Please try again.';
+        setServerError(message);
+        showToast(message, 'error');
+        return;
+      }
+      showToast('Your shared kitchen is ready.', 'success');
+      router.refresh();
+    } catch {
+      const message = 'The kitchen setup could not be saved. Check the connection and try again.';
+      setServerError(message);
+      showToast(message, 'error');
     }
-    router.refresh();
   }
 
   const { errors, isSubmitting } = form.formState;
@@ -48,9 +58,7 @@ export function SetupWizard() {
     <main className="setup-page">
       <section className="setup-intro" aria-labelledby="setup-title">
         <a className="wordmark" href="#setup-title" aria-label="Our Recipes setup">
-          <span className="wordmark-mark">
-            <Leaf aria-hidden="true" size={20} />
-          </span>
+          <span className="wordmark-mark" aria-hidden="true" />
           <span>Our Recipes</span>
         </a>
         <p className="eyebrow">A shared kitchen notebook</p>

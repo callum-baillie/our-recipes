@@ -12,17 +12,17 @@ export default async function ProfileSettingsPage() {
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
   return (
     <>
-      <header className="recipe-page settings-header">
+      <nav className="recipe-page settings-header" aria-label="Profile settings navigation">
         <div className="recipe-header">
           <Link className="wordmark" href="/">
-            <span className="wordmark-mark">✦</span>
+            <span className="wordmark-mark" aria-hidden="true" />
             <span>Our Recipes</span>
           </Link>
           <Link className="quiet-link" href="/">
             Back to kitchen
           </Link>
         </div>
-      </header>
+      </nav>
       <ProfileSettings initialProfiles={state.profiles} activeProfileId={actor.profileId} />
     </>
   );

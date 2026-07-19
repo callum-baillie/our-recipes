@@ -44,7 +44,10 @@ export const recipes = sqliteTable('recipes', {
   nutritionProteinGrams: real('nutrition_protein_grams'),
   nutritionCarbohydrateGrams: real('nutrition_carbohydrate_grams'),
   nutritionFatGrams: real('nutrition_fat_grams'),
+  nutritionSaturatedFatGrams: real('nutrition_saturated_fat_grams'),
   nutritionFiberGrams: real('nutrition_fiber_grams'),
+  nutritionSugarGrams: real('nutrition_sugar_grams'),
+  nutritionSodiumMilligrams: real('nutrition_sodium_milligrams'),
   createdByProfileId: text('created_by_profile_id')
     .notNull()
     .references(() => profiles.id),
@@ -235,7 +238,13 @@ export const importArtifacts = sqliteTable('import_artifacts', {
 export const aiOperationAudits = sqliteTable('ai_operation_audits', {
   id: text('id').primaryKey(),
   kind: text('kind', {
-    enum: ['text-normalization', 'vision-extraction', 'image-generation'],
+    enum: [
+      'text-normalization',
+      'vision-extraction',
+      'image-generation',
+      'nutrition-estimation',
+      'recipe-improvement',
+    ],
   }).notNull(),
   status: text('status', { enum: ['requested', 'succeeded', 'failed'] }).notNull(),
   sourceDigest: text('source_digest').notNull(),

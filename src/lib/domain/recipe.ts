@@ -6,6 +6,92 @@ const optionalNutritionValue = z
   .union([z.literal(''), z.coerce.number().min(0).max(100_000)])
   .default('');
 
+export const RECIPE_CATEGORY_OPTIONS = [
+  'Breakfast',
+  'Brunch',
+  'Lunch',
+  'Dinner',
+  'Appetizer',
+  'Snack',
+  'Soup',
+  'Salad',
+  'Side dish',
+  'Main dish',
+  'Sauce',
+  'Dessert',
+  'Baking',
+  'Drink',
+] as const;
+
+export const RECIPE_CUISINE_OPTIONS = [
+  'American',
+  'British',
+  'Chinese',
+  'French',
+  'Greek',
+  'Indian',
+  'Italian',
+  'Japanese',
+  'Korean',
+  'Mediterranean',
+  'Mexican',
+  'Middle Eastern',
+  'Spanish',
+  'Thai',
+  'Vietnamese',
+] as const;
+
+export const MAX_RECIPE_TAXONOMY_VALUES = 8;
+export const MAX_RECIPE_TAXONOMY_VALUE_LENGTH = 60;
+
+export function normalizeRecipeTaxonomyValues(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const value of values) {
+    const item = value.trim().replace(/\s+/gu, ' ').slice(0, MAX_RECIPE_TAXONOMY_VALUE_LENGTH);
+    const key = item.toLocaleLowerCase();
+    if (!item || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(item);
+  }
+  return normalized.slice(0, MAX_RECIPE_TAXONOMY_VALUES);
+}
+
+export function parseRecipeTaxonomyValues(value: string | null | undefined): string[] {
+  return normalizeRecipeTaxonomyValues((value ?? '').split(/[,;\n]/u));
+}
+
+export function joinRecipeTaxonomyValues(values: readonly string[]): string {
+  return normalizeRecipeTaxonomyValues(values).join(', ');
+}
+
+const recipeTaxonomySchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine(
+    (value) =>
+      value
+        .split(/[,;\n]/u)
+        .map((item) => item.trim())
+        .filter(Boolean).length <= MAX_RECIPE_TAXONOMY_VALUES,
+    `Choose no more than ${MAX_RECIPE_TAXONOMY_VALUES} values.`,
+  )
+  .refine(
+    (value) =>
+      value
+        .split(/[,;\n]/u)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .every((item) => item.length <= MAX_RECIPE_TAXONOMY_VALUE_LENGTH),
+    `Each value must be ${MAX_RECIPE_TAXONOMY_VALUE_LENGTH} characters or fewer.`,
+  )
+  .transform((value) => joinRecipeTaxonomyValues(parseRecipeTaxonomyValues(value)));
+const recipeTagsSchema = z
+  .array(requiredText(40))
+  .max(20)
+  .transform((tags) => [...new Set(tags.map((tag) => tag.toLocaleLowerCase()))]);
+
 export const recipeIngredientSchema = z.object({
   quantity: z.union([z.literal(''), z.coerce.number().positive().max(10_000)]),
   unit: boundedText(30),
@@ -32,8 +118,8 @@ export const recipeInputSchema = z.object({
   cookMinutes: z.coerce.number().int().min(0).max(10_080),
   restMinutes: z.coerce.number().int().min(0).max(10_080).default(0),
   difficulty: boundedText(40).default(''),
-  cuisine: boundedText(80).default(''),
-  category: boundedText(80).default(''),
+  cuisine: recipeTaxonomySchema.default(''),
+  category: recipeTaxonomySchema.default(''),
   tips: boundedText(2_000).default(''),
   sharedNotes: boundedText(2_000).default(''),
   sourceName: boundedText(160),
@@ -49,11 +135,11 @@ export const recipeInputSchema = z.object({
   nutritionProteinGrams: optionalNutritionValue,
   nutritionCarbohydrateGrams: optionalNutritionValue,
   nutritionFatGrams: optionalNutritionValue,
+  nutritionSaturatedFatGrams: optionalNutritionValue,
   nutritionFiberGrams: optionalNutritionValue,
-  tags: z
-    .array(requiredText(40))
-    .max(20)
-    .transform((tags) => [...new Set(tags.map((tag) => tag.toLocaleLowerCase()))]),
+  nutritionSugarGrams: optionalNutritionValue,
+  nutritionSodiumMilligrams: optionalNutritionValue,
+  tags: recipeTagsSchema,
   ingredientGroups: z.array(recipeIngredientGroupSchema).min(1).max(20),
   instructionSections: z.array(recipeInstructionSectionSchema).min(1).max(20),
 });
@@ -64,6 +150,13 @@ export type RecipePayload = z.output<typeof recipeInputSchema>;
 export const recipeUpdateInputSchema = recipeInputSchema.extend({
   expectedRevision: z.coerce.number().int().positive(),
 });
+
+export const recipeTagsUpdateSchema = z
+  .object({
+    tags: recipeTagsSchema,
+    expectedRevision: z.coerce.number().int().positive(),
+  })
+  .strict();
 
 export const recipeStatusSchema = z.object({
   status: z.enum(['active', 'archived', 'trash']),
@@ -131,7 +224,10 @@ export const emptyRecipeInput: RecipeInput = {
   nutritionProteinGrams: '',
   nutritionCarbohydrateGrams: '',
   nutritionFatGrams: '',
+  nutritionSaturatedFatGrams: '',
   nutritionFiberGrams: '',
+  nutritionSugarGrams: '',
+  nutritionSodiumMilligrams: '',
   tags: [],
   ingredientGroups: [
     {

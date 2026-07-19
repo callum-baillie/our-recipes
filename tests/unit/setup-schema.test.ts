@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { setupSchema } from '@/lib/domain/setup';
+import { householdSettingsSchema, setupSchema } from '@/lib/domain/setup';
 
 const validSetup = {
   householdName: 'The Brooks kitchen',
@@ -24,6 +24,24 @@ describe('setupSchema', () => {
   it('rejects an unsafe profile color', () => {
     expect(
       setupSchema.safeParse({ ...validSetup, profile: { ...validSetup.profile, color: 'red' } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('accepts bounded app settings and rejects unknown fields', () => {
+    expect(
+      householdSettingsSchema.safeParse({ householdName: 'Sunday table', appName: 'Recipe Box' })
+        .success,
+    ).toBe(true);
+    expect(
+      householdSettingsSchema.safeParse({
+        householdName: 'Sunday table',
+        appName: 'Recipe Box',
+        admin: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      householdSettingsSchema.safeParse({ householdName: 'Sunday table', appName: 'x'.repeat(81) })
         .success,
     ).toBe(false);
   });

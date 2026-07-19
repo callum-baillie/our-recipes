@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  AlertCircle,
   Check,
   Circle,
   FileCheck2,
@@ -15,7 +16,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import type { DragEvent, FormEvent, RefObject } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type RefObject } from 'react';
 
 export type ImportPreparationPhase = 'idle' | 'preparing' | 'ready' | 'error' | 'submitting';
 
@@ -28,6 +29,9 @@ export type ImportSelectionItem = {
   converted: boolean;
   isImage: boolean;
   isPdf: boolean;
+  previewFile: File | null;
+  previewKey: string;
+  previewReady: boolean;
 };
 
 type ImportUploadPanelProps = {
@@ -37,6 +41,7 @@ type ImportUploadPanelProps = {
   error: string | null;
   transcription: string;
   autoOpenAiVision: boolean;
+  aiImprove: boolean;
   canUseVision: boolean;
   willUseVision: boolean;
   canRetryPreparation: boolean;
@@ -45,10 +50,12 @@ type ImportUploadPanelProps = {
   onChooseFiles: () => void;
   onDropFiles: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
+  onPreviewError: (message: string) => void;
   onRetry: () => void;
   onPrimaryAction: () => void;
   onTranscriptionChange: (value: string) => void;
   onVisionChange: (enabled: boolean) => void;
+  onImproveChange: (enabled: boolean) => void;
 };
 
 const MAX_IMPORT_BYTES = 15 * 1024 * 1024;
@@ -92,14 +99,96 @@ function ImportProgress({
   );
 }
 
+function SelectedImagePreview({
+  item,
+  phase,
+  error,
+  onPreviewError,
+}: {
+  item: ImportSelectionItem;
+  phase: ImportPreparationPhase;
+  error: string | null;
+  onPreviewError: (message: string) => void;
+}) {
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const imageRef = useRef<HTMLImageElement>(null);
+  const notifiedFileRef = useRef<File | null>(null);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    const file = item.previewFile;
+    if (!image || !file) return;
+    const objectUrl = URL.createObjectURL(file);
+    image.src = objectUrl;
+    return () => {
+      image.removeAttribute('src');
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [item.previewFile]);
+
+  const preparationFailed = phase === 'error';
+  const previewFailed = loadState === 'error' && item.previewReady;
+  const showError = preparationFailed || previewFailed;
+  const showLoading =
+    !showError && (phase === 'preparing' || phase === 'submitting' || loadState === 'loading');
+  const loadingMessage =
+    phase === 'submitting'
+      ? 'Uploading safely and creating your review…'
+      : item.previewReady
+        ? 'Loading your photo…'
+        : 'Preparing this iPhone photo…';
+
+  return (
+    <div className={`import-selected-preview ${showError ? 'has-error' : ''}`}>
+      {item.previewFile ? (
+        // A local object URL keeps the selected photo on-device until the user starts review.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={imageRef}
+          alt={`Preview of ${item.sourceName}`}
+          onLoad={() => setLoadState('ready')}
+          onError={() => {
+            if (!item.previewReady) return;
+            setLoadState('error');
+            if (notifiedFileRef.current === item.previewFile) return;
+            notifiedFileRef.current = item.previewFile;
+            onPreviewError(
+              `We could not display a preview of ${item.sourceName}. The file is still selected and will be checked again before review.`,
+            );
+          }}
+        />
+      ) : null}
+      {showLoading ? (
+        <span className="import-preview-overlay" role="status">
+          <LoaderCircle className="spin" size={23} aria-hidden="true" />
+          {loadingMessage}
+        </span>
+      ) : showError ? (
+        <span className="import-preview-overlay error" role="alert">
+          <AlertCircle size={23} aria-hidden="true" />
+          {error ?? 'This preview needs attention before review.'}
+        </span>
+      ) : (
+        <span className="import-preview-ready">
+          <Check size={15} aria-hidden="true" /> Ready
+        </span>
+      )}
+    </div>
+  );
+}
+
 function SelectedFiles({
   items,
   phase,
+  error,
   onRemoveFile,
+  onPreviewError,
 }: {
   items: ImportSelectionItem[];
   phase: ImportPreparationPhase;
+  error: string | null;
   onRemoveFile: (index: number) => void;
+  onPreviewError: (message: string) => void;
 }) {
   if (!items.length) return null;
 
@@ -115,10 +204,20 @@ function SelectedFiles({
       </div>
       <ul>
         {items.map((item, index) => (
-          <li key={item.key}>
-            <span className="import-file-icon" aria-hidden="true">
-              {item.isImage ? <FileImage size={21} /> : <FileText size={21} />}
-            </span>
+          <li key={item.key} className={item.isImage ? 'has-image-preview' : undefined}>
+            {item.isImage && item.previewFile ? (
+              <SelectedImagePreview
+                key={item.previewKey}
+                item={item}
+                phase={phase}
+                error={error}
+                onPreviewError={onPreviewError}
+              />
+            ) : (
+              <span className="import-file-icon" aria-hidden="true">
+                {item.isImage ? <FileImage size={21} /> : <FileText size={21} />}
+              </span>
+            )}
             <span className="import-file-copy">
               <strong>{item.sourceName}</strong>
               <small>
@@ -160,6 +259,7 @@ export function ImportUploadPanel({
   error,
   transcription,
   autoOpenAiVision,
+  aiImprove,
   canUseVision,
   willUseVision,
   canRetryPreparation,
@@ -168,10 +268,12 @@ export function ImportUploadPanel({
   onChooseFiles,
   onDropFiles,
   onRemoveFile,
+  onPreviewError,
   onRetry,
   onPrimaryAction,
   onTranscriptionChange,
   onVisionChange,
+  onImproveChange,
 }: ImportUploadPanelProps) {
   const hasSelection = items.length > 0;
   const busy = phase === 'preparing' || phase === 'submitting';
@@ -187,7 +289,7 @@ export function ImportUploadPanel({
             : 'Choose another file'
           : ready
             ? willUseVision
-              ? 'Create OpenAI review draft'
+              ? 'Send to OpenAI and create draft'
               : 'Create review draft'
             : 'Choose photos or PDF';
 
@@ -198,7 +300,7 @@ export function ImportUploadPanel({
   }
 
   return (
-    <div className="import-workspace-card">
+    <div className="import-workspace-card" aria-busy={busy}>
       <ImportProgress phase={phase} hasSelection={hasSelection} />
 
       <div
@@ -231,7 +333,13 @@ export function ImportUploadPanel({
         />
       </div>
 
-      <SelectedFiles items={items} phase={phase} onRemoveFile={onRemoveFile} />
+      <SelectedFiles
+        items={items}
+        phase={phase}
+        error={error}
+        onRemoveFile={onRemoveFile}
+        onPreviewError={onPreviewError}
+      />
 
       {phase === 'preparing' ? (
         <div className="import-readiness preparing" role="status">
@@ -265,31 +373,6 @@ export function ImportUploadPanel({
         </div>
       ) : null}
 
-      <details className="import-transcription" open={Boolean(transcription)}>
-        <summary>
-          <ScanText size={20} aria-hidden="true" />
-          <span>
-            <strong>Add your own transcription</strong>
-            <small>Optional. Paste text you already typed or scanned.</small>
-          </span>
-        </summary>
-        <label>
-          <span className="sr-only">Manual transcription (optional)</span>
-          <textarea
-            aria-label="Manual transcription (optional)"
-            rows={7}
-            value={transcription}
-            onChange={(event) => onTranscriptionChange(event.target.value)}
-            placeholder={
-              'Tomato soup\nIngredients\n2 tbsp olive oil\n…\nMethod\n1. Simmer until ready.'
-            }
-          />
-          <small>
-            Your text takes priority over OCR. Textless PDFs still need a transcription.
-          </small>
-        </label>
-      </details>
-
       {canUseVision ? (
         <label className="import-vision-choice">
           <input
@@ -317,6 +400,25 @@ export function ImportUploadPanel({
         </p>
       ) : null}
 
+      {hasSelection ? (
+        <label className="ai-improve-choice import-ai-improve-choice">
+          <input
+            type="checkbox"
+            checked={aiImprove}
+            onChange={(event) => onImproveChange(event.target.checked)}
+          />
+          <span>
+            <strong>
+              <Sparkles size={18} aria-hidden="true" /> AI Improve
+            </strong>
+            <small>
+              When OpenAI reviews this recipe, keep its ingredients while improving spelling,
+              missing steps, timings, servings, and useful tags.
+            </small>
+          </span>
+        </label>
+      ) : null}
+
       {error ? (
         <p className="form-error import-form-error" role="alert">
           {error}
@@ -338,12 +440,39 @@ export function ImportUploadPanel({
             <RefreshCw size={19} aria-hidden="true" />
           ) : phase === 'error' ? (
             <Upload size={19} aria-hidden="true" />
+          ) : willUseVision ? (
+            <Sparkles size={19} aria-hidden="true" />
           ) : (
             <ShieldCheck size={19} aria-hidden="true" />
           )}
           {actionLabel}
         </button>
       ) : null}
+
+      <details className="import-transcription" open={Boolean(transcription)}>
+        <summary>
+          <ScanText size={20} aria-hidden="true" />
+          <span>
+            <strong>Add your own transcription</strong>
+            <small>Optional. Paste text you already typed or scanned.</small>
+          </span>
+        </summary>
+        <label>
+          <span className="sr-only">Manual transcription (optional)</span>
+          <textarea
+            aria-label="Manual transcription (optional)"
+            rows={7}
+            value={transcription}
+            onChange={(event) => onTranscriptionChange(event.target.value)}
+            placeholder={
+              'Tomato soup\nIngredients\n2 tbsp olive oil\n…\nMethod\n1. Simmer until ready.'
+            }
+          />
+          <small>
+            Your text takes priority over OCR. Textless PDFs still need a transcription.
+          </small>
+        </label>
+      </details>
 
       <p className="import-private-note">
         <LockKeyhole size={18} aria-hidden="true" />

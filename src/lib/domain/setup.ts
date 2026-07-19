@@ -20,8 +20,16 @@ export const setupSchema = z.object({
   profile: profileInputSchema,
 });
 
+export const householdSettingsSchema = z
+  .object({
+    householdName: safeText,
+    appName: safeText,
+  })
+  .strict();
+
 export type ProfileInput = z.infer<typeof profileInputSchema>;
 export type SetupInput = z.infer<typeof setupSchema>;
+export type HouseholdSettingsInput = z.infer<typeof householdSettingsSchema>;
 
 export const defaultProfileInput: ProfileInput = {
   displayName: '',

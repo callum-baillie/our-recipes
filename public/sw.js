@@ -1,5 +1,9 @@
-const CACHE_NAME = 'our-recipes-read-v2';
+const APP_VERSION = '0.1.0-beta.10';
+const CACHE_PREFIX = 'our-recipes-read-';
+const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 const OFFLINE_URL = '/offline';
+const UPDATE_QUERY_PARAM = '__our_recipes_updated';
+const IS_UPDATE = Boolean(self.registration.active);
 const RECIPE_DETAIL_PATH = /^\/recipes\/[0-9a-f-]{36}$/i;
 const RECIPE_IMAGE_PATH = /^\/api\/v1\/recipes\/[^/]+\/images\/[^/]+$/;
 
@@ -16,7 +20,9 @@ function isCacheableRead(url) {
     RECIPE_IMAGE_PATH.test(url.pathname) ||
     url.pathname.startsWith('/_next/static/') ||
     url.pathname === '/manifest.webmanifest' ||
-    url.pathname === '/icons/our-recipes-mark.svg'
+    url.pathname === '/icons/favicon-32.png' ||
+    url.pathname === '/icons/our-recipes-app-icon-192.png' ||
+    url.pathname === '/icons/our-recipes-app-icon-512.png'
   );
 }
 
@@ -28,40 +34,66 @@ async function cacheResponse(request, response) {
   return response;
 }
 
-async function cacheFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) return cached;
-  return cacheResponse(request, await fetch(request));
-}
-
 async function networkFirst(request, fallback) {
   try {
-    return await cacheResponse(request, await fetch(request));
+    const response = await fetch(request);
+    if (!response.ok) {
+      const cached = await (await caches.open(CACHE_NAME)).match(request);
+      return cached ?? response;
+    }
+    return await cacheResponse(request, response);
   } catch {
     const cached = await (await caches.open(CACHE_NAME)).match(request);
     return cached ?? fallback;
   }
 }
 
+async function deleteOldAppCaches() {
+  const keys = await caches.keys();
+  const oldAppCaches = keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME);
+  await Promise.all(oldAppCaches.map((key) => caches.delete(key)));
+  return oldAppCaches.length;
+}
+
+async function refreshWindowClients() {
+  await self.clients.claim();
+  const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  await Promise.all(
+    windowClients.map(async (client) => {
+      client.postMessage({ type: 'OUR_RECIPES_UPDATED', version: APP_VERSION });
+      if (typeof client.navigate !== 'function') return;
+      const target = new URL(client.url);
+      if (target.origin !== self.location.origin) return;
+      target.searchParams.set(UPDATE_QUERY_PARAM, APP_VERSION);
+      try {
+        await client.navigate(target.href);
+      } catch {
+        // The message and controllerchange handlers remain as reload fallbacks.
+      }
+    }),
+  );
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.add(OFFLINE_URL))
+      .then((cache) => cache.add(new Request(OFFLINE_URL, { cache: 'reload' })))
       .then(() => self.skipWaiting()),
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
-      )
-      .then(() => self.clients.claim()),
+    deleteOldAppCaches().then(async (deletedCacheCount) => {
+      if (IS_UPDATE || deletedCacheCount > 0) await refreshWindowClients();
+      else await self.clients.claim();
+    }),
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('fetch', (event) => {
@@ -79,7 +111,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.startsWith('/_next/static/')) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(networkFirst(request, caches.match(request)));
     return;
   }
 

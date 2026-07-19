@@ -99,6 +99,13 @@
       "when": 1783974000000,
       "tag": "0013_ai_operation_audits",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "1",
+      "when": 1784406000000,
+      "tag": "0014_extended_recipe_nutrition",
+      "breakpoints": true
     }
   ]
 }

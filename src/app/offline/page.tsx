@@ -4,9 +4,7 @@ export default function OfflinePage() {
   return (
     <main className="offline-page">
       <section>
-        <span className="wordmark-mark" aria-hidden="true">
-          ✦
-        </span>
+        <span className="wordmark-mark" aria-hidden="true" />
         <p className="eyebrow">OFFLINE READING</p>
         <h1>The kitchen is out of reach for a moment.</h1>
         <p>

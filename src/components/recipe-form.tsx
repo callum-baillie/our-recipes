@@ -1,31 +1,51 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDown, ChevronUp, Minus, Plus, Save } from 'lucide-react';
+import { ChevronDown, ChevronUp, LoaderCircle, Minus, Plus, Save, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 
 import {
   emptyRecipeInput,
+  joinRecipeTaxonomyValues,
+  parseRecipeTaxonomyValues,
+  RECIPE_CATEGORY_OPTIONS,
+  RECIPE_CUISINE_OPTIONS,
   recipeInputSchema,
   recipeUpdateInputSchema,
   type RecipeInput,
   type RecipePayload,
 } from '@/lib/domain/recipe';
+import { useToast } from '@/components/toast-provider';
+import { RecipeTagSelector } from '@/components/recipe-tag-selector';
+import { RecipeTaxonomySelector } from '@/components/recipe-taxonomy-selector';
+import type { AiRecipeCandidate } from '@/lib/domain/ai';
 
-type FormValues = RecipePayload & { tagsText: string; equipmentText: string };
+type FormValues = RecipePayload & { equipmentText: string };
 const recipeFormSchema = recipeInputSchema.extend({
-  tagsText: z.string(),
   equipmentText: z.string(),
 });
+
+type StoredDraft = Partial<FormValues> & { tagsText?: unknown; equipmentText?: unknown };
+
+function recipePayloadFromForm(values: FormValues): RecipePayload {
+  return recipeInputSchema.parse({
+    ...values,
+    equipment: values.equipmentText
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  });
+}
 
 type RecipeFormProps = {
   initial?: RecipeInput;
   recipeId?: string;
   currentRevision?: number;
   confirmationLabel?: string;
+  intro?: ReactNode;
 };
 
 function IngredientGroupEditor({
@@ -290,17 +310,18 @@ export function RecipeForm({
   recipeId,
   currentRevision,
   confirmationLabel,
+  intro,
 }: RecipeFormProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
   const [savedDraft, setSavedDraft] = useState<FormValues | null>(null);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [aiImproving, setAiImproving] = useState(false);
   const defaults = useMemo<FormValues>(
     () =>
       ({
         ...emptyRecipeInput,
         ...initial,
-        tagsText: (initial.tags ?? emptyRecipeInput.tags).join(', '),
         equipmentText: (initial?.equipment ?? emptyRecipeInput.equipment ?? []).join('\n'),
       }) as FormValues,
     [initial],
@@ -312,34 +333,34 @@ export function RecipeForm({
   const watchedValues = useWatch({ control: form.control });
   const ingredientGroups = useFieldArray({ control: form.control, name: 'ingredientGroups' });
   const instructionSections = useFieldArray({ control: form.control, name: 'instructionSections' });
+  const tags = useWatch({ control: form.control, name: 'tags' }) ?? [];
+  const category = useWatch({ control: form.control, name: 'category' }) ?? '';
+  const cuisine = useWatch({ control: form.control, name: 'cuisine' }) ?? '';
   const draftKey = `our-recipes:recipe-draft:${recipeId ?? 'new'}`;
-
-  useEffect(() => {
-    fetch('/api/v1/tags')
-      .then(async (response) => (response.ok ? response.json() : null))
-      .then((body: { tags?: Array<{ name?: string }> } | null) => {
-        setAvailableTags(body?.tags?.flatMap((tag) => (tag.name ? [tag.name] : [])) ?? []);
-      })
-      .catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     let restoreTimer: number | undefined;
     const rawDraft = window.localStorage.getItem(draftKey);
     if (!rawDraft) return undefined;
     try {
-      const parsed = JSON.parse(rawDraft) as FormValues;
+      const parsed = JSON.parse(rawDraft) as StoredDraft;
       const candidate = recipeFormSchema.safeParse({
         ...parsed,
-        tagsText: typeof parsed.tagsText === 'string' ? parsed.tagsText : '',
-        tags: typeof parsed.tagsText === 'string' ? parsed.tagsText.split(',') : parsed.tags,
+        tags:
+          typeof parsed.tagsText === 'string'
+            ? parsed.tagsText
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+            : parsed.tags,
         equipmentText: typeof parsed.equipmentText === 'string' ? parsed.equipmentText : '',
         equipment:
           typeof parsed.equipmentText === 'string'
             ? parsed.equipmentText.split('\n').filter(Boolean)
             : parsed.equipment,
       });
-      if (candidate.success) restoreTimer = window.setTimeout(() => setSavedDraft(parsed), 0);
+      if (candidate.success)
+        restoreTimer = window.setTimeout(() => setSavedDraft(candidate.data), 0);
     } catch {
       window.localStorage.removeItem(draftKey);
     }
@@ -365,138 +386,197 @@ export function RecipeForm({
 
   async function submit(values: FormValues) {
     setServerError(null);
-    const basePayload = {
-      ...values,
-      tags: values.tagsText
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      equipment: values.equipmentText
-        .split('\n')
-        .map((item) => item.trim())
-        .filter(Boolean),
-    };
-    const payload = recipeId
-      ? recipeUpdateInputSchema.parse({ ...basePayload, expectedRevision: currentRevision })
-      : recipeInputSchema.parse(basePayload);
-    const response = await fetch(recipeId ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes', {
-      method: recipeId ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      recipe?: { id: string };
-      error?: { message?: string };
-    } | null;
-    if (!response.ok || !body?.recipe) {
-      setServerError(body?.error?.message ?? 'We could not save this recipe yet.');
-      return;
+    try {
+      const basePayload = recipePayloadFromForm(values);
+      const payload = recipeId
+        ? recipeUpdateInputSchema.parse({ ...basePayload, expectedRevision: currentRevision })
+        : recipeInputSchema.parse(basePayload);
+      const response = await fetch(recipeId ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes', {
+        method: recipeId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        recipe?: { id: string };
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.recipe) {
+        const message = body?.error?.message ?? 'We could not save this recipe yet.';
+        setServerError(message);
+        showToast(message, 'error');
+        return;
+      }
+      window.localStorage.removeItem(draftKey);
+      form.reset(values);
+      showToast(recipeId ? 'Recipe revision saved.' : 'Recipe added to your cookbook.', 'success');
+      router.push(`/recipes/${body.recipe.id}`);
+      router.refresh();
+    } catch {
+      const message = 'The recipe could not be saved. Check the connection and try again.';
+      setServerError(message);
+      showToast(message, 'error');
     }
-    window.localStorage.removeItem(draftKey);
-    form.reset(values);
-    router.push(`/recipes/${body.recipe.id}`);
-    router.refresh();
+  }
+
+  async function improveWithAi() {
+    if (!recipeId || !currentRevision) return;
+    setAiImproving(true);
+    setServerError(null);
+    try {
+      const recipe = recipePayloadFromForm(form.getValues());
+      const response = await fetch(`/api/v1/recipes/${recipeId}/improve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true, expectedRevision: currentRevision, recipe }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        candidate?: AiRecipeCandidate;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.candidate) {
+        throw new Error(body?.error?.message ?? 'OpenAI could not improve this recipe.');
+      }
+      const improvedValues = {
+        ...body.candidate.recipe,
+        equipmentText: body.candidate.recipe.equipment.join('\n'),
+      } as FormValues;
+      form.reset(improvedValues, { keepDefaultValues: true });
+      showToast(
+        'AI improvement draft ready. Review the changes, then save a new revision.',
+        'success',
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'OpenAI could not improve this recipe.';
+      setServerError(message);
+      showToast(message, 'error');
+    } finally {
+      setAiImproving(false);
+    }
   }
 
   return (
-    <form className="recipe-form" onSubmit={form.handleSubmit(submit)} noValidate>
-      {savedDraft && (
-        <aside className="draft-recovery" aria-live="polite">
-          <div>
-            <strong>A local draft is ready</strong>
-            <span>Restore it if this is the edit you meant to continue.</span>
-          </div>
-          <div>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => {
-                form.reset(savedDraft);
-                setSavedDraft(null);
-              }}
-            >
-              Restore draft
-            </button>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => {
-                window.localStorage.removeItem(draftKey);
-                setSavedDraft(null);
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </aside>
-      )}
-      <section className="recipe-form-section">
-        <p className="eyebrow">THE RECIPE CARD</p>
-        <label>
-          <span>Recipe name</span>
-          <input
-            {...form.register('title')}
-            placeholder="e.g. Sunday tomato soup"
-            aria-invalid={Boolean(form.formState.errors.title)}
-          />
-          {form.formState.errors.title && (
-            <small role="alert">{form.formState.errors.title.message}</small>
-          )}
-        </label>
-        <label>
-          <span>
-            Short note <em>(optional)</em>
-          </span>
-          <textarea
-            {...form.register('summary')}
-            rows={3}
-            placeholder="Why it belongs in your cookbook."
-          />
-        </label>
-        <div className="field-grid three-columns">
+    <form
+      className={`recipe-form${intro ? ' editor-form-layout' : ''}`}
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
+      {intro ? <header className="editor-intro">{intro}</header> : null}
+      <div className="editor-card-column">
+        {savedDraft && (
+          <aside className="draft-recovery" aria-live="polite">
+            <div>
+              <strong>A local draft is ready</strong>
+              <span>Restore it if this is the edit you meant to continue.</span>
+            </div>
+            <div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  form.reset(savedDraft);
+                  setSavedDraft(null);
+                }}
+              >
+                Restore draft
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  window.localStorage.removeItem(draftKey);
+                  setSavedDraft(null);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </aside>
+        )}
+        <section className="recipe-form-section">
+          <p className="eyebrow">THE RECIPE CARD</p>
           <label>
-            <span>Serves</span>
-            <input {...form.register('servings')} />
-          </label>
-          <label>
-            <span>Prep minutes</span>
-            <input type="number" min="0" {...form.register('prepMinutes')} />
-          </label>
-          <label>
-            <span>Cook minutes</span>
-            <input type="number" min="0" {...form.register('cookMinutes')} />
-          </label>
-        </div>
-        <div className="field-grid three-columns">
-          <label>
-            <span>Rest minutes</span>
-            <input type="number" min="0" {...form.register('restMinutes')} />
+            <span>Recipe name</span>
+            <input
+              {...form.register('title')}
+              placeholder="e.g. Sunday tomato soup"
+              aria-invalid={Boolean(form.formState.errors.title)}
+            />
+            {form.formState.errors.title && (
+              <small role="alert">{form.formState.errors.title.message}</small>
+            )}
           </label>
           <label>
             <span>
-              Difficulty <em>(optional)</em>
+              Short note <em>(optional)</em>
             </span>
-            <select {...form.register('difficulty')}>
-              <option value="">Not set</option>
-              <option value="easy">Easy</option>
-              <option value="standard">Standard</option>
-              <option value="involved">Involved</option>
-            </select>
+            <textarea
+              {...form.register('summary')}
+              rows={3}
+              placeholder="Why it belongs in your cookbook."
+            />
           </label>
-          <label>
-            <span>
-              Category <em>(optional)</em>
-            </span>
-            <input {...form.register('category')} placeholder="e.g. Dinner" />
-          </label>
-        </div>
-        <label>
-          <span>
-            Cuisine <em>(optional)</em>
-          </span>
-          <input {...form.register('cuisine')} placeholder="e.g. Italian" />
-        </label>
-      </section>
+          <div className="field-grid three-columns">
+            <label>
+              <span>Serves</span>
+              <input {...form.register('servings')} />
+            </label>
+            <label>
+              <span>Prep minutes</span>
+              <input type="number" min="0" {...form.register('prepMinutes')} />
+            </label>
+            <label>
+              <span>Cook minutes</span>
+              <input type="number" min="0" {...form.register('cookMinutes')} />
+            </label>
+          </div>
+          <div className="field-grid two-columns">
+            <label>
+              <span>Rest minutes</span>
+              <input type="number" min="0" {...form.register('restMinutes')} />
+            </label>
+            <label>
+              <span>
+                Difficulty <em>(optional)</em>
+              </span>
+              <select {...form.register('difficulty')}>
+                <option value="">Not set</option>
+                <option value="easy">Easy</option>
+                <option value="standard">Standard</option>
+                <option value="involved">Involved</option>
+              </select>
+            </label>
+          </div>
+          <div className="field-grid two-columns recipe-taxonomy-grid">
+            <input type="hidden" {...form.register('category')} />
+            <RecipeTaxonomySelector
+              label="Categories"
+              value={parseRecipeTaxonomyValues(category)}
+              options={RECIPE_CATEGORY_OPTIONS}
+              onChange={(values) =>
+                form.setValue('category', joinRecipeTaxonomyValues(values), {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              error={form.formState.errors.category?.message}
+            />
+            <input type="hidden" {...form.register('cuisine')} />
+            <RecipeTaxonomySelector
+              label="Cuisines"
+              value={parseRecipeTaxonomyValues(cuisine)}
+              options={RECIPE_CUISINE_OPTIONS}
+              onChange={(values) =>
+                form.setValue('cuisine', joinRecipeTaxonomyValues(values), {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              error={form.formState.errors.cuisine?.message}
+            />
+          </div>
+        </section>
+      </div>
 
       <section className="recipe-form-section">
         <div className="section-heading-row">
@@ -531,7 +611,25 @@ export function RecipeForm({
       <section className="recipe-form-section">
         <div className="section-heading-row">
           <h2>Method</h2>
-          <span>Keep sections short and kitchen-readable.</span>
+          <div className="section-heading-actions">
+            <span>Keep sections short and kitchen-readable.</span>
+            {recipeId ? (
+              <button
+                className="text-button ai-improve-button"
+                type="button"
+                onClick={() => void improveWithAi()}
+                disabled={aiImproving || form.formState.isSubmitting}
+                title="Uses one paid OpenAI request and keeps ingredients unchanged"
+              >
+                {aiImproving ? (
+                  <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                ) : (
+                  <Sparkles size={16} aria-hidden="true" />
+                )}
+                {aiImproving ? 'Improving with OpenAI…' : 'AI Improve'}
+              </button>
+            ) : null}
+          </div>
         </div>
         {instructionSections.fields.map((field, index) => (
           <InstructionSectionEditor
@@ -554,16 +652,12 @@ export function RecipeForm({
       </section>
 
       <section className="recipe-form-section two-columns">
-        <label>
-          <span>
-            Tags <em>(comma-separated)</em>
-          </span>
-          <input
-            {...form.register('tagsText')}
-            list="household-tags"
-            placeholder="weeknight, vegetarian"
-          />
-        </label>
+        <RecipeTagSelector
+          value={tags}
+          onChange={(nextTags) =>
+            form.setValue('tags', nextTags, { shouldDirty: true, shouldValidate: true })
+          }
+        />
         <label>
           <span>
             Source name <em>(optional)</em>
@@ -600,7 +694,7 @@ export function RecipeForm({
         </label>
         <fieldset className="nutrition-fields">
           <legend>
-            Nutrition as entered <em>(optional; no lookup)</em>
+            Nutrition per serving <em>(optional; review AI estimates)</em>
           </legend>
           <div className="field-grid three-columns">
             <label>
@@ -625,8 +719,30 @@ export function RecipeForm({
               <input type="number" min="0" step="any" {...form.register('nutritionFatGrams')} />
             </label>
             <label>
+              <span>Saturated fat (g)</span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                {...form.register('nutritionSaturatedFatGrams')}
+              />
+            </label>
+            <label>
               <span>Fiber (g)</span>
               <input type="number" min="0" step="any" {...form.register('nutritionFiberGrams')} />
+            </label>
+            <label>
+              <span>Sugar (g)</span>
+              <input type="number" min="0" step="any" {...form.register('nutritionSugarGrams')} />
+            </label>
+            <label>
+              <span>Sodium (mg)</span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                {...form.register('nutritionSodiumMilligrams')}
+              />
             </label>
           </div>
         </fieldset>
@@ -651,19 +767,22 @@ export function RecipeForm({
           />
         </label>
       </section>
-      <datalist id="household-tags">
-        {availableTags.map((tag) => (
-          <option value={tag} key={tag} />
-        ))}
-      </datalist>
       {serverError && (
         <p className="form-error" role="alert">
           {serverError}
         </p>
       )}
       <button className="primary-button" type="submit" disabled={form.formState.isSubmitting}>
-        <Save size={17} aria-hidden="true" />{' '}
-        {recipeId ? 'Save a new revision' : (confirmationLabel ?? 'Add to the cookbook')}
+        {form.formState.isSubmitting ? (
+          <LoaderCircle className="spin" size={17} aria-hidden="true" />
+        ) : (
+          <Save size={17} aria-hidden="true" />
+        )}{' '}
+        {form.formState.isSubmitting
+          ? 'Saving recipe…'
+          : recipeId
+            ? 'Save a new revision'
+            : (confirmationLabel ?? 'Add to the cookbook')}
       </button>
     </form>
   );

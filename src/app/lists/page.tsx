@@ -8,15 +8,6 @@ export default function ListsPage() {
   const lists = listShoppingLists();
   return (
     <main className="recipe-page">
-      <header className="recipe-header">
-        <Link className="wordmark" href="/">
-          <span className="wordmark-mark">✦</span>
-          <span>Our Recipes</span>
-        </Link>
-        <Link className="primary-button compact" href="/planner">
-          Plan meals
-        </Link>
-      </header>
       <section className="library-heading">
         <div>
           <p className="eyebrow">SHOPPING LISTS</p>

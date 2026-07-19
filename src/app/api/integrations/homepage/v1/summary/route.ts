@@ -1,32 +1,35 @@
 import { NextResponse } from 'next/server';
 
-import { jsonError } from '@/lib/http';
-import {
-  getHomepageIntegrationSummary,
-  hasHomepageIntegrationToken,
-  hasValidHomepageIntegrationAuthorization,
-} from '@/lib/services/homepage-integration-service';
+import { hasValidHomepageIntegrationToken } from '@/lib/providers/homepage-integration-token';
+import { buildHomepageSummary } from '@/lib/services/homepage-integration-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const PRIVATE_RESPONSE_HEADERS = {
+  'Cache-Control': 'private, no-store',
+  Vary: 'Authorization',
+  'X-Content-Type-Options': 'nosniff',
+};
+
 export function GET(request: Request) {
-  if (!hasHomepageIntegrationToken())
-    return jsonError(
-      503,
-      'homepage_integration_unavailable',
-      'This integration is not configured.',
+  if (!hasValidHomepageIntegrationToken(request)) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'invalid_integration_credentials',
+          message: 'Valid Homepage integration credentials are required.',
+        },
+      },
+      {
+        status: 401,
+        headers: {
+          ...PRIVATE_RESPONSE_HEADERS,
+          'WWW-Authenticate': 'Bearer realm="Homepage integration"',
+        },
+      },
     );
-  if (!hasValidHomepageIntegrationAuthorization(request.headers.get('authorization')))
-    return jsonError(
-      401,
-      'homepage_integration_unauthorized',
-      'A valid integration token is required.',
-    );
-  return NextResponse.json(getHomepageIntegrationSummary(), {
-    headers: {
-      'Cache-Control': 'private, max-age=60',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
+  }
+
+  return NextResponse.json(buildHomepageSummary(), { headers: PRIVATE_RESPONSE_HEADERS });
 }

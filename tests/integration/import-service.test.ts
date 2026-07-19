@@ -11,6 +11,7 @@ import {
   confirmImportOperation,
   createImportOperation,
   getImportArtifact,
+  getRecipeImportProvenance,
   listImportOperations,
   resetImportRateLimitsForTests,
   setImportScanOcrRecognizerForTests,
@@ -143,6 +144,11 @@ describe('document import service', () => {
     expect(confirmed.operation.status).toBe('confirmed');
     expect(confirmed.operation.confirmedRecipeId).toBe(confirmed.recipe.id);
     expect(getRecipe(confirmed.recipe.id)?.createdByProfileId).toBe(profile.id);
+    expect(getRecipeImportProvenance(confirmed.recipe.id)).toEqual({
+      label: 'PDF import (Embedded text)',
+      sourceName: 'family tomato soup.pdf',
+      extractionMethod: 'pdf-text',
+    });
     expect(() =>
       confirmImportOperation(created.operation.id, created.draft.recipe, profile.id),
     ).toThrow('already been confirmed');
@@ -331,6 +337,11 @@ describe('document import service', () => {
       profile.id,
     );
     expect(confirmed.operation.status).toBe('confirmed');
+    expect(getRecipeImportProvenance(confirmed.recipe.id)).toEqual({
+      label: 'Image import (Local OCR)',
+      sourceName: 'front.png',
+      extractionMethod: 'local-ocr',
+    });
   });
 
   it('returns a retryable OCR-busy outcome without storing a scan', async () => {

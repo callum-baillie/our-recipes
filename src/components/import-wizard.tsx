@@ -1,10 +1,19 @@
 'use client';
 
-import { Cloud, FileCheck2, LoaderCircle, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  AlertCircle,
+  Cloud,
+  FileCheck2,
+  LoaderCircle,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 
 import { ImportReviewForm } from '@/components/import-review-form';
 import { JsonLdImportWizard } from '@/components/import-jsonld-wizard';
+import { useToast } from '@/components/toast-provider';
 import {
   ImportUploadPanel,
   type ImportPreparationPhase,
@@ -13,6 +22,7 @@ import {
 import {
   ClientHeicConversionError,
   convertHeicFilesInBrowser,
+  isClientHeicFile,
   type ClientImageConversion,
 } from '@/lib/client/heic-conversion';
 import type { ImportOperation, ImportReviewDraft } from '@/lib/domain/import';
@@ -83,7 +93,8 @@ function validateSelection(files: File[]): string | null {
 
 function selectionItems(preparation: FilePreparation): ImportSelectionItem[] {
   return preparation.sourceFiles.map((sourceFile, index) => {
-    const preparedFile = preparation.preparedFiles[index] ?? sourceFile;
+    const convertedFile = preparation.preparedFiles[index];
+    const preparedFile = convertedFile ?? sourceFile;
     return {
       key: `${sourceFile.name}:${sourceFile.size}:${sourceFile.lastModified}:${index}`,
       sourceName: sourceFile.name,
@@ -93,14 +104,81 @@ function selectionItems(preparation: FilePreparation): ImportSelectionItem[] {
       converted: preparedFile.name !== sourceFile.name || preparedFile.type !== sourceFile.type,
       isImage: isImageFile(sourceFile),
       isPdf: isPdfFile(sourceFile),
+      previewFile: isImageFile(preparedFile) ? preparedFile : null,
+      previewKey: `${preparedFile.name}:${preparedFile.size}:${preparedFile.lastModified}:${preparedFile.type}`,
+      previewReady: Boolean(convertedFile) || !isClientHeicFile(sourceFile),
     };
   });
 }
 
+function StoredImportPreview({
+  operationId,
+  artifact,
+  state,
+  error,
+  onError,
+}: {
+  operationId: string;
+  artifact: ImportOperation['artifacts'][number];
+  state: 'idle' | 'reading' | 'complete' | 'error';
+  error: string | null;
+  onError: (message: string) => void;
+}) {
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const notifiedRef = useRef(false);
+  const showError = state === 'error' || loadState === 'error';
+  const showLoading = !showError && (state === 'reading' || loadState === 'loading');
+  const errorMessage =
+    loadState === 'error'
+      ? 'The uploaded image preview could not be loaded. You can retry without losing the import.'
+      : (error ?? 'OpenAI could not finish reading this image.');
+
+  return (
+    <figure>
+      <div className={`import-source-preview-frame ${showError ? 'has-error' : ''}`}>
+        {/* The server stores each preview as a normalized, metadata-stripped WebP scan. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="import-source-preview"
+          src={`/api/v1/imports/${operationId}/files/${artifact.id}`}
+          alt={`Normalized scan imported from ${artifact.sourceName}`}
+          onLoad={() => setLoadState('ready')}
+          onError={() => {
+            setLoadState('error');
+            if (notifiedRef.current) return;
+            notifiedRef.current = true;
+            onError(
+              'The uploaded image preview could not be loaded. You can retry without losing the import.',
+            );
+          }}
+        />
+        {showLoading ? (
+          <span className="import-preview-overlay" role="status">
+            <LoaderCircle className="spin" size={24} aria-hidden="true" />
+            {state === 'reading' ? 'OpenAI is reading this image…' : 'Loading your image…'}
+          </span>
+        ) : showError ? (
+          <span className="import-preview-overlay error" role="alert">
+            <AlertCircle size={24} aria-hidden="true" />
+            {errorMessage}
+          </span>
+        ) : state === 'complete' ? (
+          <span className="import-preview-ready">
+            <FileCheck2 size={15} aria-hidden="true" /> AI review ready
+          </span>
+        ) : null}
+      </div>
+      <figcaption>{artifact.sourceName}</figcaption>
+    </figure>
+  );
+}
+
 export function ImportWizard() {
+  const { showToast } = useToast();
   const [preparation, setPreparation] = useState<FilePreparation>(EMPTY_PREPARATION);
   const [transcription, setTranscription] = useState('');
   const [autoOpenAiVision, setAutoOpenAiVision] = useState(true);
+  const [aiImprove, setAiImprove] = useState(false);
   const [created, setCreated] = useState<CreatedImport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiPending, setAiPending] = useState(false);
@@ -131,6 +209,7 @@ export function ImportWizard() {
         canRetry: false,
       });
       setError(selectionError);
+      showToast(selectionError, 'error');
       return;
     }
 
@@ -144,6 +223,13 @@ export function ImportWizard() {
       canRetry: true,
     });
     setError(null);
+    const imageCount = selected.filter(isImageFile).length;
+    showToast(
+      imageCount > 0
+        ? `${imageCount} ${imageCount === 1 ? 'photo received' : 'photos received'}. Preparing ${imageCount === 1 ? 'it' : 'them'} on this device…`
+        : 'PDF received. Checking it on this device…',
+      'info',
+    );
     try {
       const converted = await convertHeicFilesInBrowser(selected, MAX_IMPORT_BYTES);
       if (preparationAttemptRef.current !== attempt) return;
@@ -154,6 +240,10 @@ export function ImportWizard() {
         conversions: converted.conversions,
         canRetry: false,
       });
+      showToast(
+        `${selected.length} ${selected.length === 1 ? 'file is' : 'files are'} ready. Choose the review action when you’re ready.`,
+        'success',
+      );
     } catch (caughtError) {
       if (preparationAttemptRef.current !== attempt) return;
       setPreparation({
@@ -163,11 +253,12 @@ export function ImportWizard() {
         conversions: [],
         canRetry: true,
       });
-      setError(
+      const message =
         caughtError instanceof ClientHeicConversionError
           ? caughtError.message
-          : 'We could not prepare those files safely in this browser. Try again or choose JPEG, PNG, WebP, or PDF.',
-      );
+          : 'We could not prepare those files safely in this browser. Try again or choose JPEG, PNG, WebP, or PDF.';
+      setError(message);
+      showToast(message, 'error');
     }
   }
 
@@ -214,6 +305,12 @@ export function ImportWizard() {
     setPreparation((current) => ({ ...current, phase: 'submitting' }));
     setError(null);
     setAiVersion(0);
+    showToast(
+      shouldAutoOpenAiVision
+        ? 'Uploading the prepared image to your local app before OpenAI review…'
+        : 'Creating a review draft from your prepared file…',
+      'info',
+    );
     const formData = new FormData();
     readyPreparation.preparedFiles.forEach((file) => formData.append('files', file));
     formData.set('transcription', transcription);
@@ -227,21 +324,25 @@ export function ImportWizard() {
         (CreatedImport & { error?: undefined }) | { error?: { message?: string } } | null;
       if (!response.ok || !body || !('operation' in body) || !('draft' in body)) {
         setPreparation(readyPreparation);
-        setError(
+        const message =
           (body && 'error' in body ? body.error?.message : undefined) ??
-            'We could not create a safe review draft from this file.',
-        );
+          'We could not create a safe review draft from this file.';
+        setError(message);
+        showToast(message, 'error');
         return;
       }
       setCreated(body);
       if (body.operation.extractionMethod === 'openai-vision-pending') {
         await askOpenAiToReview(body);
+      } else {
+        showToast('Review draft ready. Check every field before saving.', 'success');
       }
     } catch {
       setPreparation(readyPreparation);
-      setError(
-        'The local app could not start this review. Check the connection and try again; your selected files remain on this device.',
-      );
+      const message =
+        'The local app could not start this review. Check the connection and try again; your selected files remain on this device.';
+      setError(message);
+      showToast(message, 'error');
     }
   }
 
@@ -250,14 +351,21 @@ export function ImportWizard() {
     const { operation, draft } = imported;
     setAiPending(true);
     setError(null);
+    showToast('Upload complete. OpenAI is reading the recipe image…', 'info');
     const payload =
       operation.kind === 'image'
-        ? { confirm: true as const, kind: 'vision-extraction' as const, importId: operation.id }
+        ? {
+            confirm: true as const,
+            kind: 'vision-extraction' as const,
+            importId: operation.id,
+            improve: aiImprove,
+          }
         : {
             confirm: true as const,
             kind: 'text-normalization' as const,
             sourceText: draft.originalText.slice(0, 30_000),
             sourceLabel: draft.provenance.sourceName,
+            improve: aiImprove,
           };
     try {
       const response = await fetch('/api/v1/ai/reviews', {
@@ -270,7 +378,9 @@ export function ImportWizard() {
         error?: { message?: string };
       } | null;
       if (!response.ok || !body?.candidate) {
-        setError(body?.error?.message ?? 'OpenAI could not create a review draft.');
+        const message = body?.error?.message ?? 'OpenAI could not create a review draft.';
+        setError(message);
+        showToast(message, 'error');
         return;
       }
       setCreated((current) =>
@@ -292,8 +402,11 @@ export function ImportWizard() {
           : current,
       );
       setAiVersion((version) => version + 1);
+      showToast('OpenAI finished reading the recipe. Review the draft before saving.', 'success');
     } catch {
-      setError('OpenAI could not be reached. Your local import is still available to retry.');
+      const message = 'OpenAI could not be reached. Your local import is still available to retry.';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setAiPending(false);
     }
@@ -309,6 +422,13 @@ export function ImportWizard() {
     const { operation, draft } = created;
     const awaitingAutomaticVision =
       operation.extractionMethod === 'openai-vision-pending' && aiVersion === 0;
+    const previewState = aiPending
+      ? 'reading'
+      : awaitingAutomaticVision && error
+        ? 'error'
+        : aiVersion > 0
+          ? 'complete'
+          : 'idle';
     return (
       <section className="import-review-layout">
         <aside className="import-provenance">
@@ -355,16 +475,14 @@ export function ImportWizard() {
                 {operation.artifacts
                   .filter((artifact) => artifact.mediaType.startsWith('image/'))
                   .map((artifact) => (
-                    <figure key={artifact.id}>
-                      {/* The server stores each preview as a normalized, metadata-stripped WebP scan. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        className="import-source-preview"
-                        src={`/api/v1/imports/${operation.id}/files/${artifact.id}`}
-                        alt={`Normalized scan imported from ${artifact.sourceName}`}
-                      />
-                      <figcaption>{artifact.sourceName}</figcaption>
-                    </figure>
+                    <StoredImportPreview
+                      key={artifact.id}
+                      operationId={operation.id}
+                      artifact={artifact}
+                      state={previewState}
+                      error={error}
+                      onError={(message) => showToast(message, 'error')}
+                    />
                   ))}
               </div>
             )}
@@ -462,10 +580,10 @@ export function ImportWizard() {
   return (
     <section className="import-layout">
       <aside className="import-intro">
-        <h1>Bring a recipe in.</h1>
+        <h1>Add from an image.</h1>
         <p>
-          We prepare the source carefully and show you an editable recipe. Nothing is saved until
-          you review and confirm it.
+          Upload a recipe photo, a set of scans, or a PDF. We prepare it carefully and show you an
+          editable draft before anything is saved.
         </p>
         <div className="import-trust-list">
           <div>
@@ -499,6 +617,7 @@ export function ImportWizard() {
           error={error}
           transcription={transcription}
           autoOpenAiVision={autoOpenAiVision}
+          aiImprove={aiImprove}
           canUseVision={hasOnlyImageScans}
           willUseVision={shouldAutoOpenAiVision}
           canRetryPreparation={preparation.canRetry}
@@ -510,10 +629,12 @@ export function ImportWizard() {
             void prepareFiles(selected);
           }}
           onRemoveFile={removeFile}
+          onPreviewError={(message) => showToast(message, 'error')}
           onRetry={() => void prepareFiles(preparation.sourceFiles)}
           onPrimaryAction={() => void createDraft()}
           onTranscriptionChange={setTranscription}
           onVisionChange={setAutoOpenAiVision}
+          onImproveChange={setAiImprove}
         />
         <JsonLdImportWizard collapsedByDefault />
       </div>

@@ -51,7 +51,12 @@ paths:
                         type: array
                         items:
                           type: string
-                          enum: [text-normalization, vision-extraction, image-generation]
+                          enum:
+                            - text-normalization
+                            - vision-extraction
+                            - image-generation
+                            - nutrition-estimation
+                            - recipe-improvement
   /ai/reviews:
     post:
       operationId: createAiReview
@@ -83,6 +88,20 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Household already exists }
+  /settings:
+    patch:
+      operationId: updateHouseholdSettings
+      summary: Update shared app and household display names
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HouseholdSettingsInput' }
+      responses:
+        '200': { description: Updated household settings }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Household setup required }
   /profiles:
     get:
       operationId: listProfiles
@@ -395,6 +414,72 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Recipe not found }
         '409': { description: Profile selection required or recipe revision conflict }
+  /recipes/{recipeId}/tags:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateRecipeTags
+      summary: Replace a recipe's tags and append a revision when its expected revision matches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeTagsUpdateInput' }
+      responses:
+        '200': { description: Recipe tags and revision saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required or recipe revision conflict }
+  /recipes/{recipeId}/nutrition/estimate:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: estimateRecipeNutrition
+      summary: Ask OpenAI to estimate per-serving nutrition and save it as a new recipe revision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiNutritionEstimationInput' }
+      responses:
+        '201': { description: Estimated nutrition saved as a new recipe revision }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required or recipe revision conflict }
+        '422': { description: OpenAI could not produce or save a valid estimate }
+        '429': { description: Profile AI-action rate limit reached }
+        '503': { description: OpenAI is not configured }
+  /recipes/{recipeId}/improve:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: improveRecipe
+      summary: Ask OpenAI for a review-only recipe improvement while preserving ingredients
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiRecipeImprovementInput' }
+      responses:
+        '201': { description: Editable improved candidate; the saved recipe is unchanged }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required or recipe revision conflict }
+        '422': { description: OpenAI could not produce a valid improved candidate }
+        '429': { description: Profile AI-action rate limit reached }
+        '503': { description: OpenAI is not configured }
   /recipes/{recipeId}/export:
     parameters:
       - name: recipeId
@@ -1017,8 +1102,82 @@ paths:
         '200': { description: Cooking session completed }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Cooking session not found }
+  /integrations/homepage/v1/summary:
+    servers:
+      - url: /api
+    get:
+      operationId: getHomepageSummary
+      summary: Return the private Homepage dashboard summary
+      description: >-
+        Read-only server-to-server summary. Requires the bearer token configured
+        in HOMEPAGE_INTEGRATION_TOKEN and returns no profile data, notes, checked
+        grocery items, or write actions.
+      security:
+        - HomepageBearer: []
+      responses:
+        '200':
+          description: Current presentation-ready Homepage summary
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'private, no-store' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HomepageSummary' }
+        '401':
+          description: Missing, invalid, or unconfigured integration credentials
 components:
+  securitySchemes:
+    HomepageBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque integration token
   schemas:
+    HomepageSummary:
+      type: object
+      required: [generatedAt, nextMeal, groceryList]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        nextMeal:
+          oneOf:
+            - { $ref: '#/components/schemas/HomepageNextMeal' }
+            - { type: 'null' }
+        groceryList:
+          oneOf:
+            - { $ref: '#/components/schemas/HomepageGroceryList' }
+            - { type: 'null' }
+    HomepageNextMeal:
+      type: object
+      required: [date, slot, title, recipeUrl, imageUrl, servings, scheduledFor]
+      properties:
+        date: { type: string, format: date }
+        slot: { type: string, enum: [breakfast, lunch, dinner, snack] }
+        title: { type: string }
+        recipeUrl: { type: string, format: uri, pattern: '^https://recipes\\.tower/' }
+        imageUrl:
+          oneOf:
+            - { type: string, format: uri, pattern: '^https://recipes\\.tower/' }
+            - { type: 'null' }
+        servings: { type: integer, minimum: 1 }
+        scheduledFor: { type: string, format: date-time }
+    HomepageGroceryList:
+      type: object
+      required: [title, updatedAt, totalItems, remainingItems, items]
+      properties:
+        title: { type: string }
+        updatedAt: { type: string, format: date-time }
+        totalItems: { type: integer, minimum: 0 }
+        remainingItems: { type: integer, minimum: 0 }
+        items:
+          type: array
+          maxItems: 5
+          items: { $ref: '#/components/schemas/HomepageGroceryItem' }
+    HomepageGroceryItem:
+      type: object
+      required: [name, quantity, category]
+      properties:
+        name: { type: string }
+        quantity: { type: string }
+        category: { type: string }
     ProfileInput:
       type: object
       required: [displayName, color, units, temperatureUnit, locale, timezone]
@@ -1105,12 +1264,14 @@ components:
             kind: { type: string, const: text-normalization }
             sourceText: { type: string, minLength: 20, maxLength: 30000 }
             sourceLabel: { type: string, minLength: 1, maxLength: 160 }
+            improve: { type: boolean, default: false }
         - type: object
           required: [confirm, kind, importId]
           properties:
             confirm: { type: boolean, const: true }
             kind: { type: string, const: vision-extraction }
             importId: { type: string, format: uuid }
+            improve: { type: boolean, default: false }
     AiImageGenerationRequest:
       type: object
       required: [confirm]
@@ -1137,6 +1298,13 @@ components:
         householdName: { type: string, minLength: 1, maxLength: 80 }
         appName: { type: string, minLength: 1, maxLength: 80 }
         profile: { $ref: '#/components/schemas/ProfileInput' }
+    HouseholdSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [householdName, appName]
+      properties:
+        householdName: { type: string, minLength: 1, maxLength: 80 }
+        appName: { type: string, minLength: 1, maxLength: 80 }
     RecipeInput:
       type: object
       required:
@@ -1166,7 +1334,10 @@ components:
         nutritionProteinGrams: { type: number, minimum: 0 }
         nutritionCarbohydrateGrams: { type: number, minimum: 0 }
         nutritionFatGrams: { type: number, minimum: 0 }
+        nutritionSaturatedFatGrams: { type: number, minimum: 0 }
         nutritionFiberGrams: { type: number, minimum: 0 }
+        nutritionSugarGrams: { type: number, minimum: 0 }
+        nutritionSodiumMilligrams: { type: number, minimum: 0 }
         tags: { type: array, items: { type: string } }
         ingredientGroups: { type: array, items: { type: object } }
         instructionSections: { type: array, items: { type: object } }
@@ -1177,6 +1348,31 @@ components:
           required: [expectedRevision]
           properties:
             expectedRevision: { type: integer, minimum: 1 }
+    RecipeTagsUpdateInput:
+      type: object
+      additionalProperties: false
+      required: [tags, expectedRevision]
+      properties:
+        tags:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 40 }
+        expectedRevision: { type: integer, minimum: 1 }
+    AiNutritionEstimationInput:
+      type: object
+      additionalProperties: false
+      required: [confirm, expectedRevision]
+      properties:
+        confirm: { type: boolean, const: true }
+        expectedRevision: { type: integer, minimum: 1 }
+    AiRecipeImprovementInput:
+      type: object
+      additionalProperties: false
+      required: [confirm, expectedRevision, recipe]
+      properties:
+        confirm: { type: boolean, const: true }
+        expectedRevision: { type: integer, minimum: 1 }
+        recipe: { $ref: '#/components/schemas/RecipeInput' }
     RecipeStatusInput:
       type: object
       required: [status, expectedRevision]

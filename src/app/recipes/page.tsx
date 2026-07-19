@@ -39,7 +39,7 @@ export default async function RecipeLibraryPage({
     <main className="recipe-page">
       <header className="recipe-header">
         <Link className="wordmark" href="/">
-          <span className="wordmark-mark">✦</span>
+          <span className="wordmark-mark" aria-hidden="true" />
           <span>Our Recipes</span>
         </Link>
         <div className="header-actions">

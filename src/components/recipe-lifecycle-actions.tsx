@@ -124,50 +124,52 @@ export function RecipeLifecycleActions({
 
   return (
     <div className="recipe-lifecycle-actions">
-      <button className="text-button" type="button" disabled={pending} onClick={duplicate}>
-        <Copy size={15} /> Duplicate
-      </button>
-      {favorite !== null && (
-        <button
-          className="text-button"
-          type="button"
-          disabled={pending}
-          onClick={toggleFavorite}
-          aria-pressed={favorite}
-        >
-          <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />{' '}
-          {favorite ? 'Favorite' : 'Save favorite'}
+      <div className="recipe-maintenance-actions" aria-label="Recipe maintenance actions">
+        <button className="text-button" type="button" disabled={pending} onClick={duplicate}>
+          <Copy size={15} /> Duplicate
         </button>
-      )}
-      {status === 'active' ? (
-        <button
-          className="text-button"
-          type="button"
-          disabled={pending}
-          onClick={() => updateStatus('archived')}
-        >
-          <Archive size={15} /> Archive
-        </button>
-      ) : (
-        <button
-          className="text-button"
-          type="button"
-          disabled={pending}
-          onClick={() => updateStatus('active')}
-        >
-          <RotateCcw size={15} /> Restore to library
-        </button>
-      )}
-      {status !== 'trash' && (
-        <button
-          className="text-button danger-text-button"
-          type="button"
-          disabled={pending}
-          onClick={() => updateStatus('trash')}
-        >
-          <Trash2 size={15} /> Move to trash
-        </button>
-      )}
+        {favorite !== null && (
+          <button
+            className="text-button"
+            type="button"
+            disabled={pending}
+            onClick={toggleFavorite}
+            aria-pressed={favorite}
+          >
+            <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />{' '}
+            {favorite ? 'Favorite' : 'Save favorite'}
+          </button>
+        )}
+        {status === 'active' ? (
+          <button
+            className="text-button"
+            type="button"
+            disabled={pending}
+            onClick={() => updateStatus('archived')}
+          >
+            <Archive size={15} /> Archive
+          </button>
+        ) : (
+          <button
+            className="text-button"
+            type="button"
+            disabled={pending}
+            onClick={() => updateStatus('active')}
+          >
+            <RotateCcw size={15} /> Restore to library
+          </button>
+        )}
+        {status !== 'trash' && (
+          <button
+            className="text-button danger-text-button"
+            type="button"
+            disabled={pending}
+            onClick={() => updateStatus('trash')}
+          >
+            <Trash2 size={15} /> Move to trash
+          </button>
+        )}
+      </div>
       {error && <span role="alert">{error}</span>}
       {personalPreference && (
         <form

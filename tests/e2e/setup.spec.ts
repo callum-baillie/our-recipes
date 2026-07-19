@@ -28,11 +28,6 @@ test('AI settings expose only a safe configuration state', async ({ page }) => {
   });
   expect(body.status.state === 'configured').toBe(body.status.enabled);
   expect(JSON.stringify(body)).not.toMatch(/sk-(?:proj-)?/u);
-  await page.goto('/settings/ai');
-  await expect(
-    page.getByRole('heading', { name: 'AI stays off until you choose otherwise.' }),
-  ).toBeVisible();
-  await expect(page.getByRole('status')).toHaveText(body.status.message);
 });
 
 test('a fresh household can complete the supported local release acceptance workflow', async ({
@@ -40,7 +35,7 @@ test('a fresh household can complete the supported local release acceptance work
 }, testInfo) => {
   // This intentionally covers the full supported household workflow. It takes
   // longer than Playwright's default in a fresh Linux CI environment.
-  testInfo.setTimeout(120_000);
+  testInfo.setTimeout(180_000);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Make this kitchen yours.' })).toBeVisible();
   await page.getByLabel('Household name').fill('The Garden Table');
@@ -49,7 +44,14 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(
     page.getByRole('heading', { name: 'Welcome to the kitchen, Callum.' }),
   ).toBeVisible();
-  await expect(page.getByText('Shared, not secured')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Make the week feel lighter.' })).toBeVisible();
+  await page.goto('/settings/ai');
+  await expect(page).toHaveURL('/settings#ai');
+  await expect(page.getByRole('heading', { name: 'Your kitchen, your way.' })).toBeVisible();
+  const aiStatus = (await (await page.request.get('/api/v1/ai/status')).json()) as {
+    status: { message: string };
+  };
+  await expect(page.locator('#ai').getByRole('status')).toHaveText(aiStatus.status.message);
   await page.goto('/recipes/new');
   await expect(page.getByRole('heading', { name: 'Add it your way.' })).toBeVisible();
   await expect(page.getByLabel('Recipe name')).toBeVisible();
@@ -85,11 +87,13 @@ test('a fresh household can complete the supported local release acceptance work
   page.once('dialog', (dialog) => dialog.accept());
   await weeknightTag.getByRole('button', { name: 'Remove' }).click();
   await expect(page.getByText('weeknight', { exact: true })).not.toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/import');
-  await expect(page.getByRole('heading', { name: 'Bring a recipe in.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Add from an image.' })).toBeVisible();
   let visionRequest: unknown;
   await page.route('**/api/v1/ai/reviews', async (route) => {
     visionRequest = route.request().postDataJSON();
+    await new Promise((resolve) => setTimeout(resolve, 750));
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -97,11 +101,29 @@ test('a fresh household can complete the supported local release acceptance work
           recipe: {
             title: 'Lemon pasta',
             summary: '',
+            status: 'active',
             servings: '4 servings',
             prepMinutes: 10,
             cookMinutes: 25,
+            restMinutes: 0,
+            difficulty: '',
+            cuisine: '',
+            category: '',
+            tips: '',
+            sharedNotes: '',
             sourceName: '',
             sourceUrl: '',
+            originalAuthor: '',
+            cookingMethod: '',
+            equipment: [],
+            nutritionCalories: '',
+            nutritionProteinGrams: '',
+            nutritionCarbohydrateGrams: '',
+            nutritionFatGrams: '',
+            nutritionSaturatedFatGrams: '',
+            nutritionFiberGrams: '',
+            nutritionSugarGrams: '',
+            nutritionSodiumMilligrams: '',
             tags: [],
             ingredientGroups: [
               {
@@ -122,14 +144,75 @@ test('a fresh household can complete the supported local release acceptance work
     });
   });
   const recipeDocumentInput = page.getByLabel('Recipe document or scan');
+  const mobilePng = await sharp({
+    create: { width: 8, height: 8, channels: 3, background: '#9f482f' },
+  })
+    .png()
+    .toBuffer();
+  await recipeDocumentInput.setInputFiles({
+    name: 'mobile-recipe.png',
+    mimeType: 'image/png',
+    buffer: mobilePng,
+  });
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByText('1 photo received. Preparing it on this device…'),
+  ).toBeVisible();
+  const mobilePngPreview = page.getByRole('img', { name: 'Preview of mobile-recipe.png' });
+  await expect(mobilePngPreview).toBeVisible();
+  await expect
+    .poll(() => mobilePngPreview.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBe(8);
+  await expect(page.getByRole('button', { name: 'Send to OpenAI and create draft' })).toBeEnabled();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    'mobile image import should not horizontally overflow',
+  ).toBe(true);
+
   await recipeDocumentInput.setInputFiles({
     name: 'unsupported.gif',
     mimeType: 'image/gif',
     buffer: Buffer.from('GIF89a'),
   });
-  await expect(page.getByText('Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.')).toBeVisible();
+  await expect(
+    page.getByRole('main').getByText('Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.'),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByText('Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.'),
+  ).toBeVisible();
   await expect(page.getByText(/PDFs use local text extraction first/)).toBeHidden();
   await expect(page.getByRole('button', { name: 'Choose another file' })).toBeEnabled();
+
+  await page.evaluate((fixture) => {
+    const input = document.querySelector<HTMLInputElement>('#recipe-import-files');
+    if (!input) throw new Error('Recipe file input is missing.');
+    const bytes = Uint8Array.from(atob(fixture.data), (character) => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(
+      new File([bytes], fixture.name, {
+        type: fixture.mimeType,
+        lastModified: Date.now(),
+      }),
+    );
+    Object.defineProperty(input, 'files', { configurable: true, value: transfer.files });
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    Reflect.deleteProperty(input, 'files');
+  }, HEIC_FIXTURES.heic);
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByText('1 photo received. Preparing it on this device…'),
+  ).toBeVisible();
+  const inputOnlyPreview = page.getByRole('img', {
+    name: `Preview of ${HEIC_FIXTURES.heic.name}`,
+  });
+  await expect(inputOnlyPreview).toBeVisible();
+  await expect
+    .poll(() => inputOnlyPreview.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
 
   await recipeDocumentInput.setInputFiles([
     {
@@ -144,9 +227,25 @@ test('a fresh household can complete the supported local release acceptance work
     },
   ]);
   await expect(page.getByText('iPhone photos were prepared as JPEG on this device.')).toBeVisible();
-  const createVisionReview = page.getByRole('button', { name: 'Create OpenAI review draft' });
+  const selectedPreviews = page.locator('.import-selected-preview img');
+  await expect(selectedPreviews).toHaveCount(2);
+  await expect
+    .poll(() =>
+      selectedPreviews.first().evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  const createVisionReview = page.getByRole('button', {
+    name: 'Send to OpenAI and create draft',
+  });
   await expect(createVisionReview).toBeEnabled();
+  const aiImproveImport = page.getByRole('checkbox', { name: /AI Improve/u });
+  await expect(aiImproveImport).toBeVisible();
+  await aiImproveImport.check();
   await createVisionReview.click();
+  const readingOverlays = page.locator('.import-source-preview-frame .import-preview-overlay');
+  await expect(readingOverlays).toHaveCount(2);
+  await expect(readingOverlays.first()).toContainText('OpenAI is reading this image');
+  await expect(page.getByText(/OpenAI is reading the normalized scan/)).toBeVisible();
   await expect(page.getByText('Review before saving')).toBeVisible();
   await expect
     .poll(() => visionRequest)
@@ -154,6 +253,7 @@ test('a fresh household can complete the supported local release acceptance work
       confirm: true,
       kind: 'vision-extraction',
       importId: expect.any(String),
+      improve: true,
     });
   await expect(page.getByText(/OpenAI read the normalized scans at your request/)).toBeVisible();
   const normalizedScans = page.getByRole('img', { name: /Normalized scan imported from/ });
@@ -163,9 +263,39 @@ test('a fresh household can complete the supported local release acceptance work
   await expect
     .poll(() => normalizedScan.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
+  await expect(page.locator('.import-source-preview-frame .import-preview-ready')).toHaveCount(2);
   await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Lemon pasta' })).toBeVisible();
   await page.unroute('**/api/v1/ai/reviews');
+
+  await page.goto('/import');
+  await page.route('**/api/v1/ai/reviews', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { message: 'OpenAI could not read this test image.' } }),
+    });
+  });
+  await page.getByLabel('Recipe document or scan').setInputFiles({
+    name: HEIC_FIXTURES.heic.name,
+    mimeType: HEIC_FIXTURES.heic.mimeType,
+    buffer: Buffer.from(HEIC_FIXTURES.heic.data, 'base64'),
+  });
+  await expect(page.getByRole('button', { name: 'Send to OpenAI and create draft' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Send to OpenAI and create draft' }).click();
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByText('OpenAI could not read this test image.'),
+  ).toBeVisible();
+  await expect(
+    page.locator('.import-source-preview-frame .import-preview-overlay.error'),
+  ).toContainText('OpenAI could not read this test image.');
+  await expect(page.getByRole('button', { name: 'Try OpenAI again' })).toBeVisible();
+  await page.unroute('**/api/v1/ai/reviews');
+
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/import');
   await page.getByRole('button', { name: /Paste Schema\.org JSON-LD/ }).click();
   await page.getByLabel('Schema.org JSON-LD').fill(
@@ -241,11 +371,11 @@ test('a fresh household can complete the supported local release acceptance work
       }),
     });
   });
-  await page.getByRole('tab', { name: 'Public URL' }).click();
+  await page.getByRole('tab', { name: 'From URL' }).click();
   await page.getByLabel('Public recipe URL').fill('https://recipes.example.test/soup');
-  await page.getByRole('button', { name: 'Create review draft' }).click();
+  await page.getByRole('button', { name: 'Find and normalize with AI' }).click();
   await expect(page.getByRole('heading', { name: 'Structured URL soup' })).toBeVisible();
-  await page.getByRole('button', { name: 'Review this recipe' }).click();
+  await page.getByRole('button', { name: 'Review with AI' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
   await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Structured URL soup' })).toBeVisible();
@@ -256,7 +386,7 @@ test('a fresh household can complete the supported local release acceptance work
     .fill(
       'Weeknight tomato soup\nIngredients\n2 tbsp olive oil\ncrushed tomatoes\nMethod\n1. Simmer the tomatoes until glossy.',
     );
-  await page.getByRole('button', { name: 'Create review draft' }).click();
+  await page.getByRole('button', { name: 'Normalize with OpenAI' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
   await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
@@ -336,26 +466,30 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByText('Revision 2')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'To serve' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Finish' })).toBeVisible();
-  await expect(page.getByText('oven-roasted', { exact: true })).toBeVisible();
+  await expect(page.getByText('Oven-Roasted', { exact: true })).toBeVisible();
   await expect(page.getByText('Sheet pan', { exact: true })).toBeVisible();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
   await page.getByLabel('Your rating').selectOption('5');
   await page.getByLabel('Personal note').fill('Use extra basil next time.');
   await page.getByRole('button', { name: 'Save personal preference' }).click();
-  await expect(page.getByRole('status')).toHaveText('Saved for your profile.');
-  await page.getByText('Revision history (2 saved versions)', { exact: true }).click();
+  await expect(page.locator('.recipe-personal-preference [role="status"]')).toHaveText(
+    'Saved for your profile.',
+  );
+  const recipeManagement = page.getByRole('region', { name: 'Recipe management' });
+  await recipeManagement.getByText('Revision history', { exact: true }).click();
+  await expect(recipeManagement.getByText('2 saved versions', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Restore revision 1' }).click();
   await expect(page.locator('.revision-restore-confirmation [role="status"]')).toContainText(
     'Restore revision 1?',
   );
   await page.getByRole('button', { name: 'Confirm restore' }).click();
-  await expect(page.getByText('Revision 3', { exact: true })).toBeVisible();
-  await expect(page.getByText('oven-roasted', { exact: true })).not.toBeVisible();
+  await expect(page.locator('.recipe-revision-badge')).toHaveText('Revision 3');
+  await expect(page.getByText('Oven-Roasted', { exact: true })).not.toBeVisible();
   await page.getByRole('link', { name: 'Cook this recipe' }).click();
   await page.getByRole('button', { name: 'Save favorite' }).click();
   await page.getByRole('button', { name: 'Start cooking' }).click();
   await page.getByLabel('Timer minutes').fill('1');
-  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('1:00')).toBeVisible();
   await page.getByRole('button', { name: 'Finish cooking' }).click();
   await page.getByRole('link', { name: '← Recipe card' }).click();
@@ -400,6 +534,11 @@ test('a fresh household can complete the supported local release acceptance work
     name: 'Our Recipes',
     display: 'standalone',
   });
+  const workerResponse = await page.request.get('/sw.js');
+  expect(workerResponse.ok()).toBe(true);
+  expect(workerResponse.headers()['cache-control']).toBe('no-cache, no-store, must-revalidate');
+  expect(workerResponse.headers()['service-worker-allowed']).toBe('/');
+  await expect(workerResponse.text()).resolves.toContain("const APP_VERSION = '0.1.0-beta.10';");
   await page.goto(recipeUrl);
   await page.waitForFunction(async () => {
     if (!('serviceWorker' in navigator)) return false;

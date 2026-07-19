@@ -4,11 +4,13 @@ import { ChevronLeft, FileText, Link2, LoaderCircle, ShieldCheck, Sparkles } fro
 import { useState } from 'react';
 
 import { RecipeForm } from '@/components/recipe-form';
+import { useToast } from '@/components/toast-provider';
 import type { AiRecipeCandidate } from '@/lib/domain/ai';
 import type { CaptureCandidate, CaptureDraft } from '@/lib/domain/capture';
 
-export function CaptureWizard() {
-  const [kind, setKind] = useState<'text' | 'url'>('text');
+export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' | 'url' }) {
+  const { showToast } = useToast();
+  const [kind, setKind] = useState<'text' | 'url'>(initialKind);
   const [value, setValue] = useState('');
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [candidates, setCandidates] = useState<CaptureCandidate[] | null>(null);
@@ -16,79 +18,101 @@ export function CaptureWizard() {
   const [pending, setPending] = useState(false);
   const [aiPending, setAiPending] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
+  const [aiImprove, setAiImprove] = useState(false);
 
-  async function askOpenAiToReview() {
-    if (!draft) return;
+  async function askOpenAiToReview(targetDraft = draft) {
+    if (!targetDraft) return;
     setAiPending(true);
     setError(null);
-    const response = await fetch('/api/v1/ai/reviews', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        confirm: true,
-        kind: 'text-normalization',
-        sourceText: draft.originalText.slice(0, 30_000),
-        sourceLabel: draft.provenance.sourceName,
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      candidate?: AiRecipeCandidate;
-      error?: { message?: string };
-    } | null;
-    setAiPending(false);
-    if (!response.ok || !body?.candidate) {
-      setError(body?.error?.message ?? 'OpenAI could not create a review draft.');
-      return;
+    try {
+      const response = await fetch('/api/v1/ai/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirm: true,
+          kind: 'text-normalization',
+          sourceText: targetDraft.originalText.slice(0, 30_000),
+          sourceLabel: targetDraft.provenance.sourceName,
+          improve: aiImprove,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        candidate?: AiRecipeCandidate;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.candidate) {
+        const message = body?.error?.message ?? 'OpenAI could not normalize this recipe.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      setDraft({
+        ...targetDraft,
+        recipe: body.candidate.recipe,
+        provenance: {
+          ...targetDraft.provenance,
+          warnings: [
+            ...(targetDraft.provenance.warnings ?? []),
+            'OpenAI suggested this review draft. Check every field before saving.',
+          ],
+        },
+      });
+      setAiVersion((version) => version + 1);
+      showToast('AI review draft ready. Check the details before saving.', 'success');
+    } catch {
+      const message =
+        'OpenAI could not be reached. Your locally prepared draft is still available to edit.';
+      setError(message);
+      showToast(message, 'error');
+    } finally {
+      setAiPending(false);
     }
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            recipe: body.candidate!.recipe,
-            provenance: {
-              ...current.provenance,
-              warnings: [
-                ...(current.provenance.warnings ?? []),
-                'OpenAI suggested this review draft. Check every field before saving.',
-              ],
-            },
-          }
-        : current,
-    );
-    setAiVersion((version) => version + 1);
   }
 
   async function createDraft(candidateIndex?: number) {
     setPending(true);
     setError(null);
-    const response = await fetch('/api/v1/capture-drafts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        kind === 'text'
-          ? { kind, text: value }
-          : { kind, url: value, ...(candidateIndex === undefined ? {} : { candidateIndex }) },
-      ),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      draft?: CaptureDraft;
-      candidates?: CaptureCandidate[];
-      error?: { message?: string };
-    } | null;
-    setPending(false);
-    if (!response.ok || !body) {
-      setError(body?.error?.message ?? 'We could not create a safe review draft.');
-      return;
+    try {
+      const response = await fetch('/api/v1/capture-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          kind === 'text'
+            ? { kind, text: value }
+            : { kind, url: value, ...(candidateIndex === undefined ? {} : { candidateIndex }) },
+        ),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        draft?: CaptureDraft;
+        candidates?: CaptureCandidate[];
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body) {
+        const message = body?.error?.message ?? 'We could not prepare a safe review draft.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      if (body.candidates) {
+        setCandidates(body.candidates);
+        showToast('Choose the recipe you want to normalize.', 'info');
+        return;
+      }
+      if (body.draft) {
+        setDraft(body.draft);
+        await askOpenAiToReview(body.draft);
+        return;
+      }
+      const message = 'The capture response did not contain a recipe review draft.';
+      setError(message);
+      showToast(message, 'error');
+    } catch {
+      const message = 'The recipe source could not be reached. Check the connection and try again.';
+      setError(message);
+      showToast(message, 'error');
+    } finally {
+      setPending(false);
     }
-    if (body.candidates) {
-      setCandidates(body.candidates);
-      return;
-    }
-    if (body.draft) {
-      setDraft(body.draft);
-      return;
-    }
-    setError('The capture response did not contain a recipe review draft.');
   }
 
   if (draft)
@@ -116,32 +140,36 @@ export function CaptureWizard() {
           <summary>View original extracted text</summary>
           <pre>{draft.originalText}</pre>
         </details>
-        <aside className="import-warnings" aria-label="Optional OpenAI review">
-          <p>
-            Optional: this sends the displayed source text to OpenAI for a structured review
-            suggestion. It uses a paid API only after you press the button, and it never saves a
-            recipe on its own.
-          </p>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => void askOpenAiToReview()}
-            disabled={aiPending || draft.originalText.trim().length < 20}
-          >
-            {aiPending ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
-            Use OpenAI for a review suggestion
-          </button>
-        </aside>
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
+        {aiPending ? (
+          <aside className="ai-waiting-panel" role="status" aria-live="polite">
+            <LoaderCircle className="spin" size={25} aria-hidden="true" />
+            <div>
+              <strong>OpenAI is organizing your recipe</strong>
+              <p>This can take a moment. Keep this page open while the review draft is prepared.</p>
+            </div>
+          </aside>
+        ) : error ? (
+          <aside className="ai-review-fallback">
+            <p>{error}</p>
+            <div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => void askOpenAiToReview()}
+              >
+                <Sparkles size={16} aria-hidden="true" /> Try AI normalization again
+              </button>
+              <span>You can also edit the locally prepared draft below.</span>
+            </div>
+          </aside>
+        ) : null}
+        {!aiPending && (
+          <RecipeForm
+            key={`capture-review-${aiVersion}`}
+            initial={draft.recipe}
+            confirmationLabel="Confirm and add to cookbook"
+          />
         )}
-        <RecipeForm
-          key={`capture-review-${aiVersion}`}
-          initial={draft.recipe}
-          confirmationLabel="Confirm and add to cookbook"
-        />
       </section>
     );
 
@@ -171,8 +199,8 @@ export function CaptureWizard() {
                 onClick={() => void createDraft(candidate.index)}
                 disabled={pending}
               >
-                {pending ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}
-                Review this recipe
+                {pending ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />}
+                {pending ? 'Preparing recipe…' : 'Review with AI'}
               </button>
             </article>
           ))}
@@ -198,11 +226,14 @@ export function CaptureWizard() {
   return (
     <section className="capture-layout">
       <div className="capture-intro">
-        <p className="eyebrow">REVIEW-FIRST CAPTURE</p>
-        <h1>Bring a recipe to the table, carefully.</h1>
+        <p className="eyebrow">{kind === 'text' ? 'PASTE OR DESCRIBE' : 'FROM A PUBLIC URL'}</p>
+        <h1>
+          {kind === 'text' ? 'Turn your notes into a recipe.' : 'Bring a recipe in from the web.'}
+        </h1>
         <p>
-          Paste recipe text or use a public page. Nothing reaches your shared cookbook until you
-          review and confirm the structured draft.
+          {kind === 'text'
+            ? 'Paste a complete recipe or describe what you want. OpenAI will organize it into an editable review draft.'
+            : 'We safely read the public page, then OpenAI organizes the recipe you choose into an editable draft.'}
         </p>
       </div>
       <div className="capture-card">
@@ -213,7 +244,7 @@ export function CaptureWizard() {
             aria-selected={kind === 'text'}
             onClick={() => setKind('text')}
           >
-            <FileText size={17} /> Paste text
+            <FileText size={17} /> Paste / AI
           </button>
           <button
             type="button"
@@ -221,18 +252,18 @@ export function CaptureWizard() {
             aria-selected={kind === 'url'}
             onClick={() => setKind('url')}
           >
-            <Link2 size={17} /> Public URL
+            <Link2 size={17} /> From URL
           </button>
         </div>
         {kind === 'text' ? (
           <label>
-            <span>Recipe text</span>
+            <span>Recipe text or request</span>
             <textarea
               value={value}
               onChange={(event) => setValue(event.target.value)}
               rows={12}
               placeholder={
-                'Tomato soup\n\nIngredients\n2 tbsp olive oil\n...\n\nMethod\n1. Warm the oil.'
+                'Paste a recipe here, or describe one: “Create a quick lemon pasta for four…”'
               }
             />
           </label>
@@ -248,10 +279,27 @@ export function CaptureWizard() {
           </label>
         )}
         <p className="capture-safety">
-          <ShieldCheck size={16} /> URLs are fetched server-side with private-network, redirect,
-          type, timeout, and size limits. Embedded Recipe metadata is parsed locally; we never
-          download page images or run page scripts.
+          <ShieldCheck size={16} />
+          {kind === 'url'
+            ? 'URLs are fetched with private-network, redirect, type, timeout, and size limits. Page scripts never run.'
+            : 'One paid OpenAI request starts only when you press the button. Nothing is saved until you confirm the draft.'}
         </p>
+        <label className="ai-improve-choice">
+          <input
+            type="checkbox"
+            checked={aiImprove}
+            onChange={(event) => setAiImprove(event.target.checked)}
+          />
+          <span>
+            <strong>
+              <Sparkles size={17} aria-hidden="true" /> AI Improve
+            </strong>
+            <small>
+              Keep the ingredients, while OpenAI fixes spelling, clarifies and completes the steps,
+              and fills responsible timing and serving estimates.
+            </small>
+          </span>
+        </label>
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -261,10 +309,16 @@ export function CaptureWizard() {
           className="primary-button"
           type="button"
           onClick={() => void createDraft()}
-          disabled={pending || !value.trim()}
+          disabled={pending || value.trim().length < (kind === 'text' ? 20 : 1)}
         >
-          {pending ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />} Create
-          review draft
+          {pending ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />}
+          {pending
+            ? kind === 'url'
+              ? 'Reading recipe page…'
+              : 'Preparing recipe…'
+            : kind === 'url'
+              ? 'Find and normalize with AI'
+              : 'Normalize with OpenAI'}
         </button>
       </div>
     </section>

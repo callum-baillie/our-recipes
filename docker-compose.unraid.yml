@@ -11,6 +11,7 @@ services:
       APP_ORIGIN: http://recipes.lan:3000
       COOKIE_SECRET: replace-with-a-unique-secret-of-at-least-32-characters
       TZ: America/Los_Angeles
+      HOMEPAGE_INTEGRATION_TOKEN: ${HOMEPAGE_INTEGRATION_TOKEN:-}
       BACKUP_INTERVAL_HOURS: 24
       BACKUP_RETENTION_DAYS: 30
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

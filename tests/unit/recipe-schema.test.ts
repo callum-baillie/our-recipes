@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  joinRecipeTaxonomyValues,
+  parseRecipeTaxonomyValues,
   recipeInputSchema,
   recipeLibraryQuerySchema,
   recipePreferenceInputSchema,
+  recipeTagsUpdateSchema,
 } from '@/lib/domain/recipe';
 
 describe('recipeInputSchema', () => {
@@ -24,6 +27,38 @@ describe('recipeInputSchema', () => {
     });
     expect(recipe.tags).toEqual(['weeknight']);
     expect(recipe.ingredientGroups[0]?.ingredients[0]?.quantity).toBe(2);
+  });
+
+  it('normalizes multi-value categories and cuisines without breaking legacy strings', () => {
+    expect(parseRecipeTaxonomyValues(undefined)).toEqual([]);
+    expect(parseRecipeTaxonomyValues('Dinner; Main dish, dinner\nFamily table')).toEqual([
+      'Dinner',
+      'Main dish',
+      'Family table',
+    ]);
+    expect(joinRecipeTaxonomyValues(['Italian', 'Mediterranean', 'italian'])).toBe(
+      'Italian, Mediterranean',
+    );
+
+    const recipe = recipeInputSchema.parse({
+      title: 'Sunday pasta',
+      summary: '',
+      servings: '4 servings',
+      prepMinutes: 10,
+      cookMinutes: 20,
+      category: 'Dinner; Main dish, dinner',
+      cuisine: 'Italian\nMediterranean',
+      sourceName: '',
+      sourceUrl: '',
+      tags: [],
+      ingredientGroups: [
+        { name: '', ingredients: [{ quantity: 1, unit: 'lb', item: 'pasta', note: '' }] },
+      ],
+      instructionSections: [{ title: '', steps: ['Cook the pasta.'] }],
+    });
+
+    expect(recipe.category).toBe('Dinner, Main dish');
+    expect(recipe.cuisine).toBe('Italian, Mediterranean');
   });
 
   it('supplies additive metadata defaults and accepts multiple recipe sections', () => {
@@ -72,7 +107,10 @@ describe('recipeInputSchema', () => {
       nutritionProteinGrams: 5,
       nutritionCarbohydrateGrams: '',
       nutritionFatGrams: 14,
+      nutritionSaturatedFatGrams: 3,
       nutritionFiberGrams: 6,
+      nutritionSugarGrams: 9,
+      nutritionSodiumMilligrams: 410,
       tags: [],
       ingredientGroups: [
         { name: '', ingredients: [{ quantity: 1, unit: 'kg', item: 'tomatoes', note: '' }] },
@@ -86,7 +124,10 @@ describe('recipeInputSchema', () => {
       nutritionCalories: 230,
       nutritionProteinGrams: 5,
       nutritionFatGrams: 14,
+      nutritionSaturatedFatGrams: 3,
       nutritionFiberGrams: 6,
+      nutritionSugarGrams: 9,
+      nutritionSodiumMilligrams: 410,
     });
     expect(recipePreferenceInputSchema.parse({ rating: '5', note: 'Use less salt.' })).toEqual({
       rating: 5,
@@ -105,5 +146,24 @@ describe('recipeInputSchema', () => {
         maxTotalMinutes: '45',
       }),
     ).toMatchObject({ status: 'archived', sort: 'highest-rated', maxTotalMinutes: 45, page: 1 });
+  });
+
+  it('validates a strict revisioned tag-only update', () => {
+    expect(
+      recipeTagsUpdateSchema.parse({
+        tags: [' Weeknight ', 'weeknight', 'Family'],
+        expectedRevision: '2',
+      }),
+    ).toEqual({ tags: ['weeknight', 'family'], expectedRevision: 2 });
+    expect(
+      recipeTagsUpdateSchema.safeParse({ tags: [], expectedRevision: 1, title: 'Not allowed' })
+        .success,
+    ).toBe(false);
+    expect(
+      recipeTagsUpdateSchema.safeParse({
+        tags: Array.from({ length: 21 }, (_, index) => `tag-${index}`),
+        expectedRevision: 1,
+      }).success,
+    ).toBe(false);
   });
 });

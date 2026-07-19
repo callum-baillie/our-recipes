@@ -3,7 +3,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import type { PDFDocumentLoadingTask } from 'pdfjs-dist/types/src/display/api';
 
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
-import { importArtifacts, importOperations } from '@/lib/db/schema';
+import { aiOperationAudits, importArtifacts, importOperations } from '@/lib/db/schema';
 import {
   MAX_IMPORT_PDF_PAGES,
   MAX_IMPORT_TEXT_CHARACTERS,
@@ -449,6 +449,44 @@ export function listImportOperations(limit = 30): ImportOperation[] {
     .limit(Math.max(1, Math.min(limit, 100)))
     .all()
     .map(toOperation);
+}
+
+export type RecipeImportProvenance = {
+  label: string;
+  sourceName: string;
+  extractionMethod: ImportExtractionMethod;
+};
+
+export function getRecipeImportProvenance(recipeId: string): RecipeImportProvenance | null {
+  ensureDatabase();
+  const operation = getDatabase()
+    .select()
+    .from(importOperations)
+    .where(eq(importOperations.confirmedRecipeId, recipeId))
+    .orderBy(desc(importOperations.confirmedAt), desc(importOperations.createdAt))
+    .get();
+  if (!operation) return null;
+
+  const successfulAiReview = getDatabase()
+    .select({ id: aiOperationAudits.id })
+    .from(aiOperationAudits)
+    .where(
+      and(eq(aiOperationAudits.importId, operation.id), eq(aiOperationAudits.status, 'succeeded')),
+    )
+    .get();
+
+  let method: string;
+  if (successfulAiReview) method = 'Normalized by OpenAI';
+  else if (operation.extractionMethod === 'local-ocr') method = 'Local OCR';
+  else if (operation.extractionMethod === 'manual-transcription') method = 'Manual transcription';
+  else if (operation.extractionMethod === 'pdf-text') method = 'Embedded text';
+  else method = 'Manual review';
+
+  return {
+    label: `${operation.kind === 'image' ? 'Image' : 'PDF'} import (${method})`,
+    sourceName: operation.sourceName,
+    extractionMethod: operation.extractionMethod,
+  };
 }
 
 export async function getImportArtifact(

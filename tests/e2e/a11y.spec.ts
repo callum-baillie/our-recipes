@@ -55,7 +55,7 @@ test('first-run setup and household organization have no automatically detectabl
     mimeType: 'image/png',
     buffer: handwrittenRecipe,
   });
-  await expect(page.getByRole('button', { name: 'Create OpenAI review draft' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Send to OpenAI and create draft' })).toBeEnabled();
   await page.getByText('Add your own transcription').click();
   await page
     .getByLabel('Manual transcription (optional)')
@@ -100,9 +100,9 @@ test('first-run setup and household organization have no automatically detectabl
       }),
     });
   });
-  await page.getByRole('tab', { name: 'Public URL' }).click();
+  await page.getByRole('tab', { name: 'From URL' }).click();
   await page.getByLabel('Public recipe URL').fill('https://recipes.example.test/soup');
-  await page.getByRole('button', { name: 'Create review draft' }).click();
+  await page.getByRole('button', { name: 'Find and normalize with AI' }).click();
   const urlCandidateResults = await new AxeBuilder({ page }).analyze();
   expect(urlCandidateResults.violations).toEqual([]);
 });
