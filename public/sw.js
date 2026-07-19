@@ -1,4 +1,4 @@
-const APP_VERSION = '0.1.0-beta.10';
+const APP_VERSION = '0.1.0-beta.11';
 const CACHE_PREFIX = 'our-recipes-read-';
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 const OFFLINE_URL = '/offline';
