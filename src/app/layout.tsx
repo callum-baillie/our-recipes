@@ -10,6 +10,8 @@ import { getHouseholdState } from '@/lib/services/household-service';
 
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Our Recipes',
   description: 'A self-hosted household recipe manager.',
