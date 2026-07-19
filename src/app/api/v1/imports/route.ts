@@ -73,6 +73,11 @@ export async function POST(request: Request) {
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     if (error instanceof ImportValidationError) return jsonError(422, error.code, error.message);
-    return jsonError(400, 'invalid_import', 'The recipe document could not be imported safely.');
+    console.error('Import processing failed before provider review.', error);
+    return jsonError(
+      500,
+      'import_processing_failed',
+      'The app could not process this upload. Your selected files were not saved; try again after checking the server logs.',
+    );
   }
 }

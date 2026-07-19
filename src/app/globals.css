@@ -3925,10 +3925,11 @@ small {
     height: 1.75rem;
   }
   .toast-region {
-    top: auto;
+    top: max(5rem, calc(env(safe-area-inset-top) + 4rem));
     right: max(0.75rem, env(safe-area-inset-right));
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    bottom: auto;
     left: max(0.75rem, env(safe-area-inset-left));
+    align-content: start;
     width: auto;
   }
 }

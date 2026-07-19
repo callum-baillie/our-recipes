@@ -238,10 +238,20 @@ test('a fresh household can complete the supported local release acceptance work
     name: 'Send to OpenAI and create draft',
   });
   await expect(createVisionReview).toBeEnabled();
+  let importRequestCount = 0;
+  await page.route('**/api/v1/imports', async (route) => {
+    importRequestCount += 1;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.continue();
+  });
   const aiImproveImport = page.getByRole('checkbox', { name: /AI Improve/u });
   await expect(aiImproveImport).toBeVisible();
   await aiImproveImport.check();
-  await createVisionReview.click();
+  await createVisionReview.evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
+  await expect(page.getByRole('button', { name: 'Creating review draft…' })).toBeDisabled();
   const readingOverlays = page.locator('.import-source-preview-frame .import-preview-overlay');
   await expect(readingOverlays).toHaveCount(2);
   await expect(readingOverlays.first()).toContainText('OpenAI is reading this image');
@@ -264,9 +274,45 @@ test('a fresh household can complete the supported local release acceptance work
     .poll(() => normalizedScan.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
   await expect(page.locator('.import-source-preview-frame .import-preview-ready')).toHaveCount(2);
+  expect(importRequestCount).toBe(1);
+  await page.unroute('**/api/v1/imports');
   await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Lemon pasta' })).toBeVisible();
   await page.unroute('**/api/v1/ai/reviews');
+
+  await page.goto('/import');
+  await page.route('**/api/v1/imports', async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: {
+          message:
+            'The app could not process this upload. Your selected files were not saved; try again after checking the server logs.',
+        },
+      }),
+    });
+  });
+  await page.getByLabel('Recipe document or scan').setInputFiles({
+    name: 'runtime-failure.png',
+    mimeType: 'image/png',
+    buffer: mobilePng,
+  });
+  const failedUploadAction = page.getByRole('button', {
+    name: 'Send to OpenAI and create draft',
+  });
+  await expect(failedUploadAction).toBeEnabled();
+  await failedUploadAction.click();
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByText(
+        'The app could not process this upload. Your selected files were not saved; try again after checking the server logs.',
+      ),
+  ).toBeVisible();
+  await expect(failedUploadAction).toBeEnabled();
+  await expect(page.getByRole('img', { name: 'Preview of runtime-failure.png' })).toBeVisible();
+  await page.unroute('**/api/v1/imports');
 
   await page.goto('/import');
   await page.route('**/api/v1/ai/reviews', async (route) => {

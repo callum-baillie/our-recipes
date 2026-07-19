@@ -40,6 +40,12 @@ COPY --chown=recipes:recipes scripts/container-entrypoint.sh ./scripts/container
 # optional provider imports must be present beside the standalone runtime.
 COPY --from=builder --chown=recipes:recipes /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 COPY --from=builder --chown=recipes:recipes /app/node_modules/openai ./node_modules/openai
+# Sharp loads its platform-specific native binding and bundled libvips from
+# optional @img packages at runtime. Next's standalone trace can include the
+# Sharp JavaScript wrapper without those native packages, so copy both
+# explicitly for each buildx target architecture.
+COPY --from=builder --chown=recipes:recipes /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder --chown=recipes:recipes /app/node_modules/@img ./node_modules/@img
 # PDF.js parses recipe PDFs through its Node legacy build. Its optional canvas
 # bridge provides DOMMatrix and must ship beside the standalone server.
 COPY --from=builder --chown=recipes:recipes /app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist
@@ -51,6 +57,8 @@ COPY --from=builder --chown=recipes:recipes /app/node_modules/tesseract.js ./nod
 COPY --from=builder --chown=recipes:recipes /app/node_modules/tesseract.js-core ./node_modules/tesseract.js-core
 COPY --from=builder --chown=recipes:recipes /app/node_modules/wasm-feature-detect ./node_modules/wasm-feature-detect
 COPY --from=builder --chown=recipes:recipes /app/node_modules/@tesseract.js-data/eng ./node_modules/@tesseract.js-data/eng
+COPY --from=builder --chown=recipes:recipes /app/scripts/verify-container-runtime.mjs ./scripts/verify-container-runtime.mjs
+RUN node ./scripts/verify-container-runtime.mjs
 RUN chmod 0755 ./scripts/container-entrypoint.sh
 EXPOSE 3000
 VOLUME ["/data"]

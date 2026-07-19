@@ -45,11 +45,13 @@ type ImportUploadPanelProps = {
   canUseVision: boolean;
   willUseVision: boolean;
   canRetryPreparation: boolean;
+  previewsReady: boolean;
   onInputClick: () => void;
   onFileInput: (event: FormEvent<HTMLInputElement>) => void;
   onChooseFiles: () => void;
   onDropFiles: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
+  onPreviewReady: (previewKey: string) => void;
   onPreviewError: (message: string) => void;
   onRetry: () => void;
   onPrimaryAction: () => void;
@@ -103,11 +105,13 @@ function SelectedImagePreview({
   item,
   phase,
   error,
+  onPreviewReady,
   onPreviewError,
 }: {
   item: ImportSelectionItem;
   phase: ImportPreparationPhase;
   error: string | null;
+  onPreviewReady: (previewKey: string) => void;
   onPreviewError: (message: string) => void;
 }) {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -146,7 +150,10 @@ function SelectedImagePreview({
         <img
           ref={imageRef}
           alt={`Preview of ${item.sourceName}`}
-          onLoad={() => setLoadState('ready')}
+          onLoad={() => {
+            setLoadState('ready');
+            onPreviewReady(item.previewKey);
+          }}
           onError={() => {
             if (!item.previewReady) return;
             setLoadState('error');
@@ -182,12 +189,14 @@ function SelectedFiles({
   phase,
   error,
   onRemoveFile,
+  onPreviewReady,
   onPreviewError,
 }: {
   items: ImportSelectionItem[];
   phase: ImportPreparationPhase;
   error: string | null;
   onRemoveFile: (index: number) => void;
+  onPreviewReady: (previewKey: string) => void;
   onPreviewError: (message: string) => void;
 }) {
   if (!items.length) return null;
@@ -211,6 +220,7 @@ function SelectedFiles({
                 item={item}
                 phase={phase}
                 error={error}
+                onPreviewReady={onPreviewReady}
                 onPreviewError={onPreviewError}
               />
             ) : (
@@ -263,11 +273,13 @@ export function ImportUploadPanel({
   canUseVision,
   willUseVision,
   canRetryPreparation,
+  previewsReady,
   onInputClick,
   onFileInput,
   onChooseFiles,
   onDropFiles,
   onRemoveFile,
+  onPreviewReady,
   onPreviewError,
   onRetry,
   onPrimaryAction,
@@ -276,22 +288,25 @@ export function ImportUploadPanel({
   onImproveChange,
 }: ImportUploadPanelProps) {
   const hasSelection = items.length > 0;
-  const busy = phase === 'preparing' || phase === 'submitting';
-  const ready = phase === 'ready';
+  const waitingForPreviews = phase === 'ready' && !previewsReady;
+  const busy = phase === 'preparing' || phase === 'submitting' || waitingForPreviews;
+  const ready = phase === 'ready' && previewsReady;
   const actionLabel =
     phase === 'preparing'
       ? 'Preparing your selection…'
       : phase === 'submitting'
         ? 'Creating review draft…'
-        : phase === 'error'
-          ? canRetryPreparation
-            ? 'Try preparation again'
-            : 'Choose another file'
-          : ready
-            ? willUseVision
-              ? 'Send to OpenAI and create draft'
-              : 'Create review draft'
-            : 'Choose photos or PDF';
+        : waitingForPreviews
+          ? 'Finishing image preview…'
+          : phase === 'error'
+            ? canRetryPreparation
+              ? 'Try preparation again'
+              : 'Choose another file'
+            : ready
+              ? willUseVision
+                ? 'Send to OpenAI and create draft'
+                : 'Create review draft'
+              : 'Choose photos or PDF';
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -301,7 +316,10 @@ export function ImportUploadPanel({
 
   return (
     <div className="import-workspace-card" aria-busy={busy}>
-      <ImportProgress phase={phase} hasSelection={hasSelection} />
+      <ImportProgress
+        phase={waitingForPreviews ? 'preparing' : phase}
+        hasSelection={hasSelection}
+      />
 
       <div
         className={`import-upload-dropzone ${hasSelection ? 'has-selection' : ''}`}
@@ -338,15 +356,22 @@ export function ImportUploadPanel({
         phase={phase}
         error={error}
         onRemoveFile={onRemoveFile}
+        onPreviewReady={onPreviewReady}
         onPreviewError={onPreviewError}
       />
 
-      {phase === 'preparing' ? (
+      {phase === 'preparing' || waitingForPreviews ? (
         <div className="import-readiness preparing" role="status">
           <LoaderCircle className="spin" size={22} aria-hidden="true" />
           <div>
-            <strong>Preparing on this device</strong>
-            <span>Checking files and converting iPhone photos when needed.</span>
+            <strong>
+              {waitingForPreviews ? 'Finishing image preview' : 'Preparing on this device'}
+            </strong>
+            <span>
+              {waitingForPreviews
+                ? 'The review action will unlock after every selected image is ready.'
+                : 'Checking files and converting iPhone photos when needed.'}
+            </span>
           </div>
         </div>
       ) : ready ? (
