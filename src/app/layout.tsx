@@ -56,8 +56,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           ) : null}
           {children}
           <AppFooter />
+          <PwaRegistration />
         </ToastProvider>
-        <PwaRegistration />
       </body>
     </html>
   );

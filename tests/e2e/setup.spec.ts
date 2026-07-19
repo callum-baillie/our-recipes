@@ -534,6 +534,11 @@ test('a fresh household can complete the supported local release acceptance work
     name: 'Our Recipes',
     display: 'standalone',
   });
+  const workerResponse = await page.request.get('/sw.js');
+  expect(workerResponse.ok()).toBe(true);
+  expect(workerResponse.headers()['cache-control']).toBe('no-cache, no-store, must-revalidate');
+  expect(workerResponse.headers()['service-worker-allowed']).toBe('/');
+  await expect(workerResponse.text()).resolves.toContain("const APP_VERSION = '0.1.0-beta.10';");
   await page.goto(recipeUrl);
   await page.waitForFunction(async () => {
     if (!('serviceWorker' in navigator)) return false;

@@ -1,6 +1,6 @@
 {
   "name": "our-recipes",
-  "version": "0.1.0-beta.8",
+  "version": "0.1.0-beta.10",
   "private": true,
   "description": "A self-hosted household recipe manager for a local Unraid deployment.",
   "packageManager": "pnpm@11.12.0",
