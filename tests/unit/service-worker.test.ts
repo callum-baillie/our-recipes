@@ -5,6 +5,9 @@ import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
 const workerSource = readFileSync(join(process.cwd(), 'public', 'sw.js'), 'utf8');
+const appVersion = (
+  JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version: string }
+).version;
 
 type WorkerListener = (event: {
   data?: unknown;
@@ -86,17 +89,13 @@ function loadWorker({ cacheKeys, isUpdate }: { cacheKeys: string[]; isUpdate: bo
 
 describe('PWA service worker updates', () => {
   it('keeps its release version synchronized with package metadata', () => {
-    const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as {
-      version: string;
-    };
-
-    expect(workerSource).toContain(`const APP_VERSION = '${packageJson.version}';`);
+    expect(workerSource).toContain(`const APP_VERSION = '${appVersion}';`);
     expect(workerSource).toContain("const CACHE_PREFIX = 'our-recipes-read-';");
   });
 
   it('deletes obsolete app caches and refreshes controlled clients during an update', async () => {
     const worker = loadWorker({
-      cacheKeys: ['our-recipes-read-v2', 'our-recipes-read-0.1.0-beta.10', 'another-app-cache'],
+      cacheKeys: ['our-recipes-read-v2', `our-recipes-read-${appVersion}`, 'another-app-cache'],
       isUpdate: true,
     });
 
@@ -104,16 +103,16 @@ describe('PWA service worker updates', () => {
 
     expect(worker.deletedCaches).toEqual(['our-recipes-read-v2']);
     expect(worker.clients.claim).toHaveBeenCalledOnce();
-    expect(worker.messages).toEqual([{ type: 'OUR_RECIPES_UPDATED', version: '0.1.0-beta.10' }]);
+    expect(worker.messages).toEqual([{ type: 'OUR_RECIPES_UPDATED', version: appVersion }]);
     expect(worker.navigations).toHaveLength(1);
     expect(new URL(worker.navigations[0]!).searchParams.get('__our_recipes_updated')).toBe(
-      '0.1.0-beta.10',
+      appVersion,
     );
   });
 
   it('claims clients without reloading them on a true first install', async () => {
     const worker = loadWorker({
-      cacheKeys: ['our-recipes-read-0.1.0-beta.10', 'another-app-cache'],
+      cacheKeys: [`our-recipes-read-${appVersion}`, 'another-app-cache'],
       isUpdate: false,
     });
 

@@ -183,17 +183,22 @@ export function ImportWizard() {
   const [error, setError] = useState<string | null>(null);
   const [aiPending, setAiPending] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
+  const [readyPreviewKeys, setReadyPreviewKeys] = useState<Set<string>>(() => new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const preparationAttemptRef = useRef(0);
   const lastSelectionSignatureRef = useRef('');
+  const submitInFlightRef = useRef(false);
   const hasOnlyImageScans =
     preparation.preparedFiles.length > 0 && preparation.preparedFiles.every(isImageFile);
   const shouldAutoOpenAiVision =
     autoOpenAiVision && hasOnlyImageScans && transcription.trim().length === 0;
   const items = selectionItems(preparation);
+  const expectedPreviewKeys = items.filter((item) => item.isImage).map((item) => item.previewKey);
+  const previewsReady = expectedPreviewKeys.every((key) => readyPreviewKeys.has(key));
 
   async function prepareFiles(selected: File[]) {
     if (!selected.length) {
+      setReadyPreviewKeys(new Set());
       setPreparation(EMPTY_PREPARATION);
       return;
     }
@@ -201,6 +206,7 @@ export function ImportWizard() {
     const selectionError = validateSelection(selected);
     if (selectionError) {
       preparationAttemptRef.current += 1;
+      setReadyPreviewKeys(new Set());
       setPreparation({
         phase: 'error',
         sourceFiles: selected,
@@ -215,6 +221,7 @@ export function ImportWizard() {
 
     const attempt = preparationAttemptRef.current + 1;
     preparationAttemptRef.current = attempt;
+    setReadyPreviewKeys(new Set());
     setPreparation({
       phase: 'preparing',
       sourceFiles: selected,
@@ -289,6 +296,7 @@ export function ImportWizard() {
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (!remaining.length) {
       preparationAttemptRef.current += 1;
+      setReadyPreviewKeys(new Set());
       setPreparation(EMPTY_PREPARATION);
       setError(null);
       return;
@@ -297,10 +305,22 @@ export function ImportWizard() {
   }
 
   async function createDraft() {
+    if (submitInFlightRef.current || preparation.phase === 'submitting') return;
+    if (preparation.phase === 'ready' && preparation.preparedFiles.length > 0 && !previewsReady) {
+      const message = 'Wait for every selected image preview to finish loading before review.';
+      setError(message);
+      showToast(message, 'info');
+      return;
+    }
     if (preparation.phase !== 'ready' || preparation.preparedFiles.length === 0) {
+      if (preparation.phase === 'preparing') {
+        showToast('Your selected files are still being prepared.', 'info');
+        return;
+      }
       openFilePicker();
       return;
     }
+    submitInFlightRef.current = true;
     const readyPreparation = preparation;
     setPreparation((current) => ({ ...current, phase: 'submitting' }));
     setError(null);
@@ -343,7 +363,26 @@ export function ImportWizard() {
         'The local app could not start this review. Check the connection and try again; your selected files remain on this device.';
       setError(message);
       showToast(message, 'error');
+    } finally {
+      submitInFlightRef.current = false;
     }
+  }
+
+  function markPreviewReady(previewKey: string) {
+    setReadyPreviewKeys((current) => {
+      if (current.has(previewKey)) return current;
+      const next = new Set(current);
+      next.add(previewKey);
+      return next;
+    });
+  }
+
+  function handlePreviewError(message: string) {
+    setPreparation((current) =>
+      current.phase === 'submitting' ? current : { ...current, phase: 'error', canRetry: true },
+    );
+    setError(message);
+    showToast(message, 'error');
   }
 
   async function askOpenAiToReview(imported = created) {
@@ -621,6 +660,7 @@ export function ImportWizard() {
           canUseVision={hasOnlyImageScans}
           willUseVision={shouldAutoOpenAiVision}
           canRetryPreparation={preparation.canRetry}
+          previewsReady={previewsReady}
           onInputClick={prepareForFilePicker}
           onFileInput={handleFileInput}
           onChooseFiles={openFilePicker}
@@ -629,7 +669,8 @@ export function ImportWizard() {
             void prepareFiles(selected);
           }}
           onRemoveFile={removeFile}
-          onPreviewError={(message) => showToast(message, 'error')}
+          onPreviewReady={markPreviewReady}
+          onPreviewError={handlePreviewError}
           onRetry={() => void prepareFiles(preparation.sourceFiles)}
           onPrimaryAction={() => void createDraft()}
           onTranscriptionChange={setTranscription}
