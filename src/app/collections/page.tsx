@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default function CollectionsPage() {
   return (
     <>
-      <header className="recipe-page settings-header">
+      <nav className="recipe-page settings-header" aria-label="Collection navigation">
         <div className="recipe-header">
           <Link className="wordmark" href="/">
             <span className="wordmark-mark" aria-hidden="true" />
@@ -18,7 +18,7 @@ export default function CollectionsPage() {
             Back to library
           </Link>
         </div>
-      </header>
+      </nav>
       <CollectionManager initialCollections={listCollections()} />
     </>
   );

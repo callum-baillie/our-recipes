@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default function TagsPage() {
   return (
     <>
-      <header className="recipe-page settings-header">
+      <nav className="recipe-page settings-header" aria-label="Tag settings navigation">
         <div className="recipe-header">
           <Link className="wordmark" href="/">
             <span className="wordmark-mark" aria-hidden="true" />
@@ -18,7 +18,7 @@ export default function TagsPage() {
             Back to kitchen
           </Link>
         </div>
-      </header>
+      </nav>
       <TagManager
         initialTags={listTags().map(({ name, color, usageCount }) => ({ name, color, usageCount }))}
       />

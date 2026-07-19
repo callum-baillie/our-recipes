@@ -99,10 +99,10 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   const recipeUrl = page.url();
 
   await page.goto('/');
-  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
-    'content',
-    /user-scalable=no/u,
-  );
+  const viewportContent = await page.locator('meta[name="viewport"]').getAttribute('content');
+  expect(viewportContent).toContain('width=device-width');
+  expect(viewportContent).toContain('viewport-fit=cover');
+  expect(viewportContent).not.toMatch(/user-scalable=no|maximum-scale=1/u);
   const addRecipeTrigger = page.getByRole('link', { name: 'Add a recipe' });
   await expect(page.locator('.profile-switcher summary .profile-dot')).toHaveText('M');
   await expect(page.locator('.app-footer')).toContainText('Built for a trusted household network.');
