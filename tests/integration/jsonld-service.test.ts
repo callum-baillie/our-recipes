@@ -46,6 +46,14 @@ describe('JSON-LD recipe export', () => {
         sharedNotes: 'Maya likes extra lemon.',
         sourceName: 'Family notes',
         sourceUrl: 'https://example.test/lemon-pasta',
+        nutritionCalories: 230,
+        nutritionProteinGrams: 5,
+        nutritionCarbohydrateGrams: 22,
+        nutritionFatGrams: 14,
+        nutritionSaturatedFatGrams: 3,
+        nutritionFiberGrams: 6,
+        nutritionSugarGrams: 9,
+        nutritionSodiumMilligrams: 410,
         tags: ['weeknight', 'pasta'],
         ingredientGroups: [
           {
@@ -73,6 +81,17 @@ describe('JSON-LD recipe export', () => {
       recipeCuisine: 'Italian',
       keywords: ['pasta', 'weeknight'],
       url: 'https://example.test/lemon-pasta',
+      nutrition: {
+        '@type': 'NutritionInformation',
+        calories: '230 kcal',
+        proteinContent: '5 g',
+        carbohydrateContent: '22 g',
+        fatContent: '14 g',
+        saturatedFatContent: '3 g',
+        fiberContent: '6 g',
+        sugarContent: '9 g',
+        sodiumContent: '410 mg',
+      },
       recipeIngredient: [
         {
           '@type': 'ItemList',

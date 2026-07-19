@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
 import { RecipeForm } from '@/components/recipe-form';
@@ -16,24 +17,23 @@ export default async function EditRecipePage({
   if (!recipe) notFound();
   return (
     <main className="recipe-page">
-      <header className="recipe-header">
-        <Link className="wordmark" href="/">
-          <span className="wordmark-mark">✦</span>
-          <span>Our Recipes</span>
-        </Link>
-        <Link className="quiet-link" href={`/recipes/${recipe.id}`}>
-          Back to recipe
-        </Link>
-      </header>
       <section className="editor-layout">
-        <div>
-          <p className="eyebrow">REVISION {recipe.currentRevision + 1}</p>
-          <h1>Make it yours.</h1>
-          <p className="muted">
-            Saving changes keeps the previous recipe card in its revision history.
-          </p>
-        </div>
         <RecipeForm
+          intro={
+            <>
+              <Link className="quiet-link editor-back-link" href={`/recipes/${recipe.id}`}>
+                <ArrowLeft size={16} aria-hidden="true" />
+                Back to recipe
+              </Link>
+              <div className="editor-title-copy">
+                <p className="eyebrow">REVISION {recipe.currentRevision + 1}</p>
+                <h1>Make it yours.</h1>
+                <p className="muted">
+                  Saving changes keeps the previous recipe card in its revision history.
+                </p>
+              </div>
+            </>
+          }
           recipeId={recipe.id}
           initial={{
             title: recipe.title,
@@ -57,7 +57,10 @@ export default async function EditRecipePage({
             nutritionProteinGrams: recipe.nutritionProteinGrams ?? '',
             nutritionCarbohydrateGrams: recipe.nutritionCarbohydrateGrams ?? '',
             nutritionFatGrams: recipe.nutritionFatGrams ?? '',
+            nutritionSaturatedFatGrams: recipe.nutritionSaturatedFatGrams ?? '',
             nutritionFiberGrams: recipe.nutritionFiberGrams ?? '',
+            nutritionSugarGrams: recipe.nutritionSugarGrams ?? '',
+            nutritionSodiumMilligrams: recipe.nutritionSodiumMilligrams ?? '',
             tags: recipe.tags,
             ingredientGroups: recipe.ingredientGroups.map((group) => ({
               name: group.name,

@@ -11,7 +11,7 @@ export default function CollectionsPage() {
       <header className="recipe-page settings-header">
         <div className="recipe-header">
           <Link className="wordmark" href="/">
-            <span className="wordmark-mark">✦</span>
+            <span className="wordmark-mark" aria-hidden="true" />
             <span>Our Recipes</span>
           </Link>
           <Link className="quiet-link" href="/recipes">

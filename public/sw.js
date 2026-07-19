@@ -1,4 +1,4 @@
-const CACHE_NAME = 'our-recipes-read-v2';
+const CACHE_NAME = 'our-recipes-read-v6';
 const OFFLINE_URL = '/offline';
 const RECIPE_DETAIL_PATH = /^\/recipes\/[0-9a-f-]{36}$/i;
 const RECIPE_IMAGE_PATH = /^\/api\/v1\/recipes\/[^/]+\/images\/[^/]+$/;
@@ -16,7 +16,9 @@ function isCacheableRead(url) {
     RECIPE_IMAGE_PATH.test(url.pathname) ||
     url.pathname.startsWith('/_next/static/') ||
     url.pathname === '/manifest.webmanifest' ||
-    url.pathname === '/icons/our-recipes-mark.svg'
+    url.pathname === '/icons/favicon-32.png' ||
+    url.pathname === '/icons/our-recipes-app-icon-192.png' ||
+    url.pathname === '/icons/our-recipes-app-icon-512.png'
   );
 }
 
@@ -26,13 +28,6 @@ async function cacheResponse(request, response) {
     await cache.put(request, response.clone());
   }
   return response;
-}
-
-async function cacheFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) return cached;
-  return cacheResponse(request, await fetch(request));
 }
 
 async function networkFirst(request, fallback) {
@@ -79,7 +74,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.startsWith('/_next/static/')) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(networkFirst(request, caches.match(request)));
     return;
   }
 

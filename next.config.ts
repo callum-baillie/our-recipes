@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 const scriptSource =
   process.env.NODE_ENV === 'development'
     ? "'self' 'unsafe-inline' 'unsafe-eval'"
-    : "'self' 'unsafe-inline'";
+    : "'self' 'unsafe-inline' 'wasm-unsafe-eval'";
 
 const securityHeaders = [
   {
@@ -21,6 +21,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // The development server is intentionally reachable from phones on the
+  // local network. Next blocks its client runtime for non-localhost hosts
+  // unless each trusted development origin is listed explicitly.
+  allowedDevOrigins: ['127.0.0.1', '192.168.0.22', 'recipes.tower'],
   // Tesseract starts a Node worker and PDF.js loads its Node canvas bridge from
   // installed files. Keep these Node-only packages external and copy them with
   // the standalone server output.

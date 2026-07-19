@@ -4,7 +4,17 @@ import { LoaderCircle, Minus, Plus, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { recipeInputSchema, type RecipePayload } from '@/lib/domain/recipe';
+import { useToast } from '@/components/toast-provider';
+import { RecipeTagSelector } from '@/components/recipe-tag-selector';
+import { RecipeTaxonomySelector } from '@/components/recipe-taxonomy-selector';
+import {
+  joinRecipeTaxonomyValues,
+  parseRecipeTaxonomyValues,
+  RECIPE_CATEGORY_OPTIONS,
+  RECIPE_CUISINE_OPTIONS,
+  recipeInputSchema,
+  type RecipePayload,
+} from '@/lib/domain/recipe';
 
 type ImportReviewFormProps = {
   initial: RecipePayload;
@@ -18,8 +28,8 @@ export function ImportReviewForm({
   initial,
 }: ImportReviewFormProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [recipe, setRecipe] = useState<RecipePayload>(initial);
-  const [tagsText, setTagsText] = useState((initial.tags ?? []).join(', '));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -44,39 +54,48 @@ export function ImportReviewForm({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    const parsed = recipeInputSchema.safeParse({
-      ...recipe,
-      tags: tagsText
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    });
+    const parsed = recipeInputSchema.safeParse(recipe);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Check the reviewed recipe details.');
+      const message = parsed.error.issues[0]?.message ?? 'Check the reviewed recipe details.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     setPending(true);
     const endpoint = importId ? `/api/v1/imports/${importId}/confirm` : confirmationEndpoint;
     if (!endpoint) {
-      setError('This review draft has no confirmation endpoint.');
+      const message = 'This review draft has no confirmation endpoint.';
+      setError(message);
+      showToast(message, 'error');
+      setPending(false);
       return;
     }
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipe: parsed.data }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      recipe?: { id?: string };
-      error?: { message?: string };
-    } | null;
-    setPending(false);
-    if (!response.ok || !body?.recipe?.id) {
-      setError(body?.error?.message ?? 'We could not add this reviewed recipe yet.');
-      return;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipe: parsed.data }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        recipe?: { id?: string };
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.recipe?.id) {
+        const message = body?.error?.message ?? 'We could not add this reviewed recipe yet.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      showToast('Recipe added to your cookbook.', 'success');
+      router.push(`/recipes/${body.recipe.id}`);
+      router.refresh();
+    } catch {
+      const message = 'The reviewed recipe could not be saved. Check the connection and try again.';
+      setError(message);
+      showToast(message, 'error');
+    } finally {
+      setPending(false);
     }
-    router.push(`/recipes/${body.recipe.id}`);
-    router.refresh();
   }
 
   return (
@@ -401,34 +420,32 @@ export function ImportReviewForm({
               }
             />
           </label>
-          <label>
-            <span>
-              Tags <em>(comma-separated)</em>
-            </span>
-            <input value={tagsText} onChange={(event) => setTagsText(event.target.value)} />
-          </label>
-          <label>
-            <span>
-              Cuisine <em>(optional)</em>
-            </span>
-            <input
-              value={recipe.cuisine ?? ''}
-              onChange={(event) =>
-                setRecipe((current) => ({ ...current, cuisine: event.target.value }))
-              }
-            />
-          </label>
-          <label>
-            <span>
-              Category <em>(optional)</em>
-            </span>
-            <input
-              value={recipe.category}
-              onChange={(event) =>
-                setRecipe((current) => ({ ...current, category: event.target.value }))
-              }
-            />
-          </label>
+          <RecipeTagSelector
+            value={recipe.tags}
+            onChange={(tags) => setRecipe((current) => ({ ...current, tags }))}
+          />
+          <RecipeTaxonomySelector
+            label="Cuisines"
+            value={parseRecipeTaxonomyValues(recipe.cuisine ?? '')}
+            options={RECIPE_CUISINE_OPTIONS}
+            onChange={(values) =>
+              setRecipe((current) => ({
+                ...current,
+                cuisine: joinRecipeTaxonomyValues(values),
+              }))
+            }
+          />
+          <RecipeTaxonomySelector
+            label="Categories"
+            value={parseRecipeTaxonomyValues(recipe.category)}
+            options={RECIPE_CATEGORY_OPTIONS}
+            onChange={(values) =>
+              setRecipe((current) => ({
+                ...current,
+                category: joinRecipeTaxonomyValues(values),
+              }))
+            }
+          />
           <label>
             <span>
               Difficulty <em>(optional)</em>
@@ -475,7 +492,7 @@ export function ImportReviewForm({
         ) : (
           <Save size={17} aria-hidden="true" />
         )}
-        Confirm and add to cookbook
+        {pending ? 'Saving recipe…' : 'Confirm and add to cookbook'}
       </button>
     </form>
   );

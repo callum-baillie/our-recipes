@@ -102,7 +102,7 @@ export function CollectionDetailManager({
           ← All collections
         </Link>
         <Link className="wordmark" href="/">
-          <span className="wordmark-mark">✦</span>
+          <span className="wordmark-mark" aria-hidden="true" />
           <span>Our Recipes</span>
         </Link>
       </header>

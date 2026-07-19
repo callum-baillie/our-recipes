@@ -3,7 +3,12 @@ import {
   MAX_JSONLD_SOURCE_BYTES,
   JsonLdValidationError,
 } from '@/lib/domain/jsonld';
-import { recipeInputSchema, type RecipePayload } from '@/lib/domain/recipe';
+import {
+  joinRecipeTaxonomyValues,
+  parseRecipeTaxonomyValues,
+  recipeInputSchema,
+  type RecipePayload,
+} from '@/lib/domain/recipe';
 import { getRecipe, type RecipeDetail } from '@/lib/services/recipe-service';
 
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
@@ -219,6 +224,36 @@ function sourceUrl(node: JsonObject): string {
   }
 }
 
+function nutritionAmount(value: JsonValue | undefined): number | '' {
+  const match = /-?\d+(?:[,.]\d+)?/u.exec(text(value, 80).replace(/,/gu, ''));
+  if (!match) return '';
+  const amount = Number(match[0]);
+  return Number.isFinite(amount) && amount >= 0 && amount <= 100_000 ? amount : '';
+}
+
+function nutritionValues(value: JsonValue | undefined) {
+  const nutrition = Array.isArray(value) ? value.find(isObject) : value;
+  if (!isObject(nutrition)) return null;
+  const sodiumSource = text(nutrition.sodiumContent, 80);
+  const sodiumAmount = nutritionAmount(nutrition.sodiumContent);
+  const sodiumMilligrams =
+    sodiumAmount === ''
+      ? ''
+      : /(?:^|\s)(?:g|grams?)(?:\s|$)/iu.test(sodiumSource)
+        ? sodiumAmount * 1_000
+        : sodiumAmount;
+  return {
+    nutritionCalories: nutritionAmount(nutrition.calories ?? nutrition.calorieContent),
+    nutritionProteinGrams: nutritionAmount(nutrition.proteinContent),
+    nutritionCarbohydrateGrams: nutritionAmount(nutrition.carbohydrateContent),
+    nutritionFatGrams: nutritionAmount(nutrition.fatContent),
+    nutritionSaturatedFatGrams: nutritionAmount(nutrition.saturatedFatContent),
+    nutritionFiberGrams: nutritionAmount(nutrition.fiberContent),
+    nutritionSugarGrams: nutritionAmount(nutrition.sugarContent),
+    nutritionSodiumMilligrams: sodiumMilligrams,
+  };
+}
+
 function mapCandidate(recipeNode: RecipeNode, index: number): JsonLdDraft {
   const { node, hasSchemaContext } = recipeNode;
   const warnings: string[] = [];
@@ -236,10 +271,16 @@ function mapCandidate(recipeNode: RecipeNode, index: number): JsonLdDraft {
     warnings.push(
       'Total time is shown in the source but is not used to infer prep, cook, or rest time.',
     );
-  ['image', 'nutrition', 'aggregateRating', 'video', 'review'].forEach((property) => {
+  ['image', 'aggregateRating', 'video', 'review'].forEach((property) => {
     if (node[property] !== undefined)
       warnings.push(`${property} is not imported into a household recipe.`);
   });
+  const nutrition = nutritionValues(node.nutrition);
+  if (node.nutrition !== undefined && !nutrition) {
+    warnings.push('Nutrition was present but was not a supported NutritionInformation object.');
+  } else if (nutrition) {
+    warnings.push('Nutrition values were imported per serving and should be reviewed.');
+  }
   const parsed = recipeInputSchema.safeParse({
     title: text(node.name, 160),
     summary: text(node.description, 800),
@@ -249,12 +290,13 @@ function mapCandidate(recipeNode: RecipeNode, index: number): JsonLdDraft {
     cookMinutes: cookMinutes ?? 0,
     restMinutes: 0,
     difficulty: '',
-    cuisine: text(node.recipeCuisine, 80),
-    category: text(node.recipeCategory, 80),
+    cuisine: joinRecipeTaxonomyValues(textList(node.recipeCuisine, 8, 60)),
+    category: joinRecipeTaxonomyValues(textList(node.recipeCategory, 8, 60)),
     tips: '',
     sharedNotes: '',
     sourceName: 'Schema.org JSON-LD',
     sourceUrl: sourceUrl(node),
+    ...(nutrition ?? {}),
     tags: keywordTags(node.keywords),
     ingredientGroups: ingredients(node.recipeIngredient),
     instructionSections: instructions(node.recipeInstructions),
@@ -379,6 +421,29 @@ export function recipeAsJsonLd(
   options: RecipeJsonLdOptions = {},
 ): JsonObject {
   const totalMinutes = recipe.prepMinutes + recipe.cookMinutes + recipe.restMinutes;
+  const nutrition = {
+    ...(recipe.nutritionCalories !== null ? { calories: `${recipe.nutritionCalories} kcal` } : {}),
+    ...(recipe.nutritionProteinGrams !== null
+      ? { proteinContent: `${recipe.nutritionProteinGrams} g` }
+      : {}),
+    ...(recipe.nutritionCarbohydrateGrams !== null
+      ? { carbohydrateContent: `${recipe.nutritionCarbohydrateGrams} g` }
+      : {}),
+    ...(recipe.nutritionFatGrams !== null ? { fatContent: `${recipe.nutritionFatGrams} g` } : {}),
+    ...(recipe.nutritionSaturatedFatGrams !== null
+      ? { saturatedFatContent: `${recipe.nutritionSaturatedFatGrams} g` }
+      : {}),
+    ...(recipe.nutritionFiberGrams !== null
+      ? { fiberContent: `${recipe.nutritionFiberGrams} g` }
+      : {}),
+    ...(recipe.nutritionSugarGrams !== null
+      ? { sugarContent: `${recipe.nutritionSugarGrams} g` }
+      : {}),
+    ...(recipe.nutritionSodiumMilligrams !== null
+      ? { sodiumContent: `${recipe.nutritionSodiumMilligrams} mg` }
+      : {}),
+  };
+  const hasNutrition = Object.keys(nutrition).length > 0;
   return {
     '@context': 'https://schema.org',
     '@type': 'Recipe',
@@ -389,10 +454,25 @@ export function recipeAsJsonLd(
     prepTime: isoDuration(recipe.prepMinutes),
     cookTime: isoDuration(recipe.cookMinutes),
     totalTime: isoDuration(totalMinutes),
-    ...(recipe.category ? { recipeCategory: recipe.category } : {}),
-    ...(recipe.cuisine ? { recipeCuisine: recipe.cuisine } : {}),
+    ...(recipe.category
+      ? {
+          recipeCategory:
+            parseRecipeTaxonomyValues(recipe.category).length === 1
+              ? recipe.category
+              : parseRecipeTaxonomyValues(recipe.category),
+        }
+      : {}),
+    ...(recipe.cuisine
+      ? {
+          recipeCuisine:
+            parseRecipeTaxonomyValues(recipe.cuisine).length === 1
+              ? recipe.cuisine
+              : parseRecipeTaxonomyValues(recipe.cuisine),
+        }
+      : {}),
     ...(recipe.tags.length ? { keywords: recipe.tags } : {}),
     ...(recipe.sourceUrl ? { url: recipe.sourceUrl } : {}),
+    ...(hasNutrition ? { nutrition: { '@type': 'NutritionInformation', ...nutrition } } : {}),
     ...(options.images?.length
       ? {
           image: options.images.map((image) => ({

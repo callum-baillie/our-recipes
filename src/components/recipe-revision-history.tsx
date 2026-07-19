@@ -1,6 +1,6 @@
 'use client';
 
-import { History, RotateCcw } from 'lucide-react';
+import { ChevronDown, History, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -62,8 +62,16 @@ export function RecipeRevisionHistory({
   return (
     <details className="recipe-revision-history">
       <summary>
-        <History size={16} aria-hidden="true" /> Revision history ({revisions.length} saved{' '}
-        {revisions.length === 1 ? 'version' : 'versions'})
+        <span>
+          <History size={17} aria-hidden="true" />
+          <span>
+            <strong>Revision history</strong>
+            <small>
+              {revisions.length} saved {revisions.length === 1 ? 'version' : 'versions'}
+            </small>
+          </span>
+        </span>
+        <ChevronDown className="revision-chevron" size={18} aria-hidden="true" />
       </summary>
       <p>
         Restoring a saved version creates a new shared revision. Personal ratings and notes stay
@@ -72,6 +80,7 @@ export function RecipeRevisionHistory({
       <ol>
         {revisions.map((revision) => (
           <li key={revision.revision}>
+            <span className="revision-timeline-marker" aria-hidden="true" />
             <div>
               <strong>Revision {revision.revision}</strong>
               <span>

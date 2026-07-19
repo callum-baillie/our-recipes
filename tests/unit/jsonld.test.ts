@@ -20,6 +20,17 @@ const source = JSON.stringify({
       recipeCategory: 'Side dish',
       recipeCuisine: 'Italian',
       keywords: 'summer, tomatoes',
+      nutrition: {
+        '@type': 'NutritionInformation',
+        calories: '230 kcal',
+        proteinContent: '5 g',
+        carbohydrateContent: '22 g',
+        fatContent: '14 g',
+        saturatedFatContent: '3 g',
+        fiberContent: '6 g',
+        sugarContent: '9 g',
+        sodiumContent: '410 mg',
+      },
       recipeIngredient: [
         {
           '@type': 'ItemList',
@@ -51,6 +62,14 @@ describe('Schema.org JSON-LD portability', () => {
       cookMinutes: 60,
       servings: '4 servings',
       tags: ['summer', 'tomatoes'],
+      nutritionCalories: 230,
+      nutritionProteinGrams: 5,
+      nutritionCarbohydrateGrams: 22,
+      nutritionFatGrams: 14,
+      nutritionSaturatedFatGrams: 3,
+      nutritionFiberGrams: 6,
+      nutritionSugarGrams: 9,
+      nutritionSodiumMilligrams: 410,
       ingredientGroups: [
         {
           name: 'For the pan',
@@ -63,6 +82,9 @@ describe('Schema.org JSON-LD portability', () => {
       instructionSections: [{ title: 'Roast', steps: ['Roast until jammy.'] }],
     });
     expect(draft.warnings).toContain('image is not imported into a household recipe.');
+    expect(draft.warnings).toContain(
+      'Nutrition values were imported per serving and should be reviewed.',
+    );
   });
 
   it('refuses non-JSON input and does not treat a URL as a fetch instruction', () => {

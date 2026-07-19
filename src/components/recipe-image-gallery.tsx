@@ -1,10 +1,11 @@
 'use client';
 
-import { ImagePlus, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
+import { ImagePlus, LoaderCircle, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
+import { useToast } from '@/components/toast-provider';
 import { ClientHeicConversionError, convertHeicFilesInBrowser } from '@/lib/client/heic-conversion';
 
 type RecipeImageGalleryProps = {
@@ -15,12 +16,15 @@ type RecipeImageGalleryProps = {
 
 export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImageGalleryProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [converting, setConverting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [editingPhotos, setEditingPhotos] = useState(false);
+  const showEditor = images.length === 0 || editingPhotos;
 
   async function chooseImage(selected: File | null) {
     if (!selected) {
@@ -34,11 +38,12 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
       setFile(converted.files[0] ?? null);
     } catch (error) {
       setFile(null);
-      setError(
+      const message =
         error instanceof ClientHeicConversionError
           ? error.message
-          : 'We could not prepare that image safely in this browser.',
-      );
+          : 'We could not prepare that image safely in this browser.';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setConverting(false);
     }
@@ -47,7 +52,9 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) {
-      setError('Choose a JPEG, PNG, or WebP image first.');
+      const message = 'Choose a JPEG, PNG, or WebP image first.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     setPending(true);
@@ -64,13 +71,17 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
     } | null;
     setPending(false);
     if (!response.ok) {
-      setError(body?.error?.message ?? 'We could not add that photo yet.');
+      const message = body?.error?.message ?? 'We could not add that photo yet.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     setFile(null);
     setAltText('');
     const input = document.getElementById('recipe-image-upload') as HTMLInputElement | null;
     if (input) input.value = '';
+    setEditingPhotos(false);
+    showToast('Recipe photo added.', 'success');
     router.refresh();
   }
 
@@ -85,9 +96,12 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
     } | null;
     setPending(false);
     if (!response.ok) {
-      setError(body?.error?.message ?? 'We could not remove that photo yet.');
+      const message = body?.error?.message ?? 'We could not remove that photo yet.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
+    showToast('Recipe photo removed.', 'success');
     router.refresh();
   }
 
@@ -104,9 +118,13 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
     } | null;
     setGenerating(false);
     if (!response.ok) {
-      setError(body?.error?.message ?? 'OpenAI could not generate a recipe image.');
+      const message = body?.error?.message ?? 'OpenAI could not generate a recipe image.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
+    setEditingPhotos(false);
+    showToast('Serving image generated and saved.', 'success');
     router.refresh();
   }
 
@@ -131,22 +149,38 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
                 unoptimized
               />
               <figcaption>
-                <span>{image.altText || 'Household recipe photo'}</span>
-                <button
-                  className="icon-button"
-                  type="button"
-                  onClick={() => void remove(image.id)}
-                  disabled={pending}
-                  aria-label={`Remove photo ${index + 1}`}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
+                <div className="recipe-image-actions">
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => setEditingPhotos((current) => !current)}
+                    aria-expanded={showEditor}
+                    aria-controls="recipe-image-editor"
+                    aria-label={`Edit recipe photos from photo ${index + 1}`}
+                  >
+                    <Pencil size={16} aria-hidden="true" />
+                  </button>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => void remove(image.id)}
+                    disabled={pending}
+                    aria-label={`Remove photo ${index + 1}`}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </div>
               </figcaption>
             </figure>
           ))}
         </div>
       )}
-      <form className="recipe-image-form" onSubmit={(event) => void upload(event)}>
+      <form
+        className="recipe-image-form"
+        id="recipe-image-editor"
+        hidden={!showEditor}
+        onSubmit={(event) => void upload(event)}
+      >
         <label htmlFor="recipe-image-upload">
           <span>Add a recipe photo</span>
           <input

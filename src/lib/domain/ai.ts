@@ -6,6 +6,8 @@ export const aiOperationKindSchema = z.enum([
   'text-normalization',
   'vision-extraction',
   'image-generation',
+  'nutrition-estimation',
+  'recipe-improvement',
 ]);
 
 export const aiUncertainSegmentSchema = z
@@ -42,17 +44,20 @@ const aiStructuredRecipeSchema = z
     title: z.string().min(1).max(160),
     summary: z.string().max(800),
     status: z.enum(['active', 'archived', 'trash']),
-    servings: z.string().min(1).max(80),
+    servings: z.string().min(1).max(80).regex(/[0-9]/u),
     prepMinutes: z.number().int().min(0).max(10_080),
     cookMinutes: z.number().int().min(0).max(10_080),
     restMinutes: z.number().int().min(0).max(10_080),
     difficulty: z.string().max(40),
-    cuisine: z.string().max(80),
-    category: z.string().max(80),
+    cuisine: z.string().max(500),
+    category: z.string().max(500),
     tips: z.string().max(2_000),
     sharedNotes: z.string().max(2_000),
     sourceName: z.string().max(160),
-    sourceUrl: z.union([z.literal(''), z.string().url().max(2_048)]),
+    // OpenAI Structured Outputs rejects the `uri` format emitted by
+    // `z.string().url()`. The app-facing schema validates this value as a URL
+    // after the provider response has been parsed.
+    sourceUrl: z.string().max(2_048),
     originalAuthor: z.string().max(160),
     cookingMethod: z.string().max(80),
     equipment: z.array(z.string().min(1).max(120)).max(30),
@@ -60,7 +65,10 @@ const aiStructuredRecipeSchema = z
     nutritionProteinGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
     nutritionCarbohydrateGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
     nutritionFatGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
+    nutritionSaturatedFatGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
     nutritionFiberGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
+    nutritionSugarGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
+    nutritionSodiumMilligrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
     tags: z.array(z.string().min(1).max(40)).max(20),
     ingredientGroups: z
       .array(
@@ -106,9 +114,25 @@ export const aiRecipeCandidateStructuredOutputSchema = z
   })
   .strict();
 
+export const aiNutritionEstimateSchema = z
+  .object({
+    servings: z.string().min(1).max(80),
+    nutritionCalories: z.number().min(0).max(100_000),
+    nutritionProteinGrams: z.number().min(0).max(100_000),
+    nutritionCarbohydrateGrams: z.number().min(0).max(100_000),
+    nutritionFatGrams: z.number().min(0).max(100_000),
+    nutritionSaturatedFatGrams: z.number().min(0).max(100_000),
+    nutritionFiberGrams: z.number().min(0).max(100_000),
+    nutritionSugarGrams: z.number().min(0).max(100_000),
+    nutritionSodiumMilligrams: z.number().min(0).max(100_000),
+    confidence: z.number().min(0).max(1),
+    warnings: z.array(z.string().min(1).max(240)).max(10),
+  })
+  .strict();
+
 export const aiReviewRequestSchema = z
   .object({
-    kind: aiOperationKindSchema.exclude(['image-generation']),
+    kind: z.enum(['text-normalization', 'vision-extraction']),
     sourceDigest: z.string().regex(/^[a-f0-9]{64}$/u),
     sourceLabel: z.string().trim().min(1).max(160),
   })
@@ -120,6 +144,7 @@ export const aiTextReviewRequestSchema = z
     kind: z.literal('text-normalization'),
     sourceText: z.string().trim().min(20).max(30_000),
     sourceLabel: z.string().trim().min(1).max(160),
+    improve: z.boolean().default(false),
   })
   .strict();
 
@@ -128,6 +153,7 @@ export const aiVisionReviewRequestSchema = z
     confirm: z.literal(true),
     kind: z.literal('vision-extraction'),
     importId: z.string().uuid(),
+    improve: z.boolean().default(false),
   })
   .strict();
 
@@ -139,6 +165,21 @@ export const aiReviewActionSchema = z.discriminatedUnion('kind', [
 export const aiImageGenerationRequestSchema = z
   .object({
     confirm: z.literal(true),
+  })
+  .strict();
+
+export const aiNutritionEstimationRequestSchema = z
+  .object({
+    confirm: z.literal(true),
+    expectedRevision: z.coerce.number().int().positive(),
+  })
+  .strict();
+
+export const aiRecipeImprovementRequestSchema = z
+  .object({
+    confirm: z.literal(true),
+    expectedRevision: z.coerce.number().int().positive(),
+    recipe: recipeInputSchema,
   })
   .strict();
 
@@ -174,11 +215,14 @@ export const aiOperationAuditSchema = z
 
 export type AiOperationKind = z.infer<typeof aiOperationKindSchema>;
 export type AiRecipeCandidate = z.infer<typeof aiRecipeCandidateSchema>;
+export type AiNutritionEstimate = z.infer<typeof aiNutritionEstimateSchema>;
 export type AiReviewRequest = z.infer<typeof aiReviewRequestSchema>;
 export type AiTextReviewRequest = z.infer<typeof aiTextReviewRequestSchema>;
 export type AiVisionReviewRequest = z.infer<typeof aiVisionReviewRequestSchema>;
 export type AiReviewAction = z.infer<typeof aiReviewActionSchema>;
 export type AiImageGenerationRequest = z.infer<typeof aiImageGenerationRequestSchema>;
+export type AiNutritionEstimationRequest = z.infer<typeof aiNutritionEstimationRequestSchema>;
+export type AiRecipeImprovementRequest = z.infer<typeof aiRecipeImprovementRequestSchema>;
 export type AiConnectionStatus = z.infer<typeof aiConnectionStatusSchema>;
 export type AiOperationAudit = z.infer<typeof aiOperationAuditSchema>;
 export type AiOperationAuditStatus = z.infer<typeof aiOperationAuditStatusSchema>;

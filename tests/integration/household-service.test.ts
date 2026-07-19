@@ -17,6 +17,7 @@ import {
   getHouseholdState,
   listProfiles,
   setProfileArchived,
+  updateHouseholdSettings,
 } from '@/lib/services/household-service';
 import {
   createCollection,
@@ -53,6 +54,7 @@ import {
   listTags,
   mergeTag,
   updateRecipe,
+  updateRecipeTags,
   updateRecipeStatus,
   updateTag,
 } from '@/lib/services/recipe-service';
@@ -93,6 +95,16 @@ describe('household persistence', () => {
     expect(state.household?.name).toBe('Sunday suppers');
     expect(state.profiles).toHaveLength(1);
     expect(state.profiles[0]?.temperatureUnit).toBe('F');
+    expect(
+      updateHouseholdSettings({
+        householdName: 'The Sunday table',
+        appName: "Maya's Recipe Box",
+      }),
+    ).toMatchObject({ name: 'The Sunday table', appName: "Maya's Recipe Box" });
+    expect(getHouseholdState().household).toMatchObject({
+      name: 'The Sunday table',
+      appName: "Maya's Recipe Box",
+    });
   });
 
   it('keeps a structured recipe searchable and records an edit revision', () => {
@@ -159,7 +171,18 @@ describe('household persistence', () => {
       recipe.currentRevision,
     );
     expect(updated.currentRevision).toBe(2);
-    expect(getRecipe(recipe.id)?.revisions).toHaveLength(2);
+    const retagged = updateRecipeTags(
+      recipe.id,
+      ['Family', 'weeknight', 'family'],
+      profile.id,
+      updated.currentRevision,
+    );
+    expect(retagged.currentRevision).toBe(3);
+    expect(retagged.tags).toEqual(['family', 'weeknight']);
+    expect(getRecipe(recipe.id)?.revisions).toHaveLength(3);
+    expect(() =>
+      updateRecipeTags(recipe.id, ['stale'], profile.id, updated.currentRevision),
+    ).toThrow(RecipeConflictError);
   });
 
   it('filters lifecycle-aware recipe cards and rejects a stale concurrent revision', () => {
@@ -184,8 +207,8 @@ describe('household persistence', () => {
         prepMinutes: 20,
         cookMinutes: 45,
         restMinutes: 10,
-        category: 'Dinner',
-        cuisine: 'Italian',
+        category: 'Dinner, Main dish',
+        cuisine: 'Italian, Mediterranean',
         difficulty: 'involved',
         tips: 'Rest before serving.',
         sharedNotes: 'Freeze half for later.',
@@ -214,7 +237,23 @@ describe('household persistence', () => {
       profile.id,
     );
     expect(active.recipes).toHaveLength(1);
-    expect(active.recipes[0]).toMatchObject({ category: 'Dinner', createdByName: 'Maya' });
+    expect(active.recipes[0]).toMatchObject({
+      category: 'Dinner, Main dish',
+      createdByName: 'Maya',
+    });
+    expect(
+      listRecipeLibrary(
+        {
+          q: '',
+          category: 'main dish',
+          cuisine: 'mediterranean',
+          status: 'active',
+          sort: 'recently-updated',
+          page: 1,
+        },
+        profile.id,
+      ).recipes,
+    ).toHaveLength(1);
     expect(getRecipe(recipe.id)?.ingredientGroups).toHaveLength(2);
 
     const archived = updateRecipeStatus(recipe.id, 'archived', profile.id, recipe.currentRevision);
@@ -533,7 +572,10 @@ describe('household persistence', () => {
       nutritionProteinGrams: 5,
       nutritionCarbohydrateGrams: 22,
       nutritionFatGrams: 14,
+      nutritionSaturatedFatGrams: 3,
       nutritionFiberGrams: 6,
+      nutritionSugarGrams: 9,
+      nutritionSodiumMilligrams: 410,
       tags: ['winter'],
       ingredientGroups: [
         { name: '', ingredients: [{ quantity: 1, unit: 'kg', item: 'tomatoes', note: '' }] },
@@ -543,6 +585,11 @@ describe('household persistence', () => {
     const created = createRecipe(input, maya.id);
     expect(created.equipment.map((item) => item.name)).toEqual(['Sheet pan', 'Immersion blender']);
     expect(created.nutritionCalories).toBe(230);
+    expect(created).toMatchObject({
+      nutritionSaturatedFatGrams: 3,
+      nutritionSugarGrams: 9,
+      nutritionSodiumMilligrams: 410,
+    });
     const revised = updateRecipe(
       created.id,
       { ...input, cookingMethod: 'roast then blend' },
@@ -604,7 +651,7 @@ describe('household persistence', () => {
     const markdown = recipeAsMarkdown(getRecipe(created.id, maya.id)!);
     expect(markdown).toContain('# Roasted tomato soup');
     expect(markdown).toContain('## Equipment');
-    expect(markdown).toContain('## Nutrition (as entered)');
+    expect(markdown).toContain('## Nutrition (per serving)');
     expect(markdown).toContain('https://example.test/roasted-tomato-soup');
     expect(markdown).not.toContain('Use ripe tomatoes.');
     expect(setRecipePreference(created.id, maya.id, { rating: null, note: '' })).toMatchObject({

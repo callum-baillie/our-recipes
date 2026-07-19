@@ -10,7 +10,7 @@ export default function ImportPage() {
     <main className="recipe-page import-page">
       <header className="recipe-header import-page-header">
         <Link className="wordmark" href="/">
-          <span className="wordmark-mark">✦</span>
+          <span className="wordmark-mark" aria-hidden="true" />
           <span>Our Recipes</span>
         </Link>
         <Link className="quiet-link" href="/recipes">
