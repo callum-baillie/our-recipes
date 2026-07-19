@@ -57,8 +57,8 @@ export function normalizeRecipeTaxonomyValues(values: readonly string[]): string
   return normalized.slice(0, MAX_RECIPE_TAXONOMY_VALUES);
 }
 
-export function parseRecipeTaxonomyValues(value: string): string[] {
-  return normalizeRecipeTaxonomyValues(value.split(/[,;\n]/u));
+export function parseRecipeTaxonomyValues(value: string | null | undefined): string[] {
+  return normalizeRecipeTaxonomyValues((value ?? '').split(/[,;\n]/u));
 }
 
 export function joinRecipeTaxonomyValues(values: readonly string[]): string {

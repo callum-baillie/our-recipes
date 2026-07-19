@@ -30,6 +30,7 @@ describe('recipeInputSchema', () => {
   });
 
   it('normalizes multi-value categories and cuisines without breaking legacy strings', () => {
+    expect(parseRecipeTaxonomyValues(undefined)).toEqual([]);
     expect(parseRecipeTaxonomyValues('Dinner; Main dish, dinner\nFamily table')).toEqual([
       'Dinner',
       'Main dish',
