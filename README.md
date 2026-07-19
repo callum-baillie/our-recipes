@@ -6,7 +6,7 @@ Our Recipes is a self-hosted recipe manager for one trusted household. It curren
 
 ## Release status
 
-**v0.1.0-beta.10** is an early beta release candidate. It is suitable for a trusted household that keeps regular backups, but it is not an authentication boundary and should not be exposed directly to the public internet. Please report issues in the [GitHub issue tracker](https://github.com/callum-baillie/our-recipes/issues).
+**v0.1.0-beta.11** is an early beta release candidate. It is suitable for a trusted household that keeps regular backups, but it is not an authentication boundary and should not be exposed directly to the public internet. Please report issues in the [GitHub issue tracker](https://github.com/callum-baillie/our-recipes/issues).
 
 ## Install with Docker
 
