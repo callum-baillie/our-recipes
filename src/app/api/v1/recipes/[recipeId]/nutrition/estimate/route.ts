@@ -61,6 +61,7 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
           confidence: created.estimate.confidence,
           warnings: created.estimate.warnings,
         },
+        integration: created.integration,
         audit: {
           id: created.audit.id,
           kind: created.audit.kind,

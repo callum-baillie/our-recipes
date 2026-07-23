@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "approved_with_scout",
+  "task_id": "T057",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T057-full-gap-ranking-review.md"
+  ],
+  "commands": [
+    { "cmd": "read-only gap ranking, diary history, authorization, idempotency, export and destructive deletion risk audit", "status": "pass" }
+  ],
+  "summary": "Approved private diary lifecycle/data rights as the top outcome but required an exact FK/transaction Scout before destructive implementation.",
+  "note": "notes/T057-full-gap-ranking-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

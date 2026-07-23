@@ -1,0 +1,823 @@
+.page {
+  width: 100%;
+  max-width: 104rem;
+  min-height: 72dvh;
+  margin: 0 auto;
+  padding: 3rem clamp(1rem, 3.4vw, 3.5rem) clamp(4rem, 7vw, 6.5rem);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: clamp(1.5rem, 3vw, 2.65rem);
+  align-items: start;
+}
+
+.mainColumn {
+  display: grid;
+  gap: 1.45rem;
+  min-width: 0;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(17rem, 0.6fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: end;
+  min-height: 9.4rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.65rem;
+  color: var(--leaf);
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+}
+
+.hero h1 {
+  max-width: 10ch;
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(3.6rem, 4.3vw, 4.25rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.hero > p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.createPanel,
+.railPanel,
+.listCard,
+.emptyState {
+  background: color-mix(in srgb, var(--field) 94%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.72rem;
+  box-shadow: 0 5px 18px rgb(55 46 35 / 4%);
+}
+
+.createPanel {
+  display: grid;
+  padding: 1.15rem;
+}
+
+.createTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 11.5rem));
+  width: fit-content;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+}
+
+.createTabs button,
+.createTabs a {
+  display: inline-flex;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.7rem;
+  padding: 0.65rem 1rem;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 750;
+  background: transparent;
+  border: 0;
+}
+
+.createTabs button {
+  color: var(--leaf);
+  background: var(--leaf-pale);
+}
+
+.createTabs a {
+  border-left: 1px solid var(--line);
+}
+
+.createForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 10.5rem;
+  gap: 0.75rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+
+.createForm label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.createForm input,
+.searchField input,
+.sortField select,
+.renameForm input {
+  width: 100%;
+  color: var(--ink);
+  font: inherit;
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  outline: 0;
+}
+
+.createForm input {
+  min-height: 3.15rem;
+  padding: 0 0.9rem;
+  border-radius: 0.48rem;
+}
+
+.createForm input:focus,
+.searchField:focus-within,
+.sortField:focus-within,
+.renameForm input:focus {
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 15%, transparent);
+}
+
+.createForm small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.createForm > button {
+  min-height: 3.15rem;
+  padding: 0.7rem 1rem;
+  color: white;
+  font-weight: 850;
+  background: var(--accent);
+  border: 0;
+  border-radius: 0.48rem;
+}
+
+.createForm > button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.plannerShortcut {
+  display: inline-flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-self: end;
+  margin-top: -0.95rem;
+  color: var(--leaf);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.plannerShortcut svg:last-child {
+  margin-left: 0.15rem;
+}
+
+.listWorkspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr) 11rem 3.2rem;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.searchField,
+.sortField,
+.directionButton {
+  min-height: 2.8rem;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.searchField {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0 0.85rem;
+  color: var(--muted);
+}
+
+.searchField input {
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.filters {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.filters button {
+  min-height: 2.5rem;
+  padding: 0.55rem 1rem;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.filters button[aria-pressed='true'] {
+  color: var(--page);
+  background: var(--leaf);
+  border-color: var(--leaf);
+}
+
+.sortField {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  padding-left: 0.75rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.sortField select {
+  min-width: 0;
+  height: 100%;
+  padding: 0 0.55rem 0 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: transparent;
+  border: 0;
+}
+
+.directionButton {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.error {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 0.55rem;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 21rem));
+  gap: 1rem;
+}
+
+.listCard {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 20.5rem;
+  overflow: visible;
+}
+
+.cardBody {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  padding: 1.35rem;
+}
+
+.cardMeta {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.cardMeta > span:last-child {
+  padding: 0.18rem 0.5rem;
+  color: var(--leaf);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  background: var(--paper-deep);
+  border-radius: 0.25rem;
+}
+
+.cardIcon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+  border-radius: 50%;
+}
+
+.listCard[data-source='planned'] .cardIcon,
+.activityList > li > span[data-source='planned'] {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.listCard[data-source='planned'] .cardMeta > span:last-child {
+  color: var(--accent-text);
+}
+
+.listCard h3 {
+  overflow: hidden;
+  margin: 1rem 0 0.25rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listCard p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.progressRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.8rem;
+}
+
+.progressRow > span {
+  height: 0.38rem;
+  overflow: hidden;
+  background: var(--paper-deep);
+  border-radius: 999px;
+}
+
+.progressRow i {
+  display: block;
+  height: 100%;
+  background: var(--leaf);
+  border-radius: inherit;
+}
+
+.listCard[data-source='planned'] .progressRow i {
+  background: var(--accent);
+}
+
+.progressRow b {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.cardBody dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.8rem 0 0;
+}
+
+.cardBody dl > div {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.cardBody dt {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.cardBody dd {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.cardActions,
+.renameForm {
+  min-height: 3.8rem;
+  padding: 0.75rem 1.1rem;
+  border-top: 1px solid var(--line);
+}
+
+.cardActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.cardActions > button,
+.cardActions summary,
+.renameForm button {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.6rem;
+  color: var(--ink);
+  font-size: 0.78rem;
+  background: transparent;
+  border: 0;
+}
+
+.cardActions > button + button {
+  border-left: 1px solid var(--line);
+}
+
+.cardActions details {
+  position: relative;
+}
+
+.cardActions summary {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.cardActions summary::-webkit-details-marker {
+  display: none;
+}
+
+.cardActions details > div {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  display: grid;
+  width: 9rem;
+  padding: 0.35rem;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  box-shadow: 0 12px 30px rgb(23 29 21 / 18%);
+}
+
+.cardActions details button {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.55rem;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0.35rem;
+}
+
+.cardActions details button:hover {
+  background: var(--paper);
+}
+
+.renameForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.renameForm input {
+  min-height: 2.35rem;
+  padding: 0 0.55rem;
+  border-radius: 0.4rem;
+}
+
+.emptyState {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  min-height: 13rem;
+  padding: 1.4rem;
+}
+
+.emptyState > span {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+  border-radius: 50%;
+}
+
+.emptyState h3,
+.emptyState p {
+  margin: 0;
+}
+
+.emptyState h3 {
+  font-size: 1.3rem;
+}
+
+.emptyState p {
+  margin-top: 0.25rem;
+  color: var(--muted);
+}
+
+.rail {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.railPanel {
+  padding: 1.15rem 1.2rem;
+}
+
+.railPanel h2 {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.insights {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.15rem 0;
+}
+
+.insights > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.insights dt {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.insights dd {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.railLink {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0;
+  color: var(--leaf);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.activityList {
+  display: grid;
+  margin: 0.8rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activityList li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.activityList li:first-child {
+  border-top: 0;
+}
+
+.activityList > li > span {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+  border-radius: 50%;
+}
+
+.activityList p {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+}
+
+.activityList a {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activityList small,
+.activityList time,
+.railEmpty,
+.plannerPanel p {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.activityList time {
+  white-space: nowrap;
+}
+
+.railEmpty {
+  margin: 1rem 0;
+}
+
+.plannerPanel p {
+  margin: 1rem 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.plannerPanel > a {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  color: var(--leaf);
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: var(--leaf-pale);
+  border-radius: 0.45rem;
+}
+
+@media (hover: hover) {
+  .listCard,
+  .createTabs a,
+  .filters button,
+  .directionButton {
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+
+  .listCard:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+
+  .createTabs a:hover,
+  .filters button:hover,
+  .directionButton:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+@media (max-width: 1360px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) 11rem 3rem;
+  }
+
+  .filters {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+
+  .cardGrid,
+  .rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plannerPanel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding-top: 2.25rem;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    min-height: 0;
+  }
+
+  .hero h1 {
+    font-size: clamp(3.1rem, 14vw, 4.25rem);
+  }
+
+  .hero > p {
+    max-width: 34rem;
+    margin-bottom: 0;
+  }
+
+  .createForm {
+    grid-template-columns: 1fr;
+  }
+
+  .plannerShortcut {
+    justify-self: start;
+    margin-top: 0.9rem;
+  }
+
+  .cardGrid,
+  .rail {
+    grid-template-columns: 1fr;
+  }
+
+  .plannerPanel {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .mainColumn {
+    gap: 1rem;
+  }
+
+  .createPanel {
+    padding: 0.8rem;
+  }
+
+  .createTabs {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .createTabs button,
+  .createTabs a {
+    padding-inline: 0.55rem;
+    font-size: 0.76rem;
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) 2.8rem;
+  }
+
+  .searchField {
+    grid-column: 1 / -1;
+  }
+
+  .sortField {
+    min-width: 0;
+  }
+
+  .filters {
+    margin-right: -1rem;
+    margin-left: -1rem;
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .listCard {
+    min-height: 19rem;
+  }
+
+  .cardBody {
+    padding: 1.1rem;
+  }
+
+  .cardActions,
+  .renameForm {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .renameForm {
+    grid-template-columns: 1fr auto;
+  }
+
+  .renameForm button:last-child {
+    grid-column: 2;
+  }
+}

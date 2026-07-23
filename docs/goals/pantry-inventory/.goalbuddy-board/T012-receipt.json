@@ -1,0 +1,48 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "full_outcome_complete": false,
+  "rationale": "The T010 defects are repaired, but optional same-product ingredients can consume a shared recipe stock pool before required lines, and the service query lacks explicit deterministic ingredient ordering. Required-first stable allocation is required before grocery/cooking reuse.",
+  "worker_package": {
+    "objective": "Complete the calculation repair: allocate each product/unit stock pool to non-optional recipe ingredients first, then expose residual optional coverage without changing output order; establish deterministic service ordering by group position, ingredient position, and stable ID; add regressions proving optional lines cannot deprive required lines and repeated reads are stable. Preserve all existing uncertainty, date, attribution, recipe-text, trusted-origin, and non-mutation behavior.",
+    "allowed_files": [
+      "src/lib/domain/pantry-availability.ts",
+      "src/lib/services/pantry-availability-service.ts",
+      "src/app/api/v1/pantry/recipes/[recipeId]/availability/route.ts",
+      "src/app/api/v1/pantry/demand/route.ts",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "src/components/meal-plan-pantry-demand.module.css",
+      "tests/unit/pantry-availability.test.ts",
+      "tests/integration/pantry-availability-service.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/decisions/0031-pantry-availability-and-demand.md"
+    ],
+    "verify": [
+      "pnpm exec prettier --check <T013 scoped files>",
+      "pnpm exec vitest run --project unit tests/unit/pantry-availability.test.ts",
+      "pnpm exec vitest run --project integration tests/integration/pantry-availability-service.test.ts",
+      "pnpm test",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm openapi:validate",
+      "git diff --check"
+    ],
+    "stop_if": [
+      "Repair requires schema/migration/grocery/cooking or files outside allowed_files.",
+      "Repair would count uncertain stock as exact, change response order, mutate batches, rewrite recipes, weaken attribution/origin checks, overwrite concurrent work, or require shared .next ownership."
+    ]
+  },
+  "evidence": [
+    "src/lib/domain/pantry-availability.ts",
+    "src/lib/services/pantry-availability-service.ts",
+    "tests/unit/pantry-availability.test.ts",
+    "tests/integration/pantry-availability-service.test.ts"
+  ],
+  "missing_evidence": [
+    "Required-first optional allocation and stable repeated-read regressions."
+  ],
+  "required_board_updates": [
+    "Activate T013 repair and repeat calculation Judge before grocery/cooking."
+  ]
+}

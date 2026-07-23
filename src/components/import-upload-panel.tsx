@@ -7,7 +7,6 @@ import {
   FileCheck2,
   FileImage,
   FileText,
-  LoaderCircle,
   LockKeyhole,
   RefreshCw,
   ScanText,
@@ -17,6 +16,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type RefObject } from 'react';
+
+import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
 
 export type ImportPreparationPhase = 'idle' | 'preparing' | 'ready' | 'error' | 'submitting';
 
@@ -166,10 +167,7 @@ function SelectedImagePreview({
         />
       ) : null}
       {showLoading ? (
-        <span className="import-preview-overlay" role="status">
-          <LoaderCircle className="spin" size={23} aria-hidden="true" />
-          {loadingMessage}
-        </span>
+        <AsyncSkeleton className="import-preview-overlay" label={loadingMessage} variant="image" />
       ) : showError ? (
         <span className="import-preview-overlay error" role="alert">
           <AlertCircle size={23} aria-hidden="true" />
@@ -238,7 +236,7 @@ function SelectedFiles({
             </span>
             <span className={`import-file-state ${phase}`}>
               {phase === 'preparing' ? (
-                <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                <InlineSkeleton label={`Preparing ${item.sourceName}`} width="1rem" />
               ) : phase === 'error' ? (
                 <Circle size={16} aria-hidden="true" />
               ) : (
@@ -361,19 +359,11 @@ export function ImportUploadPanel({
       />
 
       {phase === 'preparing' || waitingForPreviews ? (
-        <div className="import-readiness preparing" role="status">
-          <LoaderCircle className="spin" size={22} aria-hidden="true" />
-          <div>
-            <strong>
-              {waitingForPreviews ? 'Finishing image preview' : 'Preparing on this device'}
-            </strong>
-            <span>
-              {waitingForPreviews
-                ? 'The review action will unlock after every selected image is ready.'
-                : 'Checking files and converting iPhone photos when needed.'}
-            </span>
-          </div>
-        </div>
+        <AsyncSkeleton
+          className="import-readiness preparing"
+          label={waitingForPreviews ? 'Finishing image preview' : 'Preparing files on this device'}
+          variant="panel"
+        />
       ) : ready ? (
         <div className="import-readiness ready" role="status">
           <FileCheck2 size={23} aria-hidden="true" />
@@ -460,7 +450,7 @@ export function ImportUploadPanel({
           disabled={busy}
         >
           {busy ? (
-            <LoaderCircle className="spin" size={19} aria-hidden="true" />
+            <InlineSkeleton label={actionLabel} width="1.2rem" />
           ) : phase === 'error' && canRetryPreparation ? (
             <RefreshCw size={19} aria-hidden="true" />
           ) : phase === 'error' ? (

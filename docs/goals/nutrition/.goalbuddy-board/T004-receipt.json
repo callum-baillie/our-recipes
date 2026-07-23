@@ -1,0 +1,40 @@
+{
+  "result": "done",
+  "task_id": "T004",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition.ts",
+    "tests/unit/nutrition.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "pnpm exec prettier --check src/lib/domain/nutrition.ts tests/unit/nutrition.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm exec eslint src/lib/domain/nutrition.ts tests/unit/nutrition.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm typecheck",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm vitest run --project unit tests/unit/nutrition.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "git diff --check -- src/lib/domain/nutrition.ts tests/unit/nutrition.test.ts",
+      "status": "pass"
+    }
+  ],
+  "summary": "Added a pure reusable Nutrition kernel with 46 canonical nutrient definitions; explicit missing-versus-zero vector arithmetic; reliable-energy priority and documented 4/4/9/7 fallback; macro distribution; optional/excluded ingredient aggregation with explicit edible, drained, retention, confidence and completeness factors; total/per-serving/per-100g/fractional-portion scaling; distinct target/range/limit semantics; separate planned/consumed totals; missing-day-safe rolling trends; and visibility-filtered normalized household comparisons. Added 35 focused unit tests. No Pantry, schema, migration, recipe, planner, cooking, UI, documentation, or unrelated dirty file was touched.",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit without writing files, so the PM executed the same two-file package as permitted fallback.",
+    "The first typecheck attempt observed a transient externally owned Pantry missing-component error plus one local union-narrowing error; the local error was fixed within scope, the concurrent Pantry file appeared, and the required fresh typecheck passed."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 2,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

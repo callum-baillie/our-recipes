@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T097",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T097-display-preference-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only migration, validation, authorization, update, current-view behavior and deferred-boundary review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved three immediately operative private display preferences and rejected premature macro/card/planner switches.",
+  "note": "notes/T097-display-preference-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The approved additive preference vertical must be delivered and audited.",
+    "Macro mode, card/planner flags, aggregate/source datasets, weight and household views remain later tasks."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

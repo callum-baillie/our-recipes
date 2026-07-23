@@ -1,0 +1,55 @@
+{
+  "result": "done",
+  "task_id": "T090",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-energy-estimate.ts",
+    "src/lib/services/nutrition-energy-estimate-service.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/goals/estimate/route.ts",
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-profile-settings.tsx",
+    "src/components/nutrition-profile-settings.module.css",
+    "tests/unit/nutrition-energy-estimate.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-energy-estimate-service.test.ts",
+    "tests/integration/nutrition-energy-estimate-api.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused energy equation and component unit tests",
+      "status": "pass",
+      "summary": "12 tests passed"
+    },
+    {
+      "cmd": "focused energy service and API integration tests",
+      "status": "pass",
+      "summary": "4 tests passed"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "190 unit and 114 integration tests passed"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered exact adult-only NASEM 2023 EER preview and explicit append-only goal application with server-owned evidence and idempotent operation IDs.",
+  "note": "notes/T090-adult-energy-estimate-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Child, pregnancy and breastfeeding estimates remain intentionally unsupported pending separate inputs/source review.",
+    "Individual chart datasets and household analysis remain the next broad product slices."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

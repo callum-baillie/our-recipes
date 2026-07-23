@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T030",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The product persists and renders the exact required 50 g row. The test's hasText filter cannot match a product name stored only in input values/accessibility labels. Replace only that filter with a semantic descendant quantity-label locator; preserve the 50 g assertion and all fixtures.",
+    "worker_package": {
+      "objective": "Repair one semantic row locator, then complete Pantry browser/accessibility/screenshots, disposable DB, port, and diff evidence.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": ["Hash guard", "Exact semantic locator replacement", "Spec Prettier/mirror refresh", "Fresh full Pantry Playwright", "Two axe/five screenshots", "Disposable db:migrate/db:check", "Port/diff integrity"],
+      "stop_if": ["Fixture/formula/assertion/product changes.", "Locator weakens.", "Two runs fail.", "Isolation/ownership fails."]
+    },
+    "evidence": [
+      "Rendered error contexts show a 50 g Red lentils item.",
+      "Database proves 400 g required, 350 g available, 50 g shortage with complete provenance.",
+      "The article textContent omits the input value, while the Red lentils quantity accessibility label is present."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, port, browser output, and disposable DB." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Full Pantry browser/axe/screenshots", "Manual/obsolete/intake/cooking continuation", "Disposable DB", "Port/diff integrity"],
+    "required_board_updates": ["Record T030 approved.", "Activate T031 Worker.", "Keep T999 queued until passing receipt."]
+  }
+}

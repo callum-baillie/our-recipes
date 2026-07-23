@@ -1,0 +1,22 @@
+{
+  "result": "done",
+  "task_id": "T050",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T050-prepared-consumption-map.md"
+  ],
+  "commands": [
+    { "cmd": "read-only migration, schema, cook/Pantry, recipe calculation, intake, allocation, API, UI and test transaction map", "status": "pass" }
+  ],
+  "summary": "Mapped the missing prepared snapshot and atomic idempotent intake-plus-eaten-allocation command, with Pantry/cooking separation and a persistence-then-UI split.",
+  "note": "notes/T050-prepared-consumption-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit, so the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Advanced substitution/exclusion nutrition requires a later evidence-backed recipe-calculation slice."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

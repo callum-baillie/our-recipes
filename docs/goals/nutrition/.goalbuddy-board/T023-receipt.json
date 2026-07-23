@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T023",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T023-intake-decision.md"],
+  "commands": [{ "cmd": "re-audit repaired private profile service and map meal-plan/cook/Pantry/normalized-nutrition seams", "status": "pass" }],
+  "summary": "Approved repaired private-profile security and an exact additive append-only intake package with explicit allocation states, immutable nutrient/provenance snapshots, authorized corrections, view/write separation, and no automatic planner/Pantry/cooking consumption.",
+  "note": "notes/T023-intake-decision.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,39 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T020",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "rejected",
+    "full_outcome_complete": false,
+    "rationale": "Obsolete cleanup and retry-key persistence are correct, but a late success for an old key can still overwrite the current intake UI state even though it cannot rotate the key.",
+    "worker_package": {
+      "objective": "Classify late old-key intake responses as stale and skip all UI state effects while preserving current retry and idempotency semantics.",
+      "allowed_files": ["src/components/shopping-list-editor.tsx", "tests/unit/pantry-grocery-cooking.test.ts"],
+      "verify": [
+        "pnpm exec prettier --check src/components/shopping-list-editor.tsx tests/unit/pantry-grocery-cooking.test.ts",
+        "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts",
+        "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts",
+        "pnpm test",
+        "pnpm lint",
+        "pnpm typecheck",
+        "pnpm openapi:validate",
+        "git diff --check"
+      ],
+      "stop_if": [
+        "Any file outside the two-file package must change.",
+        "Retry or idempotency semantics regress.",
+        "Concurrent dirty work cannot be preserved.",
+        "Shared .next ownership is required."
+      ]
+    },
+    "evidence": [
+      "Old-key success cannot rotate the current key but the component still unconditionally applies the confirmed stale result.",
+      "All prior provenance, obsolete cleanup, atomic transaction, retry, security, and migration repairs remain sound."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "The final fix is one component contract and its unit test." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Late-result suppression regression", "Fresh safe gates, isolated build/render/accessibility/migration evidence, and final oracle"],
+    "required_board_updates": ["Mark T020 rejected.", "Activate T021 Worker.", "Require another Judge."]
+  }
+}

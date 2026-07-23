@@ -4,11 +4,8 @@ import { NextResponse } from 'next/server';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { isoDateSchema, mealPlanEntrySchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
-import {
-  addMealPlanEntry,
-  listPlannedMeals,
-  PlanningNotFoundError,
-} from '@/lib/services/planning-service';
+import { listPlannedMeals, PlanningNotFoundError } from '@/lib/services/planning-service';
+import { addMealPlanEntryWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +34,7 @@ export async function POST(request: Request) {
     return jsonError(400, 'invalid_planned_meal', 'Check the planned meal details.');
   try {
     return NextResponse.json(
-      { meal: addMealPlanEntry(parsed.data, actor.profileId) },
+      { meal: addMealPlanEntryWithNutrition(parsed.data, actor.profileId) },
       { status: 201 },
     );
   } catch (error) {

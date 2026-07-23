@@ -1,0 +1,38 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T045",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The exact role-and-accessible-name locator is correct. The implicit label includes descendant option text, while the accessibility tree exposes one combobox named Location and a separate Shelf or sub-location textbox.",
+    "worker_package": {
+      "objective": "Replace only the line-116 Location label locator with an exact Location combobox role/name locator, then complete all independent browser and persistence gates.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source/mirror pre-hash 13B92897151FAC48051797CDB11B3FBDA9434C7F60F3DA225352C390B7B883B1.",
+        "Replace only getByLabel Location exact:true with getByRole combobox name Location exact:true; preserve selectOption and everything else.",
+        "Run scoped format/lint and one-file mirror hash equality.",
+        "Run fresh management workflow with all actions, three axe/overflow/screenshots, and no browser errors.",
+        "Release port, fresh prepare, run integrated workflow with 400/350/50, provenance/manual/intake/FEFO/history, two axe, five screenshots, no browser errors.",
+        "Inspect persistence read-only, run disposable migrate/db check, release port, and record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any other locator/product/fixture/assertion/timeout/file change is required.",
+        "Exact role/name semantics weaken or fail.",
+        "Workflows share state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": [
+      "T044 timed out only at exact getByLabel.",
+      "Accessibility snapshot exposes combobox Location and separate Shelf or sub-location textbox.",
+      "Exact role/name structurally excludes the sibling without CSS or position."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, DB path, artifacts, and port require serial lifecycles." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing independent workflows and accessibility/screenshots", "Persistence/migration/port/diff proof", "Later full original-outcome audit"],
+    "required_board_updates": ["Record T045 done.", "Activate T046 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

@@ -1,0 +1,5 @@
+CREATE TABLE `nutrition_insight_feedback` (`id` text PRIMARY KEY NOT NULL,`nutrition_profile_id` text NOT NULL,`recommendation_key` text NOT NULL,`revision` integer NOT NULL,`state` text NOT NULL CHECK (`state` IN ('dismissed','helpful','not_helpful')),`reason` text NOT NULL DEFAULT '',`supersedes_feedback_id` text,`created_by_principal_id` text NOT NULL,`created_at` integer NOT NULL,FOREIGN KEY (`nutrition_profile_id`) REFERENCES `nutrition_profiles`(`id`) ON DELETE restrict,FOREIGN KEY (`supersedes_feedback_id`) REFERENCES `nutrition_insight_feedback`(`id`) ON DELETE restrict,FOREIGN KEY (`created_by_principal_id`) REFERENCES `nutrition_principals`(`id`) ON DELETE restrict);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `nutrition_insight_feedback_key_revision_idx` ON `nutrition_insight_feedback` (`nutrition_profile_id`,`recommendation_key`,`revision`);
+--> statement-breakpoint
+CREATE INDEX `nutrition_insight_feedback_profile_created_idx` ON `nutrition_insight_feedback` (`nutrition_profile_id`,`created_at`);

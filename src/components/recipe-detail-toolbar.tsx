@@ -8,13 +8,13 @@ import {
   Download,
   Edit3,
   FileText,
-  LoaderCircle,
   Printer,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import { DismissibleDetails } from '@/components/dismissible-details';
+import { InlineSkeleton } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
 
 type ExportFormat = 'JSON-LD' | 'Markdown';
@@ -109,7 +109,7 @@ export function RecipeDetailToolbar({ recipeId }: { recipeId: string }) {
               aria-busy={copying === 'JSON-LD'}
             >
               {copying === 'JSON-LD' ? (
-                <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                <InlineSkeleton label="Preparing JSON-LD" width="1rem" />
               ) : (
                 <Copy size={16} aria-hidden="true" />
               )}
@@ -132,7 +132,7 @@ export function RecipeDetailToolbar({ recipeId }: { recipeId: string }) {
               aria-busy={copying === 'Markdown'}
             >
               {copying === 'Markdown' ? (
-                <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                <InlineSkeleton label="Preparing Markdown" width="1rem" />
               ) : (
                 <Copy size={16} aria-hidden="true" />
               )}

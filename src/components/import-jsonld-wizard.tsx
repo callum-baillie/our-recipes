@@ -1,7 +1,9 @@
 'use client';
 
-import { Braces, ChevronDown, ChevronLeft, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { Braces, ChevronDown, ChevronLeft, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
+
+import { InlineSkeleton } from '@/components/skeleton';
 
 import { ImportReviewForm } from '@/components/import-review-form';
 import type { RecipePayload } from '@/lib/domain/recipe';
@@ -151,7 +153,11 @@ export function JsonLdImportWizard({
             onClick={() => void requestDraft()}
             disabled={!source.trim() || pending}
           >
-            {pending ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}
+            {pending ? (
+              <InlineSkeleton label="Finding recipe candidates" width="1.1rem" />
+            ) : (
+              <ShieldCheck size={17} />
+            )}
             Find Recipe candidates
           </button>
           {collapsedByDefault && !source && (
@@ -178,7 +184,11 @@ export function JsonLdImportWizard({
                 onClick={() => void requestDraft(candidate.index)}
                 disabled={pending}
               >
-                {pending ? <LoaderCircle className="spin" size={17} /> : <ShieldCheck size={17} />}
+                {pending ? (
+                  <InlineSkeleton label="Preparing recipe review" width="1.1rem" />
+                ) : (
+                  <ShieldCheck size={17} />
+                )}
                 Review this Recipe
               </button>
             </article>

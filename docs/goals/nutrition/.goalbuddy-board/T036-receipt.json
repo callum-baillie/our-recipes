@@ -1,0 +1,23 @@
+{
+  "result": "done",
+  "task_id": "T036",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T036-recipe-boundary-map.md"],
+  "commands": [
+    {
+      "cmd": "read-only recipe schema, serving parser, product mapping, food-record, conversion, calculation history, intake provenance, API/UI and Pantry T017 ownership map",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped a schema-safe deterministic recipe calculation and explicit server-snapshotted intake vertical slice, including a conservative conversion matrix and the missing production food-record input path.",
+  "note": "notes/T036-recipe-boundary-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit, so the PM produced the same read-only evidence map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must convert the evidence map into one exact non-conflicting Worker package."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

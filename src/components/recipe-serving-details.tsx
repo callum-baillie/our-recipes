@@ -1,8 +1,10 @@
 'use client';
 
-import { Clock3, LoaderCircle, Minus, Plus, Sparkles } from 'lucide-react';
+import { Clock3, Minus, Plus, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+
+import { InlineSkeleton } from '@/components/skeleton';
 import { useMemo, useState } from 'react';
 
 import { RecipeClassificationToolbar } from '@/components/recipe-classification-toolbar';
@@ -176,18 +178,25 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
         </div>
       </dl>
 
-      <section
-        className="nutrition-panel"
-        aria-labelledby="nutrition-heading"
-        aria-busy={estimatingNutrition}
-      >
+      <details className="nutrition-panel" aria-busy={estimatingNutrition}>
+        <summary className="nutrition-heading">
+          <div>
+            <p className="eyebrow">OPTIONAL SOURCE EVIDENCE · PER SERVING</p>
+            <strong>Imported or manual legacy Nutrition</strong>
+          </div>
+          <span>Review source values</span>
+        </summary>
         <div className="nutrition-heading">
           <div>
-            <p className="eyebrow">PER SERVING</p>
-            <h2 id="nutrition-heading">Nutritional information</h2>
+            <p>
+              These values are retained as migration/source evidence. The normalized ingredient
+              calculation above is authoritative throughout Recipes, Planner, and Nutrition.
+            </p>
           </div>
           <div className="nutrition-heading-actions">
-            <p>Values are per serving. AI-generated estimates should be reviewed.</p>
+            <p>
+              AI-generated legacy estimates are unverified source evidence and should be reviewed.
+            </p>
             {nutritionIncomplete && (
               <button
                 className="text-button nutrition-estimate-button"
@@ -197,7 +206,7 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
                 title="Uses one paid OpenAI request"
               >
                 {estimatingNutrition ? (
-                  <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                  <InlineSkeleton label="Estimating nutrition" width="1rem" />
                 ) : (
                   <Sparkles size={16} aria-hidden="true" />
                 )}
@@ -214,7 +223,7 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
             </div>
           ))}
         </dl>
-      </section>
+      </details>
 
       <RecipeClassificationToolbar
         recipeId={props.recipeId}

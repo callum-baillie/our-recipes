@@ -1,0 +1,11 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T096", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": [],
+    "commands": [{"cmd": "preflight hashes/live isolation", "status": "pass"}, {"cmd": "fresh grocery E2E", "status": "pass", "summary": "1/1 in 56.4s"}, {"cmd": "fresh recipe/planner E2E", "status": "pass", "summary": "1/1 in 45.5s"}, {"cmd": "final cleanup/protected hash/diff integrity", "status": "pass"}],
+    "summary": "Zero edits. Grocery and recipe/planner protected E2Es pass independently. Workflow fails because legacy Deduction 1 quantity accessible name is absent in the richer confirmation UI. Cleanup/integrity passed.",
+    "evidence": ["Workflow artifact preserved under recipe-t096 test-results.", "Port free, PID7376 untouched, hashes exact, diff clean."],
+    "deviations": ["Workflow legacy locator failure."],
+    "remaining_blockers": ["Accessible-name compatibility", "Disposable DB/final integrity"],
+    "verification_attempts": 1, "stopped_because": "Protected workflow failed; zero-edit stop condition preserved artifacts and cleanup."
+  }
+}

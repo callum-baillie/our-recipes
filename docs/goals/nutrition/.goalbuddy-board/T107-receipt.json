@@ -1,0 +1,32 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T107",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T107-weight-trend-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only weight authorization, query-count, smoothing, unit, axis, target privacy and accessible-rendering audit",
+      "status": "pass"
+    },
+    {
+      "cmd": "focused weight service regression after query-count and guardian assertions",
+      "status": "pass",
+      "summary": "5 integration tests passed"
+    }
+  ],
+  "summary": "Approved the measurement-authorized three-query weight trend, including disabled suppression, protected target, local-day smoothing, server units/axis and accessible factual rendering.",
+  "note": "notes/T107-weight-trend-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Recipe-card and meal-planner Nutrition display settings/integration remain.",
+    "Household analysis/charts, offline/performance documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

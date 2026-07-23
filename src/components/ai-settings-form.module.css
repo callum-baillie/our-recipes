@@ -1,0 +1,240 @@
+.shell {
+  display: grid;
+  gap: 1.25rem;
+}
+.panel {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  color: var(--ink);
+  background: var(--linen);
+}
+.panel header {
+  margin-bottom: 1rem;
+}
+.panel h2,
+.panel p {
+  margin-top: 0;
+}
+.panel header p {
+  color: var(--muted);
+  margin-bottom: 0;
+}
+.globalPreference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.8fr);
+  align-items: center;
+  gap: 1.5rem;
+}
+.globalPreference h2,
+.globalPreference p {
+  margin: 0;
+}
+.globalPreference p {
+  max-width: 44rem;
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+.masterToggle {
+  position: relative;
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--field);
+  cursor: pointer;
+}
+.masterToggle span {
+  display: grid;
+  gap: 0.2rem;
+}
+.masterToggle strong {
+  font-weight: 600;
+}
+.masterToggle small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+.masterToggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.masterToggle i {
+  position: relative;
+  display: block;
+  width: 2.4rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper-deep);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.masterToggle i::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: var(--field);
+  box-shadow: 0 1px 3px rgb(29 37 25 / 25%);
+  content: '';
+  transition: transform 150ms ease;
+}
+.masterToggle input:checked + i {
+  border-color: var(--leaf);
+  background: var(--leaf);
+}
+.masterToggle input:checked + i::after {
+  transform: translateX(1.03rem);
+}
+.workloads {
+  display: grid;
+  gap: 0.8rem;
+}
+.workload {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.3fr) minmax(140px, 0.8fr);
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--line);
+}
+.workload > strong {
+  align-self: center;
+  text-transform: capitalize;
+}
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.field select,
+.field input {
+  min-height: 42px;
+  width: 100%;
+  padding: 0 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+}
+.privacy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1.2rem;
+}
+.toggle {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.55rem 0;
+}
+.toggle input {
+  margin-top: 0.22rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  min-height: auto;
+  flex: 0 0 1.1rem;
+}
+.toggle span {
+  display: grid;
+  gap: 0.16rem;
+}
+.toggle small {
+  color: var(--muted);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+.actions button {
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+.actions button:disabled {
+  opacity: 0.55;
+}
+.status {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.field select:focus-visible,
+.field input:focus-visible,
+.toggle input:focus-visible,
+.masterToggle input:focus-visible + i,
+.actions button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--leaf) 55%, transparent);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme='light'])) .actions button {
+    color: var(--on-primary);
+    background: var(--leaf);
+  }
+}
+
+:global(html[data-theme='dark']) .actions button {
+  color: var(--on-primary);
+  background: var(--leaf);
+}
+@media (max-width: 720px) {
+  .globalPreference {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .workload {
+    grid-template-columns: 1fr;
+  }
+  .privacy {
+    grid-template-columns: 1fr;
+  }
+
+  .workload {
+    gap: 0.6rem;
+    padding: 1rem 0;
+  }
+
+  .field select,
+  .field input {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .panel {
+    padding: 1rem;
+    border-radius: 16px;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}

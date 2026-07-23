@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T079",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T079-recipe-planner-approval.md"],
+  "commands": [
+    { "cmd": "read-only T078 query, privacy, allocation, performance and regression audit", "status": "pass" }
+  ],
+  "summary": "Approved correct pre-pagination factual recipe discovery and signed private primary-planner Nutrition integration.",
+  "note": "notes/T079-recipe-planner-approval.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Personalized sufficient-data recommendations across recipes, Pantry, plan and groceries remain required."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

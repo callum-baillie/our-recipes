@@ -98,7 +98,7 @@ describe('backup and recovery', () => {
     const restored = await restoreBackup(backup.id);
     expect(restored.safetyBackup.manifest.reason).toBe('pre-restore');
     expect(getRecipe(recipe.id)?.images).toHaveLength(1);
-    expect(getHouseholdState().household?.name).toBe('Sunday suppers');
+    expect(getHouseholdState().household?.kitchenName).toBe('Sunday suppers');
     expect((await listBackups()).length).toBeGreaterThanOrEqual(2);
     expect(existsSync(resolve(backupDataDirectory, 'uploads', image.storageKey))).toBe(true);
   }, 20_000);

@@ -1,10 +1,11 @@
-import { CookingPot } from 'lucide-react';
+import { BordIcon } from '@/components/bord-brand';
+import { kitchenFooterCopy } from '@/lib/brand';
 
-export function AppFooter() {
+export function AppFooter({ kitchenName }: { kitchenName: string }) {
   return (
     <footer className="home-footer app-footer">
-      <CookingPot size={14} aria-hidden="true" />
-      <span>Built for a trusted household network.</span>
+      <BordIcon size={16} />
+      <span>{kitchenFooterCopy(kitchenName)}</span>
     </footer>
   );
 }

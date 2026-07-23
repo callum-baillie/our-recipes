@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T086", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["src/components/cooking-mode.module.css", "src/components/cooking-mode.tsx"],
+    "commands": [{"cmd": "pre-hash guards", "status": "pass"}, {"cmd": "scoped Prettier/ESLint and full typecheck", "status": "pass"}, {"cmd": "isolated full-source webpack build", "status": "pass"}, {"cmd": "two-line diff/protected hash/port/live PID integrity", "status": "pass"}],
+    "summary": "Exact local timer class/selector repair compiles. Two fresh cooking E2Es then repeated a quantity correction defect: filling 120 and blurring reverts to 150 and preview stays FEFO 100+50 rather than 100+20.",
+    "deviations": ["Mirror-owned Next webpack used for junction safety.", "Two identical product quantity-correction failures."],
+    "remaining_blockers": ["CookingMode correction-state repair", "Cooking/full/protected/disposable/integrity gates"],
+    "verification_attempts": 2, "stopped_because": "Repeated correction defect outside exact CSS scope; cleanup/protected integrity passed."
+  }
+}

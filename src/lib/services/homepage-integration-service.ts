@@ -10,14 +10,24 @@ import { getShoppingList, listShoppingLists } from '@/lib/services/planning-serv
 
 const PUBLIC_RECIPE_ORIGIN = 'https://recipes.tower';
 
-const MEAL_SLOT_HOURS = {
+const MEAL_SLOT_HOURS: Record<string, number> = {
   breakfast: 8,
+  brunch: 10,
   lunch: 12,
   dinner: 18,
+  supper: 20,
+  dessert: 20,
   snack: 15,
-} as const;
+  tiffin: 15,
+  suhoor: 5,
+  iftar: 19,
+};
 
-type MealSlot = keyof typeof MEAL_SLOT_HOURS;
+type MealSlot = string;
+
+function mealSlotHour(slot: MealSlot): number {
+  return MEAL_SLOT_HOURS[slot] ?? 12;
+}
 
 export type HomepageSummary = {
   generatedAt: string;
@@ -106,7 +116,7 @@ function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
 
 function scheduledInstant(date: string, slot: MealSlot, timeZone: string): Date {
   const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  const localAsUtc = Date.UTC(year, month - 1, day, MEAL_SLOT_HOURS[slot], 0, 0);
+  const localAsUtc = Date.UTC(year, month - 1, day, mealSlotHour(slot), 0, 0);
   let candidate = new Date(localAsUtc);
   // Re-evaluate after applying the offset so dates close to a DST boundary use
   // the offset at the actual scheduled instant.
@@ -131,7 +141,7 @@ function scheduledFor(date: string, slot: MealSlot, instant: Date, timeZone: str
   const absoluteOffset = Math.abs(offset);
   const hours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0');
   const minutes = String(absoluteOffset % 60).padStart(2, '0');
-  return `${date}T${String(MEAL_SLOT_HOURS[slot]).padStart(2, '0')}:00:00${sign}${hours}:${minutes}`;
+  return `${date}T${String(mealSlotHour(slot)).padStart(2, '0')}:00:00${sign}${hours}:${minutes}`;
 }
 
 function absoluteUrl(path: string): string {

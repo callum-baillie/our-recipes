@@ -1,0 +1,40 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T051",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The root defect is disclosure opening, not card identity or product behavior. The intended moved/opened card remains selected, but openDetails samples once and clicks a positional first summary without verifying the final state across rerender.",
+    "worker_package": {
+      "objective": "Refactor only openDetails and all 21 call sites to exact summary names with strict uniqueness and retry-verified final open state, then complete all independent gates.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source/mirror pre-hash 53429C1163C185E09231345F6BE3803ACF7B61494DF33015484B304625F23DFD.",
+        "Implement openDetails with exact visible summary name, details/summary count one, summary visibility, retry conditional click, and verified final open attribute; no positional/CSS/force/sleep/timeout/DOM mutation.",
+        "Update exactly 21 calls: Add Pantry item 2, Manage products and staples 1, Management beans 1, Manage locations 4, Cold room 1, Cold room shelf / Basket 1, Manage batch 11.",
+        "Preserve cards.first, actionForm and counts, every input/action/assertion/fixture/timeout/other locator.",
+        "Run scoped format/lint and one-file mirror hash equality.",
+        "Run fresh management workflow with all actions, three axe/overflow/screenshots, no browser errors.",
+        "Release port, fresh prepare, run integrated workflow with 400/350/50 and all provenance/manual/intake/FEFO/history evidence, two axe, five screenshots, no browser errors.",
+        "Inspect persistence read-only, run disposable migrate/dbcheck, release port, record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any exact summary/disclosure/final open state fails uniqueness.",
+        "Any cards.first/actionForm/input/action/assertion/timeout/product/other file change.",
+        "Workflows share state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": [
+      "Snapshot proves cards.first is the intended moved/opened Cold room shelf batch while Manage batch is closed.",
+      "Current helper samples open once, uses summary.first, and never asserts final open state.",
+      "All 21 call sites have exact visible summary text."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, DB, artifacts, and port require serial lifecycles." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing workflows/accessibility/screenshots", "Persistence/migration/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T051 done.", "Activate T052 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

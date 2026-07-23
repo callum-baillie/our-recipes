@@ -1,0 +1,34 @@
+{
+  "result": "done",
+  "task_id": "T030",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/components/app-header.tsx",
+    "src/lib/domain/nutrition-view.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-access-panel.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-dashboard.module.css",
+    "tests/unit/nutrition-view.test.ts",
+    "tests/unit/nutrition-components.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused Prettier and ESLint", "status": "pass" },
+    { "cmd": "focused Nutrition aggregation/render unit suite", "status": "pass", "summary": "40 tests passed" },
+    { "cmd": "pnpm typecheck", "status": "pass", "summary": "passed after Nutrition repairs before concurrent Pantry file changed again" },
+    { "cmd": "scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Delivered a real private /nutrition UI with onboarding, six views, latest-confirmed-only totals, separate planned status, data quality labels, accessible trends/table, safe household summaries, managed profiles and manual goals. Focused render/aggregation proof passes; current global type/test and direct-browser evidence are blocked by an active Pantry-owned compile defect.",
+  "note": "notes/T030-rendered-nutrition.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit; the PM completed the bounded package as permitted fallback.",
+    "Current global and live-browser gates are deferred because Pantry T015 owns the repeated cooking-service compile defect and shared dev process."
+  ],
+  "remaining_blockers": [
+    "Re-run current global type/test gates after Pantry T015 repairs cooking-service.ts.",
+    "Obtain direct browser and accessibility evidence after the existing dev server recovers."
+  ],
+  "verification_attempts": 2,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

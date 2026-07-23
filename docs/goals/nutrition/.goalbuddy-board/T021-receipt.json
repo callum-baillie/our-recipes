@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "task_id": "T021",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T021-private-security-review.md"],
+  "commands": [{ "cmd": "audit private identity/profile/permission/goal/measurement schema, services and tests", "status": "pass" }],
+  "summary": "Rejected the route-readiness gate because getPrivateNutritionProfile accepted a caller-selected narrow action but returned the full sensitive profile. All other reviewed credential, revocation, attribution, append-only history and optimistic-update boundaries passed. Defined a two-file repair and required re-review before intake.",
+  "note": "notes/T021-private-security-review.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only security gate as permitted fallback."],
+  "remaining_blockers": ["Remove caller-selectable action from full private-profile reads and prove narrow viewers cannot retrieve sensitive profiles."],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

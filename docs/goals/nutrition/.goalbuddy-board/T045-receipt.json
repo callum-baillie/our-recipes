@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T045",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T045-recipe-presentation-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only normalized-versus-legacy, current/stale, mapping, committed-edit, immutable-history, ownership and regression audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved T044 and scoped a read-only map of planner, cooking, serving, Pantry, allocation and confirmed-consumption boundaries.",
+  "note": "notes/T045-recipe-presentation-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

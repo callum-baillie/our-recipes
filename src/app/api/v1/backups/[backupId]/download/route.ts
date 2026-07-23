@@ -27,7 +27,7 @@ export async function GET(_request: Request, context: { params: Promise<{ backup
     return new NextResponse(Readable.toWeb(createReadStream(filePath)) as ReadableStream, {
       headers: {
         'Cache-Control': 'no-store',
-        'Content-Disposition': `attachment; filename="our-recipes-${id}.tar.gz"`,
+        'Content-Disposition': `attachment; filename="bord-${id}.tar.gz"`,
         'Content-Length': String(details.size),
         'Content-Type': 'application/gzip',
         'X-Content-Type-Options': 'nosniff',

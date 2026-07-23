@@ -1,0 +1,32 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T091",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-energy-estimate-service.ts",
+    "docs/goals/nutrition/notes/T091-energy-estimate-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only coefficient, server-evidence, authorization, exclusion, preview/apply, disclosure and retry audit",
+      "status": "pass"
+    },
+    {
+      "cmd": "focused idempotency shape hardening and service/API/type/lint verification",
+      "status": "pass",
+      "summary": "4 focused integration tests passed"
+    }
+  ],
+  "summary": "Approved the adult NASEM EER flow after tightening exact-operation replay to verify the persisted goal shape and value.",
+  "note": "notes/T091-energy-estimate-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same audit and one allowed-file idempotency hardening as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The required individual chart set and display preferences remain unmapped against current data availability."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

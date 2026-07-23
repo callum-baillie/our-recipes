@@ -1,0 +1,45 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T017",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [
+      "src/lib/domain/pantry-grocery-cooking.ts",
+      "src/lib/services/pantry-service.ts",
+      "src/lib/services/planning-service.ts",
+      "src/lib/services/pantry-grocery-cooking-service.ts",
+      "src/components/shopping-list-editor.tsx",
+      "src/components/shopping-list-editor.module.css",
+      "tests/unit/pantry-grocery-cooking.test.ts",
+      "tests/integration/pantry-grocery-cooking-service.test.ts",
+      "tests/integration/pantry-grocery-cooking-api.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/security.md",
+      "docs/testing.md",
+      "docs/decisions/0032-pantry-grocery-cooking.md"
+    ],
+    "commands": [
+      { "cmd": "pnpm exec prettier --check <expanded T017 allowed source, tests, and docs>", "status": "pass" },
+      { "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts", "status": "pass", "summary": "6 tests passed" },
+      { "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts", "status": "pass", "summary": "11 tests passed" },
+      { "cmd": "pnpm test", "status": "pass", "summary": "155 unit and 73 integration tests passed" },
+      { "cmd": "pnpm lint", "status": "pass" },
+      { "cmd": "pnpm typecheck", "status": "pass" },
+      { "cmd": "pnpm openapi:validate", "status": "pass", "summary": "Valid with 11 existing warnings" },
+      { "cmd": "git diff --check", "status": "pass" }
+    ],
+    "summary": "Repaired the rejected milestone without schema or migration edits. Grocery rows retain complete product/formula and per-meal recipe, entry, date, servings, ingredient, and contribution provenance plus sourceRecipeIds; UI distinguishes generated, uncertain, manual override, and obsolete-manual states. Shopping overrides and Pantry undo state transitions are atomic. Intake uses retry-stable operation keys that rotate after success. Full tests pass: 155 unit and 73 integration; lint, types, scoped format, OpenAPI, and diff checks pass.",
+    "deviations": [
+      "Expanded the placeholder scoped-Prettier command to every T017 allowed source, test, and documentation path.",
+      "Kept the existing idempotency_key column while exposing the clearer operationKey API contract, avoiding forbidden schema and migration changes."
+    ],
+    "remaining_blockers": [
+      "Production build and rendered workflow evidence remain unverified because shared .next is owned by an active development process."
+    ],
+    "verification_attempts": 2,
+    "stopped_because": null
+  }
+}

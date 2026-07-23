@@ -1,0 +1,49 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T042",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+    "commands": [
+      {
+        "cmd": "Source and mirror pre-edit SHA256 guard",
+        "status": "pass",
+        "summary": "Both hashes were CECBF4256AB5089C14D5FFD5E65ED9FB2F40C56F4C0389799F77737FC46B20E9"
+      },
+      {
+        "cmd": "Authorized exact Basket full-path regex change",
+        "status": "pass"
+      },
+      {
+        "cmd": "Scoped Prettier and ESLint",
+        "status": "pass"
+      },
+      {
+        "cmd": "One-file mirror refresh and SHA256 equality",
+        "status": "pass",
+        "summary": "Both post-edit hashes were 39475D4955A7EDF589D0EB1F41BD50F032645410C47A711EE6181CCED4DC974A"
+      },
+      {
+        "cmd": "Fresh isolated management workflow",
+        "status": "fail",
+        "summary": "The Basket locator passed; getByLabel('Location') then matched both Location and Shelf or sub-location"
+      },
+      {
+        "cmd": "Owned server cleanup and port 3100 release",
+        "status": "pass"
+      },
+      {
+        "cmd": "Scoped diff integrity",
+        "status": "pass"
+      }
+    ],
+    "summary": "The authorized full-path selector passed and the management flow reached approximate-batch creation. A separate strict-label collision then appeared because Location also matched Shelf or sub-location; no product mutation failed.",
+    "deviations": [],
+    "remaining_blockers": [
+      "Exact accessible Location selector and audit of remaining label-substring collisions",
+      "Complete management and independent integrated browser/accessibility/screenshot/persistence evidence"
+    ],
+    "verification_attempts": 1,
+    "stopped_because": "T042 permitted only the Basket regex change; repairing a separate selector was outside Worker scope."
+  }
+}

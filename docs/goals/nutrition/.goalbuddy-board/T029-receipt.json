@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T029",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T029-rendered-slice-decision.md"],
+  "commands": [{ "cmd": "re-audit repaired API and inspect current navigation/page/component patterns plus Pantry T015 ownership", "status": "pass" }],
+  "summary": "Approved the repaired server boundary and a non-placeholder first /nutrition slice with private onboarding, safe profile selection, explicit diary aggregation, nutrients, accessible trends, authorized household summaries, managed profiles and manual goals while keeping planned/Pantry/cooked food distinct from consumption.",
+  "note": "notes/T029-rendered-slice-decision.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

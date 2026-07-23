@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "task_id": "T011",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T011-rebase-decision.md"
+  ],
+  "commands": [
+    {
+      "cmd": "inspect Pantry T007 status, combined migration journal/schema, T010 receipt and dirty ownership",
+      "status": "pass"
+    }
+  ],
+  "summary": "Rejected resuming the persistence package while Pantry T007 still actively owns the shared schema and migration journal. The two migration tags are presently ordered and logically separable, but final combined verification is absent. Selected an official-primary-source reference-value Scout as the largest safe non-overlapping next package.",
+  "note": "notes/T011-rebase-decision.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Pantry T007 final receipt and stable shared-file boundary are still required before persistence resumes."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

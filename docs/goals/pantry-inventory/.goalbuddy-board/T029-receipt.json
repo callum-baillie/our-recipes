@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T029",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+    "commands": [
+      { "cmd": "Pre-edit source/mirror hash guard", "status": "pass" },
+      { "cmd": "Exact open-attribute condition repair and Prettier", "status": "pass" },
+      { "cmd": "Mirror audit/one-file refresh/post-edit hash equality", "status": "pass" },
+      { "cmd": "Fresh Pantry browser attempt 1", "status": "fail", "summary": "No Red lentils shopping row after generation at line 227" },
+      { "cmd": "Attempt 1 server cleanup/port release", "status": "pass" },
+      { "cmd": "Fresh Pantry browser attempt 2", "status": "fail", "summary": "Identical missing shopping row" },
+      { "cmd": "Attempt 2 server cleanup/port release", "status": "pass" }
+    ],
+    "summary": "The exact helper fix works and both Pantry management screenshots are captured, but two fresh runs deterministically produce no expected Red lentils shopping row. Servers and ports are clean; product behavior beyond list generation remains unverified.",
+    "deviations": ["Used fixed-path cleanup for authorized mirror outputs after shell policy rejected native recursive removal.", "Used manually owned webpack dev servers."],
+    "remaining_blockers": ["Root-cause the absent generated grocery row from persisted fixture/API state.", "Complete accessibility/screenshots, disposable DB, and diff gates."],
+    "verification_attempts": 2,
+    "stopped_because": "Fresh Pantry workflow failed twice at the same generated-shopping-row assertion."
+  }
+}

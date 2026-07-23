@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T114",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T114-planner-projection-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only query, authorization, state, date, nutrient, privacy and preview audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved the five-query exact-local-date planner projection and preview-only display flag with allocation, preparation and consumption truth preserved.",
+  "note": "notes/T114-planner-projection-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The concurrent duplicate migration number must be coordinated after Pantry releases schema/journal ownership.",
+    "Household analysis/charts, documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

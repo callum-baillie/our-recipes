@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   return new NextResponse(plannedMealsAsIcs(weekStart.data, weekEnd.data), {
     headers: {
       'Cache-Control': 'no-store',
-      'Content-Disposition': `attachment; filename="our-recipes-${weekStart.data}.ics"`,
+      'Content-Disposition': `attachment; filename="bord-${weekStart.data}.ics"`,
       'Content-Type': 'text/calendar; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
     },

@@ -1,5 +1,7 @@
 # Implementation status
 
+Current candidate: `1.0.0-rc.1`, schema `0038_meal_plan_ingredient_snapshots`. This file summarizes implementation only; target release evidence is tracked in [the v1 release checklist](docs/release-checklist.md).
+
 ## In this foundation
 
 - [x] Pinned Next/TypeScript/pnpm foundation with a frozen lockfile.
@@ -24,17 +26,24 @@
 - [x] Deterministic Schema.org Recipe JSON-LD export plus bounded local pasted JSON-LD candidate selection, editable review, and confirmation without remote/file/provider intake.
 - [x] Server-generated full recipe portability archive: deterministic JSON-LD cards, content-hash-addressed normalized WebP copies, checksummed manifest, bounded temporary output, and a local browser download; no archive intake or restore route.
 - [x] Server-only official OpenAI provider with strict structured outputs, explicit review/image actions, bounded input, rate limits, content-free audit records, local generated-image storage, and deterministic doubles (no paid live call).
-- [x] Rich recipe-card metadata (original author, source, cooking method, ordered equipment, and user-entered nutrition), deterministic Markdown export, and per-profile private ratings/notes isolated from shared revisions and exports.
+- [x] Rich recipe-card metadata (original author, source, cooking method, ordered equipment, and user-entered nutrition), deterministic Markdown export, and profile-scoped ratings/notes isolated from shared revisions and exports (but not protected by profile authentication).
 - [x] Profile-aware library rating/favorite indicators and highest-rated sorting, recipe attribution, revision timeline, and guarded snapshot restore that appends history rather than overwriting it.
 - [x] Responsive visual specification, product concept, first-run UI, unit/integration/e2e/a11y test sources, and CI workflow.
 - [x] System light/dark cookbook presentation, responsive desktop/tablet/mobile checks, US Letter/A4 recipe print rendering, and an isolated 10,000-recipe paginated library/search performance check.
 - [x] Fresh-household local release acceptance flow covering profile archive/restore, tag and collection governance, review-first capture/import/portability, rich recipe history/preferences, cooking, planning/shopping, PWA reading, and backup validation.
+- [x] Integrated Pantry inventory, recipe mappings, bounded availability filtering, Pantry-aware list regeneration, explicit purchase intake, atomic cooking deduction, leftovers, and conflict-aware undo.
+- [x] Integrated normalized Nutrition with versioned product evidence/calculations, linked profile goals, plan allocations, prepared recipe snapshots, explicit consumption, immutable diary corrections, charts, and deterministic non-medical recommendations.
+- [x] Pinned meal-plan recipe title/revision/ingredient/Nutrition snapshots with an explicit refresh command; later recipe edits do not silently rewrite planned demand.
+- [x] Shopping-list manual/lifecycle controls and durable source identity, with Nutrition recommendations preserving Pantry product/provenance identity.
+- [x] One recipe mutation command preserves Pantry mappings, revisions, search indexing, and visible Nutrition recalculation outcomes across UI and AI initiators.
+- [x] Redacted diagnostics plus app/schema/migration health, warning-free route-complete OpenAPI, standalone artifact denylist, and a deterministic integrated v1 browser oracle.
 
 ## Deliberately unrun live check
 
 - Bounded local English printed-scan OCR uses a pinned package model, local filesystem-only worker path, review-only provenance, manual fallback, and a printed-fixture smoke test. Explicit configured OpenAI vision provides the reviewable handwritten-photo/scan path; browser-only HEIC/HEIF conversion is covered with real codec fixtures. Arbitrary archive intake remains intentionally unsupported.
 - No paid live OpenAI request was made. This is intentional: automated tests use deterministic provider doubles, and a live request remains opt-in after explicit operator approval.
 - Docker Engine 29.6.1 validates the image, health, first-run setup, and temporary bind-mounted persistence recreation. The Unraid template and documentation are complete; no operator Unraid host was modified during validation.
+- The current `1.0.0-rc.1` candidate still requires a fresh Docker image/layer inspection, populated beta upgrade/restore drill, target Unraid run, and real iPhone Safari acceptance before those targets can be claimed for a public v1 tag.
 
 ## Dependency Recovery
 

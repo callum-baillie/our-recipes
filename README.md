@@ -1,39 +1,41 @@
-# Our Recipes
+# Bòrd
 
-Our Recipes is a self-hosted recipe manager for one trusted household. It currently supports editable household profiles, shared governed tags, curated collections, structured recipes with multi-section editing, local draft recovery, conflict-safe revisions, lifecycle/faceted search, review-first text/URL/PDF/scan/Schema.org JSON-LD capture, cooking mode, meal planning, editable shopping lists, print layouts, portable Recipe export, local recipe photos, rich source/equipment/nutrition card details, and profile-private ratings/notes.
+Bòrd is a self-hosted recipe keeper, meal planner, nutritional advisor, and grocery store helper for one trusted household. Its customizable kitchen name and icon personalize the shared experience while Bòrd remains the product brand.
+
+Its optional OpenAI assistant can read permitted recipe, planning, and nutrition context; prepare review-first app changes; generate meal plans from new or existing recipes; and create daily or weekly summaries. Model/reasoning choices are configurable per workload, while each profile controls which data categories may be sent.
 
 > Profiles are not passwords or access control. Keep this app behind a trusted local network until an authenticated deployment is intentionally designed and reviewed.
 
 ## Release status
 
-**v0.1.0-beta.11** is an early beta release candidate. It is suitable for a trusted household that keeps regular backups, but it is not an authentication boundary and should not be exposed directly to the public internet. Please report issues in the [GitHub issue tracker](https://github.com/callum-baillie/our-recipes/issues).
+**v1.0.0-rc.1** is a release candidate, not a public v1 tag. It is suitable for candidate testing by a trusted household that keeps regular backups, but it is not an authentication boundary and must not be exposed directly to the public internet. The canonical [capability matrix](docs/capabilities.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish implemented behavior from target-specific evidence still required. Please report issues through the [support and security guide](docs/support.md).
 
 ## Install with Docker
 
-The published image is `ghcr.io/callum-baillie/our-recipes:latest`. Its entrypoint initializes the mounted data directory, then runs the application as non-root UID/GID `1001`; it needs one durable host directory for SQLite, photos, and backups.
+The published image is `ghcr.io/callum-baillie/bord:latest`. Its entrypoint initializes the mounted data directory, then runs the application as non-root UID/GID `1001`; it needs one durable host directory for SQLite, photos, and backups.
 
 ```sh
-mkdir -p ./our-recipes-data
+mkdir -p ./bord-data
 docker run -d \
-  --name our-recipes \
+  --name bord \
   --restart unless-stopped \
   -p 3000:3000 \
-  -v "$(pwd)/our-recipes-data:/data" \
+  -v "$(pwd)/bord-data:/data" \
   -e APP_ORIGIN=http://localhost:3000 \
   -e COOKIE_SECRET="replace-with-a-unique-secret-of-at-least-32-characters" \
-  ghcr.io/callum-baillie/our-recipes:latest
+  ghcr.io/callum-baillie/bord:latest
 ```
 
 Open `http://localhost:3000`, complete the first-run household setup, then use the in-app **Backups** area before upgrades. Confirm the container is healthy with `curl http://127.0.0.1:3000/api/v1/health`.
 
 ## Unraid install
 
-1. Create `/mnt/user/appdata/our-recipes`. On first startup the image adjusts this app-specific directory for its non-root runtime user; do not bind it to a shared media directory.
-2. In **Docker → Add Container**, set the repository to `ghcr.io/callum-baillie/our-recipes:latest` (keep the `latest` tag), map an unused host port such as `4123` to container port `3000`, and map `/mnt/user/appdata/our-recipes` to container `/data`.
+1. Create `/mnt/user/appdata/bord`. On first startup the image adjusts this app-specific directory for its non-root runtime user; do not bind it to a shared media directory.
+2. In **Docker → Add Container**, set the repository to `ghcr.io/callum-baillie/bord:latest` (keep the `latest` tag), map an unused host port such as `4123` to container port `3000`, and map `/mnt/user/appdata/bord` to container `/data`.
 3. Add `COOKIE_SECRET` (a unique value of at least 32 characters), `APP_ORIGIN` (for example `http://tower.local:4123`, matching the chosen host port), and `TZ`. `OPENAI_API_KEY` is optional and should be added only when you intentionally enable an AI action.
 4. Apply the container, visit its WebUI, complete household setup, and confirm `http://tower.local:4123/api/v1/health` reports `{"status":"ok"}`.
 
-You can also import [the Unraid template](unraid/our-recipes.xml). Keep `/data` persistent: it contains the database, images, and backup bundles. The dedicated [Unraid guide](docs/deployment-unraid.md) covers upgrades and host-specific checks.
+You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persistent: it contains the database, images, and backup bundles. The dedicated [Unraid guide](docs/deployment-unraid.md) covers upgrades and host-specific checks.
 
 ## Run locally
 
@@ -43,11 +45,11 @@ You can also import [the Unraid template](unraid/our-recipes.xml). Keep `/data` 
 4. Run `pnpm db:migrate` and `pnpm dev`.
 5. Visit `http://localhost:3000` and complete the first-run form.
 
-`DATA_DIR` defaults to `./data`; `DATABASE_URL` defaults to its `our-recipes.db` file. SQLite and normalized recipe photos live beneath this durable directory. Mount it in a future Docker/Unraid deployment; never rely on a container filesystem layer for either data or media.
+`DATA_DIR` defaults to `./data`; new installations default to `bord.db`. Container startup renames an unambiguous legacy `our-recipes.db` and its SQLite sidecars before opening SQLite; local development continues to resolve an existing legacy file safely. SQLite and normalized recipe photos live beneath this durable directory.
 
 ## Quality commands
 
-Use `pnpm verify` for the non-browser base gate. Browser and accessibility checks are separate: `pnpm test:e2e`, `pnpm test:a11y`, and `pnpm test:release-quality`. `pnpm test:e2e` is the fresh-household local acceptance flow: it exercises profile archive/restore, tag rename/merge/removal, collection membership/order/cover, review-first capture/import/JSON-LD, JSON-LD and Markdown exports, rich recipe history/preferences, cooking, planning/shopping, PWA reading, and backup validation. The release-quality command exercises the same setup-to-library foundation at desktop, tablet, and mobile widths; launches the library under system light and dark schemes; renders Letter/A4 recipe PDFs; and measures the real paginated full-text path over an isolated 10,000-recipe SQLite fixture. Its local 1.5-second query budget is a regression guard, not a cross-host production latency guarantee. See [testing documentation](docs/testing.md), [architecture](docs/architecture.md), [security boundary](docs/security.md), and [implementation status](IMPLEMENTATION_STATUS.md).
+Use `pnpm verify` for the complete non-browser code/build/artifact gate and `pnpm test:v1-release` for the isolated browser release oracle plus 1,000/10,000-recipe performance guards. The browser oracle resets only `.test-data` between specs and includes the explicit Recipe → plan → Pantry-aware list → purchase intake → cook → prepared Nutrition → consumption journey without external provider traffic. See [testing documentation](docs/testing.md), [architecture](docs/architecture.md), [security boundary](docs/security.md), and [implementation status](IMPLEMENTATION_STATUS.md).
 
 ## Current boundaries
 
@@ -55,13 +57,15 @@ Recipe photos and document scans are signature-checked, size/dimension-bounded, 
 
 Each recipe card can download a deterministic [Schema.org `Recipe`](https://schema.org/Recipe) JSON-LD document. The recipe library also offers a portable full-recipe `.tar.gz`: generated JSON-LD cards, referenced normalized WebP photos, and a checksummed manifest only. It is a local download, not an import or restore format; profile details, personal preferences, revisions, OCR/import data, storage keys, and secrets are never included. The import hub separately accepts up to 1 MB of pasted JSON-LD only: it examines top-level/`@graph` Recipe candidates locally, requires an explicit candidate choice and editable review, and creates a recipe only after confirmation. It does not fetch URLs, accept JSON-LD files or archives, store the pasted source, invoke a provider, or expose private household metadata in exports.
 
-Recipe cards also record optional original author, source link, cooking method, ordered equipment, and user-entered nutrition values. Markdown download is a deterministic local transform of this shared card data. A selected profile may save a 1–5 rating and private kitchen note; these are neither shared recipe revisions nor included in any export, and the app never looks up nutrition data from a provider.
+Recipe cards also record optional original author, source link, cooking method, ordered equipment, and user-entered nutrition values. Markdown download is a deterministic local transform of this shared card data. A selected profile may save a 1–5 rating and profile-scoped kitchen note; these are neither shared recipe revisions nor included in any export. Profiles are switchable household views, not confidentiality boundaries.
 
 The library marks only the selected profile’s rating/favorite state and offers **Your highest rated** sorting; it does not turn a household member’s preference into a shared score. Recipe detail shows creation and last-edit attribution plus a revision timeline. Restoring a saved version explicitly creates a new conflict-protected revision, so prior history remains intact and personal preferences remain untouched.
 
 ## AI readiness
 
 The kitchen navigation includes **AI status**. Set `OPENAI_API_KEY` only in the server runtime (or use the ignored root `.api_keys` convenience file during local development). The official SDK is server-only; `.api_keys` is never copied into Docker. Pasted text, normalized scan review, and generated serving images each require an explicit household action, have bounded inputs and a process-local rate limit, return an editable suggestion rather than saving a recipe, and write a content-free audit record. Tests use deterministic provider doubles; this workspace makes no paid live OpenAI request.
+
+Pantry, recipe ingredients, and Nutrition also share a review-first food picker. Open Food Facts supplies read-only exact barcode data; USDA FoodData Central search is enabled by the server-only `USDA_FDC_API_KEY`. Camera scanning is optional and requires trusted HTTPS—see [food data providers and barcode scanning](docs/food-data-integrations.md), including the Nginx Proxy Manager/local-CA setup. Manual barcode entry remains available over HTTP.
 
 For a public recipe URL, the server first applies its DNS, private-network, redirect, content-type, timeout, and 1 MB response limits. It then parses only the returned bounded HTML with a server-side markup parser—never rendering the page, executing scripts, or downloading its resources. Embedded Schema.org JSON-LD Recipe candidates take precedence, followed by Microdata; Open Graph and readable page text are an explicitly warned review fallback. Tests use local fixtures and mocked fetch/DNS responses rather than live recipe sites.
 
@@ -89,7 +93,7 @@ Collections are named, manually ordered recipe shelves. A recipe can belong to m
 
 ## Offline reading
 
-Our Recipes installs a small read-only PWA after a secure local visit. It keeps successful same-origin recipe-library/detail pages, local recipe images, recipe-read API responses, and Next static assets that have already been viewed. It never caches or replays writes, so creating/editing recipes, cooking, planning, and shopping-list changes require the household network. An uncached page shows the offline fallback instead of pretending a change was saved.
+Bòrd installs a small read-only PWA after a secure local visit. It keeps successful same-origin recipe-library/detail pages, local recipe images, recipe-read API responses, and Next static assets that have already been viewed. It never caches or replays writes, so creating/editing recipes, cooking, planning, and shopping-list changes require the household network. An uncached page shows the offline fallback instead of pretending a change was saved.
 
 ## Backup and recovery
 

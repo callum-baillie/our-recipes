@@ -1,0 +1,35 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T053",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Exactly two late toolbar names are stale. Rendered accessibility exposes Show inactive and archived and Group Pantry; exact checkbox/combobox role-name locators are the bounded fix.",
+    "worker_package": {
+      "objective": "Replace only the two stale toolbar locators with exact rendered role/name locators, then complete every independent gate.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source/mirror pre-hash 18DB6AD4481326308AF990884DB8FB0D63C646518151C63DA99AD1D6ED132E69.",
+        "Replace Include inactive batches with exact checkbox Show inactive and archived, preserving check.",
+        "Replace Group inventory with exact combobox Group Pantry, preserving selectOption location; no other changes.",
+        "Run scoped format/lint and mirror hash equality.",
+        "Run fresh management through all active/inactive actions, search/group, three axe/overflow/screenshots, no browser errors.",
+        "Release port, fresh prepare, run integrated 400/350/50 flow with provenance/manual/intake/FEFO/history, two axe, five screenshots, no browser errors.",
+        "Inspect persistence read-only, run disposable migrate/dbcheck, release port, record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any change beyond two locators is required.",
+        "Either exact role/name locator fails uniqueness.",
+        "Workflows share state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": ["Inactive checkbox accessible name is Show inactive and archived.", "Grouping combobox accessible name is Group Pantry.", "All earlier active-stock actions passed."],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, DB, artifacts, and port require serial lifecycles." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing late workflow/accessibility/screenshots", "Integrated/persistence/migration/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T053 done.", "Activate T054 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

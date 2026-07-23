@@ -1,0 +1,20 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T072",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-grocery-intake.spec.ts"],
+    "commands": [
+      {"cmd": "pre-hash guards", "status": "pass"},
+      {"cmd": "scoped Prettier and ESLint", "status": "pass"},
+      {"cmd": "source/mirror repaired hash 31C73394638F37C4A2415E08F637CB09146F47CB8BE005D7A89138337E092F17", "status": "pass"},
+      {"cmd": "owned port 3100 release", "status": "pass"},
+      {"cmd": "scoped diff check and protected hashes", "status": "pass"}
+    ],
+    "summary": "The exact reload synchronization passed through PATCH, app reload, regeneration, 450g rendering, responsive screenshots, rich intake, idempotency, and missing/all behavior. The final desktop axe scan found serious product contrast failures requiring CSS outside T072; protected E2Es remain.",
+    "deviations": ["Final axe scan found #888d85 on #fffefa at 3.35:1, #aaa7a1 on #fffdf9 at 2.36:1, and #888d85 on #f9faf3 at 3.22:1 in checked/provenance/intake text."],
+    "remaining_blockers": ["Product contrast repair", "Passing new E2E", "Unchanged protected E2Es"],
+    "verification_attempts": 1,
+    "stopped_because": "Serious contrast violations require product CSS outside the one-spec authorization."
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "result": "done",
+  "task_id": "T003",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "Approve a staged normalized Nutrition architecture with a real authorization seam and immutable historical snapshots. Concurrent Pantry/schema work makes an overlapping first write unsafe. The largest reversible package is a comprehensive pure domain kernel plus focused unit suite in two new files: canonical nutrients, vector arithmetic, energy priority/fallback, recipe aggregation, completeness/confidence, target/range/limit semantics, planned versus consumed totals, missing-day trends, and normalized privacy-filtered household comparisons. Re-scout Pantry before persistence, then Judge migration/canonical-food and sensitive-authorization boundaries.",
+  "worker_package": {
+    "objective": "Implement the reusable pure Nutrition calculation kernel and comprehensive unit tests without touching current schema, migrations, Pantry, recipe, planner, cooking, UI, docs, or other dirty files.",
+    "allowed_files": [
+      "src/lib/domain/nutrition.ts",
+      "tests/unit/nutrition.test.ts"
+    ],
+    "verify": [
+      "pnpm exec prettier --check src/lib/domain/nutrition.ts tests/unit/nutrition.test.ts",
+      "pnpm exec eslint src/lib/domain/nutrition.ts tests/unit/nutrition.test.ts",
+      "pnpm typecheck",
+      "pnpm vitest run --project unit tests/unit/nutrition.test.ts",
+      "git diff --check -- src/lib/domain/nutrition.ts tests/unit/nutrition.test.ts"
+    ],
+    "stop_if": [
+      "Need files outside allowed_files.",
+      "Need to import or modify unstable Pantry, schema, migration, recipe, planner, cooking, UI, or documentation files.",
+      "Ambiguity would require inventing medical, personalized target, or authoritative reference values.",
+      "Verification fails twice for a cause not fixable within allowed_files.",
+      "A live provider call, credential, external write, or paid action would be required."
+    ]
+  },
+  "evidence": [
+    "docs/goals/nutrition/notes/T001-plan-validation.md",
+    "docs/goals/nutrition/notes/T002-repository-map.md",
+    "docs/goals/nutrition/notes/T003-architecture-decision.md",
+    "Current git status showing concurrent Pantry and unrelated dirty files"
+  ],
+  "subgoal_contract": null,
+  "parallel_safety": {
+    "safe": false,
+    "rationale": "Only one Nutrition Worker is authorized; another goal already owns concurrent Pantry/schema writes."
+  },
+  "blocked_tasks": [],
+  "missing_evidence": [
+    "Implemented and verified pure Nutrition kernel",
+    "Stable Pantry integration seam",
+    "Persistence, authorization, profiles/goals, recipe calculation, allocation/consumption, UI/charts, cross-feature and full-oracle evidence"
+  ],
+  "required_board_updates": [
+    "Populate T004 from worker_package and activate it.",
+    "After T004, re-scout the Pantry/schema state before any persistence package.",
+    "Add a migration/canonical-food Judge boundary and a separate sensitive-authorization Judge boundary."
+  ],
+  "note": "notes/T003-architecture-decision.md",
+  "harness": "codex-pm-fallback"
+}

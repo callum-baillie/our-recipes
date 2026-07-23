@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T009",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T009-persistence-decision.md"
+  ],
+  "commands": [
+    {
+      "cmd": "audit T001-T008 receipts, Pantry migration/schema/service/tests, Nutrition domain/privacy seams, journal and dirty ownership",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a normalized append-only Nutrition persistence slice in additive migration 0016: canonical definitions, explicit source provenance, product nutrition revisions and values, calculation versions, immutable recipe calculations/contributions/values, deterministic selection, legacy eight-field snapshot backfill, integration tests, and native docs. Deferred profiles, permissions, goals, intake, routes, and UI to separately reviewed packages.",
+  "note": "notes/T009-persistence-decision.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit without returning a decision, so the PM performed the same read-only decision gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

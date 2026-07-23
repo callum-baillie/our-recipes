@@ -1,0 +1,41 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T065",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The failure is harness-only: the exact text matches both the visible recipe card and collection-dialog copy, while the filtered route and coverage assertion establish product behavior. The existing Recipe results region and exact card-link accessible name provide a unique semantic locator. T064 stayed inside its approved slice and passed focused gates; browser, full-suite, isolated build, disposable-DB, and final integrity evidence remain.",
+    "worker_package": {
+      "objective": "In tests/e2e/pantry-recipe-planner.spec.ts only, replace the broad exact-text assertion with the exact Open Planner lentil stew link scoped to Recipe results, preserve every fixture/action/assertion/timeout/viewport, then complete all remaining isolated Pantry recipe/planner verification.",
+      "allowed_files": ["tests/e2e/pantry-recipe-planner.spec.ts"],
+      "verify": [
+        "Require pre-hash 786BD06780732378DA255732FF4D4A86DF9468F9BEDD347C8142273D8BA5EC70 and change only the locator.",
+        "Run scoped Prettier/ESLint, prepare isolated mirror, and prove source/mirror hash equality.",
+        "Run fresh isolated Playwright with 390/768/1280, keyboard, axe, persistence reload, screenshots, containment, and zero browser errors.",
+        "Run full tests, lint, typecheck, and OpenAPI validation.",
+        "Run isolated production build without shared .next.",
+        "Run disposable db:migrate and db:check.",
+        "Release port 3100 and prove final diff/status/hash integrity."
+      ],
+      "stop_if": [
+        "The pre-hash differs or more than the single locator edit is required.",
+        "The scoped exact link is not unique and visible.",
+        "Any product behavior fails or any product/schema/docs file must change.",
+        "Any assertion, fixture, action, timeout, or viewport must weaken.",
+        "Verification would disturb shared/live state, secrets, provider credentials, concurrent work, or a normal database."
+      ]
+    },
+    "evidence": [
+      "The broad exact-text locator collides with the card title and dialog copy.",
+      "Recipe results contains a unique link named Open Planner lentil stew.",
+      "T064 focused type, unit, integration, lint, OpenAPI, format, mirror, and port checks passed.",
+      "The pre-edit spec hash was independently confirmed."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": {"safe": false, "rationale": "One atomic spec edit and isolated browser/build/database lifecycle must be serial."},
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Complete browser evidence", "Full gates", "Isolated build", "Disposable database", "Final integrity", "Later grocery/cooking UI"],
+    "required_board_updates": ["Record T065 done.", "Activate one exact Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

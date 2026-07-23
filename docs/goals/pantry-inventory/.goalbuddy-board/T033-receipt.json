@@ -1,0 +1,21 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T033",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+    "commands": [
+      { "cmd": "Pre-edit hash guard and exact Tab repair", "status": "pass" },
+      { "cmd": "Spec Prettier and mirror refresh/hash equality", "status": "pass" },
+      { "cmd": "Fresh Pantry browser attempt 1", "status": "fail", "summary": "fill 60 plus Tab emitted no matching PATCH" },
+      { "cmd": "Attempt 1 cleanup/port release", "status": "pass" },
+      { "cmd": "Fresh Pantry browser attempt 2", "status": "fail", "summary": "Identical unresolved PATCH" },
+      { "cmd": "Attempt 2 cleanup/port release", "status": "pass" }
+    ],
+    "summary": "Both runs verify the 50 g row and provenance, but a real Tab blur still emits no observed PATCH. The assumed event contract is unproven; artifacts and clean port state are preserved.",
+    "deviations": ["Used fixed-path cleanup for authorized mirror outputs.", "Used owned webpack dev servers."],
+    "remaining_blockers": ["Root-cause missing PATCH from component/event/network evidence", "Complete workflow/axe/screenshots, disposable DB, and diff gates"],
+    "verification_attempts": 2,
+    "stopped_because": "Two fresh runs failed at the same missing PATCH after semantic blur."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T051",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T051-prepared-persistence-review.md"
+  ],
+  "commands": [
+    { "cmd": "read-only migration, prepared identity, atomic transaction, idempotency, capacity, history, permissions and Pantry-separation audit", "status": "pass" }
+  ],
+  "summary": "Approved additive prepared persistence and atomic idempotent intake-plus-eaten-allocation APIs, with UI and advanced adjustments explicitly remaining.",
+  "note": "notes/T051-prepared-persistence-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

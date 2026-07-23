@@ -1,0 +1,312 @@
+.stack,
+.panel header,
+.dayBars {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.panel {
+  min-width: 0;
+  padding: 1rem;
+  overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+}
+
+.panel h2,
+.panel p {
+  margin: 0;
+}
+
+.panel small {
+  color: var(--muted);
+}
+
+.panel summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.chart {
+  width: 100%;
+  height: 19rem;
+  min-height: 19rem;
+}
+
+.compactChart {
+  width: 100%;
+  height: 15rem;
+  min-height: 15rem;
+}
+
+.emptyChart {
+  display: grid;
+  min-height: 12rem;
+  place-content: center;
+  gap: 0.35rem;
+  padding: 1.25rem;
+  color: var(--muted);
+  text-align: center;
+  background: linear-gradient(135deg, var(--paper), var(--card));
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.7rem;
+}
+
+.emptyChart strong {
+  color: var(--ink);
+}
+
+.chartControl {
+  display: grid;
+  grid-template-columns: auto minmax(10rem, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 24rem;
+  font-weight: 800;
+}
+
+.chart :global(.recharts-cartesian-axis-tick-value),
+.chart :global(.recharts-legend-item-text) {
+  fill: var(--muted);
+  color: var(--muted) !important;
+  font-size: 0.74rem;
+}
+
+.dataDisclosure {
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.dataDisclosure summary {
+  cursor: pointer;
+  color: var(--label);
+  font-weight: 800;
+}
+
+.tableScroller {
+  overflow-x: auto;
+}
+
+.dayBars {
+  margin: 1rem 0;
+}
+
+.dayBars article {
+  display: grid;
+  grid-template-columns: 4rem minmax(7rem, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.series,
+.macroBars,
+.macroBars article,
+.macroBars span {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.series > span {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(7rem, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.barTrack {
+  display: block;
+  height: 0.75rem;
+  overflow: hidden;
+  background: var(--paper-deep);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+
+.barTrack b {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--tomato),
+    var(--tomato) 6px,
+    var(--tomato-dark) 6px,
+    var(--tomato-dark) 9px
+  );
+}
+
+.plannedBar b {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--leaf),
+    var(--leaf) 5px,
+    var(--paper) 5px,
+    var(--paper) 8px
+  );
+}
+
+.averageBar b {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--line-strong),
+    var(--line-strong) 4px,
+    var(--paper) 4px,
+    var(--paper) 7px
+  );
+}
+
+.macroBars {
+  margin: 1rem 0;
+}
+
+.macroBars article {
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.macroBars span {
+  grid-template-columns: minmax(12rem, auto) 1fr;
+  align-items: center;
+}
+
+.modeButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.modeButtons [aria-pressed='true'] {
+  outline: 2px solid var(--tomato);
+  outline-offset: 2px;
+}
+
+.table {
+  width: 100%;
+  margin-top: 0.8rem;
+  overflow-wrap: anywhere;
+  border-collapse: collapse;
+}
+
+.table caption {
+  padding: 0.6rem 0;
+  font-weight: 800;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 0.5rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.weightChart {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 36rem;
+  margin-top: 1rem;
+}
+
+.weightAxis,
+.weightDay {
+  display: grid;
+  grid-template-columns: 7rem minmax(20rem, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.weightAxis span:first-child {
+  grid-column: 2;
+}
+
+.weightAxis span:last-child {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.weightTrack {
+  position: relative;
+  height: 1.8rem;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent calc(25% - 1px),
+    var(--line) 25%
+  );
+  border-block: 1px solid var(--line);
+}
+
+.weightObservation,
+.weightAverage,
+.weightTarget {
+  position: absolute;
+  top: 50%;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
+
+.weightObservation {
+  z-index: 3;
+  color: var(--tomato-dark);
+}
+
+.weightAverage {
+  z-index: 2;
+  color: var(--ink);
+  transform: translate(-50%, -50%) scale(0.72);
+}
+
+.weightTarget {
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 0;
+  border-left: 3px dashed var(--leaf);
+  transform: translateX(-50%);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.8rem !important;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 800px) {
+  .twoColumn,
+  .dayBars article,
+  .weightAxis,
+  .weightDay {
+    grid-template-columns: 1fr;
+  }
+
+  .weightChart {
+    min-width: 26rem;
+  }
+
+  .weightAxis span:first-child,
+  .weightAxis span:last-child {
+    grid-column: 1;
+  }
+}

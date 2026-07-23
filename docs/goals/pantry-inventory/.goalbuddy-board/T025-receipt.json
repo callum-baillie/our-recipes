@@ -1,0 +1,23 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T025",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [],
+    "commands": [
+      { "cmd": "Mirror isolation/hash/junction/port re-audit", "status": "pass" },
+      { "cmd": "Scoped Pantry Prettier across 66 supported paths", "status": "pass", "summary": "Three SQL migrations excluded because no parser is configured" },
+      { "cmd": "mirror pnpm lint", "status": "pass" },
+      { "cmd": "mirror pnpm typecheck", "status": "pass" },
+      { "cmd": "mirror pnpm test", "status": "pass", "summary": "163 unit and 78 integration tests passed" },
+      { "cmd": "mirror pnpm openapi:validate", "status": "pass", "summary": "Valid with 11 existing warnings" },
+      { "cmd": "mirror pnpm build", "status": "fail", "summary": "Turbopack rejected node_modules junction outside mirror filesystem root" },
+      { "cmd": "mirror pnpm build -- --webpack", "status": "fail", "summary": "CSS Modules rejected impure :global(.planner-heading) selector in meal-planner.module.css" }
+    ],
+    "summary": "Isolation and all quality gates through tests/OpenAPI pass. Production build failed first on the mirror junction and then exposed a source CSS Modules purity defect under webpack. No source/server/database/provider/shared-state mutation occurred.",
+    "deviations": ["Excluded SQL from scoped Prettier because no parser exists.", "Used webpack fallback after the mirror-specific Turbopack junction failure."],
+    "remaining_blockers": ["Production build requires an out-of-scope planner CSS repair.", "Playwright/accessibility/screenshots, disposable DB checks, port release, and diff status remain unrun."],
+    "verification_attempts": 2,
+    "stopped_because": "Build failed twice; the second failure requires a source file outside T025 scope."
+  }
+}

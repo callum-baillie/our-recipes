@@ -1,0 +1,25 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "task_id": "T039",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T039-recipe-slice-review.md"],
+  "commands": [
+    {
+      "cmd": "schema-level malicious consumed-recipe payload plus generic route and service verification audit",
+      "status": "fail",
+      "summary": "Attacker-chosen amount and quality are accepted by the HTTP schema; route forwards them and service verifies identity but not totals."
+    }
+  ],
+  "summary": "Rejected T038 approval because the pre-existing generic intake HTTP route bypasses the new server-built recipe snapshot boundary with copied calculation identity and attacker-chosen nutrients/quality.",
+  "note": "notes/T039-recipe-slice-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only audit and attack proof as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Reject client-built recipe/product consumption on the generic route and preserve correction source-type continuity."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

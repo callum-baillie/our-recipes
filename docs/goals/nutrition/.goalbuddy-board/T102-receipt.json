@@ -1,0 +1,56 @@
+{
+  "result": "done",
+  "task_id": "T102",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/lib/services/nutrition-individual-chart-service.ts",
+    "src/lib/domain/nutrition-advanced-charts.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-advanced-chart-panels.tsx",
+    "src/components/nutrition-advanced-chart-panels.module.css",
+    "tests/unit/nutrition-advanced-charts.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-individual-chart-service.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused advanced chart domain/component tests",
+      "status": "pass",
+      "summary": "17 tests passed"
+    },
+    {
+      "cmd": "focused workspace/profile integration tests",
+      "status": "pass",
+      "summary": "8 tests passed including 1000-entry bounded query"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "212 unit and 117 integration tests passed on clean rerun"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered an authorized at-most-five-query workspace and accessible calorie/macro/heatmap/planned/source/completeness Trends experience.",
+  "note": "notes/T102-advanced-individual-chart-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "A concurrent Pantry T064 planner type error temporarily blocked repository typecheck; T102 preserved those files, and the final shared typecheck/build passed after the external repair.",
+    "One unrelated PDF import test timed out once, then passed alone and in the final full suite."
+  ],
+  "remaining_blockers": [
+    "A Judge must audit fixed-query privacy, latest/history semantics, planned/source/completeness truth and accessible rendering.",
+    "Opt-in authorized weight, card/planner display flags, household analysis, offline/performance docs and rendered final evidence remain later slices."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

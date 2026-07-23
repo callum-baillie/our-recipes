@@ -7,7 +7,7 @@ import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   RecipeConflictError,
   RecipeNotFoundError,
-  updateRecipeStatus,
+  updateRecipeStatusWithIntegrations,
 } from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
@@ -24,13 +24,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ recip
   const parsed = recipeStatusSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_recipe_status', 'Check the recipe status.');
   try {
-    const recipe = updateRecipeStatus(
+    const result = updateRecipeStatusWithIntegrations(
       (await context.params).recipeId,
       parsed.data.status,
       actor.profileId,
       parsed.data.expectedRevision,
     );
-    return NextResponse.json({ recipe });
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RecipeNotFoundError)
       return jsonError(404, 'recipe_not_found', error.message);

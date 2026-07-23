@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T094", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["docs/openapi.yaml"],
+    "commands": [{"cmd": "hash guards and one-quote diff", "status": "pass"}, {"cmd": "scoped Prettier and OpenAPI", "status": "pass"}, {"cmd": "full lint/typecheck", "status": "pass"}, {"cmd": "full unit/integration", "status": "pass", "summary": "235 unit, 133 integration"}, {"cmd": "isolated full-source webpack build", "status": "pass"}, {"cmd": "scoped diff/protected hash/port/live PID integrity", "status": "pass"}],
+    "summary": "One quoted scalar fixes OpenAPI. Full static/tests/build pass and the exact-hash cooking E2E pass remains current. Three protected E2Es, disposable DB, and final integrity remain incomplete.",
+    "deviations": ["Mirror-owned webpack used; existing OCR warnings."],
+    "remaining_blockers": ["Three protected E2Es", "Disposable DB and final integrity"],
+    "verification_attempts": 1, "stopped_because": "Final protected browser and database gates were not completed; cleanup/integrity passed."
+  }
+}

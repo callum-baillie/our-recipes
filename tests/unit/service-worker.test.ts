@@ -90,12 +90,14 @@ function loadWorker({ cacheKeys, isUpdate }: { cacheKeys: string[]; isUpdate: bo
 describe('PWA service worker updates', () => {
   it('keeps its release version synchronized with package metadata', () => {
     expect(workerSource).toContain(`const APP_VERSION = '${appVersion}';`);
-    expect(workerSource).toContain("const CACHE_PREFIX = 'our-recipes-read-';");
+    expect(workerSource).toContain("const CACHE_PREFIX = 'bord-read-';");
+    expect(workerSource).toContain("const LEGACY_CACHE_PREFIX = 'our-recipes-read-';");
+    expect(workerSource).toContain("url.pathname.startsWith('/api/v1/branding/icons/v1/')");
   });
 
   it('deletes obsolete app caches and refreshes controlled clients during an update', async () => {
     const worker = loadWorker({
-      cacheKeys: ['our-recipes-read-v2', `our-recipes-read-${appVersion}`, 'another-app-cache'],
+      cacheKeys: ['our-recipes-read-v2', `bord-read-${appVersion}`, 'another-app-cache'],
       isUpdate: true,
     });
 
@@ -103,16 +105,14 @@ describe('PWA service worker updates', () => {
 
     expect(worker.deletedCaches).toEqual(['our-recipes-read-v2']);
     expect(worker.clients.claim).toHaveBeenCalledOnce();
-    expect(worker.messages).toEqual([{ type: 'OUR_RECIPES_UPDATED', version: appVersion }]);
+    expect(worker.messages).toEqual([{ type: 'BORD_UPDATED', version: appVersion }]);
     expect(worker.navigations).toHaveLength(1);
-    expect(new URL(worker.navigations[0]!).searchParams.get('__our_recipes_updated')).toBe(
-      appVersion,
-    );
+    expect(new URL(worker.navigations[0]!).searchParams.get('__bord_updated')).toBe(appVersion);
   });
 
   it('claims clients without reloading them on a true first install', async () => {
     const worker = loadWorker({
-      cacheKeys: [`our-recipes-read-${appVersion}`, 'another-app-cache'],
+      cacheKeys: [`bord-read-${appVersion}`, 'another-app-cache'],
       isUpdate: false,
     });
 
@@ -130,5 +130,13 @@ describe('PWA service worker updates', () => {
     await worker.dispatch('message', { type: 'SKIP_WAITING' });
 
     expect(worker.self.skipWaiting).toHaveBeenCalledOnce();
+  });
+
+  it('is strictly read-only and has no mutation replay mechanism', () => {
+    expect(workerSource).toContain("request.method === 'GET'");
+    expect(workerSource).toContain('if (!isSameOriginGet(request)) return;');
+    expect(workerSource).not.toMatch(/addEventListener\(['"]sync['"]/u);
+    expect(workerSource).not.toMatch(/backgroundSync|queue|replay/iu);
+    expect(workerSource).not.toMatch(/cache\.put\([^,]+,\s*(?:new\s+)?Request\([^)]*method/iu);
   });
 });

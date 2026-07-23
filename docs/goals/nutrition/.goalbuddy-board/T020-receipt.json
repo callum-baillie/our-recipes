@@ -1,0 +1,32 @@
+{
+  "result": "done",
+  "task_id": "T020",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/db/schema.ts",
+    "drizzle/0018_nutrition_profiles_goals.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/domain/nutrition-profile.ts",
+    "src/lib/services/nutrition-profile-service.ts",
+    "tests/unit/nutrition-profile.test.ts",
+    "tests/integration/nutrition-profile-service.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused Prettier and ESLint on T020 files", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Nutrition access/profile unit and profile-service integration tests", "status": "pass", "summary": "32 unit and 4 integration tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "134 unit and 49 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass", "summary": "No errors; one concurrent Pantry availability warning" },
+    { "cmd": "DATABASE_URL=.test-data/nutrition-private-33b4e748038a44d891a2824408661e14.db pnpm db:migrate && pnpm db:check", "status": "pass" },
+    { "cmd": "scoped git diff --check", "status": "pass", "summary": "Only expected Windows LF-to-CRLF advisories" }
+  ],
+  "summary": "Added additive migration 0018 and server-only private Nutrition persistence: salted scrypt principals, access-version credential rotation, sensitive profiles linked to household profiles only for attribution, deny-by-default authorization, optimistic profile updates, append-only permission grants/revocations and goal versions, immutable measurements, stable reference string IDs, and four integration tests. Full tests, lint, types, fresh migrations and diff checks pass; no route/UI/provider call or plaintext secret storage was added.",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit without writing files, so the PM executed the same seven-file package as permitted fallback.",
+    "Production build remains deferred because live user-owned Next dev processes own .next."
+  ],
+  "remaining_blockers": ["Production build after live .next ownership ends."],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

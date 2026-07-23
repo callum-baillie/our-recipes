@@ -1,0 +1,182 @@
+.panel {
+  padding: clamp(1.15rem, 3vw, 1.8rem);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 28px rgb(65 53 39 / 8%);
+}
+
+.heading,
+.meals > li > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.heading h2,
+.meals h3 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.heading p,
+.quality,
+.nutrients,
+.empty {
+  color: var(--muted);
+}
+
+.nutrients {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+}
+
+.nutrients > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.allocationTools {
+  border-top: 1px solid var(--line);
+  padding-top: 0.7rem;
+}
+
+.allocationTools > summary {
+  cursor: pointer;
+  color: var(--label);
+  font-weight: 800;
+}
+
+.allocationTools[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+.heading > span {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 1.2rem 0;
+}
+
+.comparison article {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--paper);
+  border-radius: 0.55rem;
+}
+
+.comparison span {
+  font-size: 0.82rem;
+}
+
+.meals {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.meals > li {
+  padding: 1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.meals header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.meals dl {
+  display: flex;
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.meals dl div {
+  display: grid;
+  text-align: right;
+}
+
+.meals dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.meals dd {
+  margin: 0;
+  font-weight: 900;
+}
+
+.warning {
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--tomato) 8%, var(--paper));
+  border-left: 3px solid var(--tomato);
+}
+
+.allocations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.allocations form {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.allocations label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--label);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.formHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.status {
+  min-height: 1.4rem;
+  margin: 0.8rem 0 0;
+  color: var(--tomato-dark);
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .comparison,
+  .allocations {
+    grid-template-columns: 1fr;
+  }
+
+  .heading,
+  .meals > li > header {
+    display: grid;
+  }
+
+  .meals dl div {
+    text-align: left;
+  }
+}

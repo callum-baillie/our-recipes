@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T088", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["src/components/cooking-mode.tsx"],
+    "commands": [{"cmd": "pre-hash guards", "status": "pass"}, {"cmd": "scoped Prettier/ESLint and full typecheck", "status": "pass"}, {"cmd": "isolated full-source webpack build", "status": "pass"}, {"cmd": "state repair functional cooking assertions", "status": "pass", "summary": "120, FEFO 100+20, literal confirm, 1280/390/768 screenshots"}, {"cmd": "cleanup/protected integrity", "status": "pass"}],
+    "summary": "Latest-request guard and live blur values fix the cooking correction deterministically. Final tablet axe found only completed-state status/link contrast #52643b on #263126 at 2.09:1, requiring CSS outside T088.",
+    "deviations": ["Explicit ReviewLine annotation fixed local literal inference.", "Mirror-owned webpack used for junction safety."],
+    "remaining_blockers": ["Completed-state CSS contrast", "Full/protected/disposable/integrity gates"],
+    "verification_attempts": 1, "stopped_because": "Functional repair passed; final axe requires CSS authorization."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T090", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["src/components/cooking-mode.module.css"],
+    "commands": [{"cmd": "pre-hash guards", "status": "pass"}, {"cmd": "scoped Prettier and full typecheck", "status": "pass"}, {"cmd": "isolated full-source webpack build", "status": "pass"}, {"cmd": "two cooking E2E functional/responsive/screenshot/axe/undo paths", "status": "pass"}, {"cmd": "cleanup/protected integrity", "status": "pass"}],
+    "summary": "One finishStatus color change clears all contrast. Two fresh cooking E2Es passed all substantive assertions and failed only final zero-browser-errors due repeated planner hydration warning with client-injected caret-color transparent styles.",
+    "deviations": ["Mirror-owned webpack used for junction safety.", "Two identical hydration-warning-only failures."],
+    "remaining_blockers": ["Hydration mismatch diagnosis", "Full/protected/disposable/integrity gates"],
+    "verification_attempts": 2, "stopped_because": "Strict no-browser-errors assertion repeated out-of-scope planner hydration mismatch; cleanup passed."
+  }
+}

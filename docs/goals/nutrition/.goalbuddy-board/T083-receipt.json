@@ -1,0 +1,30 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T083",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T083-recommendation-delivery-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only recommendation privacy, evidence, sufficiency, safeguards, ordering, feedback, accessibility and non-mutation audit",
+      "status": "pass"
+    },
+    {
+      "cmd": "fresh T082 migration and full verification evidence review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved T082's deterministic private recommendations and explicit confirm-before-grocery boundary; directed a read-only settings, charts and household gap map next.",
+  "note": "notes/T083-recommendation-delivery-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Profile/settings completion, accessible chart coverage and normalized household workflows require an exact mapped implementation sequence."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

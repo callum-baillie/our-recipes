@@ -1,0 +1,46 @@
+{
+  "result": "done",
+  "task_id": "T094",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-chart-datasets.ts",
+    "src/components/nutrition-chart-panels.tsx",
+    "src/components/nutrition-chart-panels.module.css",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "tests/unit/nutrition-chart-datasets.test.ts",
+    "tests/unit/nutrition-components.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused chart dataset and rendered component tests",
+      "status": "pass",
+      "summary": "16 tests passed"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "197 unit and 114 integration tests passed"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered server-owned calorie, macro-composition and semantic nutrient-coverage datasets and accessible responsive table-backed panels.",
+  "note": "notes/T094-first-chart-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must audit formula semantics, ambiguity/missing states, accessibility and scope before richer chart or preference work.",
+    "Longer-range trends, source ranking, completeness, weight and household analysis remain later slices."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -23,7 +23,6 @@ jobs:
       - run: pnpm test:unit
       - run: pnpm test:integration
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
-      - run: pnpm test:a11y
+      - run: pnpm test:v1-release
       - run: pnpm openapi:validate
-      - run: pnpm build
+      - run: pnpm build:release

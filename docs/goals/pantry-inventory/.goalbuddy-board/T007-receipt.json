@@ -1,0 +1,57 @@
+{
+  "result": "blocked",
+  "changed_files": [
+    "src/lib/db/schema.ts",
+    "drizzle/0017_pantry_integrity.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/domain/pantry.ts",
+    "src/lib/services/pantry-service.ts",
+    "tests/unit/pantry.test.ts",
+    "tests/integration/pantry-service.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "pnpm exec prettier --check <T007 formatted files>",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm exec vitest run --project unit tests/unit/pantry.test.ts",
+      "status": "pass",
+      "summary": "7 tests passed"
+    },
+    {
+      "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-service.test.ts",
+      "status": "pass",
+      "summary": "8 tests passed"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "124 unit and 38 integration tests passed after concurrent nutrition work settled"
+    },
+    {
+      "cmd": "pnpm lint",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm typecheck",
+      "status": "pass",
+      "summary": "Passed after the concurrent Next dev type generator settled"
+    },
+    {
+      "cmd": "DATABASE_URL=.test-data/pantry-integrity-3ba659d13ab0486db86747e65ddfb1f5.db pnpm db:migrate && pnpm db:check",
+      "status": "pass",
+      "summary": "Fresh disposable database migrated through nutrition 0016 and Pantry integrity 0017"
+    },
+    {
+      "cmd": "pnpm build",
+      "status": "blocked",
+      "summary": "Not started because another user-owned task has a live Next dev process writing the shared .next directory"
+    }
+  ],
+  "summary": "Implemented and focused-verified all five additive Pantry integrity repairs. Full tests, lint, types, formatting, diff checks, and fresh migration pass; production build is deferred to avoid interfering with a concurrent live Next dev process.",
+  "blocked_reason": "A concurrent user-owned Next dev process owns the shared .next output directory, so the required build gate cannot be run safely yet.",
+  "remaining_blockers": [
+    "Run pnpm build after the concurrent dev process releases .next."
+  ]
+}

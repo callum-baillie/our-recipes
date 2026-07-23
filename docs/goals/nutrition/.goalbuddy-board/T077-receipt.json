@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T077",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T077-recipe-planner-boundary-review.md"],
+  "commands": [
+    { "cmd": "read-only recipe query, planner privacy and Pantry-ownership boundary audit", "status": "pass" }
+  ],
+  "summary": "Approved a pre-pagination factual recipe-discovery and signed private primary-planner adapter Worker.",
+  "note": "notes/T077-recipe-planner-boundary-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Personalized remaining-target discovery remains required in the deterministic recommendation slice."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

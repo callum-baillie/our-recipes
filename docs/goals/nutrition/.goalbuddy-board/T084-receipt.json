@@ -1,0 +1,30 @@
+{
+  "result": "done",
+  "task_id": "T084",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T084-settings-charts-household-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only original-brief to current settings, chart, household, offline, performance and evidence map",
+      "status": "pass"
+    },
+    {
+      "cmd": "current Pantry T045 ownership and parallel-safety audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped remaining settings, personalized-reference, chart, household and cross-cutting gaps; selected a schema-free private profile-settings UI as the first safe package.",
+  "note": "notes/T084-settings-charts-household-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must approve the exact private settings boundary before implementation.",
+    "Personalized reference/energy estimates require a separately sourced and reviewed numeric/formula package."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

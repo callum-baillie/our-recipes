@@ -1,0 +1,37 @@
+{
+  "result": "done",
+  "task_id": "T026",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/lib/nutrition-session.ts",
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/app/api/v1/nutrition/identity/route.ts",
+    "src/app/api/v1/nutrition/session/route.ts",
+    "src/app/api/v1/nutrition/profiles/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/permissions/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/goals/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/measurements/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/intake/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/allocations/route.ts",
+    "tests/integration/nutrition-profile-service.test.ts",
+    "tests/integration/nutrition-session.test.ts",
+    "tests/integration/nutrition-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused Prettier and ESLint", "status": "pass" },
+    { "cmd": "focused Nutrition API/session/profile/intake integration", "status": "pass", "summary": "12 tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "142 unit and 59 integration tests passed" },
+    { "cmd": "scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Delivered the signed-session and trusted-origin Nutrition HTTP boundary. Current accessVersion and archival are rechecked on every private request; clients never choose requester identity; routes cover onboarding, session, safe profiles, managed dependents, permissions, goals, measurements, immutable intake and allocations; focused and full denial/revocation tests pass.",
+  "note": "notes/T026-authenticated-api.md",
+  "deviations": ["The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted before writing; the PM completed the exact bounded package as permitted fallback."],
+  "remaining_blockers": ["OpenAPI/shared API documentation deferred while Pantry owns those files."],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T112",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T112-planner-projection-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only planner authorization, query, state, privacy, preview and accessibility review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a max-five-query per-person planner projection with exact confirmed totals and preview-only visibility, retaining allocations and prepared controls.",
+  "note": "notes/T112-planner-projection-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The bounded planner projection and preview rendering must be delivered and audited.",
+    "Household analysis/charts, documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

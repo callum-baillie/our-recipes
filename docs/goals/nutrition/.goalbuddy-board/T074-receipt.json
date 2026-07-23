@@ -1,0 +1,31 @@
+{
+  "result": "done",
+  "task_id": "T074",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-prepared-consumption.ts",
+    "src/lib/services/nutrition-prepared-consumption-service.ts",
+    "src/components/nutrition-meal-planning.tsx",
+    "src/components/nutrition-prepared-workspace.tsx",
+    "tests/unit/nutrition-prepared-consumption.test.ts",
+    "tests/integration/nutrition-prepared-consumption-service.test.ts",
+    "tests/integration/nutrition-prepared-consumption-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused prepared unit tests", "status": "pass", "summary": "4 tests passed" },
+    { "cmd": "focused prepared integration tests", "status": "pass", "summary": "9 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "179 unit and 107 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Aligned prepared batches to immutable server calculations and added idempotent exactly-one-basis weighed consumption with capacity safety.",
+  "note": "notes/T074-prepared-alignment-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

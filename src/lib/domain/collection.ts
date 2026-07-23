@@ -17,4 +17,8 @@ export const collectionRecipesSchema = z.object({
   recipeIds: z.array(z.string().uuid()).max(2_000),
 });
 
+export const collectionRecipeSchema = z.object({
+  recipeId: z.string().uuid(),
+});
+
 export type CollectionInput = z.output<typeof collectionInputSchema>;

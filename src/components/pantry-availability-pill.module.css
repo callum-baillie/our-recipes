@@ -1,0 +1,27 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
+.ready {
+  color: #3f6b35;
+  background: #edf5e9;
+}
+
+.partial {
+  color: #8a4b22;
+  background: #fff2df;
+}
+
+.unknown {
+  color: #655f59;
+  background: #f4f1ed;
+}

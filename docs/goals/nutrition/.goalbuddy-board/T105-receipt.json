@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T105",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T105-weight-trend-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only measurement authorization, query, smoothing, units, axis, privacy and accessibility review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a three-query opt-in weight trend with separately protected target and non-clinical accessible semantics.",
+  "note": "notes/T105-weight-trend-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The bounded weight vertical must be delivered and audited.",
+    "Card/planner preferences, household analysis, offline/performance documentation and rendered final evidence remain later tasks."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,20 @@
+{
+  "result": "done",
+  "task_id": "T056",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T056-full-brief-gap-audit.md"
+  ],
+  "commands": [
+    { "cmd": "read-only whole-brief schema, migration, service, API, page, component, docs, tests and ownership audit", "status": "pass" }
+  ],
+  "summary": "Classified proven, partial, missing and unverified requirements and ranked six remaining packages without narrowing the original acceptance scope.",
+  "note": "notes/T056-full-brief-gap-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit, so the PM completed the same full read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -52,7 +52,7 @@ export function HouseholdHome({
     <main className="home-page">
       <section className="home-hero" aria-labelledby="home-title">
         <div>
-          <p className="eyebrow">{household.name.toUpperCase()} · THE SHARED COOKBOOK</p>
+          <p className="eyebrow">{household.kitchenName.toUpperCase()} · THE SHARED COOKBOOK</p>
           <h1 id="home-title">Welcome to the kitchen, {activeProfileName}.</h1>
           <p>
             Keep the recipes you actually cook, plan the week around them, and share one calm

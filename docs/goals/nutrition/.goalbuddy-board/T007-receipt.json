@@ -1,0 +1,41 @@
+{
+  "result": "done",
+  "task_id": "T007",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/nutrition-access.ts",
+    "src/lib/domain/nutrition-profile.ts",
+    "tests/unit/nutrition-access.test.ts",
+    "tests/unit/nutrition-profile.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "pnpm exec prettier --check src/lib/nutrition-access.ts src/lib/domain/nutrition-profile.ts tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm exec eslint src/lib/nutrition-access.ts src/lib/domain/nutrition-profile.ts tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm typecheck",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm vitest run --project unit tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "git diff --check -- src/lib/nutrition-access.ts src/lib/domain/nutrition-profile.ts tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "status": "pass"
+    }
+  ],
+  "summary": "Added a server-only local Nutrition access boundary with versioned salted scrypt credential hashing, constant-time verification, signed fixed-audience sessions, access-version revocation support, strict lifetime/future-skew/expiry/tamper validation and bounded payloads. Added optional-sensitive profile validation, explicit estimated-target consent and input gates, dietary/allergy/exclusion data, privacy/comparison settings, versioned target/minimum/range/limit goals, body measurements, and deny-by-default owner/guardian/granular-viewer authorization with anonymized comparison disclosure and grant expiry. Added 32 focused tests. No config, route, schema, migration, Pantry, UI or unrelated file was touched.",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit without writing files, so the PM executed the same four-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

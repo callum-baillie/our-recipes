@@ -12,20 +12,16 @@ import type {
   AiRecipeCandidate,
 } from '@/lib/domain/ai';
 import type { RecipePayload } from '@/lib/domain/recipe';
-import {
-  AiProviderRequestError,
-  AiProviderUnavailableError,
-  OPENAI_IMAGE_MODEL,
-  OPENAI_REVIEW_MODEL,
-} from '@/lib/providers/ai-provider';
+import { AiProviderRequestError, AiProviderUnavailableError } from '@/lib/providers/ai-provider';
 import { getAiProvider, getAiReadiness } from '@/lib/services/ai-readiness-service';
+import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { getImportArtifact, getImportOperation } from '@/lib/services/import-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
 import {
   getRecipe,
   RecipeConflictError,
   RecipeNotFoundError,
-  updateRecipeNutritionEstimate,
+  updateRecipeNutritionEstimateWithIntegrations,
 } from '@/lib/services/recipe-service';
 
 const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1_000;
@@ -90,6 +86,7 @@ function beginAudit(input: {
   recipeId?: string | null;
   importId?: string | null;
   model: string;
+  reasoningEffort?: string | null;
 }): AiOperationAudit {
   ensureDatabase();
   const audit: AiAuditRow = {
@@ -100,10 +97,17 @@ function beginAudit(input: {
     sourceLabel: input.sourceLabel,
     provider: 'OpenAI',
     model: input.model,
+    reasoningEffort: input.reasoningEffort ?? null,
+    inputTokens: null,
+    outputTokens: null,
     profileId: input.profileId,
     recipeId: input.recipeId ?? null,
     importId: input.importId ?? null,
     generatedImageId: null,
+    threadId: null,
+    actionId: null,
+    summaryId: null,
+    errorCode: null,
     createdAt: new Date(),
     completedAt: null,
   };
@@ -171,21 +175,26 @@ export async function createAiReviewCandidate(input: {
   if (input.action.kind === 'text-normalization') {
     const sourceText = input.action.sourceText;
     const sourceLabel = input.action.sourceLabel;
+    const setting = getAiWorkloadSetting(input.actorProfileId, 'recipe_review');
     const audit = beginAudit({
       kind: 'text-normalization',
       sourceDigest: digest(sourceText),
       sourceLabel,
       profileId: input.actorProfileId,
-      model: OPENAI_REVIEW_MODEL,
+      model: setting.model,
+      reasoningEffort: setting.reasoningEffort,
     });
     try {
-      const candidate = await provider.createTextReviewCandidate({
-        kind: 'text-normalization',
-        sourceDigest: audit.sourceDigest,
-        sourceLabel,
-        sourceText,
-        improve: input.action.improve,
-      });
+      const candidate = await provider.createTextReviewCandidate(
+        {
+          kind: 'text-normalization',
+          sourceDigest: audit.sourceDigest,
+          sourceLabel,
+          sourceText,
+          improve: input.action.improve,
+        },
+        setting,
+      );
       return { candidate: publicCandidate(candidate, sourceLabel), audit: completeAudit(audit.id) };
     } catch (error) {
       failAudit(audit.id);
@@ -229,24 +238,29 @@ export async function createAiReviewCandidate(input: {
     );
   }
   const sourceDigest = digest(files.map((entry) => entry.artifact.sourceSha256).join(':'));
+  const setting = getAiWorkloadSetting(input.actorProfileId, 'recipe_review');
   const audit = beginAudit({
     kind: 'vision-extraction',
     sourceDigest,
     sourceLabel: loaded.operation.sourceName,
     profileId: input.actorProfileId,
     importId: loaded.operation.id,
-    model: OPENAI_REVIEW_MODEL,
+    model: setting.model,
+    reasoningEffort: setting.reasoningEffort,
   });
   try {
-    const candidate = await provider.createVisionReviewCandidate({
-      kind: 'vision-extraction',
-      sourceDigest,
-      sourceLabel: loaded.operation.sourceName,
-      imageDataUrls: files.map(
-        (entry) => `data:${entry.file.mediaType};base64,${entry.file.bytes.toString('base64')}`,
-      ),
-      improve: input.action.improve,
-    });
+    const candidate = await provider.createVisionReviewCandidate(
+      {
+        kind: 'vision-extraction',
+        sourceDigest,
+        sourceLabel: loaded.operation.sourceName,
+        imageDataUrls: files.map(
+          (entry) => `data:${entry.file.mediaType};base64,${entry.file.bytes.toString('base64')}`,
+        ),
+        improve: input.action.improve,
+      },
+      setting,
+    );
     return {
       candidate: publicCandidate(candidate, loaded.operation.sourceName),
       audit: completeAudit(audit.id),
@@ -278,16 +292,18 @@ export async function improveAiRecipe(input: {
   }
   assertAiRateLimit(input.actorProfileId);
   const provider = configuredProvider();
+  const setting = getAiWorkloadSetting(input.actorProfileId, 'recipe_review');
   const audit = beginAudit({
     kind: 'recipe-improvement',
     sourceDigest: digest(JSON.stringify(input.recipe)),
     sourceLabel: input.recipe.title.slice(0, 160),
     profileId: input.actorProfileId,
     recipeId: input.recipeId,
-    model: OPENAI_REVIEW_MODEL,
+    model: setting.model,
+    reasoningEffort: setting.reasoningEffort,
   });
   try {
-    const candidate = await provider.improveRecipe({ recipe: input.recipe });
+    const candidate = await provider.improveRecipe({ recipe: input.recipe }, setting);
     return {
       candidate: {
         ...candidate,
@@ -325,9 +341,16 @@ export async function generateAiRecipeImage(input: {
 }): Promise<{ imageId: string; audit: AiOperationAudit }> {
   ensureDatabase();
   assertAiRateLimit(input.actorProfileId);
-  const provider = configuredProvider();
   const recipe = getRecipe(input.recipeId, input.actorProfileId);
   if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
+  const setting = getAiWorkloadSetting(input.actorProfileId, 'image_generation');
+  if (!setting.enabled) {
+    throw new AiOperationError(
+      'ai_request_failed',
+      'AI recipe image generation is disabled in household settings.',
+    );
+  }
+  const provider = configuredProvider();
   const audit = beginAudit({
     kind: 'image-generation',
     sourceDigest: digest(
@@ -336,16 +359,19 @@ export async function generateAiRecipeImage(input: {
     sourceLabel: recipe.title.slice(0, 160),
     profileId: input.actorProfileId,
     recipeId: recipe.id,
-    model: OPENAI_IMAGE_MODEL,
+    model: setting.model,
   });
   try {
-    const generated = await provider.generateRecipeImage({
-      recipeTitle: recipe.title,
-      recipeSummary: recipe.summary,
-      ingredientNames: recipe.ingredientGroups.flatMap((group) =>
-        group.ingredients.map((ingredient) => ingredient.item),
-      ),
-    });
+    const generated = await provider.generateRecipeImage(
+      {
+        recipeTitle: recipe.title,
+        recipeSummary: recipe.summary,
+        ingredientNames: recipe.ingredientGroups.flatMap((group) =>
+          group.ingredients.map((ingredient) => ingredient.item),
+        ),
+      },
+      setting,
+    );
     const image = await createRecipeImage(
       recipe.id,
       input.actorProfileId,
@@ -373,6 +399,7 @@ export async function estimateAiRecipeNutrition(input: {
   expectedRevision: number;
 }): Promise<{
   recipe: NonNullable<ReturnType<typeof getRecipe>>;
+  integration: Omit<ReturnType<typeof updateRecipeNutritionEstimateWithIntegrations>, 'recipe'>;
   estimate: AiNutritionEstimate;
   audit: AiOperationAudit;
 }> {
@@ -386,6 +413,7 @@ export async function estimateAiRecipeNutrition(input: {
       'This recipe changed in another tab. Refresh the card before estimating nutrition.',
     );
   }
+  const setting = getAiWorkloadSetting(input.actorProfileId, 'nutrition_estimation');
   const audit = beginAudit({
     kind: 'nutrition-estimation',
     sourceDigest: digest(
@@ -394,33 +422,45 @@ export async function estimateAiRecipeNutrition(input: {
     sourceLabel: recipe.title.slice(0, 160),
     profileId: input.actorProfileId,
     recipeId: recipe.id,
-    model: OPENAI_REVIEW_MODEL,
+    model: setting.model,
+    reasoningEffort: setting.reasoningEffort,
   });
   try {
-    const estimate = await provider.estimateRecipeNutrition({
-      recipeTitle: recipe.title,
-      recipeSummary: recipe.summary,
-      servings: recipe.servings,
-      ingredientGroups: recipe.ingredientGroups.map((group) => ({
-        name: group.name,
-        ingredients: group.ingredients.map(({ quantity, unit, item, note }) => ({
-          quantity,
-          unit,
-          item,
-          note,
+    const estimate = await provider.estimateRecipeNutrition(
+      {
+        recipeTitle: recipe.title,
+        recipeSummary: recipe.summary,
+        servings: recipe.servings,
+        ingredientGroups: recipe.ingredientGroups.map((group) => ({
+          name: group.name,
+          ingredients: group.ingredients.map(({ quantity, unit, item, note }) => ({
+            quantity,
+            unit,
+            item,
+            note,
+          })),
         })),
-      })),
-      instructionSteps: recipe.instructionSections.flatMap((section) =>
-        section.steps.map((step) => step.body),
-      ),
-    });
-    const updated = updateRecipeNutritionEstimate(
+        instructionSteps: recipe.instructionSections.flatMap((section) =>
+          section.steps.map((step) => step.body),
+        ),
+      },
+      setting,
+    );
+    const updated = updateRecipeNutritionEstimateWithIntegrations(
       recipe.id,
       estimate,
       input.actorProfileId,
       input.expectedRevision,
     );
-    return { recipe: updated, estimate, audit: completeAudit(audit.id) };
+    return {
+      recipe: updated.recipe,
+      integration: {
+        nutritionMappingRestore: updated.nutritionMappingRestore,
+        nutritionRecalculation: updated.nutritionRecalculation,
+      },
+      estimate,
+      audit: completeAudit(audit.id),
+    };
   } catch (error) {
     failAudit(audit.id);
     if (error instanceof AiProviderUnavailableError) {

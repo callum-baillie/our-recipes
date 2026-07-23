@@ -1,0 +1,22 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T037",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T037-recipe-slice-approval.md"],
+  "commands": [
+    {
+      "cmd": "read-only recipe calculation, input-path, authorization, history, UI and Pantry ownership audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved one schema-safe production vertical slice for manual immutable product records, deterministic recipe calculations, normalized quality review, and explicit server-built recipe intake.",
+  "note": "notes/T037-recipe-slice-approval.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

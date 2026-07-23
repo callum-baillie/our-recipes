@@ -1,0 +1,23 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T021",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/components/shopping-list-editor.tsx", "tests/unit/pantry-grocery-cooking.test.ts"],
+    "commands": [
+      { "cmd": "pnpm exec prettier --check src/components/shopping-list-editor.tsx tests/unit/pantry-grocery-cooking.test.ts", "status": "pass" },
+      { "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts", "status": "pass", "summary": "7 tests passed" },
+      { "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts", "status": "pass", "summary": "12 tests passed" },
+      { "cmd": "pnpm test", "status": "pass", "summary": "163 unit and 78 integration tests passed" },
+      { "cmd": "pnpm lint", "status": "pass" },
+      { "cmd": "pnpm typecheck", "status": "pass" },
+      { "cmd": "pnpm openapi:validate", "status": "pass", "summary": "Valid with 11 existing warnings" },
+      { "cmd": "git diff --check", "status": "pass" }
+    ],
+    "summary": "Late old-key intake completions are explicitly stale and valueless; the component rechecks the expected current key before every UI update. A controlled-promise regression proves current success rotation followed by ignored late old success. All prior retry and server idempotency behavior remains intact.",
+    "deviations": [],
+    "remaining_blockers": ["Isolated build, rendered workflow, accessibility, migration, and final-oracle evidence remain."],
+    "verification_attempts": 1,
+    "stopped_because": null
+  }
+}

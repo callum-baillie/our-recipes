@@ -1,0 +1,81 @@
+{
+  "result": "done",
+  "task_id": "T003",
+  "board_path": "C:\\Users\\Callum\\Documents\\Recipe\\docs\\goals\\pantry-inventory\\state.yaml",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "Approve the foundational Pantry vertical slice. It is the largest reversible package that creates real user-visible inventory while preserving current recipe, planning, shopping, and cooking behavior. It must include additive product/location/batch/event/mapping tables, safe units and expiry primitives, optimistic transactional services, trusted APIs, top-level Pantry UX, focused tests, and docs. Recipe availability and cross-feature demand/shortage/deduction behavior remain required later phases. A migration/data-integrity Judge review is mandatory immediately after this Worker before any recipe integration.",
+  "worker_package": {
+    "objective": "Deliver the foundational event-backed Pantry vertical slice: additive canonical product, alias/identifier, recipe-mapping, location, batch, and event storage; safe unit/expiry domain logic; transactional inventory services with optimistic versions, FEFO consumption and practical undo; validated trusted-origin APIs; a responsive top-level Pantry page with search/filter/add/manage/history flows and core actions; focused tests and native documentation, without changing existing recipe/planner/list/cooking behavior.",
+    "allowed_files": [
+      "src/lib/db/schema.ts",
+      "drizzle/0015_pantry_inventory.sql",
+      "drizzle/meta/_journal.json",
+      "src/lib/domain/inventory-units.ts",
+      "src/lib/domain/pantry.ts",
+      "src/lib/services/pantry-service.ts",
+      "src/app/api/v1/pantry/summary/route.ts",
+      "src/app/api/v1/pantry/products/route.ts",
+      "src/app/api/v1/pantry/products/[productId]/route.ts",
+      "src/app/api/v1/pantry/locations/route.ts",
+      "src/app/api/v1/pantry/locations/[locationId]/route.ts",
+      "src/app/api/v1/pantry/batches/route.ts",
+      "src/app/api/v1/pantry/batches/[batchId]/route.ts",
+      "src/app/api/v1/pantry/batches/[batchId]/actions/route.ts",
+      "src/app/api/v1/pantry/events/route.ts",
+      "src/app/pantry/page.tsx",
+      "src/components/pantry-manager.tsx",
+      "src/components/app-header.tsx",
+      "src/app/globals.css",
+      "tests/unit/pantry.test.ts",
+      "tests/integration/pantry-service.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/security.md",
+      "docs/testing.md",
+      "docs/decisions/0028-pantry-inventory-foundation.md"
+    ],
+    "verify": [
+      "pnpm exec prettier --check src/lib/db/schema.ts drizzle/0015_pantry_inventory.sql drizzle/meta/_journal.json src/lib/domain/inventory-units.ts src/lib/domain/pantry.ts src/lib/services/pantry-service.ts src/app/api/v1/pantry src/app/pantry/page.tsx src/components/pantry-manager.tsx src/components/app-header.tsx src/app/globals.css tests/unit/pantry.test.ts tests/integration/pantry-service.test.ts docs/openapi.yaml docs/api.md docs/architecture.md docs/data-model.md docs/security.md docs/testing.md docs/decisions/0028-pantry-inventory-foundation.md",
+      "pnpm exec vitest run --project unit tests/unit/pantry.test.ts",
+      "pnpm exec vitest run --project integration tests/integration/pantry-service.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm openapi:validate",
+      "pnpm build",
+      "git diff --check"
+    ],
+    "stop_if": [
+      "Any applied migration SQL would need to be changed instead of adding 0015_pantry_inventory.sql.",
+      "Implementation needs files outside allowed_files; return the exact missing paths before editing them.",
+      "A Pantry-only authorization model would contradict the repository's one-household deployment and profile-convenience boundary.",
+      "A live OpenAI call, credential access, destructive database operation, or mutation of the normal data/our-recipes.db would be required.",
+      "Product-image upload, recipe availability, meal allocation, grocery recommendation, or cooking deduction work becomes necessary to make the foundation compile; keep those seams explicit and stop rather than implementing an unreviewed cross-phase redesign.",
+      "Verification fails twice for a cause that cannot be fixed inside allowed_files."
+    ]
+  },
+  "evidence": [
+    "docs/goals/pantry-inventory/notes/T001-plan-validation.md",
+    "docs/goals/pantry-inventory/notes/T002-repository-map.md",
+    "docs/goals/pantry-inventory/notes/T003-first-slice-decision.md"
+  ],
+  "subgoal_contract": null,
+  "parallel_safety": {
+    "safe": false,
+    "rationale": "The foundation crosses one migration, shared schema, service, APIs, and UI; parallel writers would have overlapping contracts and are not authorized."
+  },
+  "blocked_tasks": [],
+  "missing_evidence": [
+    "Fresh-file migration and existing-data compatibility",
+    "Rendered Pantry workflow and accessibility",
+    "Recipe, planner, grocery, purchase, and cooking integration",
+    "Full browser and final oracle suites"
+  ],
+  "required_board_updates": [
+    "Populate T004 exactly from worker_package and activate it.",
+    "After T004, create and activate a migration/data-integrity Judge review before recipe integration."
+  ],
+  "note": "notes/T003-first-slice-decision.md"
+}

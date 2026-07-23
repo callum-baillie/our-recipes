@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T034",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The PATCH path is correct; list interaction races React hydration. The Next log records a mismatch after the test opens details before handlers attach, and the controlled input reverts to 50 with no PATCH. Await ShoppingListEditor's hydration-only successful Pantry-summary GET before any list interaction.",
+    "worker_package": {
+      "objective": "Add one precise hydration readiness waiter, preserve real fill/Tab/PATCH semantics, and complete all remaining isolated verification.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": ["Hash guard", "Exact GET summary waiter before list click/interactions", "Spec Prettier/mirror refresh", "Fresh full Pantry Playwright", "No mismatch, PATCH/manual/obsolete/axe/five screenshots", "Disposable DB", "Port/diff integrity"],
+      "stop_if": ["Scope/product/assertion/timeout changes.", "Sleep/network-idle/direct bypass.", "Hydration response fails or two runs fail.", "Isolation/ownership fails."]
+    },
+    "evidence": [
+      "Tab moved focus but the controlled value stayed 50 and no PATCH persisted.",
+      "Next log records a hydration mismatch caused by pre-hydration provenance details interaction.",
+      "ShoppingListEditor's summary useEffect fires only after hydration commit and is a precise readiness signal."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, port, browser output, and disposable DB." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Hydrated PATCH/manual/obsolete flow", "Complete workflow/axe/screenshots", "Disposable DB", "Port/diff integrity"],
+    "required_board_updates": ["Record T034 approved.", "Activate T035 Worker.", "Keep T999 queued until passing receipt."]
+  }
+}

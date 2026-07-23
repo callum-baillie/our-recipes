@@ -1,0 +1,25 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T073",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T073-preparation-confidence-approval.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only T070 plus T072 confidence and final-weight audit",
+      "status": "pass",
+      "summary": "Source confidence is preserved and paired 800 g/400 g evidence proves invariant total nutrient mass with inverse concentration."
+    }
+  ],
+  "summary": "Approved preparation-aware calculation after explicit confidence and final-weight mass-invariance repair evidence.",
+  "note": "notes/T073-preparation-confidence-approval.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

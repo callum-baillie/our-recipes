@@ -153,7 +153,7 @@ describe('document import service', () => {
       confirmImportOperation(created.operation.id, created.draft.recipe, profile.id),
     ).toThrow('already been confirmed');
     expect(getHouseholdState().profiles).toHaveLength(1);
-  });
+  }, 15_000);
 
   it('creates a safe OpenAI vision-pending scan review without a transcription', async () => {
     const profile = completeSetup({

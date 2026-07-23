@@ -1,0 +1,42 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T069",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Accept T064-T068: recipe filters/details, chronological demand, persisted skipped/cancelled and derived cooked states, expiry context, unchanged responsive browser behavior, 347 tests, static/OpenAPI gates, isolated build, disposable migrations, and integrity all pass. The remaining coherent slice is explainable grocery formula and rich explicit purchased intake; cooking UI remains later.",
+    "worker_package": {
+      "objective": "Complete grocery and purchased intake without reopening proven work: missing/all generation; no-double-count recipe/staple/manual-extra/Pantry/purchased coverage formula; preserved overrides and uncertainty; covered/ignore/inaccurate/reset/Open Pantry controls; explicit unsupported substitution where no seam exists; rich idempotent partial/complete intake with full batch fields and attribution.",
+      "allowed_files": [
+        "src/lib/db/schema.ts", "drizzle/0026_pantry_grocery_formula.sql", "drizzle/meta/_journal.json", "src/lib/domain/pantry-grocery-cooking.ts", "src/lib/services/pantry-grocery-cooking-service.ts", "src/lib/services/pantry-availability-service.ts", "src/lib/services/planning-service.ts", "src/app/api/v1/shopping-lists/pantry-shortages/route.ts", "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-controls/route.ts", "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-intake/route.ts", "src/app/lists/[listId]/page.tsx", "src/components/meal-plan-pantry-demand.tsx", "src/components/meal-plan-pantry-demand.module.css", "src/components/shopping-list-editor.tsx", "src/components/shopping-list-editor.module.css", "tests/unit/pantry-grocery-cooking.test.ts", "tests/integration/pantry-availability-service.test.ts", "tests/integration/pantry-grocery-cooking-service.test.ts", "tests/integration/pantry-grocery-cooking-api.test.ts", "tests/integration/household-service.test.ts", "tests/e2e/pantry-grocery-intake.spec.ts", "docs/openapi.yaml", "docs/api.md", "docs/architecture.md", "docs/data-model.md", "docs/security.md", "docs/testing.md", "docs/decisions/0032-pantry-grocery-cooking.md"
+      ],
+      "verify": [
+        "Record all pre-hashes and protect recipe/planner/inventory/concurrent work.",
+        "Use existing schema or minimum additive 0026 only; never edit applied migrations.",
+        "Prove max(0, max(recipe requirement, active staple target) + manual extra - usable Pantry - purchased/covered) in one compatible unit with no double counting.",
+        "Prove missing/all, covered, uncertain, exclusions, overrides, regeneration, controls, and rich idempotent partial/complete intake across unit/service/API tests.",
+        "Run scoped/full static/tests/OpenAPI, isolated webpack build, new 390/768/1280 Playwright, unchanged workflow and recipe/planner oracles, disposable DB, port/hash/diff integrity."
+      ],
+      "stop_if": [
+        "Existing schema plus one small additive migration cannot represent truthful durable controls/coverage or applied migration would change.",
+        "Formula double-counts, merges incompatible units/products, counts excluded batches, or invents exact uncertainty.",
+        "Overrides/extras cannot survive regeneration or purchase state creates inventory without explicit confirmation.",
+        "Origin, ActorContext, profiles-not-auth, atomicity, idempotency, or operation-key behavior weakens.",
+        "Substitution requires a new model; omit with explicit unsupported state.",
+        "Cooking/Nutrition/inventory/recipe redesign/outside files/live/shared/secrets/provider/normal DB are required."
+      ]
+    },
+    "evidence": [
+      "T068 proves the accepted recipe/planner milestone and all full gates.",
+      "Current grocery generation emits recipe shortages only and lacks staple/manual-extra/purchased coverage controls.",
+      "Products and batches already hold most staple, package, price, store/source, date, note, and exclusion fields.",
+      "Existing intake is atomic/idempotent but UI and coverage persistence are narrow."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": {"safe": false, "rationale": "Formula persistence, regeneration, controls, intake, UI, migration, and verification are coupled."},
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Complete grocery formula and controls", "Rich partial/complete intake", "Rendered evidence", "Later cooking UI", "Final oracle"],
+    "required_board_updates": ["Record T069 done.", "Activate one grocery/intake Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T095", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Accept T092 cooking E2E and T094 OpenAPI/full235+133/build evidence. No source repair/redundant rerun remains. Run only three unchanged protected E2Es independently, disposable DB, and final integrity with zero edits.",
+    "worker_package": {"objective": "No-edit final verification of three protected E2Es, disposable DB, and integrity.", "allowed_files": [], "verify": ["Require all T095 hashes.", "Run grocery/workflow/recipe E2Es in separate fresh lifecycles with port cleanup.", "Run disposable migrate/check and final live PID/source-mirror/protected hash/diff/status integrity."], "stop_if": ["Any hash/drift/edit/failure.", "Fresh lifecycle/port/live PID isolation cannot be proven."]},
+    "evidence": ["T092 complete cooking E2E passes.", "T094 OpenAPI/full/build passes.", "Protected hashes exact."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "Three independent serial lifecycles."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Three protected E2Es", "Disposable DB/integrity", "Final audit"],
+    "required_board_updates": ["Record T095 done.", "Activate no-edit verification.", "Require final Judge."]
+  }
+}

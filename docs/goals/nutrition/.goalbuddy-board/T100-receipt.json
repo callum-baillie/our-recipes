@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "task_id": "T100",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T100-advanced-aggregate-query-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only intake/value/index, goal-history, allocation/calculation, profile preference, chart and performance inspection",
+      "status": "pass"
+    }
+  ],
+  "summary": "Designed a fixed five-query authorized workspace and exact server semantics for all remaining non-weight individual charts without a migration.",
+  "note": "notes/T100-advanced-aggregate-query-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only design as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must approve the correlated latest-revision SQL, diary-authorized historical goal context, planned aggregate join and exact five-chart Worker boundary.",
+    "Weight, card/planner flags, household analysis and rendered final evidence remain later tasks."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

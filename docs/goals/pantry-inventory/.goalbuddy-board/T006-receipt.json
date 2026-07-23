@@ -1,0 +1,10 @@
+{
+  "result": "blocked",
+  "changed_files": [],
+  "commands": [],
+  "summary": "Stopped before editing because migration 0015 is already applied to persistent data/our-recipes.db and a generated .next/standalone database. A new additive migration is required.",
+  "blocked_reason": "T006 stop condition triggered: migration 0015 is applied to non-disposable databases and must remain immutable.",
+  "remaining_blockers": [
+    "Replace the authorized 0015 edit with additive migration 0016 and expand allowed_files accordingly."
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T057",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The 390px failure is document overflow, not the intentional Pantry-view scroller. Evidence identifies the nonwrapping long expiry/card header and mobile two-column form rows as the bounded CSS root cause.",
+    "worker_package": {
+      "objective": "Inside the existing mobile breakpoint only, stack card headers, wrap/contain expiry text, collapse form rows, and contain their controls; then complete all independent gates.",
+      "allowed_files": ["src/components/pantry-manager.module.css"],
+      "verify": [
+        "Require CSS source/mirror pre-hash 36419FD53641B23F3AEB30D15C88A783198170658C8662BDEC98C2DD05E712B4; preserve TSX/spec hashes.",
+        "At max-width 700 only: cardTop stretch/column; expiry flex-start/max-width100/normal wrap; formRow minmax(0,1fr); formRow labels min-width0; local inputs/selects/textarea min-width0 width100.",
+        "Preserve views internal overflow/nowrap and all content; run scoped format, lint, typecheck, mirror hash, isolated build.",
+        "Run fresh management with all behavior, containment at three widths, zero axe at three scans, three screenshots/no errors and inspect mobile.",
+        "Release port, fresh integrated 400/350/50 flow, zero axe at two scans, five screenshots/no errors.",
+        "Read-only persistence, disposable migrate/dbcheck, final port/diff/status."
+      ],
+      "stop_if": [
+        "Pre-hash differs or another file/rule outside breakpoint/target selectors changes.",
+        "Views scrolling/content/desktop-tablet layout regresses or overflow/axe/build fails.",
+        "Either workflow fails twice or assertions/timeouts would change.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": ["Only 390px document containment failed.", "Long nonwrapping expiry visibly reaches the card boundary.", "Mobile formRow remains two intrinsic-width columns while views scrolling is intentionally contained."],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One CSS/mirror/DB/artifact/port lifecycle must be serial." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing mobile containment/axe/screenshot", "Integrated/persistence/migration/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T057 done.", "Activate T058 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

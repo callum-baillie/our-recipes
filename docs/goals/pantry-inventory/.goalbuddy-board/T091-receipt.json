@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T091", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Playwright screenshot injection, not product hydration: repo has no caret mutation; screenshots default caret hide, temporarily adding transparent caret styles across editable inputs during hydration. Add caret initial to the existing screenshot call only; keep zero-error assertion unfiltered.",
+    "worker_package": {
+      "objective": "Add only screenshot caret initial in cooking E2E, then complete every final gate.",
+      "allowed_files": ["tests/e2e/pantry-cooking-confirmation.spec.ts"],
+      "verify": ["Require E2E/CSS/TSX/config hashes and one-option diff.", "Run scoped format/lint and fresh default-context cooking E2E with unchanged zero-error assertion.", "Run full gates, isolated build, three protected E2Es, disposable DB, live PID/port/hash/diff/status integrity."],
+      "stop_if": ["Hashes differ or diff beyond caret initial.", "Warning remains or wait/filter/suppression/source/config change needed.", "Live/shared/protected/unrelated state touched."]
+    },
+    "evidence": ["No repo caret mutation.", "Playwright screenshot defaults caret hide.", "Warning transparent style/breadth matches injection.", "T090 passed all product/axe behavior."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One clean browser lifecycle then serial oracles."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Clean cooking/full/protected/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T091 done.", "Activate one test Worker.", "Require final Judge."]
+  }
+}

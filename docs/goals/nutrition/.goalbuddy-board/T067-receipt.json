@@ -1,0 +1,19 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T067",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T067-profile-deletion-approval.md"],
+  "commands": [
+    { "cmd": "read-only T064 plus T066 post-archive authorization and active-path audit", "status": "pass" }
+  ],
+  "summary": "Approved irreversible selected-profile deletion after every profile/intake/allocation/integration path was proven to deny archived profiles.",
+  "note": "notes/T067-profile-deletion-approval.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,9 +1,11 @@
 'use client';
 
-import { ChevronDown, LoaderCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+import { InlineSkeleton } from '@/components/skeleton';
 
 import { DismissibleDetails } from '@/components/dismissible-details';
 import { useToast } from '@/components/toast-provider';
@@ -70,7 +72,7 @@ export function ProfileSwitcher({ activeProfileId, profiles }: ProfileSwitcherPr
           </span>
           <span>{activeProfile.displayName}</span>
           {pending ? (
-            <LoaderCircle className="spin" size={15} aria-label="Switching profile" />
+            <InlineSkeleton label="Switching profile" width="0.95rem" />
           ) : (
             <ChevronDown size={16} aria-hidden="true" />
           )}

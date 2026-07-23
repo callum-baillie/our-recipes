@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "repair_required",
+  "task_id": "T065",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T065-profile-deletion-judge.md"],
+  "commands": [
+    { "cmd": "read-only deletion dependency, isolation, post-archive and session-safety audit", "status": "repair_required" }
+  ],
+  "summary": "Deletion transaction passes, but the duplicated intake authorization seam must deny archived profiles to prevent repopulation.",
+  "note": "notes/T065-profile-deletion-judge.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Archived profile UUID remains writable through nutrition-intake-service authorization."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

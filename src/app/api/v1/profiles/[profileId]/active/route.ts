@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, createSignedProfileValue } from '@/lib/actor-context';
+import {
+  ACTIVE_PROFILE_COOKIE,
+  createSignedProfileValue,
+  LEGACY_ACTIVE_PROFILE_COOKIE,
+} from '@/lib/actor-context';
 import { getRuntimeConfig } from '@/lib/config';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import { getProfile } from '@/lib/services/household-service';
@@ -24,6 +28,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ profi
     secure: getRuntimeConfig().isProduction,
     path: '/',
     maxAge: 60 * 60 * 24 * 365,
+  });
+  response.cookies.set(LEGACY_ACTIVE_PROFILE_COOKIE, '', {
+    path: '/',
+    maxAge: 0,
+    sameSite: 'lax',
   });
   return response;
 }

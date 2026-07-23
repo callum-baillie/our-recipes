@@ -29,6 +29,11 @@ export type CollectionDetail = CollectionSummary & {
   availableImages: CollectionCoverImage[];
 };
 
+export type RecipeCollectionMembership = {
+  collectionId: string;
+  recipeId: string;
+};
+
 export class CollectionNotFoundError extends Error {}
 export class CollectionConflictError extends Error {}
 export class CollectionValidationError extends Error {}
@@ -185,6 +190,17 @@ export function listCollectionsForRecipe(recipeId: string): CollectionSummary[] 
   return summaries(rows).sort((left, right) => left.position - right.position);
 }
 
+export function listRecipeCollectionMemberships(): RecipeCollectionMembership[] {
+  ensureDatabase();
+  return getDatabase()
+    .select({
+      collectionId: collectionRecipes.collectionId,
+      recipeId: collectionRecipes.recipeId,
+    })
+    .from(collectionRecipes)
+    .all();
+}
+
 export function createCollection(
   input: CollectionInput,
   actorProfileId: string,
@@ -295,6 +311,26 @@ export function replaceCollectionRecipes(
       .run();
   });
   return getCollection(collectionId) as CollectionDetail;
+}
+
+export function addRecipeToCollection(
+  collectionId: string,
+  recipeId: string,
+  actorProfileId: string,
+): { collection: CollectionDetail; added: boolean } {
+  const collection = getCollection(collectionId);
+  if (!collection) throw new CollectionNotFoundError('That collection no longer exists.');
+  if (collection.recipes.some((recipe) => recipe.id === recipeId)) {
+    return { collection, added: false };
+  }
+  return {
+    collection: replaceCollectionRecipes(
+      collectionId,
+      [...collection.recipes.map((recipe) => recipe.id), recipeId],
+      actorProfileId,
+    ),
+    added: true,
+  };
 }
 
 export function reorderCollections(

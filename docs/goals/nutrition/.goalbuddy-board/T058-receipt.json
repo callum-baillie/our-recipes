@@ -1,0 +1,14 @@
+{
+  "result": "done",
+  "task_id": "T058",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T058-diary-rights-map.md"],
+  "commands": [{"cmd":"read-only lifecycle, export, authorization and Nutrition FK/self-reference deletion map","status":"pass"}],
+  "summary": "Split safe append-only lifecycle/export from a later explicitly ordered irreversible deletion/scrubbing Worker.",
+  "note": "notes/T058-diary-rights-map.md",
+  "deviations": ["The exact GoalBuddy Scout exceeded the single-wait limit, so the PM completed the same read-only map as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

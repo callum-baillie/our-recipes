@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T098", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["src/components/cooking-mode.tsx"],
+    "commands": [{"cmd": "hash guards and two-label diff", "status": "pass"}, {"cmd": "scoped format/lint, focused unit, typecheck", "status": "pass", "summary": "11/11 focused"}, {"cmd": "fresh cooking E2E", "status": "pass", "summary": "1/1 in 51.8s"}, {"cmd": "cleanup/protected integrity", "status": "pass"}],
+    "summary": "Two compatible names pass and cooking E2E is green. Protected workflow completes cooking then fails because role=status includes Undo and navigation controls in addition to exact completion sentence.",
+    "evidence": ["Legacy name locators and confirmation passed; failure occurs only after completion announcement."],
+    "deviations": [], "remaining_blockers": ["Status-region semantic repair", "Build/disposable/final integrity"],
+    "verification_attempts": 1, "stopped_because": "Out-of-scope over-broad live status region; cleanup/integrity passed."
+  }
+}

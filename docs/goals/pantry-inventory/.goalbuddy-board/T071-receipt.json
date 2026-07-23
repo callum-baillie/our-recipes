@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T071",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Harness-only synchronization defect: the successful control PATCH triggers ShoppingListEditor's own window.location.reload, while the test issued regeneration and another reload before it completed. Formula and persistence are already proven at 50g extra and 450g final. Await PATCH plus application-owned reload before regeneration; preserve the post-regeneration reload and 450g assertion.",
+    "worker_package": {
+      "objective": "Change only grocery E2E manual-extra synchronization, then run the new E2E, both unchanged protected oracles, and final port/hash/diff integrity.",
+      "allowed_files": ["tests/e2e/pantry-grocery-intake.spec.ts"],
+      "verify": ["Require grocery pre-hash B02A10574444A76C7BADD3914128FB8463EBC92163C600F3DB23FC4167BD4B11 and protected oracle hashes.", "Arm exact same-page load/navigation before click; await PATCH and app reload; preserve regeneration, later reload, and 450g assertion.", "Run scoped format/lint and source/mirror hashes.", "Run new E2E and unchanged workflow/recipe-planner E2Es.", "Release port and prove diff/status/protected hashes."],
+      "stop_if": ["Any non-spec file or non-synchronization behavior must change.", "PATCH/app reload/450g fails after exact sync.", "Any assertion/fixture/timeout/viewport weakens or protected oracle needs edit.", "Shared/live/secret/normal data would be touched."]
+    },
+    "evidence": ["PATCH 200 and SQLite 50g/450g are proven.", "UI reloads immediately after successful control update.", "The test awaited PATCH but not that reload before issuing its own reload."],
+    "subgoal_contract": null,
+    "parallel_safety": {"safe": false, "rationale": "One spec and isolated browser/port lifecycle must be serial."},
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["New E2E", "Protected E2Es", "Final integrity", "Later cooking UI"],
+    "required_board_updates": ["Record T071 done.", "Activate one Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

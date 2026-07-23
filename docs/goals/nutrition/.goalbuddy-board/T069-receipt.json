@@ -1,0 +1,19 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T069",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T069-preparation-calculation-review.md"],
+  "commands": [
+    { "cmd": "read-only first-package food-science, server-ownership, immutability and dirty-boundary review", "status": "pass" }
+  ],
+  "summary": "Approved existing-schema preparation calculation and weighed-portion core while deferring prepared alignment and sourced retention.",
+  "note": "notes/T069-preparation-calculation-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

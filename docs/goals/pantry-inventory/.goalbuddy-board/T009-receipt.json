@@ -1,0 +1,42 @@
+{
+  "result": "done",
+  "changed_files": [
+    "src/lib/domain/pantry-availability.ts",
+    "src/lib/services/pantry-availability-service.ts",
+    "src/app/api/v1/pantry/mappings/[ingredientId]/route.ts",
+    "src/app/api/v1/pantry/recipes/[recipeId]/availability/route.ts",
+    "src/app/api/v1/pantry/demand/route.ts",
+    "src/components/pantry-availability-pill.tsx",
+    "src/components/pantry-availability-pill.module.css",
+    "src/components/recipe-pantry-panel.tsx",
+    "src/components/recipe-pantry-panel.module.css",
+    "src/components/meal-plan-pantry-demand.tsx",
+    "src/components/meal-plan-pantry-demand.module.css",
+    "src/components/recipe-summary-card.tsx",
+    "src/app/recipes/page.tsx",
+    "src/app/recipes/[recipeId]/page.tsx",
+    "src/app/recipes/[recipeId]/cook/page.tsx",
+    "src/app/planner/page.tsx",
+    "tests/unit/pantry-availability.test.ts",
+    "tests/integration/pantry-availability-service.test.ts",
+    "docs/openapi.yaml",
+    "docs/api.md",
+    "docs/data-model.md",
+    "docs/decisions/0031-pantry-availability-and-demand.md"
+  ],
+  "commands": [
+    { "cmd": "pnpm exec prettier --check <T009 files excluding shared active docs/data-model.md>", "status": "pass" },
+    { "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-availability.test.ts", "status": "pass", "summary": "3 tests passed" },
+    { "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-availability-service.test.ts", "status": "pass", "summary": "2 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "134 unit and 45 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass", "summary": "No errors; one non-failing scoped warning" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm openapi:validate", "status": "pass", "summary": "Valid with 11 existing warnings" },
+    { "cmd": "git diff --check", "status": "pass" }
+  ],
+  "summary": "Delivered actor-attributed manual mappings without recipe rewrites, serving-scaled ready/partial/unknown availability, and non-mutating aggregate multi-meal demand with exact single-pool stock allocation. Added trusted APIs, recipe-card/detail/cook and planner UI, focused tests, OpenAPI, and documentation.",
+  "deviations": [
+    "Pantry ADR is 0031 because concurrent nutrition owns 0029 and 0030.",
+    "Shared docs/data-model.md was excluded from Prettier while nutrition T019 remains active; content was preserved."
+  ]
+}

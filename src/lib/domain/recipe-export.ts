@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const PORTABLE_RECIPE_EXPORT_FORMAT = 'our-recipes-portable-recipe-export';
+export const PORTABLE_RECIPE_EXPORT_FORMAT = 'bord-portable-recipe-export';
+export const LEGACY_PORTABLE_RECIPE_EXPORT_FORMAT = 'our-recipes-portable-recipe-export';
 export const PORTABLE_RECIPE_EXPORT_VERSION = 1;
 export const MAX_PORTABLE_RECIPE_EXPORT_RECIPES = 10_000;
 export const MAX_PORTABLE_RECIPE_EXPORT_IMAGES = 50_000;
@@ -13,7 +14,10 @@ const archivePathSchema = z
   .regex(/^(?:recipes\/\d{5}\.jsonld|images\/[a-f0-9]{64}\.webp)$/u);
 
 export const portableRecipeExportManifestSchema = z.object({
-  format: z.literal(PORTABLE_RECIPE_EXPORT_FORMAT),
+  format: z.union([
+    z.literal(PORTABLE_RECIPE_EXPORT_FORMAT),
+    z.literal(LEGACY_PORTABLE_RECIPE_EXPORT_FORMAT),
+  ]),
   version: z.literal(PORTABLE_RECIPE_EXPORT_VERSION),
   snapshotAt: z.string().datetime({ offset: true }),
   recipeCount: z.number().int().min(0).max(MAX_PORTABLE_RECIPE_EXPORT_RECIPES),

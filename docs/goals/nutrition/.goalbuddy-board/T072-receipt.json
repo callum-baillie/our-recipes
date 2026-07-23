@@ -1,0 +1,25 @@
+{
+  "result": "done",
+  "task_id": "T072",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "tests/integration/nutrition-recipe-calculation-service.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused calculation integration tests", "status": "pass", "summary": "3 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "178 unit and 103 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Removed unsupported confidence adjustment and directly proved final weight changes concentration without changing total nutrient mass.",
+  "note": "notes/T072-preparation-confidence-repair.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact repair as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

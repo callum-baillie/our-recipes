@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T111",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T111-card-preference-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only migration, profile round-trip, signed selection, batch equivalence and compact-card audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved additive surface preferences and the signed-profile-aware one-query recipe-library projection with factual compact semantics.",
+  "note": "notes/T111-card-preference-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Planner preview visibility and bounded projection remain the next reviewed slice.",
+    "Household analysis/charts, documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

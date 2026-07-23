@@ -8,7 +8,7 @@ import {
   getRecipe,
   RecipeConflictError,
   RecipeNotFoundError,
-  updateRecipe,
+  updateRecipeWithIntegrations,
 } from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
@@ -40,9 +40,13 @@ export async function PUT(request: Request, context: { params: Promise<{ recipeI
     return jsonError(400, 'invalid_recipe', 'Check the highlighted recipe details.');
   try {
     const { recipeId } = await context.params;
-    return NextResponse.json({
-      recipe: updateRecipe(recipeId, parsed.data, actor.profileId, parsed.data.expectedRevision),
-    });
+    const result = updateRecipeWithIntegrations(
+      recipeId,
+      parsed.data,
+      actor.profileId,
+      parsed.data.expectedRevision,
+    );
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RecipeNotFoundError)
       return jsonError(404, 'recipe_not_found', error.message);

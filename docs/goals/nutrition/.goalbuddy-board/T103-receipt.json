@@ -1,0 +1,35 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T103",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-advanced-charts.ts",
+    "src/components/nutrition-advanced-chart-panels.tsx",
+    "tests/unit/nutrition-advanced-charts.test.ts",
+    "docs/goals/nutrition/notes/T103-advanced-individual-chart-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "bounded privacy/query/formula/plan/source/completeness/accessibility audit",
+      "status": "pass"
+    },
+    {
+      "cmd": "focused per-nutrient plan-evidence and goal-ambiguity repair verification",
+      "status": "pass",
+      "summary": "format, lint, types, diff, 18 unit/component and 3 integration tests passed"
+    }
+  ],
+  "summary": "Approved the advanced non-weight Trends vertical after making per-nutrient plan evidence and goal ambiguity explicit.",
+  "note": "notes/T103-advanced-individual-chart-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same audit and narrow allowed-file repairs as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Opt-in measurement-authorized weight trend remains unscoped.",
+    "Card/planner display flags, household analysis, offline/performance documentation and rendered final evidence remain later phases."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

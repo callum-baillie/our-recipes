@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "task_id": "T080",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "summary": "Mapped deterministic quality-gated private recipe/Pantry/plan/grocery recommendations and evidence-versioned feedback without Pantry mutation overlap.",
+  "note": "notes/T080-recommendation-map.md",
+  "evidence": [
+    "src/lib/domain/nutrition-insights.ts",
+    "src/lib/services/nutrition-meal-planning-service.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/lib/services/pantry-availability-service.ts",
+    "src/lib/domain/pantry-availability.ts",
+    "src/lib/db/schema.ts",
+    "src/lib/services/planning-service.ts",
+    "docs/goals/pantry-inventory/state.yaml T038"
+  ],
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The complete Pantry T038 inventory-management outcome is independently pending and must not be inferred from recommendation reads."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

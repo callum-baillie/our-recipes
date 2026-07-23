@@ -1,0 +1,27 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T066",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-recipe-planner.spec.ts"],
+    "commands": [
+      {"cmd": "source/mirror pre-hash guard", "status": "pass"},
+      {"cmd": "scoped Prettier and ESLint", "status": "pass"},
+      {"cmd": "source/mirror post-hash EA421DFB174F59CAAA1ED1CB998F91168686498AD59291F0C20D5A52FD7E2F7D", "status": "pass"},
+      {"cmd": "fresh isolated mirror preparation before both attempts", "status": "pass"},
+      {"cmd": "port 3100 release", "status": "pass"},
+      {"cmd": "protected Pantry hashes", "status": "pass"}
+    ],
+    "summary": "The only authorized exact card-link repair passed. Two fresh isolated runs then failed the preserved detail expiry assertion: the opened batch rendered no expiry recorded despite a 201 fixture request carrying bestBeforeDate 2027-04-02. T066 could not change product or fixture code. Port and protected hashes are clean.",
+    "deviations": [
+      "Both browser runs passed the repaired library locator and failed identically at the mobile recipe-detail expiry assertion.",
+      "Actual opened batch detail was 300 g, Planner shelf, no expiry recorded."
+    ],
+    "remaining_blockers": [
+      "Diagnose expiry fixture persistence/return versus product rendering.",
+      "Complete 390/768/1280 browser evidence and all full/build/disposable-DB gates."
+    ],
+    "verification_attempts": 2,
+    "stopped_because": "Two identical non-harness expiry-context failures fell outside the one-file authorization."
+  }
+}

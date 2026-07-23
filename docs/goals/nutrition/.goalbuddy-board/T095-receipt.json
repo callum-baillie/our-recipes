@@ -1,0 +1,32 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T095",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T095-first-chart-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "bounded formula, server-ownership, ambiguity, planned-separation, accessibility, responsive and scope audit",
+      "status": "pass"
+    },
+    {
+      "cmd": "fresh T094 full verification evidence review",
+      "status": "pass",
+      "summary": "16 focused, 197 unit and 114 integration tests plus lint, types, format/diff and production build passed"
+    }
+  ],
+  "summary": "Approved the first individual chart package with exact server-owned inputs, preserved goal semantics, explicit missing/ambiguity truth and accessible table-backed rendering.",
+  "note": "notes/T095-first-chart-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same bounded audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Versioned display preferences and remaining 7/14/30, source, completeness and weight dataset boundaries need an exact map.",
+    "Household analysis, offline/performance/documentation and rendered acceptance evidence remain later phases."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

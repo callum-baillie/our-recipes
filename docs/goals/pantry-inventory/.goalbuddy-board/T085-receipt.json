@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T085", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "CSS Module purity defect: the entirely global selector needs a real local anchor applied to the timer aside. Add styles.timerPanel alongside global timer-panel and change only the selector to .timerPanel :global(.muted), preserving #d8ded4 and all layout/semantics/behavior.",
+    "worker_package": {
+      "objective": "Make exact two-file timer class/selector wiring repair, then complete all final cooking/full/protected/build/database/integrity gates.",
+      "allowed_files": ["src/components/cooking-mode.module.css", "src/components/cooking-mode.tsx"],
+      "verify": ["Require CSS/TSX/E2E hashes from T085.", "Change only timer aside class token and local/global selector; preserve color and behavior.", "Run scoped format/lint/type, isolated build, cooking E2E, full gates, three protected E2Es, disposable DB, live PID/port/hash/diff/status integrity."],
+      "stop_if": ["Hashes differ or color/global CSS/DOM/layout/logic/tests change.", "Compilation/contrast still fails.", "Live/shared/secret/normal/protected/unrelated state touched."]
+    },
+    "evidence": ["T084 exact navigation passed and failed only on CSS purity.", "Timer markup has only global classes; CookingMode already imports styles.", "Local timerPanel plus global muted matches same paragraph truthfully."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "Two-file selector contract and serial verification."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Compilation/cooking E2E/full/protected/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T085 done.", "Activate one two-file Worker.", "Require final Judge after all gates."]
+  }
+}

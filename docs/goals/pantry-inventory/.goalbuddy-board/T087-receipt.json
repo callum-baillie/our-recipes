@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T087", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Product state-overwrite defect: blur sends an empty patch that can read stale 150, and an older product preview can overwrite a newer 120 edit. The API correctly echoes requested quantity and FEFO. Pass live blur values and apply only the latest response matching current product/quantity/unit.",
+    "worker_package": {
+      "objective": "Repair only CookingMode request/state ordering, then complete every final gate.",
+      "allowed_files": ["src/components/cooking-mode.tsx"],
+      "verify": ["Require TSX/CSS/E2E hashes from T087.", "Pass live quantity/unit on blur; guard preview responses by latest request and current line triplet.", "Run scoped/type/build, unchanged cooking E2E, full gates, three protected E2Es, disposable DB, live PID/port/hash/diff/status integrity."],
+      "stop_if": ["Hashes differ or E2E still 150/100+50.", "Preview API/service/FEFO/transaction/CSS/tests change required.", "Older response can overwrite newer state or live/shared/protected/unrelated state touched."]
+    },
+    "evidence": ["Two deterministic failures.", "Controlled onChange writes 120 but blur sends empty patch.", "Unawaited selection preview can race edit.", "Service necessarily returns 100+20 for 120."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One state/request boundary and serial verification."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Passing cooking/full/protected/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T087 done.", "Activate one CookingMode Worker.", "Require final Judge."]
+  }
+}

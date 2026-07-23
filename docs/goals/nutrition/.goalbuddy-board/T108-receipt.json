@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "task_id": "T108",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T108-card-planner-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only card/list/filter, planner/allocation, profile preference, authorization, query and concurrent Pantry ownership map",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped existing factual card filters and authorized per-person planner flow, then split the missing persisted display flags and two N+1/history performance repairs into reviewable card and planner Workers.",
+  "note": "notes/T108-card-planner-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must approve the additive preference and recipe-library batch slice before implementation.",
+    "The planner preview/bounded projection slice requires a separate post-card review.",
+    "Household analysis/charts, offline/performance documentation and rendered final evidence remain later tasks."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

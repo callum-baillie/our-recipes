@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T081", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Accept the grocery/formula/intake milestone. Current type/build, focused formula/accessibility/purchase evidence, new grocery E2E, both protected E2Es, and integrity pass. Final remaining slice is cooking UI over existing confirmed atomic FEFO, leftover, and guarded undo services; no migration or new substitution model is justified.",
+    "worker_package": {
+      "objective": "Implement linked planned-meal cooking entry; detailed server-derived batch/location/expiry/quantity review; quantity correction, explicit no-deduction/inaccurate handling, and one-cook compatible product alternative; literal confirmation only; multiple linked leftovers; post-cook Pantry/planner refresh/navigation; guarded undo with conflicts/recovery; and deterministic cooking E2E over existing transaction seams.",
+      "allowed_files": ["src/lib/services/pantry-service.ts", "src/lib/services/pantry-grocery-cooking-service.ts", "src/app/api/v1/cook-sessions/route.ts", "src/app/api/v1/cook-sessions/[sessionId]/pantry/route.ts", "src/app/api/v1/cook-sessions/[sessionId]/complete/route.ts", "src/app/api/v1/cook-sessions/[sessionId]/pantry/undo/route.ts", "src/components/cooking-mode.tsx", "src/components/cooking-mode.module.css", "src/components/meal-planner.tsx", "src/components/meal-planner.module.css", "docs/openapi.yaml", "tests/unit/pantry-grocery-cooking.test.ts", "tests/unit/pantry-recipe-planner-components.test.ts", "tests/integration/pantry-grocery-cooking-service.test.ts", "tests/integration/pantry-grocery-cooking-api.test.ts", "tests/e2e/pantry-cooking-confirmation.spec.ts"],
+      "verify": ["Focused cooking unit/integration/API tests.", "Full lint/type/unit/integration/OpenAPI and isolated full-source webpack build.", "New isolated cooking E2E proving no pre-confirm deduction, linked meal, batch review/adjustments, confirmation, leftovers, refresh, undo/conflicts, 390/768/1280 keyboard/axe/screenshots/no errors.", "Run unchanged grocery/workflow/recipe-planner E2Es independently.", "Fresh disposable migrations/db check and final port/hash/diff/status integrity."],
+      "stop_if": ["Migration/new persistent substitution/recipe mutation needed.", "Any pre-confirm deduction, FEFO/transaction/conflict/ActorContext/origin weakening or silent retry.", "Manual grocery state overwritten or protected hashes drift.", "Live/shared/secret/normal data or unrelated files required."]
+    },
+    "evidence": ["T080 proves accepted grocery milestone/full gates.", "Existing services already implement confirmed atomic FEFO, attribution, leftovers, and guarded undo.", "Cooking UI lacks linked meal, batch review, refresh, and undo recovery."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "Cooking services/UI/E2E and serial protected oracles are coupled."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Complete rendered cooking UI and oracle", "Final full-outcome audit"],
+    "required_board_updates": ["Record T081 done.", "Activate one cooking Worker.", "Require final Judge."]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T035",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+    "commands": [
+      { "cmd": "Hash guard, exact hydration waiter, Prettier, and mirror refresh", "status": "pass" },
+      { "cmd": "Fresh Pantry attempt 1", "status": "fail", "summary": "Hydration/PATCH/manual/obsolete passed; intake select lacked Basement shelf" },
+      { "cmd": "Attempt 1 cleanup/port release", "status": "pass" },
+      { "cmd": "Fresh Pantry attempt 2", "status": "fail", "summary": "Open grocery list link absent after Make shortage list" },
+      { "cmd": "Attempt 2 cleanup/port release", "status": "pass" }
+    ],
+    "summary": "The hydration waiter works; deepest run proves PATCH, manual 60, obsolete cleanup, and three screenshots. Two attempts then fail at distinct readiness points: missing intake location option and missing generated-list link.",
+    "deviations": ["Used fixed-path cleanup for authorized mirror outputs.", "Used owned webpack dev servers."],
+    "remaining_blockers": ["Root-cause both readiness/data-flow failures", "Complete intake/cooking/axe/screenshots, disposable DB, and diff gates"],
+    "verification_attempts": 2,
+    "stopped_because": "Two fresh attempts failed at distinct later workflow boundaries."
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T100", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["src/components/cooking-mode.tsx"],
+    "commands": [{"cmd": "scoped Prettier/ESLint, focused unit, typecheck", "status": "pass", "summary": "11 focused"}, {"cmd": "isolated full-source webpack build", "status": "pass"}, {"cmd": "cooking E2E", "status": "pass", "summary": "1/1 in fresh lifecycle"}, {"cmd": "protected workflow E2E", "status": "pass", "summary": "1/1 in fresh lifecycle"}, {"cmd": "fresh disposable migrate/check", "status": "pass"}, {"cmd": "live PID/port/source-mirror/protected hash/diff/status integrity", "status": "pass"}],
+    "summary": "Moved role=status to completion paragraph only. Focused/type/build, cooking and workflow E2Es, disposable DB, and final integrity pass; exact-hash grocery/recipe passes remain current.",
+    "deviations": ["Mirror-owned direct Next build for junction safety.", "One stale Playwright child was stopped by exact process tree; fresh retry passed.", "One integrity path typo was corrected and rerun."],
+    "remaining_blockers": [], "verification_attempts": 2, "stopped_because": null
+  }
+}

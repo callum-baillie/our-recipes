@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('server-only', () => ({}));
+
 import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
@@ -20,6 +22,7 @@ import {
   updateHouseholdSettings,
 } from '@/lib/services/household-service';
 import {
+  addRecipeToCollection,
   createCollection,
   deleteCollection,
   getCollection,
@@ -29,6 +32,7 @@ import {
   updateCollection,
 } from '@/lib/services/collection-service';
 import {
+  addMealPlanEntries,
   addMealPlanEntry,
   createShoppingAisle,
   duplicateWeek,
@@ -37,6 +41,7 @@ import {
   plannedMealsAsIcs,
   removeShoppingAisle,
   reorderShoppingAisles,
+  swapMealPlanEntries,
   updateShoppingListItem,
 } from '@/lib/services/planning-service';
 import {
@@ -51,6 +56,7 @@ import {
   recipeAsMarkdown,
   restoreRecipeRevision,
   setRecipePreference,
+  setRecipeReaction,
   listTags,
   mergeTag,
   updateRecipe,
@@ -63,6 +69,12 @@ import {
   deleteRecipeImage,
   getRecipeImageFile,
 } from '@/lib/services/recipe-image-service';
+import {
+  appendRecipeNutritionCalculation,
+  createNutritionDataSource,
+  registerCalculationVersion,
+} from '@/lib/services/nutrition-foundation-service';
+import { getPrivateNutritionProfile } from '@/lib/services/nutrition-profile-service';
 
 describe('household persistence', () => {
   beforeEach(() => {
@@ -81,6 +93,85 @@ describe('household persistence', () => {
     completeSetup({
       householdName: 'Sunday suppers',
       appName: 'Our Recipes',
+      brandIcon: 'cooking-pot',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'imperial',
+        temperatureUnit: 'F',
+        locale: 'en-US',
+        timezone: 'America/Los_Angeles',
+        mainGoals: 'Make weekday meals simpler and waste less food.',
+        goalContext: {
+          focusAreas: ['organized-meals', 'reduce-food-waste'],
+          motivation: 'I want evenings to feel less rushed.',
+          challenges: 'I decide what to cook too late.',
+          successVision: 'Dinner is planned and the fridge gets used.',
+        },
+      },
+      nutrition: {
+        profileType: 'adult',
+        dateOfBirth: '1991-04-12',
+        heightCentimeters: 168,
+        currentWeightKilograms: 64,
+        referenceSexCategory: 'female',
+        activityLevel: 'moderate',
+        nutritionGoalType: 'maintain',
+        dietaryPreferences: ['Vegetarian'],
+        foodAllergies: ['Peanuts'],
+        dietaryExclusions: ['Alcohol'],
+        weightTrackingEnabled: true,
+        estimatedTargetsEnabled: true,
+        estimatedTargetConsent: true,
+      },
+    });
+    const state = getHouseholdState();
+    expect(state.household?.kitchenName).toBe('Sunday suppers');
+    expect(state.household?.kitchenIcon).toBe('cooking-pot');
+    expect(state.profiles).toHaveLength(1);
+    expect(state.profiles[0]?.temperatureUnit).toBe('F');
+    expect(state.profiles[0]?.mainGoals).toBe('Make weekday meals simpler and waste less food.');
+    expect(state.profiles[0]?.goalContext).toEqual({
+      focusAreas: ['organized-meals', 'reduce-food-waste'],
+      motivation: 'I want evenings to feel less rushed.',
+      challenges: 'I decide what to cook too late.',
+      successVision: 'Dinner is planned and the fridge gets used.',
+    });
+    expect(getPrivateNutritionProfile(state.profiles[0]!.id, state.profiles[0]!.id)).toMatchObject({
+      profileType: 'adult',
+      dateOfBirth: '1991-04-12',
+      heightCentimeters: 168,
+      currentWeightKilograms: 64,
+      activityLevel: 'moderate',
+      nutritionGoalType: 'maintain',
+      dietaryPreferences: '["Vegetarian"]',
+      foodAllergies: '["Peanuts"]',
+      dietaryExclusions: '["Alcohol"]',
+      weightTrackingEnabled: true,
+      estimatedTargetsEnabled: true,
+      estimatedTargetConsent: true,
+    });
+    expect(
+      updateHouseholdSettings({
+        householdName: 'The Sunday table',
+        appName: "Maya's Recipe Box",
+        brandIcon: 'cooking-pot',
+      }),
+    ).toMatchObject({
+      kitchenName: "Maya's Recipe Box",
+      kitchenIcon: 'cooking-pot',
+    });
+    expect(getHouseholdState().household).toMatchObject({
+      kitchenName: "Maya's Recipe Box",
+      kitchenIcon: 'cooking-pot',
+    });
+  });
+
+  it('creates an ordered multi-profile roster atomically during setup', () => {
+    const state = completeSetup({
+      householdName: 'Everyone cooks',
+      appName: 'Everyone cooks',
       profile: {
         displayName: 'Maya',
         color: '#637A45',
@@ -90,21 +181,183 @@ describe('household persistence', () => {
         locale: 'en-US',
         timezone: 'America/Los_Angeles',
       },
+      additionalProfiles: [
+        {
+          profile: {
+            displayName: 'Avery',
+            color: '#466F75',
+            avatarUrl: '',
+            units: 'imperial',
+            temperatureUnit: 'F',
+            locale: 'en-US',
+            timezone: 'America/Los_Angeles',
+            mainGoals: 'Try one new dinner each week.',
+          },
+          nutrition: {
+            profileType: 'dependent',
+            dateOfBirth: '',
+            heightCentimeters: null,
+            currentWeightKilograms: null,
+            referenceSexCategory: null,
+            activityLevel: null,
+            nutritionGoalType: 'none',
+            dietaryPreferences: [],
+            foodAllergies: ['Peanuts'],
+            dietaryExclusions: [],
+            weightTrackingEnabled: false,
+            estimatedTargetsEnabled: false,
+            estimatedTargetConsent: false,
+          },
+        },
+      ],
     });
-    const state = getHouseholdState();
-    expect(state.household?.name).toBe('Sunday suppers');
-    expect(state.profiles).toHaveLength(1);
-    expect(state.profiles[0]?.temperatureUnit).toBe('F');
+
+    expect(state.profiles.map((profile) => profile.displayName)).toEqual(['Maya', 'Avery']);
+    expect(getPrivateNutritionProfile(state.profiles[1]!.id, state.profiles[1]!.id)).toMatchObject({
+      profileType: 'dependent',
+      foodAllergies: '["Peanuts"]',
+    });
+  });
+
+  it('filters and sorts current normalized nutrition before pagination', () => {
+    const profile = completeSetup({
+      householdName: 'Nutrition recipe table',
+      appName: 'Our Recipes',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'metric',
+        temperatureUnit: 'C',
+        locale: 'en-US',
+        timezone: 'America/Los_Angeles',
+      },
+    }).profiles[0]!;
+    const recipeInput = (title: string) => ({
+      title,
+      summary: '',
+      servings: '4 servings',
+      prepMinutes: 10,
+      cookMinutes: 20,
+      sourceName: '',
+      sourceUrl: '',
+      tags: [],
+      ingredientGroups: [
+        { name: '', ingredients: [{ quantity: 1, unit: 'g', item: 'test food', note: '' }] },
+      ],
+      instructionSections: [{ title: '', steps: ['Cook.'] }],
+    });
+    const highProtein = createRecipe(recipeInput('High protein soup'), profile.id);
+    const lowerSodium = createRecipe(recipeInput('Lower sodium soup'), profile.id);
+    const source = createNutritionDataSource({
+      sourceType: 'calculated',
+      name: 'Recipe library test calculator',
+      provider: 'Our Recipes',
+      version: '1',
+      citation: 'Deterministic integration fixture',
+    });
+    const version = registerCalculationVersion({
+      algorithm: 'ingredient-sum',
+      version: '1',
+      energyFactorsVersion: 'general-4-4-9-7-v1',
+      implementationDigest: 'recipe-library-nutrition-v1',
+    });
+    let highProteinCalculationId = '';
+    for (const [recipe, values, completeness] of [
+      [
+        highProtein,
+        [
+          ['energy_kcal', 400],
+          ['protein', 40],
+          ['fiber', 20],
+          ['sodium', 800],
+        ],
+        0.9,
+      ],
+      [
+        lowerSodium,
+        [
+          ['energy_kcal', 800],
+          ['protein', 20],
+          ['fiber', 4],
+          ['sodium', 400],
+        ],
+        0.6,
+      ],
+    ] as const) {
+      const calculation = appendRecipeNutritionCalculation({
+        recipeId: recipe.id,
+        recipeRevision: recipe.currentRevision,
+        calculationVersionId: version.id,
+        sourceId: source.id,
+        sourceDigest: `library-${recipe.id}`,
+        servingCount: 4,
+        confidence: 0.9,
+        completeness,
+        values: values.map(([nutrientCode, amount]) => ({
+          nutrientCode,
+          amount,
+          confidence: 0.9,
+          completeness,
+        })),
+      });
+      if (recipe.id === highProtein.id) highProteinCalculationId = calculation.id;
+    }
+
+    const filtered = listRecipeLibrary(
+      {
+        q: '',
+        status: 'active',
+        sort: 'highest-protein',
+        minProteinPerServing: 8,
+        minNutritionCompleteness: 80,
+        page: 1,
+      },
+      profile.id,
+      1,
+    );
+    expect(filtered).toMatchObject({ total: 1, totalPages: 1, pageSize: 1 });
+    expect(filtered.recipes.map((recipe) => recipe.id)).toEqual([highProtein.id]);
+
+    const sorted = listRecipeLibrary(
+      { q: '', status: 'active', sort: 'lowest-sodium', page: 1 },
+      profile.id,
+      1,
+    );
+    expect(sorted).toMatchObject({ total: 2, totalPages: 2 });
+    expect(sorted.recipes[0]!.id).toBe(lowerSodium.id);
+
+    appendRecipeNutritionCalculation({
+      recipeId: highProtein.id,
+      recipeRevision: highProtein.currentRevision,
+      calculationVersionId: version.id,
+      sourceId: source.id,
+      sourceDigest: `library-latest-${highProtein.id}`,
+      servingCount: 4,
+      confidence: 0.9,
+      completeness: 0.9,
+      supersedesCalculationId: highProteinCalculationId,
+      values: [
+        {
+          nutrientCode: 'energy_kcal',
+          amount: 400,
+          confidence: 0.9,
+          completeness: 0.9,
+        },
+      ],
+    });
     expect(
-      updateHouseholdSettings({
-        householdName: 'The Sunday table',
-        appName: "Maya's Recipe Box",
-      }),
-    ).toMatchObject({ name: 'The Sunday table', appName: "Maya's Recipe Box" });
-    expect(getHouseholdState().household).toMatchObject({
-      name: 'The Sunday table',
-      appName: "Maya's Recipe Box",
-    });
+      listRecipeLibrary(
+        {
+          q: '',
+          status: 'active',
+          sort: 'highest-protein',
+          minProteinPerServing: 8,
+          page: 1,
+        },
+        profile.id,
+      ).total,
+    ).toBe(0);
   });
 
   it('keeps a structured recipe searchable and records an edit revision', () => {
@@ -440,6 +693,11 @@ describe('household persistence', () => {
       { name: 'Quick weekday meals', description: '', coverImageId: '' },
       profile.id,
     );
+    expect(addRecipeToCollection(secondCollection.id, first.id, profile.id).added).toBe(true);
+    expect(addRecipeToCollection(secondCollection.id, first.id, profile.id).added).toBe(false);
+    expect(getCollection(secondCollection.id)?.recipes.map((recipe) => recipe.id)).toEqual([
+      first.id,
+    ]);
     expect(
       reorderCollections([secondCollection.id, collection.id], profile.id).map(
         (candidate) => candidate.id,
@@ -508,6 +766,22 @@ describe('household persistence', () => {
       profile.id,
     );
     expect(freeform).toMatchObject({ recipeId: null, recipeTitle: 'Leftovers board' });
+    const [dessert] = addMealPlanEntries(
+      {
+        entries: [
+          {
+            plannedFor: '2026-07-15',
+            meal: 'dessert',
+            recipeId: recipe.id,
+            title: '',
+            servings: 3,
+            note: 'For Maya, Jon, Julia',
+          },
+        ],
+      },
+      profile.id,
+    );
+    expect(dessert).toMatchObject({ meal: 'dessert', servings: 3, recipeTitle: 'Pasta night' });
     expect(plannedMealsAsIcs('2026-07-13', '2026-07-19')).toContain(
       'SUMMARY:snack: Leftovers board',
     );
@@ -517,6 +791,17 @@ describe('household persistence', () => {
         profile.id,
       ).map((meal) => meal.recipeTitle),
     ).toContain('Leftovers board');
+    const [swappedFreeform, swappedDessert] = swapMealPlanEntries(
+      {
+        sourceId: freeform.id,
+        targetId: dessert.id,
+        sourceExpectedUpdatedAt: freeform.updatedAt.toISOString(),
+        targetExpectedUpdatedAt: dessert.updatedAt.toISOString(),
+      },
+      profile.id,
+    );
+    expect(swappedFreeform).toMatchObject({ plannedFor: '2026-07-15', meal: 'dessert' });
+    expect(swappedDessert).toMatchObject({ plannedFor: '2026-07-14', meal: 'snack' });
     const produce = createShoppingAisle({ name: 'Produce' });
     const pantry = createShoppingAisle({ name: 'Pantry' });
     reorderShoppingAisles([pantry.id, produce.id]);
@@ -619,6 +904,16 @@ describe('household persistence', () => {
       note: '',
     });
     expect(getRecipe(created.id)?.personalPreference).toBeNull();
+    expect(setRecipeReaction(created.id, maya.id, 1)).toMatchObject({
+      rating: 1,
+      note: 'Use ripe tomatoes.',
+    });
+    expect(isFavorite(created.id, maya.id)).toBe(false);
+    expect(setRecipeReaction(created.id, maya.id, 5)).toMatchObject({
+      rating: 5,
+      note: 'Use ripe tomatoes.',
+    });
+    expect(isFavorite(created.id, maya.id)).toBe(true);
     const lowerRated = createRecipe(
       { ...input, title: 'Weeknight tomato soup', cookingMethod: 'quick stovetop' },
       maya.id,
@@ -697,6 +992,15 @@ describe('household persistence', () => {
     );
     setFavorite(recipe.id, profile.id, true);
     expect(isFavorite(recipe.id, profile.id)).toBe(true);
+    expect(getRecipe(recipe.id, profile.id)?.personalPreference?.rating).toBe(3);
+    expect(setRecipeReaction(recipe.id, profile.id, 5)).toMatchObject({ rating: 5, note: '' });
+    expect(isFavorite(recipe.id, profile.id)).toBe(true);
+    expect(setRecipeReaction(recipe.id, profile.id, 1)).toMatchObject({ rating: 1, note: '' });
+    expect(isFavorite(recipe.id, profile.id)).toBe(false);
+    expect(setRecipeReaction(recipe.id, profile.id, null)).toMatchObject({
+      rating: null,
+      note: '',
+    });
     const session = startCookSession(recipe.id, profile.id, 2);
     completeCookSession(session.id, profile.id);
   });

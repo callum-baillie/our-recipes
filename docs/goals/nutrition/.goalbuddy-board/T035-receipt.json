@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T035",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T035-repair-and-recipe-boundary-review.md"],
+  "commands": [
+    {
+      "cmd": "read-only repair, recipe foundation, ingredient, serving, conversion, intake and Pantry ownership audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved the nutrient-specific quality and profile-local timezone repair. Scoped a read-only Scout to map the exact recipe calculation and explicit-intake boundary before implementation.",
+  "note": "notes/T035-repair-and-recipe-boundary-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Map stable recipe, product-record, unit, serving, immutable-calculation and explicit-intake seams without touching Pantry T015-owned files."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -24,6 +24,12 @@ Use **Backups → Create backup** for a manual recovery point. The application a
 
 Only locally created, currently listed server bundles are restorable. Uploading an arbitrary archive is deliberately unsupported: it avoids zip-slip, corrupt-archive, and unreviewed compatibility risks. A restore replaces current household data; it is not a merge tool.
 
-## Current operational boundary
+## Operating policy and failure recovery
 
-The scheduled timer runs inside the single application process. Docker/Unraid startup scheduling, remote/off-machine replication, and mounted-volume persistence proof are not complete until the deployment package is implemented and verified with a real daemon.
+The scheduled timer runs inside the single application process, so a stopped app cannot create backups. Keep at least 30 daily recovery points by default, copy a verified bundle to an independently protected location at least weekly, and perform a restore drill after every major upgrade and at least quarterly.
+
+SQLite, `uploads`, and `generated` are one consistency set. Move or restore them only through the backup workflow; copying a live database file or restoring media alone can create broken references. The startup migrator takes a pre-migration SQLite safety copy, but that copy is not a substitute for a complete media backup.
+
+If storage is full or read-only, stop writes, preserve the data directory, free or repair storage outside the app, and restart. Do not delete WAL/SHM files from a running instance. For corruption, stop the app, copy the entire data root for investigation, validate the newest independent bundle, then restore it into a fresh data directory. The health endpoint and System Settings report database integrity and migration status without exposing paths.
+
+Mounted-volume persistence must be proved on each release-candidate Docker/Unraid host. A source test or prior host run is not evidence for a new target.

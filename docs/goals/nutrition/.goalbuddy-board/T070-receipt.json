@@ -1,0 +1,32 @@
+{
+  "result": "done",
+  "task_id": "T070",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-recipe-calculation.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/components/nutrition-data-workspace.tsx",
+    "src/components/nutrition-data-workspace.module.css",
+    "tests/unit/nutrition-recipe-calculation.test.ts",
+    "tests/unit/nutrition-recipe-components.test.ts",
+    "tests/integration/nutrition-recipe-calculation-service.test.ts",
+    "tests/integration/nutrition-recipe-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused calculation/component unit tests", "status": "pass", "summary": "7 tests passed" },
+    { "cmd": "focused calculation/API/intake integration tests", "status": "pass", "summary": "9 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "178 unit and 103 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Delivered server-owned preparation adjustments, final-weight/per-100g summaries and immutable weighed recipe intake without speculative retention.",
+  "note": "notes/T070-preparation-calculation-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

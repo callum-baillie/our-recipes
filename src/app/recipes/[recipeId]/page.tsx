@@ -5,12 +5,17 @@ import { notFound } from 'next/navigation';
 import { RecipeDetailToolbar } from '@/components/recipe-detail-toolbar';
 import { RecipeImageGallery } from '@/components/recipe-image-gallery';
 import { RecipeLifecycleActions } from '@/components/recipe-lifecycle-actions';
+import { RecipePantryPanel } from '@/components/recipe-pantry-panel';
+import { RecipeNormalizedNutrition } from '@/components/recipe-normalized-nutrition';
 import { RecipeRevisionHistory } from '@/components/recipe-revision-history';
 import { RecipeServingDetails } from '@/components/recipe-serving-details';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { listCollectionsForRecipe } from '@/lib/services/collection-service';
 import { isFavorite } from '@/lib/services/cooking-service';
 import { getRecipeImportProvenance } from '@/lib/services/import-service';
+import { getRecipePantryAvailability } from '@/lib/services/pantry-availability-service';
+import { listPantryProducts } from '@/lib/services/pantry-service';
+import { getRecipeNutritionPresentation } from '@/lib/services/nutrition-recipe-calculation-service';
 import { getRecipe, listTags } from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +33,9 @@ export default async function RecipeDetailPage({
   const importProvenance = getRecipeImportProvenance(recipe.id);
   const availableTags = listTags().map((tag) => tag.name);
   const favorite = actor.profileId ? isFavorite(recipe.id, actor.profileId) : null;
+  const pantryAvailability = getRecipePantryAvailability(recipe.id);
+  const pantryProducts = listPantryProducts().map(({ id, displayName }) => ({ id, displayName }));
+  const normalizedNutrition = getRecipeNutritionPresentation(recipe.id);
   return (
     <main className="recipe-page recipe-detail">
       <article>
@@ -37,16 +45,7 @@ export default async function RecipeDetailPage({
         <h1>{recipe.title}</h1>
         {recipe.summary && <p className="recipe-summary">{recipe.summary}</p>}
         <RecipeDetailToolbar recipeId={recipe.id} />
-        <RecipeImageGallery
-          recipeId={recipe.id}
-          recipeTitle={recipe.title}
-          images={recipe.images.map(({ id, altText, width, height }) => ({
-            id,
-            altText,
-            width,
-            height,
-          }))}
-        />
+        <RecipeNormalizedNutrition nutrition={normalizedNutrition} />
         <RecipeServingDetails
           key={recipe.currentRevision}
           servings={recipe.servings}
@@ -73,6 +72,17 @@ export default async function RecipeDetailPage({
           ingredientGroups={recipe.ingredientGroups}
           instructionSections={recipe.instructionSections}
         />
+        <RecipeImageGallery
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          images={recipe.images.map(({ id, altText, width, height }) => ({
+            id,
+            altText,
+            width,
+            height,
+          }))}
+        />
+        <RecipePantryPanel initialAvailability={pantryAvailability} products={pantryProducts} />
         {recipe.equipment.length > 0 && (
           <aside className="recipe-notes equipment-note">
             <strong>Equipment</strong>

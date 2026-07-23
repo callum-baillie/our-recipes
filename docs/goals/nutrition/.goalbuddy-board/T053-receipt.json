@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T053",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T053-prepared-persistence-review.md"
+  ],
+  "commands": [
+    { "cmd": "read-only migration, prepared history, actual-yield, transaction, idempotency, privacy, route and regression audit", "status": "pass" }
+  ],
+  "summary": "Approved T052 and scoped an idempotent prepared-state API plus accessible partial serving, seconds, skip, leftover and explicit eaten UI.",
+  "note": "notes/T053-prepared-persistence-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

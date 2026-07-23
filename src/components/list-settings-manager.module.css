@@ -1,0 +1,299 @@
+.manager {
+  display: grid;
+  gap: 1rem;
+  max-width: var(--content-width);
+  margin: 0 auto 5rem;
+}
+.preferences,
+.profiles {
+  background: color-mix(in srgb, var(--linen) 88%, white);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+.preferences {
+  padding: 1.25rem;
+}
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.sectionTitle p {
+  margin: 0;
+}
+.preferenceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.15rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+.preferenceGrid label,
+.profileFields label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.preferenceGrid select,
+.profileFields input,
+.profileFields textarea,
+.routeInputs input {
+  width: 100%;
+  min-height: 2.85rem;
+  border: 1px solid var(--line-strong);
+  background: var(--linen);
+}
+.toggleRow {
+  display: flex !important;
+  align-items: center;
+  gap: 0.7rem !important;
+  min-height: 2.85rem;
+  font-weight: 500 !important;
+}
+.toggleRow input {
+  width: 2.65rem;
+  height: 1.45rem;
+  accent-color: var(--leaf);
+}
+.profiles {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.32fr) minmax(0, 1fr);
+  overflow: hidden;
+}
+.profileRail {
+  padding: 1.25rem 0;
+  border-right: 1px solid var(--line);
+}
+.profileRail > p {
+  margin: 0 1.25rem 1rem;
+}
+.profileList {
+  display: grid;
+}
+.profileList button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid transparent;
+}
+.profileList button:hover,
+.profileList .selectedProfile {
+  color: var(--leaf);
+  background: var(--leaf-pale);
+  border-left-color: var(--leaf);
+}
+.profileList button span {
+  display: grid;
+  gap: 0.2rem;
+}
+.profileList small {
+  color: var(--muted);
+  font-size: 0.73rem;
+  font-weight: 500;
+}
+.archivedList {
+  display: grid;
+  gap: 0.4rem;
+  margin: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.archivedList > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.archivedList button {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.3rem 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  text-align: left;
+}
+.profileEditor {
+  min-width: 0;
+  padding: 1.25rem;
+}
+.profileFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.profileFields textarea {
+  min-height: 4.5rem;
+  padding: 0.75rem;
+  resize: vertical;
+}
+.routeHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 0 0.65rem;
+}
+.routeHeader p {
+  margin: 0 0 0.25rem;
+}
+.routeHeader span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.routeList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routeList li {
+  display: grid;
+  grid-template-columns: auto 2rem minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 4.3rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.grip {
+  color: var(--muted);
+}
+.routeNumber {
+  color: var(--leaf);
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+}
+.routeInputs {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.65fr) minmax(12rem, 1.35fr);
+  gap: 0.65rem;
+}
+.routeInputs input {
+  min-height: 2.45rem;
+  padding: 0.55rem 0.65rem;
+}
+.routeInputs input:first-child {
+  font-family: var(--font-serif);
+  font-size: 1.04rem;
+}
+.routeActions {
+  display: flex;
+  gap: 0.35rem;
+}
+.routeActions button {
+  display: grid;
+  place-items: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+}
+.routeActions button:disabled {
+  opacity: 0.3;
+}
+.addSection,
+.archiveButton {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.9rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--tomato);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--tomato) 45%, var(--line));
+  border-radius: 0.35rem;
+  font-weight: 800;
+}
+.editorFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem -1.25rem -1.25rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.editorFooter > p {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 28rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.editorFooter > p svg {
+  flex: 0 0 auto;
+  color: var(--leaf);
+}
+.editorFooter > div {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+.archiveButton {
+  margin: 0;
+  border: 0;
+}
+.status {
+  min-height: 1.4rem;
+  margin: 1.6rem 0 0;
+  color: var(--leaf);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+@media (max-width: 1000px) {
+  .preferenceGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .profiles {
+    grid-template-columns: 1fr;
+  }
+  .profileRail {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .profileList {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .preferenceGrid,
+  .profileFields,
+  .routeInputs {
+    grid-template-columns: 1fr;
+  }
+  .profileList {
+    grid-template-columns: 1fr;
+  }
+  .routeList li {
+    grid-template-columns: auto 1.7rem minmax(0, 1fr);
+  }
+  .routeActions {
+    grid-column: 3;
+  }
+  .editorFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .editorFooter > div {
+    flex-wrap: wrap;
+  }
+}

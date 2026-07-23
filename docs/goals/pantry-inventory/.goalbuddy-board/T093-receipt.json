@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T093", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "OpenAPI YAML syntax only: quote the comma-containing GET 200 description scalar, preserving every word and contract element. Then run all remaining final gates; retain T092 cooking E2E pass if hashes remain exact.",
+    "worker_package": {
+      "objective": "Quote one OpenAPI scalar only, then complete final OpenAPI/full/build/protected/database/integrity gates.",
+      "allowed_files": ["docs/openapi.yaml"],
+      "verify": ["Require OpenAPI/cooking/CSS/TSX hashes from T093 and one-line quote-only diff.", "Run scoped format/OpenAPI/full lint/type/unit/integration, isolated full-source build.", "Run three unchanged protected E2Es and disposable DB; retain exact-hash T092 cooking pass or rerun if needed.", "Final live PID/port/source-mirror/protected hash/diff/status integrity."],
+      "stop_if": ["Hashes differ or diff beyond quotes.", "Another OpenAPI error or any source/test/config change needed.", "Live/shared/protected/unrelated state touched."]
+    },
+    "evidence": ["YAML flow commas require one quoted scalar.", "T092 cooking E2E passed completely.", "Cleanup/protected hashes passed."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "Parse repair precedes serial final gates."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Final full/protected/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T093 done.", "Activate YAML-only Worker.", "Require final completion Judge."]
+  }
+}

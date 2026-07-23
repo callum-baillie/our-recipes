@@ -3,7 +3,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getRuntimeConfig } from '@/lib/config';
 import { getProfile, listProfiles } from '@/lib/services/household-service';
 
-export const ACTIVE_PROFILE_COOKIE = 'our_recipes_active_profile';
+export const ACTIVE_PROFILE_COOKIE = 'bord_active_profile';
+export const LEGACY_ACTIVE_PROFILE_COOKIE = 'our_recipes_active_profile';
 
 export type ActorContext = {
   profileId: string | null;

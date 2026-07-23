@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-const image = process.env.DOCKER_IMAGE ?? 'our-recipes:smoke';
-const container = `our-recipes-smoke-${Date.now()}`;
+const image = process.env.DOCKER_IMAGE ?? 'bord:smoke';
+const container = `bord-smoke-${Date.now()}`;
 const hostPort = Number(process.env.DOCKER_SMOKE_PORT ?? '3910');
-const dataDirectory = await mkdtemp(join(tmpdir(), 'our-recipes-docker-smoke-'));
+const dataDirectory = await mkdtemp(join(tmpdir(), 'bord-docker-smoke-'));
 const baseUrl = `http://127.0.0.1:${hostPort}`;
 
 async function docker(...args) {
@@ -46,7 +46,7 @@ async function runContainer() {
     '-e',
     'DATA_DIR=/data',
     '-e',
-    'DATABASE_URL=/data/our-recipes.db',
+    'DATABASE_URL=/data/bord.db',
     image,
   );
   await waitForHealth();
@@ -59,8 +59,8 @@ try {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: baseUrl },
     body: JSON.stringify({
-      householdName: 'Docker smoke household',
-      appName: 'Our Recipes',
+      kitchenName: 'Bòrd',
+      kitchenIcon: 'table',
       profile: {
         displayName: 'Cook',
         color: '#637A45',

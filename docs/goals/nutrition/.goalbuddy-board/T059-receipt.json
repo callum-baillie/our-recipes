@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T059",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T059-diary-lifecycle-review.md"],
+  "commands": [{"cmd":"read-only Worker A history, idempotency, authorization, export and ownership audit","status":"pass"}],
+  "summary": "Approved append-only idempotent diary lifecycle and private export while deferring irreversible deletion to Worker B.",
+  "note": "notes/T059-diary-lifecycle-review.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

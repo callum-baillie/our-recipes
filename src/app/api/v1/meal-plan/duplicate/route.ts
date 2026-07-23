@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { duplicateWeekSchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
-import { duplicateWeek } from '@/lib/services/planning-service';
+import { duplicateWeekWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,5 +22,8 @@ export async function POST(request: Request) {
   const parsed = duplicateWeekSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return jsonError(400, 'invalid_week_copy', 'Use valid source and destination weeks.');
-  return NextResponse.json({ meals: duplicateWeek(parsed.data, actor.profileId) }, { status: 201 });
+  return NextResponse.json(
+    { meals: duplicateWeekWithNutrition(parsed.data, actor.profileId) },
+    { status: 201 },
+  );
 }

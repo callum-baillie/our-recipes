@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T052",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+    "commands": [
+      { "cmd": "Source/mirror pre-edit hash guard", "status": "pass", "summary": "Both matched 53429C1163C185E09231345F6BE3803ACF7B61494DF33015484B304625F23DFD" },
+      { "cmd": "Exact retry-safe openDetails refactor and 21-call distribution", "status": "pass" },
+      { "cmd": "Scoped Prettier/ESLint", "status": "pass" },
+      { "cmd": "One-file mirror refresh/hash equality", "status": "pass", "summary": "Both matched 18DB6AD4481326308AF990884DB8FB0D63C646518151C63DA99AD1D6ED132E69" },
+      { "cmd": "Fresh isolated management workflow", "status": "fail", "summary": "Disclosure helper passed through split/undo and both consumption actions; outdated Include inactive batches label timed out" },
+      { "cmd": "Owned server cleanup/port release", "status": "pass" },
+      { "cmd": "Scoped diff integrity", "status": "pass" }
+    ],
+    "summary": "The exact disclosure helper is proven through the complete active-stock action sequence. The next failure is a stale toolbar control name: rendered accessibility exposes Show inactive and archived, not Include inactive batches.",
+    "deviations": [],
+    "remaining_blockers": ["Exact accessible toolbar checkbox/group selector repair", "Complete inactive actions, accessibility/screenshots, integrated and persistence evidence"],
+    "verification_attempts": 1,
+    "stopped_because": "A locator outside the authorized disclosure package requires change."
+  }
+}

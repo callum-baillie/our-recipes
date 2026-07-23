@@ -1,0 +1,62 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T064",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [
+      "src/lib/db/schema.ts",
+      "drizzle/0025_pantry_recipe_planner_status.sql",
+      "drizzle/meta/_journal.json",
+      "src/lib/domain/recipe.ts",
+      "src/lib/domain/planning.ts",
+      "src/lib/domain/pantry-availability.ts",
+      "src/lib/services/planning-service.ts",
+      "src/lib/services/pantry-availability-service.ts",
+      "src/app/api/v1/meal-plan/[entryId]/route.ts",
+      "src/app/recipes/page.tsx",
+      "src/components/recipe-summary-card.tsx",
+      "src/components/recipe-library-filters.tsx",
+      "src/components/recipe-pantry-panel.tsx",
+      "src/components/recipe-pantry-panel.module.css",
+      "src/components/meal-planner.tsx",
+      "src/components/meal-planner.module.css",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "tests/unit/pantry-availability.test.ts",
+      "tests/unit/recipe-schema.test.ts",
+      "tests/unit/pantry-recipe-planner-components.test.ts",
+      "tests/integration/pantry-availability-service.test.ts",
+      "tests/e2e/pantry-recipe-planner.spec.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/security.md",
+      "docs/testing.md",
+      "docs/decisions/0031-pantry-availability-and-demand.md"
+    ],
+    "commands": [
+      {"cmd": "tsc --noEmit", "status": "pass"},
+      {"cmd": "focused Pantry recipe/planner unit tests", "status": "pass"},
+      {"cmd": "focused Pantry availability integration tests", "status": "pass"},
+      {"cmd": "scoped ESLint", "status": "pass"},
+      {"cmd": "OpenAPI lint", "status": "pass"},
+      {"cmd": "scoped formatting", "status": "pass"},
+      {"cmd": "isolated mirror preparation and E2E spec hash equality", "status": "pass"},
+      {"cmd": "port 3100 cleanup", "status": "pass"}
+    ],
+    "summary": "Implemented the T064 vertical slice and passed focused type, unit, integration, lint, and OpenAPI checks. Isolated browser verification exhausted its authorized retries on one strict locator ambiguity after successful setup and Pantry-filtered rendering. Port 3100 is clear; full/build/browser/disposable-DB gates remain unverified.",
+    "deviations": [
+      "Browser attempt 1 requested Pantry locations before setup navigation completed.",
+      "Browser attempt 2 assumed setup seeded a location; the test was corrected to create one via trusted-origin API.",
+      "Browser attempt 3 reached /recipes?pantry=ready but exact recipe text matched the card title and collection-dialog copy.",
+      "One transient Windows docs/api.md formatter-open error passed on isolated retry."
+    ],
+    "remaining_blockers": [
+      "Repair the one ambiguous semantic title assertion and rerun the isolated workflow.",
+      "Prove 390/768/1280 keyboard, axe, persistence, screenshots, containment, and no browser errors.",
+      "Run full gates, isolated build, disposable DB checks, and final integrity hashes."
+    ],
+    "verification_attempts": 3,
+    "stopped_because": "Authorized browser retries were exhausted at tests/e2e/pantry-recipe-planner.spec.ts line 126 because exact title text matched two visible elements."
+  }
+}

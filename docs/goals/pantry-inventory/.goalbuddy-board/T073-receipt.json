@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T073",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "All failures come from global checked-row opacity 0.55 compositing generated fields, provenance, and intake content. Child opacity cannot undo parent compositing. Restore opacity 1 only for checked shopping items containing the module-local intake editor, retaining checkbox and line-through cues; existing palette then renders at accessible contrast.",
+    "worker_package": {
+      "objective": "Add one CSS-only checked-editor opacity override, then run isolated build, new grocery E2E, both protected E2Es, and final integrity.",
+      "allowed_files": ["src/components/shopping-list-editor.module.css"],
+      "verify": ["Require CSS pre-hash 746CA18B02080C844FED69C3AF45422C41CF54D8AB76B62FE06637D6A6B93779 and protected E2E hashes.", "Add only :global(.shopping-item.checked):has(.intake) { opacity: 1; } equivalent.", "Run scoped format, mirror hashes, isolated webpack build.", "Run unchanged new grocery and both protected browser oracles including axe.", "Release port and prove CSS-only diff/protected hashes."],
+      "stop_if": ["Any non-CSS file, DOM/layout/semantics/test behavior changes.", "Axe weakening or contrast remains.", "Protected oracle needs edit or shared/live/secret/normal data would be touched."]
+    },
+    "evidence": ["Reported colors are composited rather than literal declarations.", "Global checked opacity covers provenance and intake descendants.", "Restoring parent opacity preserves existing accessible direct colors and line-through cue."],
+    "subgoal_contract": null,
+    "parallel_safety": {"safe": false, "rationale": "One CSS, build, and three serial oracles share a mirror/port lifecycle."},
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing three E2Es", "CSS build", "Final integrity", "Later cooking UI"],
+    "required_board_updates": ["Record T073 done.", "Activate one CSS Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

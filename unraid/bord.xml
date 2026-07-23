@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Bòrd</Name>
+  <Repository>ghcr.io/callum-baillie/bord:latest</Repository>
+  <Registry>https://github.com/callum-baillie/bord</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/callum-baillie/bord/issues</Support>
+  <Overview>Bòrd is a private, self-hosted recipe keeper, meal planner, nutritional advisor, and grocery store helper. Profiles are not authentication; keep it on a trusted local network.</Overview>
+  <Category>Productivity: Tools</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/callum-baillie/bord/main/unraid/bord.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/callum-baillie/bord/main/public/icons/bord-app-icon-512.png</Icon>
+  <Config Name="Web port" Target="3000" Default="3000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Persistent data" Target="/data" Default="/mnt/user/appdata/bord" Mode="rw" Description="SQLite, media, and backups" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/bord</Config>
+  <Config Name="Cookie secret" Target="COOKIE_SECRET" Default="" Mode="" Description="At least 32 random characters" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="App origin" Target="APP_ORIGIN" Default="https://recipes.tower" Mode="" Description="Exact browser-visible HTTPS origin. Camera scanning requires a trusted certificate." Type="Variable" Display="always" Required="true" Mask="false">https://recipes.tower</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Los_Angeles" Mode="" Description="Container timezone" Type="Variable" Display="always" Required="false" Mask="false">America/Los_Angeles</Config>
+  <Config Name="Homepage integration token" Target="HOMEPAGE_INTEGRATION_TOKEN" Default="" Mode="" Description="Optional private bearer token for the read-only Homepage summary endpoint." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Backup interval" Target="BACKUP_INTERVAL_HOURS" Default="24" Mode="" Description="Local in-process backup interval in hours" Type="Variable" Display="always" Required="false" Mask="false">24</Config>
+  <Config Name="Backup retention" Target="BACKUP_RETENTION_DAYS" Default="30" Mode="" Description="Local backup retention in days" Type="Variable" Display="always" Required="false" Mask="false">30</Config>
+  <Config Name="OpenAI API key" Target="OPENAI_API_KEY" Default="" Mode="" Description="Optional. Enables only explicitly requested review and image actions." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Open Food Facts" Target="OPEN_FOOD_FACTS_ENABLED" Default="true" Mode="" Description="Enable read-only exact barcode lookups." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
+  <Config Name="Open Food Facts user agent" Target="OPEN_FOOD_FACTS_USER_AGENT" Default="Bord/1.0.0-rc.1 (https://github.com/callum-baillie/bord)" Mode="" Description="Identifies this installation to Open Food Facts." Type="Variable" Display="advanced" Required="false" Mask="false">Bord/1.0.0-rc.1 (https://github.com/callum-baillie/bord)</Config>
+  <Config Name="USDA FoodData Central API key" Target="USDA_FDC_API_KEY" Default="" Mode="" Description="Optional server-only data.gov key for USDA food search and detail." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>

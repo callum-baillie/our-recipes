@@ -20,7 +20,7 @@ import { recipeAsJsonLd } from '@/lib/services/jsonld-service';
 import { listRecipesForPortableExport } from '@/lib/services/recipe-service';
 import { readRegularRecipeImage } from '@/lib/storage/recipe-image-storage';
 
-const EXPORT_DOWNLOAD_NAME = 'our-recipes-portable-recipes.tar.gz';
+const EXPORT_DOWNLOAD_NAME = 'bord-portable-recipes.tar.gz';
 const MAX_ARCHIVE_OVERHEAD_BYTES =
   (MAX_PORTABLE_RECIPE_EXPORT_RECIPES + MAX_PORTABLE_RECIPE_EXPORT_IMAGES + 1) * 2_048;
 

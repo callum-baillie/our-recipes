@@ -1,0 +1,58 @@
+{
+  "result": "done",
+  "task_id": "T002",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "summary": "Mapped the current stack and all relevant seams. Nutrition is eight mutable per-serving recipe columns plus an explicit audited AI estimate path; there are no canonical nutrients/foods, source/reference/goal models, allocations, intake records, snapshots, charts, or true private authorization. Planner servings are integer household totals, cook completion is not consumption, and Pantry schema/domain work began concurrently during the Scout. Current lint, types, and 80 unit/integration tests pass; repository-wide format:check is pre-existing red. The safest first slice is a new-file pure Nutrition calculation kernel while Pantry-owned schema changes stabilize.",
+  "evidence": [
+    "docs/goals/nutrition/notes/T002-repository-map.md",
+    "src/lib/db/schema.ts",
+    "src/lib/actor-context.ts",
+    "src/lib/domain/recipe.ts",
+    "src/lib/domain/ingredient-scaling.ts",
+    "src/lib/services/recipe-service.ts",
+    "src/lib/services/planning-service.ts",
+    "src/lib/services/cooking-service.ts",
+    "src/components/app-header.tsx",
+    "src/components/recipe-serving-details.tsx",
+    "src/components/meal-planner.tsx",
+    "drizzle/0014_extended_recipe_nutrition.sql",
+    "drizzle/0015_pantry_inventory.sql",
+    "package.json",
+    "tests"
+  ],
+  "facts": [
+    "Existing profiles are explicitly convenience/attribution and not authorization.",
+    "Current recipe nutrition is eight nullable per-serving values without durable source/confidence/completeness metadata.",
+    "Recipe ingredients are free-form; no tracked canonical ingredient or nutrient record exists.",
+    "Meal plans have integer household servings and no per-person allocation or status.",
+    "Cook sessions record completion only and do not create prepared or consumed snapshots.",
+    "Pantry 0015/schema/domain files appeared during the Scout and are externally owned in-progress work.",
+    "No charting library or offline mutation/sync layer exists.",
+    "Lint, typecheck, 50 unit tests, and 30 integration tests pass at this snapshot.",
+    "Repository-wide format:check fails on 88 files before Nutrition implementation."
+  ],
+  "contradictions": [
+    "The brief requires server-private adult diaries, but the current signed profile cookie is deliberately not an authorization boundary.",
+    "The brief assumes integrated Pantry nutrition, while Pantry implementation is currently concurrent and incomplete.",
+    "The release oracle requires a clean format gate, but the current repository-wide format check is already red."
+  ],
+  "ambiguity_requiring_judge": [
+    "Approve a true local Nutrition credential/session and permission design rather than keying privacy to switchable profiles.",
+    "Choose the canonical food identity after the Pantry schema stabilizes.",
+    "Define legacy backfill provenance for the eight existing recipe fields.",
+    "Choose an accessible chart implementation without an existing chart library.",
+    "Protect concurrent Pantry and recipe-reaction changes with non-overlapping first-slice files."
+  ],
+  "commands": [
+    "rg --files and targeted rg/Get-Content repository inspection",
+    "git status --short and git diff ownership inspection",
+    "pnpm format:check (fail: pre-existing 88-file format drift)",
+    "pnpm lint (pass)",
+    "pnpm typecheck (pass)",
+    "pnpm test:unit (pass: 50)",
+    "pnpm test:integration (pass: 30)"
+  ],
+  "note_needed": true,
+  "note": "notes/T002-repository-map.md",
+  "harness": "codex-pm-fallback"
+}

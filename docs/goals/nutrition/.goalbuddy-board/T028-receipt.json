@@ -1,0 +1,31 @@
+{
+  "result": "done",
+  "task_id": "T028",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/app/api/v1/nutrition/identity/route.ts",
+    "src/app/api/v1/nutrition/session/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/permissions/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/goals/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/measurements/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/intake/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/allocations/route.ts",
+    "tests/integration/nutrition-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused Prettier and ESLint", "status": "pass" },
+    { "cmd": "focused Nutrition API/session integration", "status": "pass", "summary": "4 tests passed" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "142 unit and 60 integration tests passed" },
+    { "cmd": "scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Validated every dynamic Nutrition profile ID and aligned identity/login secrets with the credential UTF-8 byte boundary. Invalid path and multibyte-overflow requests now return non-echoing 400 responses without changing origin, session or authorization behavior.",
+  "note": "notes/T028-api-validation-repair.md",
+  "deviations": ["The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the bounded repair as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

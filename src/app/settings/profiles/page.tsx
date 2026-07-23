@@ -11,19 +11,16 @@ export default async function ProfileSettingsPage() {
   const state = getHouseholdState(true);
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
   return (
-    <>
-      <nav className="recipe-page settings-header" aria-label="Profile settings navigation">
-        <div className="recipe-header">
-          <Link className="wordmark" href="/">
-            <span className="wordmark-mark" aria-hidden="true" />
-            <span>Our Recipes</span>
-          </Link>
-          <Link className="quiet-link" href="/">
-            Back to kitchen
-          </Link>
-        </div>
-      </nav>
+    <main className="recipe-page settings-hub">
+      <section className="settings-intro settings-hub-intro">
+        <Link className="quiet-link" href="/settings">
+          ← All settings
+        </Link>
+        <p className="eyebrow">PROFILE SETTINGS</p>
+        <h1>Make the app feel right for each person.</h1>
+        <p>Manage names, avatars, colors, units, locale, time zone, and archived profiles.</p>
+      </section>
       <ProfileSettings initialProfiles={state.profiles} activeProfileId={actor.profileId} />
-    </>
+    </main>
   );
 }

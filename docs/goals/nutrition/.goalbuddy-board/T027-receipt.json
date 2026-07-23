@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "task_id": "T027",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T027-api-security-review.md"],
+  "commands": [{ "cmd": "read-only session, route, service, response and test audit", "status": "pass" }],
+  "summary": "Rejected UI readiness: session, origin, identity ownership, expiry, disclosure and error-hiding boundaries pass, but dynamic profile IDs are not UUID-validated and multibyte over-byte-limit bootstrap secrets can produce 500 instead of a validated 400.",
+  "note": "notes/T027-api-security-review.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."],
+  "remaining_blockers": ["Validate every Nutrition profile route parameter and credential UTF-8 byte length at the HTTP boundary."],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

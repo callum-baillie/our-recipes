@@ -1,0 +1,65 @@
+{
+  "result": "done",
+  "task_id": "T098",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "drizzle/0024_nutrition_display_preferences.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/db/schema.ts",
+    "src/lib/domain/nutrition-profile.ts",
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-profile-settings.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-chart-panels.tsx",
+    "src/lib/domain/nutrition-chart-datasets.ts",
+    "tests/unit/nutrition-profile.test.ts",
+    "tests/unit/nutrition-view.test.ts",
+    "tests/unit/nutrition-chart-datasets.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-profile-service.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused preference validation/view/chart/component tests",
+      "status": "pass",
+      "summary": "43 unit tests passed"
+    },
+    {
+      "cmd": "focused profile persistence tests",
+      "status": "pass",
+      "summary": "5 integration tests passed"
+    },
+    {
+      "cmd": "disposable file migration plus PRAGMA default inspection",
+      "status": "pass",
+      "summary": "0024 applied; three non-null defaults verified"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "203 unit and 114 integration tests passed"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered three additive authorized display preferences and applied each to current semantic coverage, trend-range and planned-value presentation.",
+  "note": "notes/T098-display-preference-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "The first disposable migration command was blocked before execution by destructive-cleanup policy; a second unique system-temp run omitted deletion and passed."
+  ],
+  "remaining_blockers": [
+    "A Judge must audit migration/defaults, profile authorization, current behavior and truthful deferred boundaries.",
+    "Bounded aggregate/source charts, macro mode, weight, card/planner flags, household analysis and rendered final evidence remain later slices."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

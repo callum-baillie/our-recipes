@@ -1,0 +1,90 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T016",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "rejected",
+    "full_outcome_complete": false,
+    "rationale": "Migration, uncertainty, intake, confirmation, FEFO, attribution, leftovers, origin gates, formatting, and OpenAPI evidence are substantially sound. Rejection is required because definitive shortage rows omit recipe IDs and serving/contribution provenance and write sourceRecipeIds as an empty array. Shopping-row edits and override flags are separate writes, while inventory undo commits before the cook-plan state transition. The active Next process also leaves build and rendered workflow proof unavailable.",
+    "worker_package": {
+      "objective": "Repair complete grocery provenance, atomic shopping overrides, atomic inventory undo plus cook-plan state, conflict regressions, and retry-stable distinct intake operation keys without changing migration history or audited availability semantics.",
+      "allowed_files": [
+        "src/lib/domain/pantry.ts",
+        "src/lib/domain/planning.ts",
+        "src/lib/domain/pantry-grocery-cooking.ts",
+        "src/lib/services/pantry-service.ts",
+        "src/lib/services/planning-service.ts",
+        "src/lib/services/cooking-service.ts",
+        "src/lib/services/pantry-grocery-cooking-service.ts",
+        "src/app/api/v1/shopping-lists/pantry-shortages/route.ts",
+        "src/app/api/v1/shopping-lists/[listId]/route.ts",
+        "src/app/api/v1/shopping-lists/[listId]/items/route.ts",
+        "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/route.ts",
+        "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-intake/route.ts",
+        "src/app/api/v1/cook-sessions/route.ts",
+        "src/app/api/v1/cook-sessions/[sessionId]/complete/route.ts",
+        "src/app/api/v1/cook-sessions/[sessionId]/pantry/undo/route.ts",
+        "src/components/meal-plan-pantry-demand.tsx",
+        "src/components/meal-plan-pantry-demand.module.css",
+        "src/app/lists/[listId]/page.tsx",
+        "src/components/shopping-list-editor.tsx",
+        "src/components/shopping-list-editor.module.css",
+        "src/app/recipes/[recipeId]/cook/page.tsx",
+        "src/components/cooking-mode.tsx",
+        "src/components/cooking-mode.module.css",
+        "tests/unit/pantry-grocery-cooking.test.ts",
+        "tests/unit/cooking.test.ts",
+        "tests/integration/pantry-grocery-cooking-service.test.ts",
+        "tests/integration/pantry-grocery-cooking-api.test.ts",
+        "docs/openapi.yaml",
+        "docs/api.md",
+        "docs/architecture.md",
+        "docs/data-model.md",
+        "docs/security.md",
+        "docs/testing.md",
+        "docs/decisions/0032-pantry-grocery-cooking.md"
+      ],
+      "verify": [
+        "pnpm exec prettier --check <T017 allowed source, tests, and docs>",
+        "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts",
+        "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts",
+        "pnpm test",
+        "pnpm lint",
+        "pnpm typecheck",
+        "pnpm openapi:validate",
+        "git diff --check"
+      ],
+      "stop_if": [
+        "Repair would edit migration 0020, an earlier migration, or the migration journal.",
+        "Repair would make uncertainty numeric, alter required-first allocation, weaken ActorContext or trusted-origin checks, or permit unconfirmed deduction.",
+        "Atomic undo cannot preserve all conflict checks.",
+        "Concurrent dirty work cannot be preserved or files outside scope are required.",
+        "Verification requires shared .next ownership."
+      ]
+    },
+    "evidence": [
+      "Definitive demand provenance lacks recipe, servings, and contribution data and generated sourceRecipeIds is empty.",
+      "Shopping mutation and override recording are separate writes.",
+      "Inventory undo commits before cook-plan state transition.",
+      "Migration 0020 is additive and uncertainty, FEFO, ActorContext, trusted-origin, intake, and leftovers remain sound.",
+      "Scoped Prettier, OpenAPI, and git diff checks pass; active Next dev remains untouched."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": {
+      "safe": false,
+      "rationale": "The repair shares service transaction boundaries, provenance contracts, UI, and tests, so one Worker must own it."
+    },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Complete grocery provenance and explanation",
+      "Atomic override and undo boundaries with conflict regressions",
+      "Rendered browser and accessibility evidence",
+      "Fresh full build and final Pantry oracle"
+    ],
+    "required_board_updates": [
+      "Mark T016 done as rejected.",
+      "Activate one T017 repair Worker.",
+      "Require another Judge before final acceptance."
+    ]
+  }
+}

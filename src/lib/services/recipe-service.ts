@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
@@ -9,6 +9,7 @@ import {
   recipeFavorites,
   recipeEquipment,
   recipeIngredientGroups,
+  recipeIngredientProductMappings,
   recipeIngredients,
   recipeImages,
   recipeInstructionSections,
@@ -26,9 +27,15 @@ import {
   type RecipePayload,
   type RecipePreferenceInput,
 } from '@/lib/domain/recipe';
+import type { RecipeReactionScore } from '@/lib/domain/recipe-reaction';
 import type { TagInput } from '@/lib/domain/tag';
 import type { AiNutritionEstimate } from '@/lib/domain/ai';
 import { parseServingCount } from '@/lib/domain/ingredient-scaling';
+import {
+  captureRecipeIngredientMappings,
+  recalculateRecipeNutritionAfterRecipeEdit,
+  restoreRecipeIngredientMappings,
+} from '@/lib/services/nutrition-recipe-calculation-service';
 
 export type RecipeRecord = typeof recipes.$inferSelect;
 export type RecipeListItem = Pick<
@@ -121,6 +128,21 @@ export class RecipeConflictError extends Error {}
 export class RecipeRevisionNotFoundError extends Error {}
 export class TagNotFoundError extends Error {}
 export class TagConflictError extends Error {}
+
+export type RecipeUpdateIntegrationResult = {
+  recipe: RecipeDetail;
+  nutritionMappingRestore: {
+    restored: number;
+    missing: number;
+    status: 'available';
+  };
+  nutritionRecalculation: ReturnType<typeof recalculateRecipeNutritionAfterRecipeEdit>;
+};
+
+export type RecipeTransaction = Parameters<
+  Parameters<ReturnType<typeof getDatabase>['transaction']>[0]
+>[0];
+type RecipeExecutor = ReturnType<typeof getDatabase> | RecipeTransaction;
 
 function readDetail(recipe: RecipeRecord, activeProfileId: string | null = null): RecipeDetail {
   const db = getDatabase();
@@ -263,7 +285,11 @@ function searchExpression(query: string): string | null {
     : null;
 }
 
-function indexRecipe(recipeId: string, payload: RecipePayload): void {
+function indexRecipe(
+  recipeId: string,
+  payload: RecipePayload,
+  executor: RecipeExecutor = getDatabase(),
+): void {
   const ingredients = payload.ingredientGroups
     .flatMap((group) => group.ingredients)
     .map((ingredient) =>
@@ -272,7 +298,7 @@ function indexRecipe(recipeId: string, payload: RecipePayload): void {
         .join(' '),
     )
     .join(' ');
-  const db = getDatabase();
+  const db = executor;
   db.run(sql`DELETE FROM recipe_search WHERE recipe_id = ${recipeId}`);
   db.run(sql`INSERT INTO recipe_search (recipe_id, title, summary, ingredients, tags)
     VALUES (${recipeId}, ${payload.title}, ${payload.summary}, ${ingredients}, ${[
@@ -282,9 +308,14 @@ function indexRecipe(recipeId: string, payload: RecipePayload): void {
     ].join(' ')})`);
 }
 
-function createGraph(recipeId: string, payload: RecipePayload): void {
-  const db = getDatabase();
-  ensureTags(payload.tags);
+function createGraph(
+  recipeId: string,
+  payload: RecipePayload,
+  executor: RecipeExecutor = getDatabase(),
+  actorProfileId?: string,
+): void {
+  const db = executor;
+  ensureTags(payload.tags, executor);
   payload.tags.forEach((tag) => db.insert(recipeTags).values({ recipeId, tag }).run());
   payload.ingredientGroups.forEach((group, groupPosition) => {
     const groupId = randomUUID();
@@ -292,9 +323,10 @@ function createGraph(recipeId: string, payload: RecipePayload): void {
       .values({ id: groupId, recipeId, position: groupPosition, name: group.name })
       .run();
     group.ingredients.forEach((ingredient, position) => {
+      const ingredientId = randomUUID();
       db.insert(recipeIngredients)
         .values({
-          id: randomUUID(),
+          id: ingredientId,
           recipeId,
           groupId,
           position,
@@ -304,6 +336,20 @@ function createGraph(recipeId: string, payload: RecipePayload): void {
           note: ingredient.note,
         })
         .run();
+      if (ingredient.pantryProductId && actorProfileId) {
+        db.insert(recipeIngredientProductMappings)
+          .values({
+            recipeIngredientId: ingredientId,
+            productId: ingredient.pantryProductId,
+            matchType: 'manual',
+            compatibleVariant: false,
+            isOptional: false,
+            mappedByProfileId: actorProfileId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .run();
+      }
     });
   });
   payload.instructionSections.forEach((section, sectionPosition) => {
@@ -322,8 +368,8 @@ function createGraph(recipeId: string, payload: RecipePayload): void {
   });
 }
 
-function ensureTags(tagNames: string[]): void {
-  const db = getDatabase();
+function ensureTags(tagNames: string[], executor: RecipeExecutor = getDatabase()): void {
+  const db = executor;
   const now = new Date();
   tagNames.forEach((name) => {
     db.insert(tags)
@@ -500,6 +546,40 @@ export function deleteTag(tagName: string): void {
   refreshTagSearch(recipeIds);
 }
 
+function currentNutritionPerServing(nutrientCode: string) {
+  return sql<number | null>`(
+    SELECT nutrient.amount / NULLIF(calculation.serving_count, 0)
+    FROM recipe_nutrition_calculations calculation
+    INNER JOIN recipe_nutrient_values nutrient
+      ON nutrient.calculation_id = calculation.id
+    WHERE calculation.recipe_id = ${recipes.id}
+      AND calculation.recipe_revision = ${recipes.currentRevision}
+      AND calculation.id = (
+        SELECT latest.id
+        FROM recipe_nutrition_calculations latest
+        WHERE latest.recipe_id = ${recipes.id}
+          AND latest.recipe_revision = ${recipes.currentRevision}
+        ORDER BY latest.revision DESC
+        LIMIT 1
+      )
+      AND nutrient.nutrient_code = ${nutrientCode}
+    ORDER BY calculation.revision DESC
+    LIMIT 1
+  )`;
+}
+
+function currentNutritionCompleteness() {
+  return sql<number | null>`(
+    SELECT calculation.completeness
+    FROM recipe_nutrition_calculations calculation
+    WHERE calculation.recipe_id = ${recipes.id}
+      AND calculation.recipe_revision = ${recipes.currentRevision}
+      AND calculation.serving_count > 0
+    ORDER BY calculation.revision DESC
+    LIMIT 1
+  )`;
+}
+
 export function listRecipeLibrary(
   query: RecipeLibraryQuery,
   activeProfileId: string | null,
@@ -553,6 +633,25 @@ export function listRecipeLibrary(
     const cookedIds = activeProfileId ? idsForProfileRecipeRows(activeProfileId, cookSessions) : [];
     conditions.push(cookedIds.length ? inArray(recipes.id, cookedIds) : noRowsCondition());
   }
+  const energyPerServing = currentNutritionPerServing('energy_kcal');
+  const proteinPerServing = currentNutritionPerServing('protein');
+  const fiberPerServing = currentNutritionPerServing('fiber');
+  const sodiumPerServing = currentNutritionPerServing('sodium');
+  const nutritionCompleteness = currentNutritionCompleteness();
+  if (query.maxCaloriesPerServing !== undefined)
+    conditions.push(lte(energyPerServing, query.maxCaloriesPerServing));
+  if (query.minProteinPerServing !== undefined)
+    conditions.push(gte(proteinPerServing, query.minProteinPerServing));
+  if (query.minFiberPerServing !== undefined)
+    conditions.push(gte(fiberPerServing, query.minFiberPerServing));
+  if (query.maxSodiumPerServing !== undefined)
+    conditions.push(lte(sodiumPerServing, query.maxSodiumPerServing));
+  if (query.minNutritionCompleteness !== undefined)
+    conditions.push(gte(nutritionCompleteness, query.minNutritionCompleteness / 100));
+  if (query.supportsNutrient) {
+    const supported = currentNutritionPerServing(query.supportsNutrient);
+    conditions.push(sql`${supported} IS NOT NULL`);
+  }
   const where = conditions.length ? and(...conditions) : undefined;
   const total =
     db
@@ -576,6 +675,23 @@ export function listRecipeLibrary(
     'highest-rated': [highestRatedOrder, desc(recipes.updatedAt), desc(recipes.id)],
     'shortest-time': [
       asc(sql<number>`${recipes.prepMinutes} + ${recipes.cookMinutes} + ${recipes.restMinutes}`),
+      asc(recipes.title),
+    ],
+    'lowest-calories': [
+      sql`${energyPerServing} IS NULL`,
+      asc(energyPerServing),
+      asc(recipes.title),
+    ],
+    'highest-protein': [
+      sql`${proteinPerServing} IS NULL`,
+      desc(proteinPerServing),
+      asc(recipes.title),
+    ],
+    'highest-fiber': [sql`${fiberPerServing} IS NULL`, desc(fiberPerServing), asc(recipes.title)],
+    'lowest-sodium': [sql`${sodiumPerServing} IS NULL`, asc(sodiumPerServing), asc(recipes.title)],
+    'highest-nutrition-completeness': [
+      sql`${nutritionCompleteness} IS NULL`,
+      desc(nutritionCompleteness),
       asc(recipes.title),
     ],
   }[query.sort];
@@ -758,85 +874,97 @@ export function getRecipe(
 
 export function createRecipe(input: RecipeInput, actorProfileId: string): RecipeDetail {
   ensureDatabase();
-  const payload = recipeInputSchema.parse(input);
-  const recipeId = randomUUID();
-  const now = new Date();
   const db = getDatabase();
-  db.transaction(() => {
-    db.insert(recipes)
-      .values({
-        id: recipeId,
-        title: payload.title,
-        summary: payload.summary,
-        status: payload.status,
-        servings: payload.servings,
-        prepMinutes: payload.prepMinutes,
-        cookMinutes: payload.cookMinutes,
-        restMinutes: payload.restMinutes,
-        difficulty: payload.difficulty,
-        cuisine: payload.cuisine,
-        category: payload.category,
-        tips: payload.tips,
-        sharedNotes: payload.sharedNotes,
-        sourceName: payload.sourceName || null,
-        sourceUrl: payload.sourceUrl || null,
-        originalAuthor: payload.originalAuthor || null,
-        cookingMethod: payload.cookingMethod,
-        nutritionCalories: payload.nutritionCalories === '' ? null : payload.nutritionCalories,
-        nutritionProteinGrams:
-          payload.nutritionProteinGrams === '' ? null : payload.nutritionProteinGrams,
-        nutritionCarbohydrateGrams:
-          payload.nutritionCarbohydrateGrams === '' ? null : payload.nutritionCarbohydrateGrams,
-        nutritionFatGrams: payload.nutritionFatGrams === '' ? null : payload.nutritionFatGrams,
-        nutritionSaturatedFatGrams:
-          payload.nutritionSaturatedFatGrams === '' ? null : payload.nutritionSaturatedFatGrams,
-        nutritionFiberGrams:
-          payload.nutritionFiberGrams === '' ? null : payload.nutritionFiberGrams,
-        nutritionSugarGrams:
-          payload.nutritionSugarGrams === '' ? null : payload.nutritionSugarGrams,
-        nutritionSodiumMilligrams:
-          payload.nutritionSodiumMilligrams === '' ? null : payload.nutritionSodiumMilligrams,
-        createdByProfileId: actorProfileId,
-        lastEditedByProfileId: actorProfileId,
-        currentRevision: 1,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    createGraph(recipeId, payload);
-    db.insert(recipeRevisions)
-      .values({
-        recipeId,
-        revision: 1,
-        snapshot: JSON.stringify(payload),
-        editedByProfileId: actorProfileId,
-        createdAt: now,
-      })
-      .run();
-    indexRecipe(recipeId, payload);
+  let recipeId = '';
+  db.transaction((transaction) => {
+    recipeId = createRecipeInTransaction(transaction, input, actorProfileId);
   });
   return getRecipe(recipeId) as RecipeDetail;
 }
 
-export function updateRecipe(
+export function createRecipeInTransaction(
+  transaction: RecipeTransaction,
+  input: RecipeInput,
+  actorProfileId: string,
+): string {
+  const payload = recipeInputSchema.parse(input);
+  const recipeId = randomUUID();
+  const now = new Date();
+  transaction
+    .insert(recipes)
+    .values({
+      id: recipeId,
+      title: payload.title,
+      summary: payload.summary,
+      status: payload.status,
+      servings: payload.servings,
+      prepMinutes: payload.prepMinutes,
+      cookMinutes: payload.cookMinutes,
+      restMinutes: payload.restMinutes,
+      difficulty: payload.difficulty,
+      cuisine: payload.cuisine,
+      category: payload.category,
+      tips: payload.tips,
+      sharedNotes: payload.sharedNotes,
+      sourceName: payload.sourceName || null,
+      sourceUrl: payload.sourceUrl || null,
+      originalAuthor: payload.originalAuthor || null,
+      cookingMethod: payload.cookingMethod,
+      nutritionCalories: payload.nutritionCalories === '' ? null : payload.nutritionCalories,
+      nutritionProteinGrams:
+        payload.nutritionProteinGrams === '' ? null : payload.nutritionProteinGrams,
+      nutritionCarbohydrateGrams:
+        payload.nutritionCarbohydrateGrams === '' ? null : payload.nutritionCarbohydrateGrams,
+      nutritionFatGrams: payload.nutritionFatGrams === '' ? null : payload.nutritionFatGrams,
+      nutritionSaturatedFatGrams:
+        payload.nutritionSaturatedFatGrams === '' ? null : payload.nutritionSaturatedFatGrams,
+      nutritionFiberGrams: payload.nutritionFiberGrams === '' ? null : payload.nutritionFiberGrams,
+      nutritionSugarGrams: payload.nutritionSugarGrams === '' ? null : payload.nutritionSugarGrams,
+      nutritionSodiumMilligrams:
+        payload.nutritionSodiumMilligrams === '' ? null : payload.nutritionSodiumMilligrams,
+      createdByProfileId: actorProfileId,
+      lastEditedByProfileId: actorProfileId,
+      currentRevision: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  createGraph(recipeId, payload, transaction, actorProfileId);
+  transaction
+    .insert(recipeRevisions)
+    .values({
+      recipeId,
+      revision: 1,
+      snapshot: JSON.stringify(payload),
+      editedByProfileId: actorProfileId,
+      createdAt: now,
+    })
+    .run();
+  indexRecipe(recipeId, payload, transaction);
+  return recipeId;
+}
+
+export function updateRecipeWithIntegrations(
   recipeId: string,
   input: RecipeInput,
   actorProfileId: string,
   expectedRevision: number,
-): RecipeDetail {
+): RecipeUpdateIntegrationResult {
   ensureDatabase();
   const payload = recipeInputSchema.parse(input);
-  const current = getDatabase().select().from(recipes).where(eq(recipes.id, recipeId)).get();
-  if (!current) throw new RecipeNotFoundError('That recipe no longer exists.');
-  if (current.currentRevision !== expectedRevision)
-    throw new RecipeConflictError(
-      'This recipe changed in another tab. Refresh the card before saving your revision.',
-    );
-  const revision = current.currentRevision + 1;
-  const now = new Date();
   const db = getDatabase();
-  db.transaction(() => {
-    db.update(recipes)
+  const nutritionMappingRestore = db.transaction((transaction) => {
+    const current = transaction.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+    if (!current) throw new RecipeNotFoundError('That recipe no longer exists.');
+    if (current.currentRevision !== expectedRevision)
+      throw new RecipeConflictError(
+        'This recipe changed in another tab. Refresh the card before saving your revision.',
+      );
+    const mappingSnapshot = captureRecipeIngredientMappings(recipeId, transaction);
+    const revision = current.currentRevision + 1;
+    const now = new Date();
+    transaction
+      .update(recipes)
       .set({
         title: payload.title,
         summary: payload.summary,
@@ -874,14 +1002,19 @@ export function updateRecipe(
       })
       .where(eq(recipes.id, recipeId))
       .run();
-    db.delete(recipeTags).where(eq(recipeTags.recipeId, recipeId)).run();
-    db.delete(recipeIngredientGroups).where(eq(recipeIngredientGroups.recipeId, recipeId)).run();
-    db.delete(recipeInstructionSections)
+    transaction.delete(recipeTags).where(eq(recipeTags.recipeId, recipeId)).run();
+    transaction
+      .delete(recipeIngredientGroups)
+      .where(eq(recipeIngredientGroups.recipeId, recipeId))
+      .run();
+    transaction
+      .delete(recipeInstructionSections)
       .where(eq(recipeInstructionSections.recipeId, recipeId))
       .run();
-    db.delete(recipeEquipment).where(eq(recipeEquipment.recipeId, recipeId)).run();
-    createGraph(recipeId, payload);
-    db.insert(recipeRevisions)
+    transaction.delete(recipeEquipment).where(eq(recipeEquipment.recipeId, recipeId)).run();
+    createGraph(recipeId, payload, transaction, actorProfileId);
+    transaction
+      .insert(recipeRevisions)
       .values({
         recipeId,
         revision,
@@ -890,9 +1023,26 @@ export function updateRecipe(
         createdAt: now,
       })
       .run();
-    indexRecipe(recipeId, payload);
+    indexRecipe(recipeId, payload, transaction);
+    return {
+      ...restoreRecipeIngredientMappings(recipeId, mappingSnapshot, transaction),
+      status: 'available' as const,
+    };
   });
-  return getRecipe(recipeId) as RecipeDetail;
+  return {
+    recipe: getRecipe(recipeId) as RecipeDetail,
+    nutritionMappingRestore,
+    nutritionRecalculation: recalculateRecipeNutritionAfterRecipeEdit(recipeId),
+  };
+}
+
+export function updateRecipe(
+  recipeId: string,
+  input: RecipeInput,
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeDetail {
+  return updateRecipeWithIntegrations(recipeId, input, actorProfileId, expectedRevision).recipe;
 }
 
 export function updateRecipeTags(
@@ -901,9 +1051,19 @@ export function updateRecipeTags(
   actorProfileId: string,
   expectedRevision: number,
 ): RecipeDetail {
+  return updateRecipeTagsWithIntegrations(recipeId, tagNames, actorProfileId, expectedRevision)
+    .recipe;
+}
+
+export function updateRecipeTagsWithIntegrations(
+  recipeId: string,
+  tagNames: string[],
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeUpdateIntegrationResult {
   const recipe = getRecipe(recipeId);
   if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
-  return updateRecipe(
+  return updateRecipeWithIntegrations(
     recipeId,
     { ...recipePayloadFromDetail(recipe), tags: tagNames },
     actorProfileId,
@@ -917,9 +1077,23 @@ export function updateRecipeNutritionEstimate(
   actorProfileId: string,
   expectedRevision: number,
 ): RecipeDetail {
+  return updateRecipeNutritionEstimateWithIntegrations(
+    recipeId,
+    estimate,
+    actorProfileId,
+    expectedRevision,
+  ).recipe;
+}
+
+export function updateRecipeNutritionEstimateWithIntegrations(
+  recipeId: string,
+  estimate: AiNutritionEstimate,
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeUpdateIntegrationResult {
   const recipe = getRecipe(recipeId);
   if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
-  return updateRecipe(
+  return updateRecipeWithIntegrations(
     recipeId,
     {
       ...recipePayloadFromDetail(recipe),
@@ -1001,13 +1175,23 @@ export function updateRecipeStatus(
   actorProfileId: string,
   expectedRevision: number,
 ): RecipeDetail {
+  return updateRecipeStatusWithIntegrations(recipeId, status, actorProfileId, expectedRevision)
+    .recipe;
+}
+
+export function updateRecipeStatusWithIntegrations(
+  recipeId: string,
+  status: RecipePayload['status'],
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeUpdateIntegrationResult {
   const recipe = getRecipe(recipeId);
   if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
   if (recipe.currentRevision !== expectedRevision)
     throw new RecipeConflictError(
       'This recipe changed in another tab. Refresh the card before changing its lifecycle.',
     );
-  return updateRecipe(
+  return updateRecipeWithIntegrations(
     recipeId,
     { ...recipePayloadFromDetail(recipe), status },
     actorProfileId,
@@ -1021,6 +1205,20 @@ export function restoreRecipeRevision(
   actorProfileId: string,
   expectedRevision: number,
 ): RecipeDetail {
+  return restoreRecipeRevisionWithIntegrations(
+    recipeId,
+    sourceRevision,
+    actorProfileId,
+    expectedRevision,
+  ).recipe;
+}
+
+export function restoreRecipeRevisionWithIntegrations(
+  recipeId: string,
+  sourceRevision: number,
+  actorProfileId: string,
+  expectedRevision: number,
+): RecipeUpdateIntegrationResult {
   ensureDatabase();
   const snapshot = getDatabase()
     .select({ snapshot: recipeRevisions.snapshot })
@@ -1040,7 +1238,7 @@ export function restoreRecipeRevision(
   const payload = recipeInputSchema.safeParse(parsedSnapshot);
   if (!payload.success)
     throw new RecipeRevisionNotFoundError('That saved recipe version cannot be restored safely.');
-  return updateRecipe(recipeId, payload.data, actorProfileId, expectedRevision);
+  return updateRecipeWithIntegrations(recipeId, payload.data, actorProfileId, expectedRevision);
 }
 
 export function setRecipePreference(
@@ -1058,25 +1256,65 @@ export function setRecipePreference(
   const preference = input;
   const db = getDatabase();
   if (preference.rating === null && !preference.note) {
-    db.delete(recipeProfilePreferences)
-      .where(
-        and(
-          eq(recipeProfilePreferences.recipeId, recipeId),
-          eq(recipeProfilePreferences.profileId, profileId),
-        ),
-      )
-      .run();
+    db.transaction((tx) => {
+      tx.delete(recipeProfilePreferences)
+        .where(
+          and(
+            eq(recipeProfilePreferences.recipeId, recipeId),
+            eq(recipeProfilePreferences.profileId, profileId),
+          ),
+        )
+        .run();
+      tx.delete(recipeFavorites)
+        .where(
+          and(eq(recipeFavorites.recipeId, recipeId), eq(recipeFavorites.profileId, profileId)),
+        )
+        .run();
+    });
     return { rating: null, note: '', updatedAt: null };
   }
   const updatedAt = new Date();
-  db.insert(recipeProfilePreferences)
-    .values({ recipeId, profileId, rating: preference.rating, note: preference.note, updatedAt })
-    .onConflictDoUpdate({
-      target: [recipeProfilePreferences.profileId, recipeProfilePreferences.recipeId],
-      set: { rating: preference.rating, note: preference.note, updatedAt },
-    })
-    .run();
+  db.transaction((tx) => {
+    tx.insert(recipeProfilePreferences)
+      .values({ recipeId, profileId, rating: preference.rating, note: preference.note, updatedAt })
+      .onConflictDoUpdate({
+        target: [recipeProfilePreferences.profileId, recipeProfilePreferences.recipeId],
+        set: { rating: preference.rating, note: preference.note, updatedAt },
+      })
+      .run();
+    if (preference.rating !== null && preference.rating >= 3) {
+      tx.insert(recipeFavorites)
+        .values({ recipeId, profileId, createdAt: updatedAt })
+        .onConflictDoNothing()
+        .run();
+    } else {
+      tx.delete(recipeFavorites)
+        .where(
+          and(eq(recipeFavorites.recipeId, recipeId), eq(recipeFavorites.profileId, profileId)),
+        )
+        .run();
+    }
+  });
   return { rating: preference.rating, note: preference.note, updatedAt };
+}
+
+export function setRecipeReaction(
+  recipeId: string,
+  profileId: string,
+  score: RecipeReactionScore | null,
+): NonNullable<RecipeDetail['personalPreference']> {
+  ensureDatabase();
+  const existing = getDatabase()
+    .select({ note: recipeProfilePreferences.note })
+    .from(recipeProfilePreferences)
+    .where(
+      and(
+        eq(recipeProfilePreferences.recipeId, recipeId),
+        eq(recipeProfilePreferences.profileId, profileId),
+      ),
+    )
+    .get();
+  return setRecipePreference(recipeId, profileId, { rating: score, note: existing?.note ?? '' });
 }
 
 function markdownInline(value: string): string {

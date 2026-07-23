@@ -1,0 +1,779 @@
+.launch {
+  display: inline-flex;
+  width: 100%;
+  min-height: 3.35rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--tomato);
+  border-radius: 0.55rem;
+  color: #fff;
+  background: var(--tomato);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.launch:hover:not(:disabled) {
+  background: var(--tomato-dark);
+  border-color: var(--tomato-dark);
+  transform: translateY(-1px);
+}
+
+.launch:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dialog {
+  width: min(54rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  color: var(--ink);
+  background: var(--linen);
+  box-shadow: 0 2rem 5rem rgb(26 34 24 / 28%);
+}
+
+.dialog::backdrop {
+  background: rgb(31 38 28 / 46%);
+  backdrop-filter: blur(1.5px);
+}
+
+.dialogShell {
+  position: relative;
+  max-height: calc(100dvh - 2rem);
+  padding: 1.65rem 1.8rem 1rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--leaf) 65%, transparent) transparent;
+}
+
+.dialogShell::-webkit-scrollbar {
+  width: 7px;
+}
+
+.dialogShell::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--leaf) 65%, transparent);
+  background-clip: padding-box;
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.heading > div {
+  max-width: 36rem;
+}
+
+.heading h2 {
+  margin: 0;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.8rem, 3.4vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+}
+
+.heading p {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: grid;
+  width: 2.65rem;
+  height: 2.65rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--surface-hover);
+}
+
+.contextStrip {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1fr auto;
+  align-items: stretch;
+  margin-top: 1.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--field) 88%, var(--leaf-pale));
+}
+
+.contextStrip > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0 0.8rem;
+  border-right: 1px solid var(--line);
+  font-size: 0.78rem;
+}
+
+.contextStrip > div:first-child {
+  padding-left: 0;
+}
+
+.contextStrip svg {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  color: var(--leaf);
+}
+
+.contextStrip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contextStrip small {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.contextStrip > button {
+  min-height: 2.75rem;
+  margin-left: 0.8rem;
+  padding: 0 0.2rem;
+  border: 0;
+  color: var(--leaf);
+  background: transparent;
+  font: inherit;
+  font-size: 0.76rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+  cursor: pointer;
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.nutritionNotice {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--tomato) 28%, var(--line));
+  border-radius: 0.6rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--tomato) 5%, var(--field));
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.nutritionNotice a {
+  color: var(--leaf);
+  font-weight: 600;
+  text-underline-offset: 0.18em;
+}
+
+.modeCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--field);
+}
+
+.modeHeading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.modeHeading > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+}
+
+.modeHeading svg {
+  width: 1rem;
+}
+
+.modeHeading h3 {
+  margin: 0;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.modeHeading p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.costEstimate {
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--leaf) 18%, var(--line));
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--leaf-pale) 45%, var(--field));
+}
+
+.costEstimate > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.costEstimate > div span {
+  color: var(--ink);
+  font-size: 0.73rem;
+}
+
+.costEstimate > div strong {
+  color: var(--leaf);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.costEstimate dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  margin: 0.5rem 0 0;
+}
+
+.costEstimate dl div {
+  display: flex;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.costEstimate dt::after {
+  content: ':';
+}
+
+.costEstimate dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+.costEstimate small {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
+.toggleList {
+  display: grid;
+  gap: 0;
+  margin: 0.75rem 0 1rem;
+}
+
+.imageSettingNote {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.67rem;
+  line-height: 1.4;
+}
+
+.imageSettingNote a {
+  color: var(--leaf);
+  text-underline-offset: 0.16rem;
+}
+
+.toggle {
+  position: relative;
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  cursor: pointer;
+}
+
+.toggle:last-child {
+  border-bottom: 0;
+}
+
+.toggle > span {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.5rem 0;
+}
+
+.toggle strong {
+  font-size: 0.79rem;
+  font-weight: 500;
+}
+
+.toggle small {
+  max-width: 17rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.toggle i {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 2.15rem;
+  height: 1.2rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper-deep);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.toggle i::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.82rem;
+  height: 0.82rem;
+  border-radius: 50%;
+  background: var(--field);
+  box-shadow: 0 1px 3px rgb(29 37 25 / 25%);
+  content: '';
+  transition: transform 150ms ease;
+}
+
+.toggle input:checked + i {
+  border-color: var(--leaf);
+  background: var(--leaf);
+}
+
+.toggle input:checked + i::after {
+  transform: translateX(0.94rem);
+}
+
+.toggle input:focus-visible + i {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.toggleDisabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.recipebookAction,
+.aiAction {
+  width: 100%;
+  min-height: 2.9rem;
+  margin-top: auto;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recipebookAction {
+  border: 1px solid var(--leaf);
+  color: var(--leaf);
+  background: transparent;
+}
+
+.aiAction {
+  border: 1px solid var(--tomato);
+  color: #fff;
+  background: var(--tomato);
+}
+
+.recipebookAction:hover:not(:disabled) {
+  background: var(--leaf-pale);
+}
+
+.aiAction:hover:not(:disabled) {
+  background: var(--tomato-dark);
+}
+
+.review {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.conflicts,
+.planPreview,
+.profileSummary,
+.warnings {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--field);
+}
+
+.conflicts {
+  padding: 0.9rem;
+  border-color: var(--warning-border);
+  background: var(--warning-surface);
+}
+
+.conflicts h3,
+.conflicts p {
+  margin: 0;
+}
+
+.conflicts h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.conflicts p {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.conflictRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--warning-border);
+}
+
+.conflictRow > span {
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.78rem;
+}
+
+.conflictRow small {
+  color: var(--muted);
+}
+
+.conflictRow > div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.conflictRow button {
+  min-height: 2.4rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--field);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.conflictRow button[aria-pressed='true'] {
+  border-color: var(--leaf);
+  color: #fff;
+  background: var(--leaf);
+}
+
+.planPreview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.planPreview article {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 4rem;
+  padding: 0.65rem 0.8rem;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.planPreview article:nth-child(2n) {
+  border-right: 0;
+}
+
+.planPreview article > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.planPreview article > div:first-child span,
+.planPreview article > div:first-child small {
+  font-size: 0.68rem;
+}
+
+.planPreview article strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planPreview article > div:nth-child(2) span,
+.planPreview article > span {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.previewMealKept {
+  opacity: 0.52;
+  background: var(--paper-deep);
+}
+
+.profileSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 0.45rem;
+}
+
+.profileSummary > div {
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.profileSummary svg {
+  width: 1.15rem;
+  color: var(--leaf);
+}
+
+.profileSummary span {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.profileSummary strong {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.profileSummary small {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.warnings {
+  padding: 0.8rem 1rem;
+  color: var(--warning-ink);
+  background: var(--warning-surface);
+}
+
+.warnings strong,
+.warnings li {
+  font-size: 0.72rem;
+}
+
+.warnings ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.reviewActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.reviewActions button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5rem;
+  color: var(--ink);
+  background: var(--field);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.reviewActions button:first-child {
+  margin-right: auto;
+}
+
+.reviewActions svg {
+  width: 1rem;
+}
+
+.reviewActions .confirmAction {
+  border-color: var(--tomato);
+  color: #fff;
+  background: var(--tomato);
+}
+
+.reviewActions button:disabled,
+.recipebookAction:disabled,
+.aiAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.loading {
+  margin-top: 0.8rem;
+}
+
+.safetyFooter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.safetyFooter svg {
+  width: 1rem;
+  color: var(--leaf);
+}
+
+.status {
+  min-height: 1.1rem;
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.launch:focus-visible,
+.close:focus-visible,
+.contextStrip button:focus-visible,
+.recipebookAction:focus-visible,
+.aiAction:focus-visible,
+.conflictRow button:focus-visible,
+.reviewActions button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .dialog {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    border-radius: 0.85rem;
+  }
+
+  .dialogShell {
+    max-height: calc(100dvh - 1rem);
+    padding: 1.25rem 1rem 0.8rem;
+  }
+
+  .heading {
+    padding: 0 2.2rem;
+  }
+
+  .heading h2 {
+    font-size: 1.75rem;
+  }
+
+  .contextStrip {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+
+  .contextStrip > div {
+    padding: 0;
+    border: 0;
+  }
+
+  .contextStrip > button {
+    min-height: 2rem;
+    margin: 0;
+    text-align: left;
+  }
+
+  .modeGrid,
+  .planPreview {
+    grid-template-columns: 1fr;
+  }
+
+  .modeHeading p {
+    min-height: 0;
+  }
+
+  .planPreview article,
+  .planPreview article:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .conflictRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .conflictRow > div,
+  .conflictRow button {
+    flex: 1;
+  }
+
+  .reviewActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .reviewActions button:first-child {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch,
+  .toggle i,
+  .toggle i::after {
+    transition: none;
+  }
+}

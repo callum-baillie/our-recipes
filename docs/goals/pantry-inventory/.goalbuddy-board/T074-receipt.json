@@ -1,0 +1,20 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T074",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/components/shopping-list-editor.module.css"],
+    "commands": [
+      {"cmd": "pre-hash guards", "status": "pass"},
+      {"cmd": "scoped Prettier and source/mirror hashes", "status": "pass"},
+      {"cmd": "isolated webpack build", "status": "pass"},
+      {"cmd": "unchanged grocery/intake E2E", "status": "pass", "summary": "1/1; 390/768/1280 axe, all formula/intake/persistence assertions, screenshots, containment, zero errors"},
+      {"cmd": "port release, scoped diff, protected hashes", "status": "pass"}
+    ],
+    "summary": "The one-selector contrast repair compiles and clears the full grocery oracle including final axe. The unchanged integrated workflow then failed only because product UI renamed the established Make shortage list action to Make missing-items list; recipe/planner oracle remains.",
+    "deviations": ["Protected workflow line 234 could not find Make shortage list because current UI exposes Make missing-items list."],
+    "remaining_blockers": ["Resolve product accessible-name compatibility", "Pass workflow and recipe/planner oracles"],
+    "verification_attempts": 1,
+    "stopped_because": "Protected oracle exposed a product label regression outside CSS scope."
+  }
+}

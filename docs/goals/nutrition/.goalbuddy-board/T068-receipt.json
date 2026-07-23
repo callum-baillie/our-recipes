@@ -1,0 +1,18 @@
+{
+  "result": "done",
+  "task_id": "T068",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T068-preparation-calculation-map.md"],
+  "commands": [
+    { "cmd": "read-only calculation, prepared alignment, UI/test and dirty-ownership map", "status": "pass" }
+  ],
+  "summary": "Mapped existing dormant final-weight/factor fields and split evidence-backed calculation, prepared alignment and optional sourced retention into safe sequential packages.",
+  "note": "notes/T068-preparation-calculation-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

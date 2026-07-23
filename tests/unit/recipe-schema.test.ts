@@ -6,6 +6,7 @@ import {
   recipeInputSchema,
   recipeLibraryQuerySchema,
   recipePreferenceInputSchema,
+  recipeReactionInputSchema,
   recipeTagsUpdateSchema,
 } from '@/lib/domain/recipe';
 
@@ -134,6 +135,12 @@ describe('recipeInputSchema', () => {
       note: 'Use less salt.',
     });
     expect(recipePreferenceInputSchema.safeParse({ rating: 6, note: '' }).success).toBe(false);
+    expect(recipeReactionInputSchema.parse({ score: 1 })).toEqual({ score: 1 });
+    expect(recipeReactionInputSchema.parse({ score: 3 })).toEqual({ score: 3 });
+    expect(recipeReactionInputSchema.parse({ score: 5 })).toEqual({ score: 5 });
+    expect(recipeReactionInputSchema.parse({ score: null })).toEqual({ score: null });
+    expect(recipeReactionInputSchema.safeParse({ score: 2 }).success).toBe(false);
+    expect(recipeReactionInputSchema.safeParse({ score: 4 }).success).toBe(false);
   });
 
   it('accepts bounded library facets and safe sort choices', () => {
@@ -144,8 +151,40 @@ describe('recipeInputSchema', () => {
         sort: 'highest-rated',
         favorite: 'true',
         maxTotalMinutes: '45',
+        minProteinPerServing: '20',
+        minNutritionCompleteness: '75',
+        supportsNutrient: 'vitamin_d',
+        nutritionFields: ['energy_kcal', 'protein', 'total_fat'],
+        pantry: 'ready',
       }),
-    ).toMatchObject({ status: 'archived', sort: 'highest-rated', maxTotalMinutes: 45, page: 1 });
+    ).toMatchObject({
+      status: 'archived',
+      sort: 'highest-rated',
+      maxTotalMinutes: 45,
+      minProteinPerServing: 20,
+      minNutritionCompleteness: 75,
+      supportsNutrient: 'vitamin_d',
+      nutritionFields: ['energy_kcal', 'protein', 'total_fat'],
+      pantry: 'ready',
+      page: 1,
+    });
+    expect(
+      recipeLibraryQuerySchema.safeParse({
+        nutritionFields: ['protein', 'protein'],
+      }).success,
+    ).toBe(false);
+    expect(recipeLibraryQuerySchema.safeParse({ nutritionFields: [] }).success).toBe(false);
+    expect(recipeLibraryQuerySchema.safeParse({ nutritionFields: ['vitamin_d'] }).success).toBe(
+      false,
+    );
+    expect(
+      recipeLibraryQuerySchema.safeParse({
+        nutritionFields: ['energy_kcal', 'protein', 'carbohydrate', 'total_fat', 'fiber', 'sodium'],
+      }).success,
+    ).toBe(false);
+    expect(recipeLibraryQuerySchema.parse({ sort: 'lowest-calories' }).sort).toBe(
+      'lowest-calories',
+    );
   });
 
   it('validates a strict revisioned tag-only update', () => {

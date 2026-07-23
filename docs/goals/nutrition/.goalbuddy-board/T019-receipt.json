@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T019",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T019-history-privacy-decision.md"
+  ],
+  "commands": [
+    {
+      "cmd": "audit migrations 0016/0017, schema mappings, record services/tests, privacy/access domains and active external ownership",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved normalized persistence historical integrity and an exact seven-file next package for real scrypt-backed Nutrition principals, private profiles, append-only permission versions, versioned goals, immutable measurements, access-version revocation, optimistic profile updates and focused tests. Household profiles remain attribution-only; routes/UI/intake are deferred to a privacy review.",
+  "note": "notes/T019-history-privacy-decision.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

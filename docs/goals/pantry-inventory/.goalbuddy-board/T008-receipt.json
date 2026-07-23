@@ -1,0 +1,67 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "PM fallback approves the additive Pantry integrity repair after the exact Judge timed out. Exact/approximate measurement is mutually exclusive in Zod and migration 0017 triggers with existing-row validation; undo snapshots include product/source links and use deterministic batch sequence; product archival is blocked in service and SQLite when active stock exists; FEFO uses effective opened shelf life and checks each optimistic update. Focused and full tests, lint, TypeScript, formatting, diff checks, and fresh migration pass. Production build remains an explicit shared-.next environmental gate for final verification.",
+  "worker_package": {
+    "objective": "Deliver recipe availability and projected meal demand on the repaired Pantry foundation: actor-attributed manual ingredient-to-product mappings that preserve recipe text; serving-scaled per-recipe availability with ready/partial/unknown states and exact explainability; aggregate multi-meal demand that allocates compatible exact stock only once without consuming it; visible Pantry status on recipe cards/detail/cook surfaces and an explainable demand panel in the planner; validated trusted-origin APIs, focused tests, and docs. Preserve all concurrent nutrition/reaction/planner behavior.",
+    "allowed_files": [
+      "src/lib/domain/pantry-availability.ts",
+      "src/lib/services/pantry-availability-service.ts",
+      "src/app/api/v1/pantry/mappings/[ingredientId]/route.ts",
+      "src/app/api/v1/pantry/recipes/[recipeId]/availability/route.ts",
+      "src/app/api/v1/pantry/demand/route.ts",
+      "src/components/pantry-availability-pill.tsx",
+      "src/components/pantry-availability-pill.module.css",
+      "src/components/recipe-pantry-panel.tsx",
+      "src/components/recipe-pantry-panel.module.css",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "src/components/meal-plan-pantry-demand.module.css",
+      "src/components/recipe-summary-card.tsx",
+      "src/app/recipes/page.tsx",
+      "src/app/recipes/[recipeId]/page.tsx",
+      "src/app/recipes/[recipeId]/cook/page.tsx",
+      "src/app/planner/page.tsx",
+      "tests/unit/pantry-availability.test.ts",
+      "tests/integration/pantry-availability-service.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/data-model.md",
+      "docs/decisions/0029-pantry-availability-and-demand.md"
+    ],
+    "verify": [
+      "pnpm exec prettier --check src/lib/domain/pantry-availability.ts src/lib/services/pantry-availability-service.ts src/app/api/v1/pantry/mappings src/app/api/v1/pantry/recipes src/app/api/v1/pantry/demand src/components/pantry-availability-pill.tsx src/components/pantry-availability-pill.module.css src/components/recipe-pantry-panel.tsx src/components/recipe-pantry-panel.module.css src/components/meal-plan-pantry-demand.tsx src/components/meal-plan-pantry-demand.module.css src/components/recipe-summary-card.tsx src/app/recipes/page.tsx src/app/recipes/[recipeId]/page.tsx src/app/recipes/[recipeId]/cook/page.tsx src/app/planner/page.tsx tests/unit/pantry-availability.test.ts tests/integration/pantry-availability-service.test.ts docs/openapi.yaml docs/api.md docs/data-model.md docs/decisions/0029-pantry-availability-and-demand.md",
+      "pnpm exec vitest run --project unit tests/unit/pantry-availability.test.ts",
+      "pnpm exec vitest run --project integration tests/integration/pantry-availability-service.test.ts",
+      "pnpm test",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm openapi:validate",
+      "git diff --check"
+    ],
+    "stop_if": [
+      "Implementation would rewrite original recipe ingredient text or recipe revisions instead of adding/removing mapping rows.",
+      "Unknown, approximate, missing-quantity, or incompatible-unit stock would need to be treated as exact or silently converted.",
+      "Projected demand would need to mutate Pantry batches, reserve physical stock, or double-count stock across meals.",
+      "Implementation requires migration/schema changes, grocery recommendation changes, cooking deductions, or files outside allowed_files.",
+      "Any change would overwrite concurrent nutrition, reaction, planner redesign, or unrelated user work; merge precisely or stop with the conflicting path.",
+      "Production build would require taking ownership of another task's live Next dev process or shared .next directory."
+    ]
+  },
+  "evidence": [
+    "drizzle/0017_pantry_integrity.sql",
+    "src/lib/domain/pantry.ts",
+    "src/lib/services/pantry-service.ts",
+    "tests/unit/pantry.test.ts",
+    "tests/integration/pantry-service.test.ts",
+    "docs/goals/pantry-inventory/notes/T007-additive-integrity-repair.md"
+  ],
+  "missing_evidence": [
+    "Production build after the concurrent Next dev process releases .next.",
+    "Recipe availability, projected demand, grocery, purchase, cooking, leftovers, and rendered acceptance."
+  ],
+  "required_board_updates": [
+    "Mark T008 done and activate T009 from worker_package.",
+    "Require a calculation-correctness Judge after T009 before grocery/cooking integration."
+  ]
+}

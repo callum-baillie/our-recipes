@@ -1,0 +1,45 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T040",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+    "commands": [
+      {
+        "cmd": "Source and mirror spec SHA256 guard",
+        "status": "pass",
+        "summary": "Initial hashes matched A03F1224...E907"
+      },
+      {
+        "cmd": "Exact Cold room and Basket direct-summary locator repair with strict counts",
+        "status": "pass"
+      },
+      {
+        "cmd": "Scoped Prettier and ESLint",
+        "status": "pass"
+      },
+      {
+        "cmd": "One-file mirror refresh and SHA256 equality",
+        "status": "pass",
+        "summary": "Source and mirror hashes matched CECBF425...B20E9"
+      },
+      {
+        "cmd": "Fresh isolated management E2E on owned port 3100",
+        "status": "fail",
+        "summary": "Nested location summary renders Cold room shelf / Basket, so the mandated exact Basket summary was absent"
+      },
+      {
+        "cmd": "Owned server cleanup and port 3100 release",
+        "status": "pass"
+      }
+    ],
+    "summary": "The exact direct-summary repair removed the inherited subtree-text ambiguity and the fresh workflow reached nested-location creation. It then exposed a contract mismatch: nested summaries intentionally render their full path, so the mandated exact Basket locator cannot match.",
+    "deviations": [],
+    "remaining_blockers": [
+      "Judge selection of an exact full-path nested-location locator",
+      "Independent fresh-state management and integrated Pantry browser/accessibility/screenshot/persistence proof"
+    ],
+    "verification_attempts": 1,
+    "stopped_because": "T040 required an exact Basket summary, while rendered evidence shows the accessible summary is Cold room shelf / Basket. Changing the contract was outside Worker scope."
+  }
+}

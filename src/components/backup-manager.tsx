@@ -1,7 +1,10 @@
 'use client';
 
-import { ArchiveRestore, Download, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { ArchiveRestore, Download, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
+
+import { useToast } from '@/components/toast-provider';
+import { InlineSkeleton } from '@/components/skeleton';
 
 type BackupSummary = { id: string; createdAt: string; bytes: number };
 type BackupManifest = {
@@ -28,6 +31,7 @@ function displayDate(value: string): string {
 }
 
 export function BackupManager({ initialBackups }: BackupManagerProps) {
+  const { showToast } = useToast();
   const [backups, setBackups] = useState(initialBackups);
   const [preview, setPreview] = useState<BackupPreview | null>(null);
   const [confirmation, setConfirmation] = useState('');
@@ -49,10 +53,13 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
     } | null;
     setPending(null);
     if (!response.ok) {
-      setError(body?.error?.message ?? 'We could not create a backup yet.');
+      const message = body?.error?.message ?? 'We could not create a backup yet.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     await refreshBackups();
+    showToast('Backup created and verified.', 'success');
   }
 
   async function inspect(id: string) {
@@ -65,11 +72,14 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
     } | null;
     setPending(null);
     if (!response.ok || !body?.backup) {
-      setError(body?.error?.message ?? 'We could not validate that backup.');
+      const message = body?.error?.message ?? 'We could not validate that backup.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     setPreview(body.backup);
     setConfirmation('');
+    showToast('Backup validated. Review it before restoring.', 'success');
   }
 
   async function restore() {
@@ -86,7 +96,9 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
     } | null;
     setPending(null);
     if (!response.ok) {
-      setError(body?.error?.message ?? 'The backup could not be restored safely.');
+      const message = body?.error?.message ?? 'The backup could not be restored safely.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     window.location.assign('/');
@@ -106,11 +118,12 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
         <button
           className="primary-button"
           type="button"
+          aria-busy={pending === 'create'}
           onClick={() => void create()}
           disabled={pending !== null}
         >
           {pending === 'create' ? (
-            <LoaderCircle className="spin" size={17} />
+            <InlineSkeleton label="Creating backup" width="1.1rem" />
           ) : (
             <ArchiveRestore size={17} />
           )}
@@ -146,11 +159,12 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
                 <button
                   className="text-button"
                   type="button"
+                  aria-busy={pending === 'preview'}
                   onClick={() => void inspect(backup.id)}
                   disabled={pending !== null}
                 >
                   {pending === 'preview' ? (
-                    <LoaderCircle className="spin" size={16} />
+                    <InlineSkeleton label="Validating backup" width="1rem" />
                   ) : (
                     <ShieldCheck size={16} />
                   )}
@@ -194,10 +208,13 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
           <button
             className="danger-button"
             type="button"
+            aria-busy={pending === 'restore'}
             onClick={() => void restore()}
             disabled={confirmation !== 'RESTORE' || pending !== null}
           >
-            {pending === 'restore' && <LoaderCircle className="spin" size={17} />}
+            {pending === 'restore' ? (
+              <InlineSkeleton label="Restoring backup" width="1.1rem" />
+            ) : null}
             Restore this backup
           </button>
         </section>

@@ -1,0 +1,37 @@
+{
+  "result": "done",
+  "task_id": "T044",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-recipe-presentation.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/app/api/v1/recipes/[recipeId]/route.ts",
+    "src/app/recipes/[recipeId]/page.tsx",
+    "src/app/recipes/page.tsx",
+    "src/components/recipe-normalized-nutrition.tsx",
+    "src/components/recipe-normalized-nutrition.module.css",
+    "src/components/recipe-serving-details.tsx",
+    "src/components/recipe-summary-card.tsx",
+    "tests/unit/nutrition-recipe-presentation.test.ts",
+    "tests/unit/nutrition-recipe-components.test.ts",
+    "tests/integration/nutrition-recipe-calculation-service.test.ts",
+    "tests/integration/nutrition-recipe-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused normalized recipe presentation/component unit tests", "status": "pass", "summary": "4 tests passed" },
+    { "cmd": "focused recipe calculation/edit API integration tests", "status": "pass", "summary": "3 tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "166 unit and 79 integration tests passed" },
+    { "cmd": "focused Prettier and scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Delivered current/stale normalized recipe detail and library presentation, explicit legacy separation, exact mapping restoration across graph rewrites, and non-destructive edit-triggered calculation revisions with full gates passing.",
+  "note": "notes/T044-normalized-recipe-presentation.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

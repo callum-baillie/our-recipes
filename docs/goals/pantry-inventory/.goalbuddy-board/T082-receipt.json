@@ -1,0 +1,14 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T082", "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/lib/services/pantry-service.ts", "src/lib/services/pantry-grocery-cooking-service.ts", "src/app/api/v1/cook-sessions/[sessionId]/pantry/route.ts", "src/components/cooking-mode.tsx", "src/components/cooking-mode.module.css", "src/components/meal-planner.tsx", "src/components/meal-planner.module.css", "docs/openapi.yaml", "tests/unit/pantry-recipe-planner-components.test.ts", "tests/integration/pantry-grocery-cooking-service.test.ts", "tests/integration/pantry-grocery-cooking-api.test.ts", "tests/e2e/pantry-cooking-confirmation.spec.ts"],
+    "commands": [
+      {"cmd": "focused cooking unit tests", "status": "pass", "summary": "11/11"}, {"cmd": "focused cooking integration/API tests", "status": "pass", "summary": "17/17"}, {"cmd": "pnpm typecheck", "status": "pass"}, {"cmd": "scoped ESLint", "status": "pass"}, {"cmd": "isolated full-source webpack build", "status": "pass"}, {"cmd": "owned mirror cleanup and port 3100 release", "status": "pass"}
+    ],
+    "summary": "Implemented linked-meal Cook entry, FEFO preview, corrections/alternatives/no-deduction, multiple leftovers, refresh, undo, OpenAPI, and tests. Focused/type/lint/build pass. One E2E run proved the functional confirmation path but found contrast defects; after CSS repair, the final fresh run timed out after planned-meal navigation waiting for Start cooking.",
+    "deviations": ["Initial source E2E collided with untouched live PID 7376.", "Mirror build used direct Next webpack due pnpm junction guard.", "Earlier E2E ambiguity was repaired; next run proved functionality and exposed repaired contrast defects.", "Final run timed out waiting for Start cooking after clicking verified Cook link."],
+    "remaining_blockers": ["Final rendered 390/768/1280 keyboard/axe/no-error proof and remaining full/protected/disposable/integrity gates"],
+    "verification_attempts": 2,
+    "stopped_because": "Final bounded isolated E2E remained unsuccessful; mirror cleaned and live process untouched."
+  }
+}

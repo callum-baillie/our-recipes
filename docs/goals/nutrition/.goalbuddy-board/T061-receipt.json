@@ -1,0 +1,22 @@
+{
+  "result": "done",
+  "decision": "repair_required",
+  "task_id": "T061",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T061-diary-lifecycle-judge.md"],
+  "commands": [
+    { "cmd": "read-only T060 privacy, atomicity, authorization, export and evidence audit", "status": "repair_required" }
+  ],
+  "summary": "Lifecycle semantics pass, but export must redact cross-profile command identifiers and enforce its row bound before materialization.",
+  "note": "notes/T061-diary-lifecycle-judge.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Outgoing command history exposes target profile/revision identifiers.",
+    "Export row cap is checked only after rows are loaded."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

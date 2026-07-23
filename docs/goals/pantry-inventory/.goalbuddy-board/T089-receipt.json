@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T089", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "One local declaration causes all remaining contrast failures: finishStatus overrides the dark page's light foreground with #52643b. Replace it with the already-proven dark-surface token #d8ded4; descendants inherit it. No selector/DOM/layout/logic/test change.",
+    "worker_package": {
+      "objective": "Change only finishStatus color, then complete every final gate.",
+      "allowed_files": ["src/components/cooking-mode.module.css"],
+      "verify": ["Require CSS/TSX/E2E hashes from T089 and one-declaration diff.", "Run scoped format/type, isolated build, unchanged cooking E2E.", "Run full gates, three protected E2Es, disposable DB, live PID/port/hash/diff/status integrity."],
+      "stop_if": ["Hash differs or diff beyond one color.", "Contrast remains or any selector/global/DOM/layout/logic/test change needed.", "Live/shared/protected/unrelated state touched."]
+    },
+    "evidence": ["finishStatus and descendants inherit #52643b on #263126.", "#d8ded4 already passes on same dark surface.", "T088 proves all functional behavior."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One declaration and serial final lifecycle."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Cooking/full/protected/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T089 done.", "Activate CSS-only Worker.", "Require final Judge."]
+  }
+}

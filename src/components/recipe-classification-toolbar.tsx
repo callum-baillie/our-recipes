@@ -1,8 +1,10 @@
 'use client';
 
-import { LoaderCircle, Plus, Tag, X } from 'lucide-react';
+import { Plus, Tag, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CSSProperties, FormEvent, useState } from 'react';
+
+import { InlineSkeleton } from '@/components/skeleton';
 
 import { useToast } from '@/components/toast-provider';
 import { parseRecipeTaxonomyValues } from '@/lib/domain/recipe';
@@ -140,7 +142,7 @@ export function RecipeClassificationToolbar({
                 aria-label={`Remove ${tag} tag`}
               >
                 {pendingTag === `${titleCase(tag)} tag removed.` ? (
-                  <LoaderCircle className="spin" size={12} aria-hidden="true" />
+                  <InlineSkeleton label={`Removing ${titleCase(tag)} tag`} width="0.75rem" />
                 ) : (
                   <X size={12} aria-hidden="true" />
                 )}
@@ -174,7 +176,7 @@ export function RecipeClassificationToolbar({
             aria-label="Attach tag"
           >
             {pendingTag?.endsWith('tag added.') ? (
-              <LoaderCircle className="spin" size={15} aria-hidden="true" />
+              <InlineSkeleton label="Adding tag" width="0.95rem" />
             ) : (
               <Plus size={15} aria-hidden="true" />
             )}

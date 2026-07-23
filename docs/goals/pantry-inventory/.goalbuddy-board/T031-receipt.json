@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T031",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+    "commands": [
+      { "cmd": "Pre-edit source/mirror hash guard", "status": "pass" },
+      { "cmd": "Exact semantic shopping-row locator repair and Prettier", "status": "pass" },
+      { "cmd": "Mirror audit/one-file refresh/post-edit hash equality", "status": "pass" },
+      { "cmd": "Fresh Pantry browser attempt 1", "status": "fail", "summary": "Verified 50 g row and both contributions; nonexistent Week of blur target prevented PATCH" },
+      { "cmd": "Attempt 1 cleanup/port release", "status": "pass" },
+      { "cmd": "Fresh Pantry browser attempt 2", "status": "fail", "summary": "Identical nonexistent blur target and unresolved PATCH" },
+      { "cmd": "Attempt 2 cleanup/port release", "status": "pass" }
+    ],
+    "summary": "The semantic grocery locator works and both runs prove the 50 g shortage and provenance. Both then fail because the test tries to blur via a Week of heading absent on the shopping-list page, so the real PATCH path is not triggered.",
+    "deviations": ["Used fixed-path cleanup for authorized mirror outputs.", "Used owned webpack dev servers."],
+    "remaining_blockers": ["Semantic quantity blur/PATCH harness repair", "Remaining workflow/axe/screenshots, disposable DB, and diff gates"],
+    "verification_attempts": 2,
+    "stopped_because": "Two fresh runs failed at the same nonexistent blur target."
+  }
+}

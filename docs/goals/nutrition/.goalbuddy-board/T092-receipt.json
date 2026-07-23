@@ -1,0 +1,30 @@
+{
+  "result": "done",
+  "task_id": "T092",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T092-individual-chart-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only ten-chart requirement, data, privacy, accessibility and performance map",
+      "status": "pass"
+    },
+    {
+      "cmd": "Pantry T045 overlap audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped all ten chart families and selected server-owned calorie, macro and semantic nutrient-coverage panels as the smallest high-value first package.",
+  "note": "notes/T092-individual-chart-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must approve the exact first chart formulas and accessible rendering boundary.",
+    "Longer-range, source, completeness and weight charts need later data services/preferences."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

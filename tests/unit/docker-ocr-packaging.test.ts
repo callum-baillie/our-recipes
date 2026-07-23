@@ -21,6 +21,9 @@ describe('native Docker runtime packaging', () => {
     expect(dockerfile).toContain('VOLUME ["/data"]');
     expect(dockerfile).not.toContain('/data/ocr-models');
     expect(dockerfile).toContain('/app/node_modules/drizzle-orm ./node_modules/drizzle-orm');
+    expect(dockerfile).toContain(
+      '/app/scripts/migration-lineage-recovery.cjs ./scripts/migration-lineage-recovery.cjs',
+    );
     expect(dockerfile).toContain('/app/node_modules/openai ./node_modules/openai');
     expect(dockerfile).toContain('/app/node_modules/sharp ./node_modules/sharp');
     expect(dockerfile).toContain('/app/node_modules/@img ./node_modules/@img');

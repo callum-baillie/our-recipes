@@ -1,10 +1,11 @@
 openapi: 3.1.0
 info:
   title: Our Recipes API
-  version: 0.1.0
-  description: Local household foundation API. Profiles are not authentication.
+  version: 1.0.0-rc.1
+  description: Trusted-household self-hosted API. Profiles are convenience identity, not authentication or access control.
   license:
     name: Private household use — see repository license decision before redistribution
+    identifier: LicenseRef-Proprietary
 servers:
   - url: /api/v1
 security: []
@@ -20,12 +21,114 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, version, setupComplete]
+                required: [status, version, schemaVersion, migrationStatus, setupComplete]
                 properties:
-                  status: { type: string, const: ok }
-                  version: { type: string, const: v1 }
+                  status: { type: string, enum: [ok, error] }
+                  version: { type: string, example: 1.0.0-rc.1 }
+                  schemaVersion: { type: string, example: 0038_meal_plan_ingredient_snapshots }
+                  migrationStatus: { type: string, enum: [current, incomplete] }
                   setupComplete: { type: boolean }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Storage is unavailable }
+  /food-data/status:
+    get:
+      operationId: getFoodDataStatus
+      summary: Report non-secret food provider capabilities and quota state
+      responses:
+        '200':
+          description: Provider and camera readiness without credentials
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+  /food-data/barcode-lookups:
+    post:
+      operationId: lookupFoodBarcode
+      summary: Resolve a validated GTIN through local, Open Food Facts, and optional USDA sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [barcode]
+              properties:
+                barcode: { type: string, minLength: 1, maxLength: 32 }
+                language: { type: string, default: en }
+                compareUsda: { type: boolean, default: false }
+      responses:
+        '200':
+          { description: 'Preferred normalized record, exact alternatives, and provider status' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: No exact local or provider record }
+        '409': { description: Active profile selection required }
+        '429': { description: Install or upstream provider budget exhausted }
+        '503': { description: Configured providers are unavailable }
+  /food-data/searches:
+    post:
+      operationId: searchFoodData
+      summary: Search local products and USDA FoodData Central on explicit submission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [query, context]
+              properties:
+                query: { type: string, minLength: 2, maxLength: 120 }
+                context: { type: string, enum: [pantry, recipe, nutrition] }
+                kind: { type: string, enum: [any, generic, branded], default: any }
+                page: { type: integer, minimum: 1, maximum: 10, default: 1 }
+      responses:
+        '200':
+          { description: 'Local products, normalized USDA records, status, and cache freshness' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile selection required }
+  /food-data/details:
+    post:
+      operationId: getFoodDataDetails
+      summary: Resolve a selected provider record to the normalized review model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [provider, recordId]
+              properties:
+                provider: { type: string, enum: [open_food_facts, usda_fdc] }
+                recordId: { type: string, minLength: 1, maxLength: 160 }
+                language: { type: string, default: en }
+      responses:
+        '200': { description: Normalized provider record and freshness metadata }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Provider record not found }
+        '409': { description: Active profile selection required }
+  /food-data/imports:
+    post:
+      operationId: importReviewedFoodData
+      summary: Create or reuse a catalog product from a reviewed provider record without stock or intake
+      responses:
+        '201':
+          {
+            description: 'Product, immutable source snapshot, and nutrition record created or reused',
+          }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: 'Identity, review, or idempotency conflict' }
+  /pantry/catalog-imports:
+    post:
+      operationId: importReviewedFoodDataToPantry
+      summary: Atomically import reviewed food data and add one or more physical Pantry batches
+      responses:
+        '201': { description: Catalog product and Pantry batches created or reused }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: 'Identity, review, or idempotency conflict' }
   /ai/status:
     get:
       operationId: getAiStatus
@@ -57,6 +160,7 @@ paths:
                             - image-generation
                             - nutrition-estimation
                             - recipe-improvement
+        '400': { $ref: '#/components/responses/InvalidRequest' }
   /ai/reviews:
     post:
       operationId: createAiReview
@@ -108,6 +212,7 @@ paths:
       summary: List household profiles
       responses:
         '200': { description: Profile list }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Storage is unavailable }
     post:
       operationId: addProfile
@@ -173,6 +278,7 @@ paths:
       summary: List canonical household tags with usage counts
       responses:
         '200': { description: Tag list }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Tag storage is unavailable }
     post:
       operationId: createTag
@@ -239,6 +345,7 @@ paths:
       summary: List manually ordered household collections with optional local-photo covers
       responses:
         '200': { description: Collection list }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Collection storage is unavailable }
     post:
       operationId: createCollection
@@ -301,6 +408,26 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Collection not found }
   /collections/{collectionId}/recipes:
+    post:
+      operationId: addRecipeToCollection
+      summary: Add one recipe to the end of a collection if it is not already present
+      parameters:
+        - name: collectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CollectionRecipeInput' }
+      responses:
+        '200': { description: Recipe was already in the collection }
+        '201': { description: Recipe added to the collection }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Collection not found }
+        '409': { description: Active profile is missing }
     put:
       operationId: replaceCollectionRecipes
       summary: Replace a collection’s ordered recipe membership
@@ -532,6 +659,20 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Recipe not found }
         '409': { description: Profile selection required }
+    patch:
+      operationId: setRecipeReaction
+      summary: Set or clear the active profile’s dislike, like, or staple score while preserving its note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeReactionInput' }
+      responses:
+        '200': { description: Private profile reaction saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Recipe not found }
+        '409': { description: Profile selection required }
   /recipes/{recipeId}/revisions/{revision}/restore:
     parameters:
       - name: recipeId
@@ -699,6 +840,34 @@ paths:
         '204': { description: Planned meal removed }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Planned meal not found }
+    patch:
+      operationId: updateMealPlanEntryStatus
+      summary: Mark a meal planned, skipped, or cancelled; cooked remains derived
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { type: string, enum: [planned, skipped, cancelled] }
+      responses:
+        '200': { description: Persisted meal status and derived effective status }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Planned meal not found }
+        '409': { description: Active profile selection required }
+  /meal-plan/swap:
+    post:
+      operationId: swapMealPlanEntries
+      summary: Atomically swap two current planned-meal slots
+      responses:
+        '200': { description: Both planned meals after the swap }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required or a planned meal changed }
   /meal-plan/duplicate:
     post:
       operationId: duplicateMealPlanWeek
@@ -742,6 +911,110 @@ paths:
         '201': { description: Shopping list created }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Plan contains no meals }
+  /settings/lists:
+    get:
+      operationId: getListSettings
+      summary: Read household list behavior and all supermarket profiles
+      responses:
+        '200': { description: List settings and supermarket profiles }
+        '400': { description: List settings request could not be read }
+    patch:
+      operationId: updateListSettings
+      summary: Replace household list behavior and the default supermarket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                [
+                  defaultSupermarketProfileId,
+                  completedItemsBehavior,
+                  openPantryPurchaseOnCheck,
+                  keepScreenAwake,
+                ]
+              properties:
+                defaultSupermarketProfileId:
+                  oneOf: [{ type: string, const: '' }, { type: string, format: uuid }]
+                completedItemsBehavior:
+                  type: string
+                  enum: [completed_section, hide, in_place]
+                openPantryPurchaseOnCheck: { type: boolean }
+                keepScreenAwake: { type: boolean }
+      responses:
+        '200': { description: List settings saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile or household setup required }
+  /supermarket-profiles:
+    get:
+      operationId: listSupermarketProfiles
+      summary: Read active and archived supermarket profiles with ordered route sections
+      responses:
+        '200': { description: List settings and supermarket profiles }
+        '400': { description: Supermarket profile request could not be read }
+    post:
+      operationId: createSupermarketProfile
+      summary: Create a supermarket profile and ordered in-store route
+      responses:
+        '201': { description: Supermarket profile created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Duplicate supermarket identity or active profile required }
+  /supermarket-profiles/{profileId}:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateSupermarketProfile
+      summary: Replace, archive, or restore a supermarket and its ordered route
+      responses:
+        '200': { description: Supermarket profile saved and associated lists reclassified }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Supermarket profile not found }
+        '409': { description: Duplicate supermarket identity or active profile required }
+  /supermarket-profiles/{profileId}/duplicate:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: duplicateSupermarketProfile
+      summary: Copy one supermarket route and its learned item assignments
+      responses:
+        '201': { description: Independent supermarket profile copy created }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Supermarket profile not found }
+        '409': { description: Active profile required }
+  /shopping-lists/pantry-shortages:
+    post:
+      operationId: generatePantryShortageList
+      summary: Create or regenerate Pantry shortages without overwriting manual edits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weekStart, weekEnd]
+              properties:
+                weekStart: { type: string, format: date }
+                weekEnd: { type: string, format: date }
+                listId: { type: string, format: uuid }
+                mode: { type: string, enum: [missing, all], default: missing }
+      responses:
+        '200': { description: Existing Pantry shortage list regenerated }
+        '201': { description: Pantry shortage list created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Shopping list not found }
+        '409': { description: List range conflicts with request }
   /shopping-lists/{listId}:
     parameters:
       - name: listId
@@ -776,6 +1049,35 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Shopping list not found }
+  /shopping-lists/{listId}/supermarket-profile:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: setShoppingListSupermarket
+      summary: Switch a list's supermarket and deterministically reclassify every item
+      responses:
+        '200': { description: Supermarket selected and list reclassified }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Shopping list or supermarket profile not found }
+        '409': { description: Archived supermarket or active profile conflict }
+  /shopping-lists/{listId}/retry-store:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: retryShoppingListAtStore
+      summary: Create a new list for unavailable items using another supermarket route
+      responses:
+        '201': { description: New store-ordered shopping list created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Profile selection required or retry list unavailable }
   /shopping-lists/{listId}/items/{itemId}:
     parameters:
       - name: listId
@@ -801,12 +1103,99 @@ paths:
         '204': { description: Shopping item removed }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Shopping item not found }
+  /shopping-lists/{listId}/items/{itemId}/pantry-intake:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: intakePurchasedShoppingItem
+      summary: Add one retry-stable purchase operation to an explicit Pantry location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [operationKey, productId, locationId, quantity, unit]
+              properties:
+                operationKey: { type: string, minLength: 8, maxLength: 160 }
+                productId: { type: string, format: uuid }
+                locationId: { type: string, format: uuid }
+                quantity: { type: number, exclusiveMinimum: 0, maximum: 1000000 }
+                unit: { type: string, minLength: 1, maxLength: 30 }
+                intakeMode: { type: string, enum: [partial, complete], default: partial }
+                packageCount: { type: number, exclusiveMinimum: 0, maximum: 1000000 }
+                amountPerPackage: { type: number, exclusiveMinimum: 0, maximum: 1000000 }
+                packageUnit: { type: string, maxLength: 30 }
+                sublocation: { type: string, maxLength: 120 }
+                purchaseDate: { type: string, format: date }
+                bestBeforeDate: { type: string, format: date }
+                useByDate: { type: string, format: date }
+                sellByDate: { type: string, format: date }
+                openedDate: { type: string, format: date }
+                frozenDate: { type: string, format: date }
+                thawedDate: { type: string, format: date }
+                preparedDate: { type: string, format: date }
+                expiryPrecision:
+                  type: string
+                  enum: [exact, estimated, month_only, unknown]
+                  default: unknown
+                purchasePriceCents: { type: integer, minimum: 0, maximum: 100000000 }
+                store: { type: string, maxLength: 120 }
+                source: { type: string, maxLength: 160 }
+                notes: { type: string, maxLength: 2000 }
+      responses:
+        '200': { description: Prior intake replayed without another batch }
+        '201': { description: Purchased batch added }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: 'Shopping item, product, or location not found' }
+        '409': { description: Generated item product conflicts with request }
+  /shopping-lists/{listId}/items/{itemId}/pantry-controls:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateShoppingItemPantryControl
+      summary: Mark coverage, ignore Pantry stock, flag inaccurate inventory, add extra demand, or reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: { type: string, enum: [covered, ignore, inaccurate, reset, extra] }
+                quantity: { type: number, minimum: 0, maximum: 1000000 }
+                unit: { type: string, maxLength: 30 }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: Pantry grocery control saved }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Generated shopping item not found }
   /shopping-lists/aisles:
     get:
       operationId: listShoppingAisles
       summary: List household store aisles in durable display order
       responses:
         '200': { description: Ordered shopping aisles }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
       operationId: createShoppingAisle
       summary: Create a bounded unique household store aisle
@@ -823,7 +1212,7 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Profile selection required or aisle order changed }
-  /shopping-lists/aisles/{aisleId}:
+  /shopping-list-aisles/{aisleId}:
     parameters:
       - name: aisleId
         in: path
@@ -1092,7 +1481,7 @@ paths:
   /cook-sessions/{sessionId}/complete:
     post:
       operationId: completeCookSession
-      summary: Mark the current profile's cooking session complete
+      summary: Explicitly confirm adjusted Pantry deductions and complete cooking atomically
       parameters:
         - name: sessionId
           in: path
@@ -1100,8 +1489,334 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200': { description: Cooking session completed }
+        '400': { description: Explicit confirmation or deduction input missing }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Cooking session not found }
+        '409': { description: Pantry stock or cooking session changed }
+  /cook-sessions/{sessionId}/pantry:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getCookSessionPantryPreview
+      summary: Refresh the planned-meal identity and server-derived FEFO Pantry review
+      responses:
+        '200':
+          { description: 'Exact batch, location, expiry, quantity, and compatible-product review' }
+        '404': { description: Cooking session not found }
+        '409': { description: Profile selection required }
+    post:
+      operationId: previewCookSessionPantryAllocation
+      summary: Recalculate an adjusted one-cook product and quantity using server FEFO rules
+      responses:
+        '200': { description: Adjusted server-derived exact batch review }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Cooking session or Pantry product not found }
+        '409': { description: Profile selection required }
+  /cook-sessions/{sessionId}/pantry/undo:
+    post:
+      operationId: undoCookSessionPantry
+      summary: Undo unchanged cooking deductions with compensating events
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Pantry deductions undone }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Pantry cook record not found }
+        '409': { description: Stock or linked leftovers changed and require review }
+  /pantry/summary:
+    get:
+      operationId: getPantrySummary
+      summary: Read filtered Pantry inventory and summary totals
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 160 } }
+        - {
+            name: view,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [all, pantry, refrigerator, freezer, low_stock, opened, recent],
+              },
+          }
+        - {
+            name: sort,
+            in: query,
+            schema: { type: string, enum: [name, expiry, quantity, added, updated, location] },
+          }
+      responses:
+        '200': { description: 'Products, locations, batches, summary totals, and recent history' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+  /pantry/products:
+    get:
+      operationId: listPantryProducts
+      summary: List canonical Pantry products
+      responses:
+        '200': { description: Canonical products with aliases and identifiers }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+    post:
+      operationId: createPantryProduct
+      summary: Create a canonical Pantry product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PantryProductInput' }
+      responses:
+        '201': { description: Canonical product created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile required or duplicate product }
+  /pantry/products/{productId}:
+    patch:
+      operationId: updatePantryProduct
+      summary: Replace one canonical Pantry product definition
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PantryProductInput' }
+      responses:
+        '200': { description: Canonical product updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Product not found }
+        '409': { description: Product conflict or active profile required }
+  /pantry/locations:
+    get:
+      operationId: listPantryLocations
+      summary: List the nested Pantry storage tree
+      responses:
+        '200': { description: Active storage locations with paths }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+    post:
+      operationId: createPantryLocation
+      summary: Create a Pantry storage location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PantryLocationInput' }
+      responses:
+        '201': { description: Storage location created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile required or duplicate sibling location }
+  /pantry/locations/{locationId}:
+    patch:
+      operationId: updatePantryLocation
+      summary: Rename, move, archive, or restore a storage location
+      parameters:
+        - { name: locationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PantryLocationInput' }
+      responses:
+        '200': { description: Storage location updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Location not found }
+        '409': { description: Location contains active stock/children or active profile required }
+  /pantry/batches:
+    get:
+      operationId: listPantryBatches
+      summary: List filtered physical Pantry batches
+      responses:
+        '200':
+          { description: 'Physical batches with product, location, quantity, and expiry state' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+    post:
+      operationId: createPantryBatch
+      summary: Add a physical Pantry batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PantryBatchInput' }
+      responses:
+        '201': { description: Physical batch and immutable add event created }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Active profile required }
+  /pantry/batches/{batchId}:
+    patch:
+      operationId: updatePantryBatch
+      summary: Replace version-protected physical batch details
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/PantryBatchInput' }
+                - type: object
+                  required: [expectedVersion]
+                  properties:
+                    expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Batch and immutable edit event updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Batch not found }
+        '409': { description: Stale version or active profile required }
+  /pantry/batches/{batchId}/actions:
+    post:
+      operationId: applyPantryBatchAction
+      summary: Apply and record one version-protected stock action
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, expectedVersion]
+              properties:
+                type:
+                  {
+                    type: string,
+                    enum:
+                      [
+                        consume,
+                        consume_one,
+                        mark_empty,
+                        open,
+                        move,
+                        freeze,
+                        thaw,
+                        correct,
+                        discard,
+                        donate,
+                        restore,
+                        split,
+                        combine,
+                        undo,
+                      ],
+                  }
+                expectedVersion: { type: integer, minimum: 1 }
+                quantity: { type: number, exclusiveMinimum: 0 }
+                unit: { type: string, maxLength: 30 }
+                locationId: { type: string, format: uuid }
+                targetBatchId: { type: string, format: uuid }
+                targetExpectedVersion: { type: integer, minimum: 1 }
+                reason: { type: string, maxLength: 160 }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          { description: Updated batch and immutable action event or paired split/combine events }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Batch or destination location not found }
+        '409':
+          {
+            description: 'Stale source/peer version, insufficient or incompatible stock, lossy combine metadata, or active profile required',
+          }
+  /pantry/events:
+    get:
+      operationId: listPantryEvents
+      summary: Read bounded immutable Pantry history
+      parameters:
+        - { name: batchId, in: query, schema: { type: string, format: uuid } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+      responses:
+        '200': { description: 'Newest Pantry events, optionally limited to one batch' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+  /pantry/mappings/{ingredientId}:
+    parameters:
+      - in: path
+        name: ingredientId
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      operationId: setRecipeIngredientPantryMapping
+      summary: Save an actor-attributed manual Pantry mapping without changing recipe text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [productId]
+              properties:
+                productId: { type: string, format: uuid }
+                compatibleVariant: { type: boolean, default: false }
+                isOptional: { type: boolean, default: false }
+      responses:
+        '200': { description: 'Saved manual ingredient mapping' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: 'Ingredient or active Pantry product not found' }
+        '409': { description: 'Active profile selection required' }
+    delete:
+      operationId: removeRecipeIngredientPantryMapping
+      summary: Remove a manual Pantry mapping without changing recipe text
+      responses:
+        '204': { description: 'Mapping removed' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: 'Mapping not found' }
+        '409': { description: 'Active profile selection required' }
+  /pantry/recipes/{recipeId}/availability:
+    get:
+      operationId: getRecipePantryAvailability
+      summary: Calculate serving-scaled recipe availability from compatible exact stock
+      parameters:
+        - in: path
+          name: recipeId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: servings
+          schema: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+      responses:
+        '200':
+          description: >-
+            Ready, partial, or unknown ingredient-level availability with matching batches,
+            locations, planned commitments, projected remainder, and recorded expiry context.
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { description: 'Recipe not found' }
+  /pantry/demand:
+    get:
+      operationId: getProjectedPantryDemand
+      summary: Allocate non-mutating Pantry demand chronologically across active planned meals
+      parameters:
+        - in: query
+          name: weekStart
+          required: true
+          description: Real Gregorian calendar date at the inclusive start of the range.
+          schema: { type: string, format: date }
+        - in: query
+          name: weekEnd
+          required: true
+          description: Real Gregorian calendar date at the inclusive end of the range.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: >-
+            Read-only demand lines distinguish covered, definitive shortage, and uncertain
+            conclusions. Uncertain lines expose a null shortageQuantity and an
+            uncertaintyReason when approximate or incompatible stock could change the result.
+            Skipped, cancelled, and meals with completed linked cook sessions are excluded.
+            Lines can include projected remainder, later exhaustion, earliest recorded expiry,
+            and recorded expiry-before-meal conflicts without food-safety conclusions.
+        '400': { $ref: '#/components/responses/InvalidRequest' }
   /integrations/homepage/v1/summary:
     servers:
       - url: /api
@@ -1132,6 +1847,51 @@ components:
       scheme: bearer
       bearerFormat: opaque integration token
   schemas:
+    PantryProductInput:
+      type: object
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        brand: { type: string, maxLength: 120 }
+        variant: { type: string, maxLength: 120 }
+        category: { type: string, maxLength: 80 }
+        aliases: { type: array, maxItems: 30, items: { type: string, maxLength: 120 } }
+        defaultInventoryUnit: { type: string, maxLength: 30, default: each }
+        defaultStorageType: { type: string, enum: [pantry, refrigerator, freezer, counter, other] }
+        isStaple: { type: boolean, default: false }
+        reorderThreshold: { type: [number, 'null'], minimum: 0 }
+        stockUnit: { type: string, maxLength: 30 }
+    PantryLocationInput:
+      type: object
+      required: [name, storageType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        parentId: { type: string }
+        storageType: { type: string, enum: [pantry, refrigerator, freezer, counter, other] }
+        description: { type: string, maxLength: 500 }
+        archived: { type: boolean, default: false }
+    PantryBatchInput:
+      type: object
+      required: [productId, locationId]
+      properties:
+        productId: { type: string, format: uuid }
+        quantityRemaining: { type: [number, 'null'], minimum: 0 }
+        originalQuantity: { type: [number, 'null'], exclusiveMinimum: 0 }
+        unit: { type: string, maxLength: 30 }
+        approximateState:
+          {
+            type: [string, 'null'],
+            enum: [full, three_quarters, half, quarter, almost_empty, unknown, null],
+          }
+        locationId: { type: string, format: uuid }
+        bestBeforeDate: { type: [string, 'null'], format: date }
+        useByDate: { type: [string, 'null'], format: date }
+        status:
+          {
+            type: string,
+            enum: [unopened, opened, frozen, thawed, reserved, depleted, discarded, donated],
+          }
+        notes: { type: string, maxLength: 2000 }
     HomepageSummary:
       type: object
       required: [generatedAt, nextMeal, groceryList]
@@ -1189,6 +1949,31 @@ components:
         temperatureUnit: { type: string, enum: [C, F] }
         locale: { type: string }
         timezone: { type: string }
+        mainGoals: { type: string, maxLength: 2000 }
+        goalContext:
+          type: object
+          additionalProperties: false
+          properties:
+            focusAreas:
+              type: array
+              maxItems: 8
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - feel-healthier
+                  - weight-goals
+                  - organized-meals
+                  - easier-groceries
+                  - understand-nutrition
+                  - cook-more
+                  - discover-recipes
+                  - reduce-food-waste
+                  - save-money
+                  - support-dietary-needs
+            motivation: { type: string, maxLength: 800 }
+            challenges: { type: string, maxLength: 800 }
+            successVision: { type: string, maxLength: 800 }
     ProfileArchiveInput:
       type: object
       required: [archived]
@@ -1233,6 +2018,11 @@ components:
           type: array
           maxItems: 2000
           items: { type: string, format: uuid }
+    CollectionRecipeInput:
+      type: object
+      required: [recipeId]
+      properties:
+        recipeId: { type: string, format: uuid }
     CaptureDraftRequest:
       oneOf:
         - type: object
@@ -1387,6 +2177,15 @@ components:
             - { type: integer, minimum: 1, maximum: 5 }
             - { type: 'null' }
         note: { type: string, maxLength: 2000 }
+    RecipeReactionInput:
+      type: object
+      additionalProperties: false
+      required: [score]
+      properties:
+        score:
+          oneOf:
+            - { type: integer, enum: [1, 3, 5] }
+            - { type: 'null' }
     RecipeRevisionRestoreInput:
       type: object
       required: [expectedRevision]

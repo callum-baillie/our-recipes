@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T025",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T025-intake-review.md"],
+  "commands": [{ "cmd": "read-only audit of migration 0019, schema, intake domain/service, authorization and focused/full evidence", "status": "pass" }],
+  "summary": "Approved T024: append-only latest-revision checks, cross-profile isolation, fixed private permissions, frozen recipe/product/source/calculation/portion evidence, and explicit allocation-to-intake linking preserve privacy and history while keeping planned/Pantry/cooked state out of consumption. The next required boundary is signed-session resolution and trusted-origin authenticated APIs.",
+  "note": "notes/T025-intake-review.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T093",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T093-first-chart-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only calorie, macro, target/range/limit, missing/ambiguity, planned-separation and accessibility audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved server-owned calorie, macro and semantic coverage panels with no planned/consumed summing or goal guessing.",
+  "note": "notes/T093-first-chart-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The bounded first chart Worker must be delivered and audited before richer aggregate services."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

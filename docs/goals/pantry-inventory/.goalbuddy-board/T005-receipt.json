@@ -1,0 +1,52 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "full_outcome_complete": false,
+  "rationale": "Rejected at the migration/data-integrity gate. Exact and approximate batch measurement can coexist; reversible snapshots omit product and source links; event timestamps do not deterministically order undo; archived products can hide active batches; and multi-batch FEFO does not check optimistic updates or opened-shelf-life effective expiry.",
+  "worker_package": {
+    "objective": "Repair the Pantry foundation integrity as one coherent slice: enforce mutually exclusive exact-versus-approximate measurements in validation and storage; make every reversible batch edit capture and restore product and source-link state; give events deterministic per-batch ordering for most-recent undo; prevent product archival from hiding active physical stock; make FEFO use effective expiry including opened shelf life; and fail atomically when any optimistic multi-batch deduction update does not change exactly one row. Add focused regression coverage without touching recipe availability, projected demand, or concurrent nutrition/reaction behavior.",
+    "allowed_files": [
+      "src/lib/db/schema.ts",
+      "drizzle/0015_pantry_inventory.sql",
+      "src/lib/domain/pantry.ts",
+      "src/lib/services/pantry-service.ts",
+      "tests/unit/pantry.test.ts",
+      "tests/integration/pantry-service.test.ts"
+    ],
+    "verify": [
+      "pnpm exec prettier --check src/lib/db/schema.ts src/lib/domain/pantry.ts src/lib/services/pantry-service.ts tests/unit/pantry.test.ts tests/integration/pantry-service.test.ts",
+      "pnpm exec vitest run --project unit tests/unit/pantry.test.ts",
+      "pnpm exec vitest run --project integration tests/integration/pantry-service.test.ts",
+      "pnpm test",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm build",
+      "$env:DATABASE_URL='.test-data/pantry-integrity-repair.db'; pnpm db:migrate; pnpm db:check",
+      "git diff --check -- src/lib/db/schema.ts drizzle/0015_pantry_inventory.sql src/lib/domain/pantry.ts src/lib/services/pantry-service.ts tests/unit/pantry.test.ts tests/integration/pantry-service.test.ts"
+    ],
+    "stop_if": [
+      "Migration 0015 is found applied to any persistent, non-disposable, or shipped database; return that evidence before editing migration SQL so the PM can scope an additive migration.",
+      "The repair requires destructive migration behavior, mutation of data/our-recipes.db, or deletion of Pantry history.",
+      "The repair requires files outside allowed_files; return the exact missing paths before editing them.",
+      "Any change would overwrite or reformat unrelated nutrition, recipe-reaction, planner, cooking, API, page, CSS, documentation, or E2E work currently dirty in the worktree.",
+      "A profile is treated as an authorization boundary rather than signed ActorContext attribution.",
+      "Verification fails twice for a cause that cannot be fixed inside allowed_files."
+    ]
+  },
+  "evidence": [
+    "drizzle/0015_pantry_inventory.sql",
+    "src/lib/domain/pantry.ts",
+    "src/lib/services/pantry-service.ts",
+    "tests/integration/pantry-service.test.ts",
+    "docs/goals/pantry-inventory/notes/T004-foundation-receipt.md"
+  ],
+  "blocked_tasks": [
+    "Recipe availability and projected meal-demand integration until repair and re-audit pass."
+  ],
+  "missing_evidence": [
+    "Regression proof for all five integrity defects and fresh migration alignment."
+  ],
+  "required_board_updates": [
+    "Mark T005 done, activate T006 repair, then require a fresh Judge re-audit."
+  ]
+}

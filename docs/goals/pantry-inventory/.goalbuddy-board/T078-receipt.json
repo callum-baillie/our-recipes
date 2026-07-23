@@ -1,0 +1,14 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T078", "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/components/shopping-list-editor.tsx", "tests/e2e/pantry-grocery-intake.spec.ts"],
+    "commands": [
+      {"cmd": "pre-hash and protected guards", "status": "pass"}, {"cmd": "scoped Prettier and ESLint", "status": "pass"}, {"cmd": "unchanged focused Pantry unit", "status": "pass", "summary": "8/8"}, {"cmd": "two-file diff check", "status": "pass"}, {"cmd": "protected hashes", "status": "pass"}, {"cmd": "port 3100 clear", "status": "pass"}
+    ],
+    "summary": "The two-file purchase-lifecycle repair is implemented and scoped checks pass. Full typecheck repeatedly fails only in concurrent untracked tests/unit/nutrition-household.test.ts, so no mirror/build/browser lifecycle was started and that file was not modified or masked.",
+    "deviations": ["Typecheck errors at Nutrition test lines 39-40: callback union arity and object where readonly link array required."],
+    "remaining_blockers": ["Concurrent Nutrition typecheck settlement", "Mirror/build", "Three browser oracles"],
+    "verification_attempts": 3,
+    "stopped_because": "Required typecheck remained broken by concurrent untracked work outside allowed files."
+  }
+}

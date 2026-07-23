@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+import { RECIPE_REACTION_SCORES } from '@/lib/domain/recipe-reaction';
+import { NUTRIENT_CODES } from '@/lib/domain/nutrition';
+
 const boundedText = (max: number) => z.string().trim().max(max);
 const requiredText = (max: number) => boundedText(max).min(1);
 const optionalNutritionValue = z
@@ -97,6 +100,7 @@ export const recipeIngredientSchema = z.object({
   unit: boundedText(30),
   item: requiredText(160),
   note: boundedText(240),
+  pantryProductId: z.union([z.literal(''), z.string().uuid()]).optional(),
 });
 
 export const recipeIngredientGroupSchema = z.object({
@@ -174,6 +178,17 @@ export const recipePreferenceInputSchema = z.object({
 
 export type RecipePreferenceInput = z.output<typeof recipePreferenceInputSchema>;
 
+export const recipeReactionInputSchema = z
+  .object({
+    score: z.union([
+      z.null(),
+      z.literal(RECIPE_REACTION_SCORES.dislike),
+      z.literal(RECIPE_REACTION_SCORES.like),
+      z.literal(RECIPE_REACTION_SCORES.staple),
+    ]),
+  })
+  .strict();
+
 export const recipeLibraryQuerySchema = z.object({
   q: boundedText(160).default(''),
   creator: z.string().uuid().optional(),
@@ -186,6 +201,26 @@ export const recipeLibraryQuerySchema = z.object({
   maxTotalMinutes: z.coerce.number().int().min(1).max(30_240).optional(),
   favorite: z.enum(['true']).optional(),
   cooked: z.enum(['true']).optional(),
+  pantry: z.enum(['ready', 'partial', 'unknown']).optional(),
+  maxCaloriesPerServing: z.coerce.number().finite().min(0).max(100_000).optional(),
+  minProteinPerServing: z.coerce.number().finite().min(0).max(100_000).optional(),
+  minFiberPerServing: z.coerce.number().finite().min(0).max(100_000).optional(),
+  maxSodiumPerServing: z.coerce.number().finite().min(0).max(10_000_000).optional(),
+  minNutritionCompleteness: z.coerce.number().finite().min(0).max(100).optional(),
+  supportsNutrient: z.enum(NUTRIENT_CODES).optional(),
+  nutritionFields: z
+    .preprocess(
+      (value) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]),
+      z
+        .array(z.enum(['energy_kcal', 'protein', 'carbohydrate', 'total_fat', 'fiber', 'sodium']))
+        .min(1)
+        .max(5)
+        .refine((values) => new Set(values).size === values.length, {
+          message: 'Compact Nutrition fields must be unique.',
+        })
+        .optional(),
+    )
+    .optional(),
   status: z.enum(['active', 'archived', 'trash', 'all']).default('active'),
   sort: z
     .enum([
@@ -195,6 +230,11 @@ export const recipeLibraryQuerySchema = z.object({
       'most-recently-cooked',
       'shortest-time',
       'highest-rated',
+      'lowest-calories',
+      'highest-protein',
+      'highest-fiber',
+      'lowest-sodium',
+      'highest-nutrition-completeness',
     ])
     .default('recently-updated'),
   page: z.coerce.number().int().min(1).default(1),

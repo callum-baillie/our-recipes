@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 import { useToast } from '@/components/toast-provider';
 
-const APP_CACHE_PREFIX = 'our-recipes-read-';
-const UPDATE_QUERY_PARAM = '__our_recipes_updated';
+const APP_CACHE_PREFIXES = ['bord-read-', 'our-recipes-read-'];
+const UPDATE_QUERY_PARAM = '__bord_updated';
+const LEGACY_UPDATE_QUERY_PARAM = '__our_recipes_updated';
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1_000;
 
 function updateUrl(version: string): string {
@@ -16,9 +17,12 @@ function updateUrl(version: string): string {
 
 function takeUpdateMarker(): string | null {
   const current = new URL(window.location.href);
-  const version = current.searchParams.get(UPDATE_QUERY_PARAM);
+  const version =
+    current.searchParams.get(UPDATE_QUERY_PARAM) ??
+    current.searchParams.get(LEGACY_UPDATE_QUERY_PARAM);
   if (!version) return null;
   current.searchParams.delete(UPDATE_QUERY_PARAM);
+  current.searchParams.delete(LEGACY_UPDATE_QUERY_PARAM);
   window.history.replaceState(window.history.state, '', current);
   return version;
 }
@@ -26,16 +30,32 @@ function takeUpdateMarker(): string | null {
 async function removeAppCaches(): Promise<void> {
   const keys = await window.caches.keys();
   await Promise.all(
-    keys.filter((key) => key.startsWith(APP_CACHE_PREFIX)).map((key) => window.caches.delete(key)),
+    keys
+      .filter((key) => APP_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix)))
+      .map((key) => window.caches.delete(key)),
   );
+}
+
+function subscribeToConnectivity(callback: () => void): () => void {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
 }
 
 export function PwaRegistration() {
   const { showToast } = useToast();
+  const online = useSyncExternalStore(
+    subscribeToConnectivity,
+    () => navigator.onLine,
+    () => true,
+  );
 
   useEffect(() => {
     const updatedVersion = takeUpdateMarker();
-    if (updatedVersion) showToast(`Our Recipes updated to ${updatedVersion}.`, 'success');
+    if (updatedVersion) showToast(`Bòrd updated to ${updatedVersion}.`, 'success');
 
     if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
     const shouldRegister =
@@ -68,7 +88,7 @@ export function PwaRegistration() {
     }
 
     function handleWorkerMessage(event: MessageEvent) {
-      if (event.data?.type === 'OUR_RECIPES_UPDATED') {
+      if (event.data?.type === 'BORD_UPDATED' || event.data?.type === 'OUR_RECIPES_UPDATED') {
         reloadForUpdate(String(event.data.version || 'the current version'));
       }
     }
@@ -106,5 +126,9 @@ export function PwaRegistration() {
     };
   }, [showToast]);
 
-  return null;
+  return online ? null : (
+    <div className="offline-read-only-banner" role="status">
+      Offline reading only. Changes are unavailable and will not be queued.
+    </div>
+  );
 }

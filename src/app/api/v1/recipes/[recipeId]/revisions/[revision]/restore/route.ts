@@ -7,7 +7,7 @@ import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   RecipeConflictError,
   RecipeRevisionNotFoundError,
-  restoreRecipeRevision,
+  restoreRecipeRevisionWithIntegrations,
 } from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
@@ -42,14 +42,14 @@ export async function POST(
     return jsonError(400, 'invalid_recipe_revision', 'Choose a valid saved recipe version.');
   }
   try {
-    return NextResponse.json({
-      recipe: restoreRecipeRevision(
+    return NextResponse.json(
+      restoreRecipeRevisionWithIntegrations(
         recipeId,
         sourceRevision,
         actor.profileId,
         input.data.expectedRevision,
       ),
-    });
+    );
   } catch (error) {
     if (error instanceof RecipeRevisionNotFoundError)
       return jsonError(404, 'recipe_revision_not_found', error.message);

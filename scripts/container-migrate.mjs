@@ -5,8 +5,12 @@ import { access, mkdir, open, rm } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+import lineageRecovery from './migration-lineage-recovery.cjs';
+
+const { assertDuplicate0026Lineage, recoverDuplicate0026Lineage } = lineageRecovery;
+
 const dataDirectory = resolve(process.cwd(), process.env.DATA_DIR ?? '/data');
-const configuredDatabase = process.env.DATABASE_URL ?? join(dataDirectory, 'our-recipes.db');
+const configuredDatabase = process.env.DATABASE_URL ?? join(dataDirectory, 'bord.db');
 const databasePath = configuredDatabase.startsWith('file:')
   ? configuredDatabase.slice('file:'.length)
   : configuredDatabase;
@@ -53,7 +57,10 @@ try {
         throw new Error('SQLite integrity check failed before migration.');
       }
     }
-    migrate(drizzle(sqlite), { migrationsFolder: resolve(process.cwd(), 'drizzle') });
+    const migrationsFolder = resolve(process.cwd(), 'drizzle');
+    recoverDuplicate0026Lineage(sqlite, migrationsFolder);
+    migrate(drizzle(sqlite), { migrationsFolder });
+    assertDuplicate0026Lineage(sqlite, migrationsFolder);
   } finally {
     sqlite.close();
   }

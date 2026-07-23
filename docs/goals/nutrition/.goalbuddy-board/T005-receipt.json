@@ -1,0 +1,48 @@
+{
+  "result": "done",
+  "task_id": "T005",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "summary": "Pantry foundation work is now real but still active and unverified: product/batch/event schema, safe units, service, APIs, page and navigation exist, while approved Pantry tests/docs/receipt are missing. Reusable pantryProducts plus recipeIngredientProductMappings is the provisional canonical product/ingredient nutrition anchor; physical batches remain availability only. Schema/journal/Pantry files are externally owned and unsafe to overlap. Current lint, types, 85 unit tests and 30 integration tests pass. The next safe Nutrition slice is a separate local credential/session plus profile/goal/permission validation kernel in new files; normalized persistence must wait for Pantry migration review.",
+  "evidence": [
+    "docs/goals/nutrition/notes/T005-pantry-refresh.md",
+    "docs/goals/pantry-inventory/state.yaml",
+    "drizzle/0015_pantry_inventory.sql",
+    "src/lib/db/schema.ts",
+    "src/lib/domain/inventory-units.ts",
+    "src/lib/domain/pantry.ts",
+    "src/lib/services/pantry-service.ts",
+    "src/app/api/v1/pantry",
+    "src/app/pantry/page.tsx",
+    "src/components/pantry-manager.tsx"
+  ],
+  "facts": [
+    "Pantry Worker T004 remains active with no receipt or package verification.",
+    "pantryProducts is separate from pantryBatches and supports generic or packaged reusable food identity.",
+    "recipeIngredientProductMappings is the present recipe-to-product bridge.",
+    "Pantry unit conversion rejects incompatible dimensions and has no density conversion.",
+    "Pantry stock deduction is explicit and transactional but not consumption.",
+    "No Pantry nutrient data, planner allocation, grocery shortage or consumption integration exists yet.",
+    "Lint, typecheck, 85 unit tests and 30 integration tests pass at this snapshot."
+  ],
+  "contradictions": [
+    "The desired Nutrition persistence slice overlaps schema/journal files currently owned by an active Pantry Worker.",
+    "Existing ActorContext is adequate for shared Pantry attribution but cannot enforce private Nutrition viewing.",
+    "Pantry product identity looks suitable but lacks completed migration/data-integrity acceptance evidence."
+  ],
+  "ambiguity_requiring_judge": [
+    "Approve the separate local Nutrition principal credential/session contract.",
+    "Keep Pantry product as provisional nutrition anchor until Pantry review.",
+    "Define the exact new-file privacy/access Worker package while persistence overlap is unsafe.",
+    "Preserve legacy recipe nutrition as explicitly unknown-provenance per-serving data in a later migration."
+  ],
+  "commands": [
+    "Current file, symbol, goal-board and git-status inspection",
+    "pnpm lint (pass)",
+    "pnpm typecheck (pass)",
+    "pnpm test:unit (pass: 85)",
+    "pnpm test:integration (pass: 30)"
+  ],
+  "note_needed": true,
+  "note": "notes/T005-pantry-refresh.md",
+  "harness": "codex-pm-fallback"
+}

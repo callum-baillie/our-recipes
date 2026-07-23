@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "changed_files": [
+    "src/lib/domain/pantry-availability.ts",
+    "src/components/meal-plan-pantry-demand.tsx",
+    "src/components/meal-plan-pantry-demand.module.css",
+    "tests/unit/pantry-availability.test.ts",
+    "tests/integration/pantry-availability-service.test.ts",
+    "docs/openapi.yaml",
+    "docs/api.md",
+    "docs/decisions/0031-pantry-availability-and-demand.md"
+  ],
+  "commands": [
+    { "cmd": "pnpm exec prettier --check <T011 scoped files>", "status": "pass" },
+    { "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-availability.test.ts", "status": "pass", "summary": "6 tests passed" },
+    { "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-availability-service.test.ts", "status": "pass", "summary": "3 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "137 unit and 50 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm openapi:validate", "status": "pass", "summary": "Valid with 11 existing warnings" },
+    { "cmd": "git diff --check", "status": "pass" }
+  ],
+  "summary": "Repaired duplicate same-product recipe allocation with one deterministic calculation-only stock pool. Projected demand now exposes covered, definitive shortage, and uncertain states with nullable shortage math and explicit approximate/incompatible reasons. Added semantic date validation, planner presentation, docs, and regressions while preserving non-mutation and mapping attribution."
+}

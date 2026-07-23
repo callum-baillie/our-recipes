@@ -1,0 +1,11 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T099", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Move role=status from finishStatus container to existing message paragraph only. Controls remain adjacent visually but excluded from live announcement; text, DOM elements, ordering, logic, CSS, and both E2E contracts remain.",
+    "worker_package": {"objective": "Move one role attribute only, then focused/type/build, cooking/workflow, disposable DB, final integrity; retain grocery/recipe passes.", "allowed_files": ["src/components/cooking-mode.tsx"], "verify": ["Require T099 hashes and role-only diff.", "Run scoped format/lint, focused unit, typecheck, isolated build.", "Run unchanged cooking and workflow E2Es separately.", "Run disposable DB and final live PID/port/hash/diff/status integrity."], "stop_if": ["Hashes differ or diff beyond role placement.", "Any text/control/order/DOM/CSS/logic/test change or E2E failure.", "Live/shared/protected/unrelated state touched."]},
+    "evidence": ["Container currently wraps message and controls in status.", "Existing first paragraph contains only finishStatus.", "New cooking locates controls separately; old workflow expects exact status."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One DOM-role boundary and two serial oracles."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Cooking/workflow/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T099 done.", "Activate component Worker.", "Retain grocery/recipe passes.", "Require final Judge."]
+  }
+}

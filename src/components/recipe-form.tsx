@@ -1,9 +1,12 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronDown, ChevronUp, LoaderCircle, Minus, Plus, Save, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Minus, Plus, Save, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+
+import { InlineSkeleton } from '@/components/skeleton';
+import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -141,6 +144,30 @@ function IngredientGroupEditor({
               `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.note` as const,
             )}
           />
+          <input
+            type="hidden"
+            {...form.register(
+              `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId` as const,
+            )}
+          />
+          <FoodCatalogPicker
+            context="recipe"
+            defaultQuery={form.getValues(
+              `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
+            )}
+            onImported={(product) => {
+              form.setValue(
+                `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
+                product.displayName,
+                { shouldDirty: true },
+              );
+              form.setValue(
+                `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId` as const,
+                product.id,
+                { shouldDirty: true },
+              );
+            }}
+          />
           <div className="reorder-actions compact-actions">
             <button
               className="icon-button"
@@ -175,7 +202,9 @@ function IngredientGroupEditor({
       <button
         className="text-button"
         type="button"
-        onClick={() => ingredients.append({ quantity: '', unit: '', item: '', note: '' })}
+        onClick={() =>
+          ingredients.append({ quantity: '', unit: '', item: '', note: '', pantryProductId: '' })
+        }
       >
         <Plus size={16} /> Add ingredient
       </button>
@@ -336,11 +365,13 @@ export function RecipeForm({
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? [];
   const category = useWatch({ control: form.control, name: 'category' }) ?? '';
   const cuisine = useWatch({ control: form.control, name: 'cuisine' }) ?? '';
-  const draftKey = `our-recipes:recipe-draft:${recipeId ?? 'new'}`;
+  const draftKey = `bord:recipe-draft:${recipeId ?? 'new'}`;
+  const legacyDraftKey = `our-recipes:recipe-draft:${recipeId ?? 'new'}`;
 
   useEffect(() => {
     let restoreTimer: number | undefined;
-    const rawDraft = window.localStorage.getItem(draftKey);
+    const rawDraft =
+      window.localStorage.getItem(draftKey) ?? window.localStorage.getItem(legacyDraftKey);
     if (!rawDraft) return undefined;
     try {
       const parsed = JSON.parse(rawDraft) as StoredDraft;
@@ -367,7 +398,7 @@ export function RecipeForm({
     return () => {
       if (restoreTimer) window.clearTimeout(restoreTimer);
     };
-  }, [draftKey]);
+  }, [draftKey, legacyDraftKey]);
 
   useEffect(() => {
     if (form.formState.isDirty)
@@ -398,6 +429,8 @@ export function RecipeForm({
       });
       const body = (await response.json().catch(() => null)) as {
         recipe?: { id: string };
+        nutritionMappingRestore?: { missing?: number };
+        nutritionRecalculation?: { status?: string; message?: string };
         error?: { message?: string };
       } | null;
       if (!response.ok || !body?.recipe) {
@@ -407,8 +440,19 @@ export function RecipeForm({
         return;
       }
       window.localStorage.removeItem(draftKey);
+      window.localStorage.removeItem(legacyDraftKey);
       form.reset(values);
       showToast(recipeId ? 'Recipe revision saved.' : 'Recipe added to your cookbook.', 'success');
+      if (
+        body.nutritionMappingRestore?.missing ||
+        body.nutritionRecalculation?.status === 'unavailable'
+      ) {
+        showToast(
+          body.nutritionRecalculation?.message ??
+            'Recipe saved. Review Pantry mappings or normalized Nutrition for changed ingredients.',
+          'info',
+        );
+      }
       router.push(`/recipes/${body.recipe.id}`);
       router.refresh();
     } catch {
@@ -485,6 +529,7 @@ export function RecipeForm({
                 type="button"
                 onClick={() => {
                   window.localStorage.removeItem(draftKey);
+                  window.localStorage.removeItem(legacyDraftKey);
                   setSavedDraft(null);
                 }}
               >
@@ -600,7 +645,7 @@ export function RecipeForm({
           onClick={() =>
             ingredientGroups.append({
               name: '',
-              ingredients: [{ quantity: '', unit: '', item: '', note: '' }],
+              ingredients: [{ quantity: '', unit: '', item: '', note: '', pantryProductId: '' }],
             })
           }
         >
@@ -622,7 +667,7 @@ export function RecipeForm({
                 title="Uses one paid OpenAI request and keeps ingredients unchanged"
               >
                 {aiImproving ? (
-                  <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                  <InlineSkeleton label="Improving recipe" width="1rem" />
                 ) : (
                   <Sparkles size={16} aria-hidden="true" />
                 )}
@@ -774,7 +819,7 @@ export function RecipeForm({
       )}
       <button className="primary-button" type="submit" disabled={form.formState.isSubmitting}>
         {form.formState.isSubmitting ? (
-          <LoaderCircle className="spin" size={17} aria-hidden="true" />
+          <InlineSkeleton label="Saving recipe" width="1.1rem" />
         ) : (
           <Save size={17} aria-hidden="true" />
         )}{' '}

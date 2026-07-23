@@ -1,0 +1,75 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T015",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [
+      "src/lib/db/schema.ts",
+      "drizzle/0020_pantry_grocery_cooking.sql",
+      "drizzle/meta/_journal.json",
+      "src/lib/domain/pantry-grocery-cooking.ts",
+      "src/lib/services/pantry-service.ts",
+      "src/lib/services/planning-service.ts",
+      "src/lib/services/cooking-service.ts",
+      "src/lib/services/pantry-grocery-cooking-service.ts",
+      "src/app/api/v1/shopping-lists/pantry-shortages/route.ts",
+      "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-intake/route.ts",
+      "src/app/api/v1/cook-sessions/route.ts",
+      "src/app/api/v1/cook-sessions/[sessionId]/complete/route.ts",
+      "src/app/api/v1/cook-sessions/[sessionId]/pantry/undo/route.ts",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "src/components/meal-plan-pantry-demand.module.css",
+      "src/app/lists/[listId]/page.tsx",
+      "src/components/shopping-list-editor.tsx",
+      "src/components/shopping-list-editor.module.css",
+      "src/app/recipes/[recipeId]/cook/page.tsx",
+      "src/components/cooking-mode.tsx",
+      "src/components/cooking-mode.module.css",
+      "tests/unit/pantry-grocery-cooking.test.ts",
+      "tests/integration/pantry-grocery-cooking-service.test.ts",
+      "tests/integration/pantry-grocery-cooking-api.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/security.md",
+      "docs/testing.md",
+      "docs/decisions/0032-pantry-grocery-cooking.md"
+    ],
+    "commands": [
+      { "cmd": "pnpm typecheck", "status": "pass" },
+      {
+        "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts",
+        "status": "pass",
+        "summary": "5 tests passed"
+      },
+      {
+        "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts",
+        "status": "pass",
+        "summary": "6 tests passed"
+      },
+      {
+        "cmd": "pnpm exec prettier --check <exact T015 scoped files>",
+        "status": "fail",
+        "summary": "Seven formatting findings; task-owned findings were formatted before the stop condition."
+      },
+      {
+        "cmd": "pnpm openapi:validate",
+        "status": "fail",
+        "summary": "Two task-owned YAML defects were fixed; final rerun was preempted by the stop condition."
+      },
+      {
+        "cmd": "Get-CimInstance Win32_Process -Filter Name=node.exe",
+        "status": "blocked",
+        "summary": "Active next dev PID 35964 and .next/dev workers own shared build state."
+      }
+    ],
+    "summary": "Implemented additive 0020 persistence, explainable shortages with nonnumeric uncertainty, override-safe regeneration, idempotent location intake, explicit cook confirmation, atomic linked FEFO events, conflict-aware undo, leftovers, UI, APIs, tests, and docs. Focused tests pass. Full verification stopped because an active Next dev process owns shared .next; it was not disrupted.",
+    "deviations": [],
+    "remaining_blockers": [
+      "Stop the active Recipe next dev process and its .next/dev workers, then rerun the exact T015 verification sequence through pnpm build and git diff --check."
+    ],
+    "verification_attempts": 1,
+    "stopped_because": "Required pnpm build would take shared .next ownership while an active Next dev process and its workers remain."
+  }
+}

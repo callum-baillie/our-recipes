@@ -1,0 +1,37 @@
+{
+  "result": "done",
+  "task_id": "T088",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T088-personalized-energy-source-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "primary-source NASEM 2023 adult EER equation and applicability review",
+      "status": "pass",
+      "summary": "Table 5-16 eight adult equations, units and weight-stable boundary captured"
+    },
+    {
+      "cmd": "primary-source USDA DRI input/category/disclaimer review",
+      "status": "pass",
+      "summary": "four explicit PAL categories and user-input limitations captured"
+    },
+    {
+      "cmd": "current profile/reference/goal/settings feasibility audit",
+      "status": "pass",
+      "summary": "schema-free adult non-pregnant/non-lactating preview/apply package identified"
+    }
+  ],
+  "summary": "Mapped an exact primary-source, adult-only, consent-gated NASEM 2023 EER package and excluded unsupported life stages without inference.",
+  "note": "notes/T088-personalized-energy-source-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same primary-source map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must verify every coefficient, applicability boundary, operation-idempotency design and manual-goal preservation before implementation.",
+    "Children, pregnancy and lactation remain unsupported until their additional inputs and equations receive separate review."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

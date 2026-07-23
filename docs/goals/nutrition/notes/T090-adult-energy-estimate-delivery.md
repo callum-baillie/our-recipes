@@ -1,0 +1,11 @@
+# T090 adult NASEM energy estimate delivery
+
+Nutrition Settings now provides an adult-only, consent-gated maintenance-energy preview and explicit goal application using the eight NASEM 2023 Table 5-16 equations. All body/reference inputs are loaded server-side from the exact authorized profile. The request supplies only the current profile version, effective date and a freshly selected Inactive/Low active/Active/Very active category; the generic stored activity field is never translated automatically.
+
+The pure domain module records source ID/version/URL/DOI, exact formula row, completed age, canonical centimeters/kilograms, unrounded result and nearest-whole-kcal display rule. It rejects people under 19, non-finite/negative inputs and unusable results. The server additionally rejects absent consent, incomplete profile evidence and pregnancy/breastfeeding because their required reviewed inputs are not modeled. Wording identifies weight-maintenance scope, PAL uncertainty, individual variability and the absence of medical or weight-loss advice.
+
+Preview is non-mutating and requires both private-profile and goal-management rights. Apply uses the existing append-only goal history with `sourceReferenceId=nasem-eer-2023-table-5-16`. It starts a new series only when no current calorie goal exists; otherwise the user must select the exact latest goal version to supersede. The old manual/reference row remains immutable. An operation UUID makes exact retries return the same row and rejects reuse with different evidence. The strict signed route retains trusted-origin checks and rejects client-supplied body facts.
+
+Verification passed: 12 focused unit/component tests, 4 focused service/API integration tests, 190 full unit tests, 114 full integration tests, full ESLint and TypeScript, focused Prettier/scoped diff checks and a production build. The build retained the existing backup-service NFT trace warning. No schema, migration, non-energy DRI, child/life-stage calculation, Pantry, planner, recommendation, permission or external-provider behavior changed.
+
+The exact GoalBuddy Worker exceeded the single 30-second wait and was interrupted. The PM completed the same bounded allowed-file package as permitted fallback.

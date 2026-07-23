@@ -1,0 +1,64 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T018",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "rejected",
+    "full_outcome_complete": false,
+    "rationale": "Active generated rows now have complete provenance and both transaction repairs are atomic. Obsolete-manual rows still retain and render stale sourceRecipeIds and numeric contribution claims. Intake keys are not retry-stable across rejected fetches or concurrent clicks because the key is persisted only after a Response arrives.",
+    "worker_package": {
+      "objective": "Clear stale generated claims from retained obsolete-manual rows and make intake operation keys persist before dispatch and rotate only after confirmed success, with focused regressions.",
+      "allowed_files": [
+        "src/lib/domain/pantry-grocery-cooking.ts",
+        "src/lib/services/pantry-grocery-cooking-service.ts",
+        "src/components/shopping-list-editor.tsx",
+        "src/components/shopping-list-editor.module.css",
+        "tests/unit/pantry-grocery-cooking.test.ts",
+        "tests/integration/pantry-grocery-cooking-service.test.ts",
+        "tests/integration/pantry-grocery-cooking-api.test.ts",
+        "docs/api.md",
+        "docs/architecture.md",
+        "docs/data-model.md",
+        "docs/security.md",
+        "docs/testing.md",
+        "docs/decisions/0032-pantry-grocery-cooking.md"
+      ],
+      "verify": [
+        "pnpm exec prettier --check <T019 allowed source, tests, and docs>",
+        "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts",
+        "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts",
+        "pnpm test",
+        "pnpm lint",
+        "pnpm typecheck",
+        "pnpm openapi:validate",
+        "git diff --check"
+      ],
+      "stop_if": [
+        "Migration history or schema must change.",
+        "Manual item values would be overwritten.",
+        "Retry stability cannot be achieved inside allowed files.",
+        "Audited Pantry boundaries or concurrent work would regress.",
+        "Shared .next ownership is required."
+      ]
+    },
+    "evidence": [
+      "Obsolete overridden rows change demandState but retain generated source and numeric provenance.",
+      "The UI renders stored contributions for manual obsolete rows.",
+      "Client intake operation keys are stored only after fetch returns.",
+      "Active-row provenance, atomic overrides, atomic undo conflicts, FEFO, origins, and ActorContext are sound."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "The remaining persistence and client state seams share focused tests and documentation." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Cleared obsolete generated claims",
+      "Rejected-fetch and concurrent-retry operation-key proof",
+      "Fresh safe gates, build, rendered workflow, accessibility, and final oracle"
+    ],
+    "required_board_updates": [
+      "Mark T018 done as rejected.",
+      "Activate one T019 Worker.",
+      "Require another Judge before final verification."
+    ]
+  }
+}

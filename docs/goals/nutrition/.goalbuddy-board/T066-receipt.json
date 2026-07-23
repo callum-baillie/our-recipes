@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "task_id": "T066",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-intake-service.ts",
+    "tests/integration/nutrition-diary-lifecycle-service.test.ts",
+    "tests/integration/nutrition-diary-lifecycle-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused intake/lifecycle/API integration tests", "status": "pass", "summary": "17 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "177 unit and 102 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Archived Nutrition profiles are now denied at the shared intake/allocation seam and cannot be repopulated through a retained session.",
+  "note": "notes/T066-archived-profile-guard.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file repair as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

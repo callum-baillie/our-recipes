@@ -1,0 +1,24 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T023",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+    "commands": [
+      { "cmd": "Get-NetTCPConnection -LocalPort 3100", "status": "pass", "summary": "No listener" },
+      { "cmd": "Test-Path C:/Users/Callum/AppData/Local/Temp/our-recipes-pantry-final-T023", "status": "pass", "summary": "False before creation" },
+      { "cmd": "pnpm exec prettier --check tests/e2e/pantry-workflow.spec.ts", "status": "pass" },
+      { "cmd": "Create and audit isolated mirror", "status": "pass", "summary": "Excluded Git, .next, data, test artifacts, env, keys, credentials, and logs; node_modules junction only" },
+      { "cmd": "mirror pnpm format:check attempt 1", "status": "fail", "summary": "pnpm dependency guard refused junctioned node_modules in noninteractive mode" },
+      { "cmd": "mirror pnpm format:check attempt 2", "status": "fail", "summary": "Prettier reported 75 pre-existing files outside T023 allowed_files; assigned spec was clean" }
+    ],
+    "summary": "Added and formatted the focused Pantry workflow E2E spec and created the audited secret-free mirror. Full formatting is blocked by 75 existing out-of-scope files. No server, Playwright, database, provider, Docker, device, backup, normal DB, or shared .next mutation began.",
+    "deviations": ["Disabled pnpm verify-deps-before-run only for the mirror so the junctioned node_modules would not be purged or reinstalled."],
+    "remaining_blockers": [
+      "Mirror-wide formatting fails on 75 existing files outside allowed_files.",
+      "Remaining isolated gates were not run after the stop condition."
+    ],
+    "verification_attempts": 2,
+    "stopped_because": "A required gate failed twice and remediation requires files outside allowed_files."
+  }
+}

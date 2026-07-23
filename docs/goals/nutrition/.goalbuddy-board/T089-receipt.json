@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T089",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T089-energy-reference-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only primary-source coefficient, unit, applicability, PAL, privacy, idempotency and goal-series audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved an adult-only NASEM 2023 EER preview/apply implementation with fresh PAL selection and explicit append-only goal supersession.",
+  "note": "notes/T089-energy-reference-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Children, pregnancy and lactation remain intentionally unsupported.",
+    "A Worker must implement and prove the bounded adult estimate flow before chart work."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

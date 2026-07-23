@@ -1,0 +1,25 @@
+{
+  "result": "done",
+  "task_id": "T046",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T046-planner-cooking-allocation-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only schema, planner, cooking, Pantry, allocation, intake, API, UI, test and ownership map",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped existing event distinctions and scoped a Nutrition-owned planned projection/allocation slice that avoids concurrent dirty planner and Pantry files.",
+  "note": "notes/T046-planner-cooking-allocation-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit, so the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Planner-page integration is deferred until concurrent Pantry ownership releases the dirty planner files."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

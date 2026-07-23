@@ -14,6 +14,7 @@ import {
 } from '@/lib/domain/ai';
 import { normalizeAiRecipeCandidate } from '@/lib/domain/ai-candidate-normalization';
 import type { RecipePayload } from '@/lib/domain/recipe';
+import type { AiReasoningEffort } from '@/lib/domain/ai-assistant';
 
 export const OPENAI_REVIEW_MODEL = 'gpt-5.4-mini';
 export const OPENAI_IMAGE_MODEL = 'gpt-image-2';
@@ -61,14 +62,31 @@ export type AiGeneratedImage = {
   altText: string;
 };
 
+export type AiProviderOptions = { model?: string; reasoningEffort?: AiReasoningEffort | null };
+
 export interface AiProvider {
   readonly name: 'OpenAI';
   getStatus(): AiConnectionStatus;
-  createTextReviewCandidate(input: AiTextReviewInput): Promise<AiRecipeCandidate>;
-  createVisionReviewCandidate(input: AiVisionReviewInput): Promise<AiRecipeCandidate>;
-  generateRecipeImage(input: AiImageGenerationInput): Promise<AiGeneratedImage>;
-  estimateRecipeNutrition(input: AiNutritionEstimationInput): Promise<AiNutritionEstimate>;
-  improveRecipe(input: AiRecipeImprovementInput): Promise<AiRecipeCandidate>;
+  createTextReviewCandidate(
+    input: AiTextReviewInput,
+    options?: AiProviderOptions,
+  ): Promise<AiRecipeCandidate>;
+  createVisionReviewCandidate(
+    input: AiVisionReviewInput,
+    options?: AiProviderOptions,
+  ): Promise<AiRecipeCandidate>;
+  generateRecipeImage(
+    input: AiImageGenerationInput,
+    options?: AiProviderOptions,
+  ): Promise<AiGeneratedImage>;
+  estimateRecipeNutrition(
+    input: AiNutritionEstimationInput,
+    options?: AiProviderOptions,
+  ): Promise<AiNutritionEstimate>;
+  improveRecipe(
+    input: AiRecipeImprovementInput,
+    options?: AiProviderOptions,
+  ): Promise<AiRecipeCandidate>;
 }
 
 export class AiProviderUnavailableError extends Error {
@@ -214,10 +232,15 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  async estimateRecipeNutrition(input: AiNutritionEstimationInput): Promise<AiNutritionEstimate> {
+  async estimateRecipeNutrition(
+    input: AiNutritionEstimationInput,
+    options?: AiProviderOptions,
+  ): Promise<AiNutritionEstimate> {
     try {
       const response = await this.client.responses.parse({
-        model: OPENAI_REVIEW_MODEL,
+        model: options?.model ?? OPENAI_REVIEW_MODEL,
+        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+        store: false,
         instructions: nutritionInstructions,
         input: [
           {
@@ -240,10 +263,15 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  async createTextReviewCandidate(input: AiTextReviewInput): Promise<AiRecipeCandidate> {
+  async createTextReviewCandidate(
+    input: AiTextReviewInput,
+    options?: AiProviderOptions,
+  ): Promise<AiRecipeCandidate> {
     try {
       const response = await this.client.responses.parse({
-        model: OPENAI_REVIEW_MODEL,
+        model: options?.model ?? OPENAI_REVIEW_MODEL,
+        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+        store: false,
         instructions: reviewPrompt(input.improve),
         input: [
           {
@@ -262,10 +290,15 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  async createVisionReviewCandidate(input: AiVisionReviewInput): Promise<AiRecipeCandidate> {
+  async createVisionReviewCandidate(
+    input: AiVisionReviewInput,
+    options?: AiProviderOptions,
+  ): Promise<AiRecipeCandidate> {
     try {
       const response = await this.client.responses.parse({
-        model: OPENAI_REVIEW_MODEL,
+        model: options?.model ?? OPENAI_REVIEW_MODEL,
+        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+        store: false,
         instructions: reviewPrompt(input.improve),
         input: [
           {
@@ -294,10 +327,15 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  async improveRecipe(input: AiRecipeImprovementInput): Promise<AiRecipeCandidate> {
+  async improveRecipe(
+    input: AiRecipeImprovementInput,
+    options?: AiProviderOptions,
+  ): Promise<AiRecipeCandidate> {
     try {
       const response = await this.client.responses.parse({
-        model: OPENAI_REVIEW_MODEL,
+        model: options?.model ?? OPENAI_REVIEW_MODEL,
+        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+        store: false,
         instructions: [
           reviewInstructions,
           improvementInstructions,
@@ -323,7 +361,10 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  async generateRecipeImage(input: AiImageGenerationInput): Promise<AiGeneratedImage> {
+  async generateRecipeImage(
+    input: AiImageGenerationInput,
+    options?: AiProviderOptions,
+  ): Promise<AiGeneratedImage> {
     const title = input.recipeTitle
       .replace(/[\r\n]+/gu, ' ')
       .trim()
@@ -344,7 +385,7 @@ export class OpenAiProvider implements AiProvider {
       .join(', ');
     try {
       const response = await this.client.images.generate({
-        model: OPENAI_IMAGE_MODEL,
+        model: options?.model ?? OPENAI_IMAGE_MODEL,
         prompt: `Create an appetizing editorial food photograph for the household recipe "${title}". ${summary ? `Recipe note: ${summary}. ` : ''}Key ingredients: ${ingredients || 'not specified'}. Show the finished dish only, with no text, logos, labels, watermarks, or people.`,
         size: '1024x1024',
         quality: 'low',

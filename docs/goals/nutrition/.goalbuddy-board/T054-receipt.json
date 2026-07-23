@@ -1,0 +1,37 @@
+{
+  "result": "done",
+  "task_id": "T054",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-prepared-consumption.ts",
+    "src/lib/services/nutrition-prepared-consumption-service.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/[preparedId]/allocations/route.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-meal-planning.tsx",
+    "src/components/nutrition-meal-planning.module.css",
+    "src/components/nutrition-prepared-workspace.tsx",
+    "src/components/nutrition-prepared-workspace.module.css",
+    "src/components/nutrition-dashboard.tsx",
+    "tests/unit/nutrition-prepared-consumption.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-prepared-consumption-service.test.ts",
+    "tests/integration/nutrition-prepared-consumption-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused prepared domain/component unit tests", "status": "pass", "summary": "6 tests passed" },
+    { "cmd": "focused prepared service/API integration tests", "status": "pass", "summary": "8 tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "171 unit and 90 integration tests passed" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Delivered explicit private prepared-batch, served, skipped, leftover, partial, seconds and atomic eaten controls with idempotent state history and full gates passing.",
+  "note": "notes/T054-prepared-serving-workflow.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

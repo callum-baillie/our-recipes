@@ -1,0 +1,33 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T061",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The final failure is positional, not product behavior. The complementary Recent history contains exactly two visible confirmed-deduction entries; exact visible count two is stronger than page-wide first visibility.",
+    "worker_package": {
+      "objective": "Replace only the final history assertion with exact visible count two in the complementary region, then complete integrated/disposable-DB gates.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": [
+        "Require old-spec source/mirror pre-hash A48CE49715EB0FFDCBDFD1C7BAC59F46ED5648E913499119D310A69C06ED0690 and protected hashes.",
+        "Replace only page-wide .first visibility with complementary exact text, visible:true, toHaveCount(2); no positional/broad/CSS/force.",
+        "Preserve everything else and 180s; run scoped format/lint and mirror hash.",
+        "Run fresh complete integrated workflow with all 400/350/50/provenance/manual/intake/FEFO/history, two axe, five screenshots, responsive, no errors.",
+        "Release port, disposable migrate/dbcheck, final diff/status/protected hashes."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any change beyond one assertion is required.",
+        "Visible history count differs from two or assertion semantics weaken.",
+        "Integrated flow fails twice or any protected artifact changes.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": ["API assertions already prove two linked events.", "Accessibility snapshot shows exactly two visible Recent history entries.", "Page-wide first selected a hidden per-batch duplicate."],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One integrated mirror/DB/artifact/port lifecycle must be serial." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Final successful integrated run", "Disposable DB/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T061 done.", "Activate T062 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

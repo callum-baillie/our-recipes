@@ -3,7 +3,7 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
-data/
+/data/
 .test-data/
 .env
 .env.local

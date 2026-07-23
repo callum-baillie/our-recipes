@@ -1,0 +1,52 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "full_outcome_complete": false,
+  "rationale": "Recipe availability can reuse one product stock pool independently for duplicate same-product ingredients; projected demand hides approximate/incompatible stock behind a definitive shortage; and demand date validation accepts impossible calendar dates. Mapping attribution, recipe-text preservation, serving scaling, exact multi-meal pooling, and non-mutation are otherwise sound.",
+  "worker_package": {
+    "objective": "Repair the T009 calculation boundary as one coherent vertical slice: allocate each compatible product stock pool only once across all required ingredients within a recipe; preserve deterministic ingredient-level explanations; expose approximate or incompatible stock as explicit projected-demand uncertainty instead of a definitive shortage; validate real ISO calendar dates; update the planner presentation, API contract, ADR, and focused tests while preserving recipe text, mapping attribution, current concurrent UI integrations, and the non-mutating projection boundary.",
+    "allowed_files": [
+      "src/lib/domain/pantry-availability.ts",
+      "src/lib/services/pantry-availability-service.ts",
+      "src/app/api/v1/pantry/recipes/[recipeId]/availability/route.ts",
+      "src/app/api/v1/pantry/demand/route.ts",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "src/components/meal-plan-pantry-demand.module.css",
+      "tests/unit/pantry-availability.test.ts",
+      "tests/integration/pantry-availability-service.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/decisions/0031-pantry-availability-and-demand.md"
+    ],
+    "verify": [
+      "pnpm exec prettier --check src/lib/domain/pantry-availability.ts src/lib/services/pantry-availability-service.ts src/app/api/v1/pantry/recipes src/app/api/v1/pantry/demand src/components/meal-plan-pantry-demand.tsx src/components/meal-plan-pantry-demand.module.css tests/unit/pantry-availability.test.ts tests/integration/pantry-availability-service.test.ts docs/openapi.yaml docs/api.md docs/decisions/0031-pantry-availability-and-demand.md",
+      "pnpm exec vitest run --project unit tests/unit/pantry-availability.test.ts",
+      "pnpm exec vitest run --project integration tests/integration/pantry-availability-service.test.ts",
+      "pnpm test",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm openapi:validate",
+      "git diff --check"
+    ],
+    "stop_if": [
+      "Repair requires schema or migration changes, grocery/cooking implementation, or files outside allowed_files.",
+      "Any solution would count approximate or incompatible stock as exact, silently convert across unit families, or hide uncertainty behind a definitive shortage.",
+      "Any solution would reserve, consume, version, or otherwise mutate Pantry batches while calculating availability or demand.",
+      "Any change would rewrite recipe ingredient text or revisions, weaken signed-profile mapping attribution, or loosen trusted-origin checks.",
+      "Any edit would overwrite concurrent nutrition, reaction, planner, or unrelated user work.",
+      "Verification fails twice for a cause outside allowed_files or requires ownership of shared .next."
+    ]
+  },
+  "evidence": [
+    "src/lib/domain/pantry-availability.ts",
+    "src/lib/services/pantry-availability-service.ts",
+    "tests/unit/pantry-availability.test.ts",
+    "tests/integration/pantry-availability-service.test.ts"
+  ],
+  "missing_evidence": [
+    "Duplicate same-product ingredient allocation, demand uncertainty, and semantic date regressions."
+  ],
+  "required_board_updates": [
+    "Activate one repair Worker, then repeat calculation review before grocery/cooking."
+  ]
+}

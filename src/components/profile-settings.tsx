@@ -1,8 +1,17 @@
 'use client';
 
-import { Archive, Plus, RotateCcw, Save } from 'lucide-react';
+import { Archive, Plus, RotateCcw, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { useToast } from '@/components/toast-provider';
+import {
+  defaultProfileGoalContext,
+  profileGoalFocusOptions,
+  type ProfileGoalContext,
+  type ProfileGoalFocus,
+} from '@/lib/domain/profile-goals';
 
 type Profile = {
   id: string;
@@ -13,6 +22,8 @@ type Profile = {
   temperatureUnit: 'C' | 'F';
   locale: string;
   timezone: string;
+  mainGoals: string;
+  goalContext: ProfileGoalContext;
   archivedAt: Date | string | null;
 };
 
@@ -24,16 +35,8 @@ type ProfileValues = {
   temperatureUnit: Profile['temperatureUnit'];
   locale: string;
   timezone: string;
-};
-
-const blankProfile: ProfileValues = {
-  displayName: '',
-  color: '#5B713E',
-  avatarUrl: '',
-  units: 'metric' as const,
-  temperatureUnit: 'C' as const,
-  locale: 'en-US',
-  timezone: 'America/Los_Angeles',
+  mainGoals: string;
+  goalContext: ProfileGoalContext;
 };
 
 export function ProfileSettings({
@@ -44,6 +47,7 @@ export function ProfileSettings({
   activeProfileId: string | null;
 }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [profiles, setProfiles] = useState(initialProfiles);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,33 +64,15 @@ export function ProfileSettings({
       error?: { message?: string };
     } | null;
     if (!response.ok || !body?.profile) {
-      setError(body?.error?.message ?? 'We could not update this profile.');
+      const message = body?.error?.message ?? 'We could not update this profile.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     setProfiles((current) =>
       current.map((item) => (item.id === profile.id ? body.profile! : item)),
     );
-    router.refresh();
-  }
-
-  async function addProfile(data: ProfileValues) {
-    setError(null);
-    const response = await fetch('/api/v1/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const body = (await response.json().catch(() => null)) as
-      | (Profile & {
-          error?: { message?: string };
-        })
-      | null;
-    if (!response.ok || !body?.id) {
-      setError(body?.error?.message ?? 'We could not add this profile.');
-      return;
-    }
-    setProfiles((current) => [...current, body]);
-    setAdding(false);
+    showToast(`${body.profile.displayName} updated.`, 'success');
     router.refresh();
   }
 
@@ -102,25 +88,23 @@ export function ProfileSettings({
       error?: { message?: string };
     } | null;
     if (!response.ok || !body?.profile) {
-      setError(body?.error?.message ?? 'We could not change this profile.');
+      const message = body?.error?.message ?? 'We could not change this profile.';
+      setError(message);
+      showToast(message, 'error');
       return;
     }
     setProfiles((current) =>
       current.map((item) => (item.id === profile.id ? body.profile! : item)),
     );
+    showToast(
+      archived ? `${body.profile.displayName} archived.` : `${body.profile.displayName} restored.`,
+      'success',
+    );
     router.refresh();
   }
 
   return (
-    <main className="settings-page">
-      <section className="settings-intro">
-        <p className="eyebrow">HOUSEHOLD SETTINGS</p>
-        <h1>The people around the table.</h1>
-        <p>
-          Profiles control personal units, temperature, and attribution. They are not passwords or
-          access control.
-        </p>
-      </section>
+    <div className="settings-page">
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -137,33 +121,89 @@ export function ProfileSettings({
           />
         ))}
       </section>
+      <button
+        className="text-button"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="profile-onboarding-dialog"
+        aria-expanded={adding}
+        onClick={() => setAdding(true)}
+      >
+        <Plus size={16} /> Add another profile
+      </button>
       {adding ? (
-        <ProfileEditor
-          profile={{ ...blankProfile, id: 'new', archivedAt: null }}
-          active={false}
-          isNew
-          onSave={(_profile, data) => addProfile(data)}
-          onArchive={async () => {}}
+        <ProfileOnboardingDialog
+          onClose={() => setAdding(false)}
+          onProfileCreated={(profile) => {
+            setProfiles((current) => [...current, profile]);
+            router.refresh();
+          }}
         />
-      ) : (
-        <button className="text-button" type="button" onClick={() => setAdding(true)}>
-          <Plus size={16} /> Add another profile
-        </button>
-      )}
-    </main>
+      ) : null}
+    </div>
+  );
+}
+
+function ProfileOnboardingDialog({
+  onClose,
+  onProfileCreated,
+}: {
+  onClose: () => void;
+  onProfileCreated: (profile: Profile) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  function closeDialog() {
+    dialogRef.current?.close();
+  }
+
+  return (
+    <dialog
+      className="profile-onboarding-dialog"
+      id="profile-onboarding-dialog"
+      ref={dialogRef}
+      aria-labelledby="profile-onboarding-dialog-title"
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) closeDialog();
+      }}
+    >
+      <h2 className="sr-only" id="profile-onboarding-dialog-title">
+        New profile onboarding
+      </h2>
+      <button
+        className="profile-onboarding-dialog-close"
+        type="button"
+        aria-label="Close profile onboarding"
+        onClick={closeDialog}
+      >
+        <X size={20} aria-hidden="true" />
+      </button>
+      <OnboardingWizard
+        mode="profile"
+        onCancel={closeDialog}
+        onProfileCreated={(profile) => {
+          onProfileCreated(profile);
+          closeDialog();
+        }}
+      />
+    </dialog>
   );
 }
 
 function ProfileEditor({
   profile,
   active,
-  isNew = false,
   onSave,
   onArchive,
 }: {
   profile: Profile;
   active: boolean;
-  isNew?: boolean;
   onSave: (profile: Profile, values: ProfileValues) => Promise<void>;
   onArchive: (profile: Profile, archived: boolean) => Promise<void>;
 }) {
@@ -175,8 +215,31 @@ function ProfileEditor({
     temperatureUnit: profile.temperatureUnit,
     locale: profile.locale,
     timezone: profile.timezone,
+    mainGoals: profile.mainGoals ?? '',
+    goalContext: profile.goalContext ?? defaultProfileGoalContext,
   });
   const archived = Boolean(profile.archivedAt);
+
+  function toggleGoalFocus(focus: ProfileGoalFocus) {
+    const selected = values.goalContext.focusAreas.includes(focus);
+    setValues({
+      ...values,
+      goalContext: {
+        ...values.goalContext,
+        focusAreas: selected
+          ? values.goalContext.focusAreas.filter((item) => item !== focus)
+          : [...values.goalContext.focusAreas, focus],
+      },
+    });
+  }
+
+  function updateGoalContext(changes: Partial<ProfileGoalContext>) {
+    setValues({
+      ...values,
+      goalContext: { ...values.goalContext, ...changes },
+    });
+  }
+
   return (
     <section className="settings-card profile-editor">
       <div className="profile-editor-heading">
@@ -186,27 +249,21 @@ function ProfileEditor({
             style={{ backgroundColor: values.color }}
             aria-hidden="true"
           />
-          <h2>{isNew ? 'New profile' : profile.displayName}</h2>
+          <h2>{profile.displayName}</h2>
           {active && <small>Active profile</small>}
           {archived && <small>Archived</small>}
         </div>
-        {!isNew && (
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => onArchive(profile, !archived)}
-          >
-            {archived ? (
-              <>
-                <RotateCcw size={15} /> Restore
-              </>
-            ) : (
-              <>
-                <Archive size={15} /> Archive
-              </>
-            )}
-          </button>
-        )}
+        <button className="text-button" type="button" onClick={() => onArchive(profile, !archived)}>
+          {archived ? (
+            <>
+              <RotateCcw size={15} /> Restore
+            </>
+          ) : (
+            <>
+              <Archive size={15} /> Archive
+            </>
+          )}
+        </button>
       </div>
       <div className="field-grid two-columns">
         <label>
@@ -274,6 +331,70 @@ function ProfileEditor({
             onChange={(event) => setValues({ ...values, timezone: event.target.value })}
           />
         </label>
+        <section
+          className="full-width-field profile-goal-settings"
+          aria-labelledby={`goals-${profile.id}`}
+        >
+          <div>
+            <h3 id={`goals-${profile.id}`}>What this profile wants help with</h3>
+            <p>These reflections can be updated whenever priorities or routines change.</p>
+          </div>
+          <div className="profile-goal-settings-options">
+            {profileGoalFocusOptions.map((option) => {
+              const selected = values.goalContext.focusAreas.includes(option.value);
+              return (
+                <label className={selected ? 'selected' : ''} key={option.value}>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={!selected && values.goalContext.focusAreas.length >= 8}
+                    onChange={() => toggleGoalFocus(option.value)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="field-grid two-columns">
+            <label>
+              <span>Why it matters now</span>
+              <textarea
+                rows={3}
+                maxLength={800}
+                value={values.goalContext.motivation}
+                onChange={(event) => updateGoalContext({ motivation: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>What gets in the way</span>
+              <textarea
+                rows={3}
+                maxLength={800}
+                value={values.goalContext.challenges}
+                onChange={(event) => updateGoalContext({ challenges: event.target.value })}
+              />
+            </label>
+            <label className="full-width-field">
+              <span>What success feels like</span>
+              <textarea
+                rows={3}
+                maxLength={800}
+                value={values.goalContext.successVision}
+                onChange={(event) => updateGoalContext({ successVision: event.target.value })}
+              />
+            </label>
+          </div>
+        </section>
+        <label className="full-width-field">
+          <span>
+            Anything else the app should remember <em>(optional)</em>
+          </span>
+          <textarea
+            rows={3}
+            value={values.mainGoals}
+            onChange={(event) => setValues({ ...values, mainGoals: event.target.value })}
+          />
+        </label>
       </div>
       <button
         className="primary-button compact"
@@ -281,7 +402,7 @@ function ProfileEditor({
         disabled={archived || !values.displayName.trim()}
         onClick={() => onSave(profile, values)}
       >
-        <Save size={16} /> {isNew ? 'Create profile' : 'Save profile'}
+        <Save size={16} /> Save profile
       </button>
     </section>
   );

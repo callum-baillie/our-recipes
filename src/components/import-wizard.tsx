@@ -1,18 +1,11 @@
 'use client';
 
-import {
-  AlertCircle,
-  Cloud,
-  FileCheck2,
-  LoaderCircle,
-  LockKeyhole,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { AlertCircle, Cloud, FileCheck2, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 
 import { ImportReviewForm } from '@/components/import-review-form';
 import { JsonLdImportWizard } from '@/components/import-jsonld-wizard';
+import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
 import {
   ImportUploadPanel,
@@ -153,10 +146,11 @@ function StoredImportPreview({
           }}
         />
         {showLoading ? (
-          <span className="import-preview-overlay" role="status">
-            <LoaderCircle className="spin" size={24} aria-hidden="true" />
-            {state === 'reading' ? 'OpenAI is reading this image…' : 'Loading your image…'}
-          </span>
+          <AsyncSkeleton
+            className="import-preview-overlay"
+            label={state === 'reading' ? 'OpenAI is reading this image' : 'Loading your image'}
+            variant="image"
+          />
         ) : showError ? (
           <span className="import-preview-overlay error" role="alert">
             <AlertCircle size={24} aria-hidden="true" />
@@ -538,10 +532,7 @@ export function ImportWizard() {
           {awaitingAutomaticVision ? (
             <aside className="import-warnings" aria-label="OpenAI vision review">
               {aiPending ? (
-                <p role="status">
-                  <LoaderCircle className="spin" size={16} aria-hidden="true" /> OpenAI is reading
-                  the normalized scan. The recipe will remain a review draft.
-                </p>
+                <AsyncSkeleton label="OpenAI is reading the normalized scan" variant="panel" />
               ) : (
                 <>
                   <p className="form-error" role="alert">
@@ -591,7 +582,7 @@ export function ImportWizard() {
                     }
                   >
                     {aiPending ? (
-                      <LoaderCircle className="spin" size={16} />
+                      <InlineSkeleton label="OpenAI is reading the recipe" width="1rem" />
                     ) : (
                       <Sparkles size={16} />
                     )}

@@ -1,0 +1,41 @@
+{
+  "result": "done",
+  "task_id": "T038",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-recipe-calculation.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/app/api/v1/nutrition/products/[productId]/records/route.ts",
+    "src/app/api/v1/nutrition/recipes/[recipeId]/calculations/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/intake/recipe/route.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-data-workspace.tsx",
+    "src/components/nutrition-data-workspace.module.css",
+    "tests/unit/nutrition-recipe-calculation.test.ts",
+    "tests/unit/nutrition-recipe-components.test.ts",
+    "tests/integration/nutrition-recipe-calculation-service.test.ts",
+    "tests/integration/nutrition-recipe-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused recipe calculation and component unit tests", "status": "pass", "summary": "5 tests passed" },
+    { "cmd": "focused recipe service and API integration tests", "status": "pass", "summary": "2 tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "160 unit and 75 integration tests passed" },
+    { "cmd": "focused Prettier and scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Delivered manual immutable product records, evidence-backed deterministic recipe calculations/history, normalized quality UI, and explicit server-built recipe intake. Full repository gates pass.",
+  "note": "notes/T038-recipe-nutrition-vertical.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "Build and rendered browser evidence remain deferred because an existing Next process owns shared .next."
+  ],
+  "remaining_blockers": [
+    "Judge the pre-existing generic intake API for a client-supplied consumed-nutrient bypass."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

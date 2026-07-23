@@ -1,78 +1,106 @@
-import { ArchiveRestore, Bot, ChevronRight, Users } from 'lucide-react';
+import {
+  Activity,
+  CalendarDays,
+  ChevronRight,
+  ClipboardList,
+  ListChecks,
+  PackageOpen,
+  Settings2,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { AppSettingsForm } from '@/components/app-settings-form';
 import { getAiReadiness } from '@/lib/services/ai-readiness-service';
-import { listBackups } from '@/lib/services/backup-service';
 import { getHouseholdState } from '@/lib/services/household-service';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+const categories = [
+  {
+    href: '/settings/system',
+    eyebrow: 'SYSTEM SETTINGS',
+    title: 'App identity, appearance, and recovery',
+    description: 'Rename the app, choose its icon and colors, manage backups, or start over.',
+    icon: Settings2,
+  },
+  {
+    href: '/settings/ai',
+    eyebrow: 'AI SETTINGS',
+    title: 'Models, privacy, and summaries',
+    description: 'Choose models by task and control exactly which profile data AI may use.',
+    icon: Sparkles,
+  },
+  {
+    href: '/settings/profiles',
+    eyebrow: 'PROFILE SETTINGS',
+    title: 'People, units, and regional defaults',
+    description: 'Manage household profiles, avatars, colors, units, locale, and time zone.',
+    icon: Users,
+  },
+  {
+    href: '/settings/recipes',
+    eyebrow: 'RECIPE SETTINGS',
+    title: 'Cookbook and recipe defaults',
+    description: 'Set the initial library order and serving count for newly added recipes.',
+    icon: ClipboardList,
+  },
+  {
+    href: '/settings/meal-plan',
+    eyebrow: 'MEALPLAN SETTINGS',
+    title: 'Weeks, planning range, and meals',
+    description: 'Choose how a fresh meal-planning session is laid out.',
+    icon: CalendarDays,
+  },
+  {
+    href: '/settings/lists',
+    eyebrow: 'LIST SETTINGS',
+    title: 'Shopping behavior and supermarket routes',
+    description: 'Control completed items, Pantry intake, wake lock, stores, and aisle order.',
+    icon: ListChecks,
+  },
+  {
+    href: '/settings/pantry',
+    eyebrow: 'PANTRY SETTINGS',
+    title: 'Stock views and organization',
+    description: 'Choose the default Pantry filter, sort order, and grouping.',
+    icon: PackageOpen,
+  },
+  {
+    href: '/settings/nutrition',
+    eyebrow: 'NUTRITION SETTINGS',
+    title: 'Goals, tracking, and visibility',
+    description: 'Manage profile goals, diary behavior, nutrients, trends, and planner display.',
+    icon: Activity,
+  },
+] as const;
+
+export default function SettingsPage() {
   const state = getHouseholdState();
   if (!state.household) notFound();
-  const [backups, ai] = await Promise.all([listBackups(), Promise.resolve(getAiReadiness())]);
-  const latestBackup = backups[0];
-
+  const ai = getAiReadiness();
   return (
     <main className="recipe-page settings-hub">
       <section className="settings-intro settings-hub-intro">
         <p className="eyebrow">SETTINGS</p>
         <h1>Your kitchen, your way.</h1>
-        <p>Manage the shared app, household profiles, AI connection, and local recovery.</p>
+        <p>Choose a category to manage shared app behavior or profile-specific preferences.</p>
       </section>
-
-      <AppSettingsForm
-        initialAppName={state.household.appName}
-        initialHouseholdName={state.household.name}
-      />
-
-      <section className="settings-overview" aria-label="Settings overview">
-        <article id="ai" className="settings-overview-card">
-          <span className="settings-overview-icon" aria-hidden="true">
-            <Bot size={21} />
-          </span>
-          <div>
-            <p className="eyebrow">AI CONNECTION</p>
-            <h2>{ai.enabled ? 'OpenAI is ready' : 'OpenAI is not configured'}</h2>
-            <p role="status">{ai.message}</p>
-            <small>
-              Recipe information leaves this server only when someone explicitly starts an AI
-              action.
-            </small>
-          </div>
-        </article>
-
-        <Link className="settings-overview-card linked" href="/settings/backups">
-          <span className="settings-overview-icon" aria-hidden="true">
-            <ArchiveRestore size={21} />
-          </span>
-          <div>
-            <p className="eyebrow">LOCAL BACKUPS</p>
-            <h2>{latestBackup ? 'A recovery point is available' : 'No backup created yet'}</h2>
-            <p>
-              {latestBackup
-                ? `Latest backup: ${latestBackup.createdAt.toLocaleString()}`
-                : 'Create and verify a local backup of recipes, photos, and household data.'}
-            </p>
-          </div>
-          <ChevronRight size={20} aria-hidden="true" />
-        </Link>
-
-        <Link className="settings-overview-card linked" href="/settings/profiles">
-          <span className="settings-overview-icon" aria-hidden="true">
-            <Users size={21} />
-          </span>
-          <div>
-            <p className="eyebrow">HOUSEHOLD PROFILES</p>
-            <h2>
-              {state.profiles.length} active profile{state.profiles.length === 1 ? '' : 's'}
-            </h2>
-            <p>Manage names, colors, units, temperature preferences, and archived profiles.</p>
-          </div>
-          <ChevronRight size={20} aria-hidden="true" />
-        </Link>
+      <section className="settings-overview" aria-label="Settings categories">
+        {categories.map(({ href, eyebrow, title, description, icon: Icon }) => (
+          <Link className="settings-overview-card linked" href={href} key={href}>
+            <span className="settings-overview-icon" aria-hidden="true">
+              <Icon size={21} />
+            </span>
+            <div>
+              <p className="eyebrow">{eyebrow}</p>
+              <h2>{title}</h2>
+              <p>{href === '/settings/ai' ? `${ai.message} ${description}` : description}</p>
+            </div>
+            <ChevronRight size={20} aria-hidden="true" />
+          </Link>
+        ))}
       </section>
     </main>
   );

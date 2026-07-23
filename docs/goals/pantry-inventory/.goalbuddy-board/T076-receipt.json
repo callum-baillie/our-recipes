@@ -1,0 +1,13 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T076", "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/components/meal-plan-pantry-demand.tsx"],
+    "commands": [
+      {"cmd": "pre-hash and protected guards", "status": "pass"}, {"cmd": "scoped Prettier/ESLint", "status": "pass"}, {"cmd": "focused unit and typecheck", "status": "pass"}, {"cmd": "mirror hashes and isolated webpack build", "status": "pass"}, {"cmd": "unchanged grocery E2E", "status": "pass"}, {"cmd": "port/diff/protected integrity", "status": "pass"}
+    ],
+    "summary": "The accessible-name compatibility repair works and the grocery oracle passes. The protected workflow then found two details summaries in an unpurchased generated row: provenance and the always-present rich intake prompt. Resolving that product DOM/flow issue is outside T076.",
+    "deviations": ["Protected workflow summary locator matched Generated Pantry shortage 50 g and Record an actual Pantry purchase."],
+    "remaining_blockers": ["Authorize purchased-state intake visibility repair", "Pass workflow and recipe/planner oracles"],
+    "verification_attempts": 1, "stopped_because": "Shopping-row DOM incompatibility outside component-only authorization."
+  }
+}

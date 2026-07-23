@@ -1,0 +1,23 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T056",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/components/pantry-manager.tsx"],
+    "commands": [
+      { "cmd": "Component/spec pre-hash guards and exactly nine accessible names", "status": "pass" },
+      { "cmd": "Scoped Prettier/ESLint and mirror hash equality", "status": "pass", "summary": "Component both F2060CCA8956FDA8CE9A139AC0A38BE68C47A5C8D45FC8FBA7BF15C09B0F282F" },
+      { "cmd": "pnpm format:check", "status": "fail", "summary": "73 unrelated baseline files; scoped component format passed" },
+      { "cmd": "pnpm lint, typecheck, test", "status": "pass", "summary": "190 unit and 114 integration tests passed" },
+      { "cmd": "Isolated mirror webpack build", "status": "pass" },
+      { "cmd": "Fresh management browser workflow", "status": "fail", "summary": "All mutations and desktop/tablet zero-axe scans/screenshots passed; 390px document overflow failed before mobile axe/screenshot" },
+      { "cmd": "Owned server cleanup/port release", "status": "pass" },
+      { "cmd": "Scoped diff integrity", "status": "pass" }
+    ],
+    "summary": "The production accessibility repair is complete and proven at desktop/tablet with zero axe violations. The remaining management gate is a real 390px horizontal overflow, visually consistent with the non-wrapping long expiry pill/card header and mobile multi-column form rows.",
+    "deviations": ["Checkout-wide format remains red on the known unrelated 73-file baseline; scoped Pantry formatting is green."],
+    "remaining_blockers": ["Evidence-backed 390px Pantry CSS containment repair", "Mobile axe/screenshot plus integrated/persistence/migration gates"],
+    "verification_attempts": 1,
+    "stopped_because": "Responsive repair requires Pantry CSS outside T056 scope."
+  }
+}

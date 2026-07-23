@@ -1,0 +1,109 @@
+.confirmation {
+  position: fixed;
+  inset: 1rem;
+  z-index: 20;
+  overflow: auto;
+  max-width: 48rem;
+  margin: auto;
+  padding: 1.25rem;
+  border: 1px solid #d9d2c7;
+  border-radius: 1rem;
+  background: #fffdf9;
+  color: #242821;
+  box-shadow: 0 1rem 4rem rgb(0 0 0 / 20%);
+}
+
+.timerPanel :global(.muted) {
+  color: #d8ded4;
+}
+
+.deduction,
+.leftover,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.deduction,
+.leftover {
+  border: 1px solid #e2dbcf;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.deduction label,
+.leftover label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.deduction input,
+.deduction select,
+.leftover input,
+.leftover select {
+  min-width: 7rem;
+}
+
+.fullRow,
+.batchReview {
+  flex-basis: 100%;
+}
+
+.batchReview {
+  padding: 0.65rem;
+  border-radius: 0.55rem;
+  background: #f3f0e8;
+}
+
+.batchReview p {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+}
+
+.mealIdentity {
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid #637a45;
+  background: #f3f0e8;
+}
+
+.leftoverHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+.finishStatus {
+  margin: 1rem;
+  color: #d8ded4;
+  text-align: center;
+}
+
+@media (max-width: 42rem) {
+  .confirmation {
+    inset: 0;
+    border-radius: 0;
+  }
+
+  .deduction,
+  .leftover {
+    align-items: stretch;
+  }
+
+  .deduction label,
+  .deduction input,
+  .deduction select,
+  .leftover input,
+  .leftover select {
+    width: 100%;
+  }
+}

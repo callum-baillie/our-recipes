@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T087",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T087-private-settings-audit.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only settings authorization, field, sensitive-input, unit, payload, estimator, accessibility and regression audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved the private settings delivery and selected an evidence-only primary-source NASEM EER feasibility map next.",
+  "note": "notes/T087-private-settings-audit.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only audit as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "No personalized estimate may ship until current primary-source equations and applicability are captured and reviewed."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,79 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "Required-first allocation preserves original response order; ingredient reads are stably ordered; repeated reads match; uncertainty, semantic dates, non-mutation, mapping attribution, and recipe text are covered. Grocery/cooking integration may proceed, while rendered/final evidence remains outstanding.",
+  "worker_package": {
+    "objective": "Deliver one integrated grocery-to-cooking Pantry slice: definitive projected-demand shortages with uncertain lines kept non-numeric; persisted formula inputs and meal/recipe/product provenance; manual override preservation across regeneration; explicit location-aware actor-attributed idempotent purchased-item intake; explicit cook confirmation/adjustment before atomic FEFO deduction; recipe/meal/list/cook/ActorContext event linkage; safe conflict-aware undo; and linked leftover batches. Use additive migration 0020 and preserve all current dirty work.",
+    "allowed_files": [
+      "src/lib/db/schema.ts",
+      "drizzle/0020_pantry_grocery_cooking.sql",
+      "drizzle/meta/_journal.json",
+      "src/lib/domain/pantry.ts",
+      "src/lib/domain/planning.ts",
+      "src/lib/domain/pantry-grocery-cooking.ts",
+      "src/lib/services/pantry-service.ts",
+      "src/lib/services/planning-service.ts",
+      "src/lib/services/cooking-service.ts",
+      "src/lib/services/pantry-grocery-cooking-service.ts",
+      "src/app/api/v1/shopping-lists/pantry-shortages/route.ts",
+      "src/app/api/v1/shopping-lists/[listId]/route.ts",
+      "src/app/api/v1/shopping-lists/[listId]/items/route.ts",
+      "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/route.ts",
+      "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-intake/route.ts",
+      "src/app/api/v1/cook-sessions/route.ts",
+      "src/app/api/v1/cook-sessions/[sessionId]/complete/route.ts",
+      "src/app/api/v1/cook-sessions/[sessionId]/pantry/undo/route.ts",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "src/components/meal-plan-pantry-demand.module.css",
+      "src/app/lists/[listId]/page.tsx",
+      "src/components/shopping-list-editor.tsx",
+      "src/components/shopping-list-editor.module.css",
+      "src/app/recipes/[recipeId]/cook/page.tsx",
+      "src/components/cooking-mode.tsx",
+      "src/components/cooking-mode.module.css",
+      "tests/unit/pantry-grocery-cooking.test.ts",
+      "tests/unit/cooking.test.ts",
+      "tests/integration/pantry-grocery-cooking-service.test.ts",
+      "tests/integration/pantry-grocery-cooking-api.test.ts",
+      "docs/openapi.yaml",
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/security.md",
+      "docs/testing.md",
+      "docs/decisions/0032-pantry-grocery-cooking.md"
+    ],
+    "verify": [
+      "pnpm exec prettier --check <T015 source/tests/docs excluding SQL and actively shared docs/data-model.md>",
+      "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts",
+      "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts",
+      "pnpm test",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm openapi:validate",
+      "pnpm build",
+      "git diff --check"
+    ],
+    "stop_if": [
+      "0020 exists, applied migration must change, or journal cannot extend additively.",
+      "Uncertain/incompatible stock would become exact or availability formula files must change.",
+      "Regeneration would overwrite manual fields/additions or intake cannot be idempotent.",
+      "Deduction occurs before confirmation, bypasses FEFO without explicit adjustment, lacks atomic attribution, or has unsafe undo/leftover conflicts.",
+      "Dirty planning/list/cooking/schema/docs/nutrition/UI work cannot be preserved; files outside scope or weakened origin/ActorContext/credential boundaries are required; normal household DB would be mutated; or shared .next ownership is required."
+    ]
+  },
+  "evidence": [
+    "src/lib/domain/pantry-availability.ts",
+    "src/lib/services/pantry-availability-service.ts",
+    "tests/unit/pantry-availability.test.ts",
+    "tests/integration/pantry-availability-service.test.ts",
+    "docs/goals/pantry-inventory/notes/T013-required-first-repair.md"
+  ],
+  "missing_evidence": [
+    "Implemented grocery/cooking migration, provenance, intake, confirmation, deduction, undo, leftovers, rendered UX, full build, and final oracle."
+  ],
+  "required_board_updates": [
+    "Activate one T015 Worker; then require milestone Judge and rendered UX review before T999."
+  ]
+}

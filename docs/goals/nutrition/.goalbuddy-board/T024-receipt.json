@@ -1,0 +1,31 @@
+{
+  "result": "done",
+  "task_id": "T024",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/db/schema.ts",
+    "drizzle/0019_nutrition_intake.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/domain/nutrition-intake.ts",
+    "src/lib/services/nutrition-intake-service.ts",
+    "tests/unit/nutrition-intake.test.ts",
+    "tests/integration/nutrition-intake-service.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused Prettier and ESLint", "status": "pass" },
+    { "cmd": "focused Nutrition unit tests", "status": "pass", "summary": "57 tests passed" },
+    { "cmd": "focused intake integration tests", "status": "pass", "summary": "4 tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "141 unit and 54 integration tests passed" },
+    { "cmd": "fresh isolated pnpm db:migrate && pnpm db:check", "status": "pass", "summary": "migrations current through 0019; database reachable" },
+    { "cmd": "scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Added additive append-only meal allocation and private diary persistence. Only explicit eaten/corrected revisions carry immutable sparse nutrient and full provenance snapshots; skipped/deleted revisions carry no consumed totals; corrections never overwrite history; reads and writes enforce fixed private Nutrition permissions; planner, Pantry, cooking and allocation state never automatically become consumption.",
+  "note": "notes/T024-immutable-intake.md",
+  "deviations": ["The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted before writing; the PM completed the exact bounded package as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

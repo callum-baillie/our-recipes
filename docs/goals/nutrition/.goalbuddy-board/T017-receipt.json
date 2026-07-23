@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T017",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T017-persistence-rescope.md"
+  ],
+  "commands": [
+    {
+      "cmd": "audit Pantry T009 allowed files against T015/T016 persistence scope and current git status",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a four-file non-overlapping persistence completion package covering exact schema mappings, strict record inputs, append-only source-aware services, and legacy/historical integration tests. Deferred all documentation reconciliation until Pantry releases docs/data-model.md without weakening verification or integrity requirements.",
+  "note": "notes/T017-persistence-rescope.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only rescope as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

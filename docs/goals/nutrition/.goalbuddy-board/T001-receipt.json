@@ -1,0 +1,34 @@
+{
+  "result": "done",
+  "task_id": "T001",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "The supplied Nutrition brief is a coherent existing plan with an observable full-outcome oracle. It is approved for continuous execution, but implementation scope must follow an initial read-only repository map. Required boundaries are architecture, migration and historical integrity, sensitive authorization/privacy, cross-feature allocation and consumption correctness, accessible UX/data quality, and final acceptance. A standalone calorie page, mutable history, broad household visibility, equal-serving assumptions, or treating planned/Pantry food as consumed cannot satisfy the outcome. The active Pantry board is intent, not implementation evidence.",
+  "worker_package": null,
+  "evidence": [
+    "C:/Users/Callum/.codex/attachments/3448dd1c-b1f2-4c59-a0b5-1eca707057a1/pasted-text-1.txt",
+    "docs/goals/nutrition/goal.md",
+    "docs/goals/nutrition/notes/T001-plan-validation.md",
+    "AGENTS.md",
+    "docs/goals/our-recipes/state.yaml",
+    "docs/goals/pantry-inventory/state.yaml"
+  ],
+  "subgoal_contract": null,
+  "parallel_safety": {
+    "safe": false,
+    "rationale": "The next package is one read-only architecture map; write scopes and Pantry implementation state are not yet known."
+  },
+  "blocked_tasks": [],
+  "missing_evidence": [
+    "Repository architecture and baseline gate map",
+    "Implementation, migration, authorization, rendered workflow, historical-integrity, and full-oracle verification evidence"
+  ],
+  "required_board_updates": [
+    "Mark T001 done with this receipt and note.",
+    "Activate T002 exactly as the queued read-only repository mapping package.",
+    "Keep T003 as the architecture-boundary Judge and do not populate T004 allowed_files until T003 approves a Worker package."
+  ],
+  "note": "notes/T001-plan-validation.md",
+  "harness": "codex-pm-fallback"
+}

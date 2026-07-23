@@ -4,6 +4,10 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, normalize, resolve } from 'node:path';
 
+import {
+  assertDuplicate0026Lineage,
+  recoverDuplicate0026Lineage,
+} from '../../../scripts/migration-lineage-recovery.cjs';
 import { getRuntimeConfig } from '@/lib/config';
 import * as schema from '@/lib/db/schema';
 
@@ -51,9 +55,12 @@ export function getDatabasePath(): string {
 }
 
 export function ensureDatabase(): void {
-  const { db } = openDatabase();
+  const { db, sqlite } = openDatabase();
   if (!hasMigrated) {
-    migrate(db, { migrationsFolder: resolve(process.cwd(), 'drizzle') });
+    const migrationsFolder = resolve(process.cwd(), 'drizzle');
+    recoverDuplicate0026Lineage(sqlite, migrationsFolder);
+    migrate(db, { migrationsFolder });
+    assertDuplicate0026Lineage(sqlite, migrationsFolder);
     hasMigrated = true;
   }
 }

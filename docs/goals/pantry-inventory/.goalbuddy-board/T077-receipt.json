@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T077", "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Semantic defect: rich intake appears before purchase, contrary to the explicit post-purchase prompt. Render it open only when checked, add dedicated pre-purchase manual-extra quantity/unit controls, and expose a compatible intake submit name containing old/new phrases. Update only the new grocery E2E lifecycle; protected tests stay unchanged.",
+    "worker_package": {
+      "objective": "Repair ShoppingListEditor purchased-state intake visibility and dedicated extra controls, update only the new E2E interaction, then run focused/type/build and all three browser oracles.",
+      "allowed_files": ["src/components/shopping-list-editor.tsx", "tests/e2e/pantry-grocery-intake.spec.ts"],
+      "verify": ["Require component/E2E pre-hashes and all protected hashes from T077.", "Add accessible extra quantity/unit controls; render intake open only when checked; compatible submit accessible name includes both old/new phrases.", "New E2E uses real UI checkbox/PATCH before intake and preserves 50g/450g/retry/formula assertions.", "Run scoped format/lint, unchanged unit, typecheck, mirror/build.", "Run new grocery and unchanged workflow/recipe E2Es, port/hash/diff integrity."],
+      "stop_if": ["Rich intake remains pre-purchase or missing post-purchase.", "Manual extra/formula/intake fields/idempotency/atomicity/accessibility weakens.", "Protected/outside files must change or shared/live/secret/normal data touched."]
+    },
+    "evidence": ["Original brief prompts explicit Add to Pantry after purchased.", "Current intake details render unconditionally.", "Protected workflow checks row then expects intake controls.", "Manual extra currently borrows premature intake fields."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "Component lifecycle and new E2E are coupled with serial build/oracles."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Purchased visibility proof", "Three E2Es", "Build/integrity", "Later cooking UI"],
+    "required_board_updates": ["Record T077 done.", "Activate one Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

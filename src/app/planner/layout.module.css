@@ -1,0 +1,96 @@
+:global(html:has(.planner-workspace-shell)),
+:global(html:has(.planner-workspace-shell) body),
+:global(body:has(.planner-workspace-shell)) {
+  overflow: hidden;
+}
+
+:global(.planner-workspace-shell + .app-footer) {
+  display: none !important;
+}
+
+.workspaceShell {
+  width: 100%;
+  height: calc(100dvh - 5.5rem);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--page);
+}
+
+.workspaceShell > :global(.recipe-page) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.workspaceShell :global(.planner-workspace-grid) {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+@media (min-width: 1401px) {
+  .workspaceShell :global(.planner-workspace-grid) {
+    grid-template-columns: 19rem minmax(0, 1fr) 19rem;
+  }
+}
+
+@media (min-width: 1101px) and (max-width: 1400px) {
+  .workspaceShell :global(.planner-workspace-grid) {
+    grid-template-columns: 18rem minmax(0, 1fr) 17rem;
+  }
+}
+
+@media (max-width: 900px) {
+  :global(html:has(.planner-workspace-shell)),
+  :global(html:has(.planner-workspace-shell) body),
+  :global(body:has(.planner-workspace-shell)) {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  :global(html:has(.planner-workspace-shell))::-webkit-scrollbar,
+  :global(body:has(.planner-workspace-shell))::-webkit-scrollbar {
+    display: none;
+  }
+
+  :global(.planner-workspace-shell + .app-footer) {
+    display: flex !important;
+  }
+
+  .workspaceShell {
+    height: auto;
+    min-height: calc(100dvh - 5.5rem);
+    overflow: visible;
+  }
+
+  .workspaceShell > :global(.recipe-page) {
+    height: auto;
+    min-height: calc(100dvh - 5.5rem);
+    overflow: visible;
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
+  }
+
+  .workspaceShell > :global(.recipe-page)::-webkit-scrollbar {
+    display: none;
+  }
+
+  .workspaceShell :global(.planner-workspace-grid) {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+  }
+
+  .workspaceShell :global(.planner-workspace-center) {
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+}

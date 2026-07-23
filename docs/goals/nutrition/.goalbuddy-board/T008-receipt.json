@@ -1,0 +1,38 @@
+{
+  "result": "done",
+  "task_id": "T008",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T008-pantry-acceptance.md"
+  ],
+  "commands": [
+    {
+      "cmd": "inspect Pantry T004 board receipt, migration, schema, service, tests and dirty ownership",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm exec vitest run --project unit tests/unit/pantry.test.ts",
+      "status": "pass",
+      "summary": "5 tests passed"
+    },
+    {
+      "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-service.test.ts",
+      "status": "pass",
+      "summary": "4 tests passed"
+    }
+  ],
+  "summary": "Accepted the completed Pantry foundation as a stable Nutrition integration boundary: products are canonical food identities, batches are availability only, recipe mappings are explicit, and 0016 is the next additive migration. Preserved Pantry and unrelated dirty-file ownership and defined a safe normalized persistence candidate with stop conditions.",
+  "evidence": [
+    "docs/goals/pantry-inventory/state.yaml records T004 done with full verification",
+    "drizzle/0015_pantry_inventory.sql and src/lib/db/schema.ts define the stable Pantry boundary",
+    "Fresh Pantry unit and integration test runs passed"
+  ],
+  "note": "notes/T008-pantry-acceptance.md",
+  "deviations": [
+    "The exact GoalBuddy Scout timed out without a receipt, so the PM completed the same read-only evidence audit as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

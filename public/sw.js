@@ -1,8 +1,9 @@
-const APP_VERSION = '0.1.0-beta.11';
-const CACHE_PREFIX = 'our-recipes-read-';
+const APP_VERSION = '1.0.0-rc.1';
+const CACHE_PREFIX = 'bord-read-';
+const LEGACY_CACHE_PREFIX = 'our-recipes-read-';
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 const OFFLINE_URL = '/offline';
-const UPDATE_QUERY_PARAM = '__our_recipes_updated';
+const UPDATE_QUERY_PARAM = '__bord_updated';
 const IS_UPDATE = Boolean(self.registration.active);
 const RECIPE_DETAIL_PATH = /^\/recipes\/[0-9a-f-]{36}$/i;
 const RECIPE_IMAGE_PATH = /^\/api\/v1\/recipes\/[^/]+\/images\/[^/]+$/;
@@ -21,8 +22,9 @@ function isCacheableRead(url) {
     url.pathname.startsWith('/_next/static/') ||
     url.pathname === '/manifest.webmanifest' ||
     url.pathname === '/icons/favicon-32.png' ||
-    url.pathname === '/icons/our-recipes-app-icon-192.png' ||
-    url.pathname === '/icons/our-recipes-app-icon-512.png'
+    url.pathname === '/icons/bord-app-icon-192.png' ||
+    url.pathname === '/icons/bord-app-icon-512.png' ||
+    url.pathname.startsWith('/api/v1/branding/icons/v1/')
   );
 }
 
@@ -50,7 +52,10 @@ async function networkFirst(request, fallback) {
 
 async function deleteOldAppCaches() {
   const keys = await caches.keys();
-  const oldAppCaches = keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME);
+  const oldAppCaches = keys.filter(
+    (key) =>
+      (key.startsWith(CACHE_PREFIX) || key.startsWith(LEGACY_CACHE_PREFIX)) && key !== CACHE_NAME,
+  );
   await Promise.all(oldAppCaches.map((key) => caches.delete(key)));
   return oldAppCaches.length;
 }
@@ -60,7 +65,7 @@ async function refreshWindowClients() {
   const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   await Promise.all(
     windowClients.map(async (client) => {
-      client.postMessage({ type: 'OUR_RECIPES_UPDATED', version: APP_VERSION });
+      client.postMessage({ type: 'BORD_UPDATED', version: APP_VERSION });
       if (typeof client.navigate !== 'function') return;
       const target = new URL(client.url);
       if (target.origin !== self.location.origin) return;

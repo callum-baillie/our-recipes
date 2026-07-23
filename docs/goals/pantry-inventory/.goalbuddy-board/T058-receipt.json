@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T058",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/components/pantry-manager.module.css"],
+    "commands": [
+      { "cmd": "CSS/TSX/spec pre-hash guards and authorized mobile CSS", "status": "pass" },
+      { "cmd": "Scoped format/ESLint/typecheck, mirror hash, isolated build", "status": "pass", "summary": "CSS both 2D4922E372A68175056559B920809A0C000B909169303248CF20428ADD867684" },
+      { "cmd": "Fresh management browser workflow", "status": "pass", "summary": "All behavior in 41.9s, three zero-axe scans, three responsive containment checks/screenshots, no browser errors" },
+      { "cmd": "Mobile visual and read-only management persistence inspection", "status": "pass" },
+      { "cmd": "Independent integrated lifecycle preparation", "status": "pass" },
+      { "cmd": "Fresh integrated Pantry workflow", "status": "fail", "summary": "Old broad Quantity label matched Quantity and Original quantity before first Pantry mutation" },
+      { "cmd": "Both owned server cleanups/port release and scoped diff", "status": "pass" }
+    ],
+    "summary": "The complete inventory-management milestone now passes behavior, responsive rendering, accessibility, screenshots, browser errors, build, and persistence. Only the independently prepared older integrated spec is blocked by stale pre-mutation selectors.",
+    "deviations": [],
+    "remaining_blockers": ["Exhaustive exact semantic selector refresh in the old Pantry workflow spec", "Integrated browser and disposable DB proof"],
+    "verification_attempts": 1,
+    "stopped_because": "Old E2E selector repair is outside T058 CSS-only scope."
+  }
+}

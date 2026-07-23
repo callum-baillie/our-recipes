@@ -1,8 +1,11 @@
 'use client';
 
-import { LoaderCircle, Minus, Plus, Save } from 'lucide-react';
+import { Minus, Plus, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+import { InlineSkeleton } from '@/components/skeleton';
+import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 
 import { useToast } from '@/components/toast-provider';
 import { RecipeTagSelector } from '@/components/recipe-tag-selector';
@@ -211,7 +214,7 @@ export function ImportReviewForm({
                     ...group,
                     ingredients: [
                       ...group.ingredients,
-                      { quantity: '', unit: '', item: '', note: '' },
+                      { quantity: '', unit: '', item: '', note: '', pantryProductId: '' },
                     ],
                   })
                 }
@@ -289,6 +292,24 @@ export function ImportReviewForm({
                           ingredients: group.ingredients.map((current, currentIndex) =>
                             currentIndex === index
                               ? { ...current, note: event.target.value }
+                              : current,
+                          ),
+                        })
+                      }
+                    />
+                    <FoodCatalogPicker
+                      context="recipe"
+                      defaultQuery={ingredient.item}
+                      onImported={(product) =>
+                        updateGroup(groupIndex, {
+                          ...group,
+                          ingredients: group.ingredients.map((current, currentIndex) =>
+                            currentIndex === index
+                              ? {
+                                  ...current,
+                                  item: product.displayName,
+                                  pantryProductId: product.id,
+                                }
                               : current,
                           ),
                         })
@@ -488,7 +509,7 @@ export function ImportReviewForm({
       )}
       <button className="primary-button" type="submit" disabled={pending}>
         {pending ? (
-          <LoaderCircle className="spin" size={17} />
+          <InlineSkeleton label="Saving recipe" width="1.1rem" />
         ) : (
           <Save size={17} aria-hidden="true" />
         )}

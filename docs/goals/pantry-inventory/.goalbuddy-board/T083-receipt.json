@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T083", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Harness synchronization: exact linked href and route wiring are correct, Start cooking server-renders initially, and the same functional path previously passed before CSS-only changes. The test clicked a Next Link then immediately queried the destination without awaiting client navigation. Add exact URL wait around the real click only.",
+    "worker_package": {
+      "objective": "Change only cooking E2E navigation synchronization, then complete cooking/full/protected/build/disposable/integrity gates in isolation.",
+      "allowed_files": ["tests/e2e/pantry-cooking-confirmation.spec.ts"],
+      "verify": ["Await exact /recipes/{id}/cook?mealPlanEntryId={mealId} around real link click; then require existing Start cooking visible.", "Run scoped format/lint and complete cooking E2E.", "Run full lint/type/unit/integration/OpenAPI, isolated build, three unchanged protected E2Es, disposable DB, port/hash/diff/status/live PID integrity."],
+      "stop_if": ["Exact URL/response/Start cooking still fails; capture logs/artifacts.", "Any source/CSS/fixture/assertion/timeout/axe/protected edit needed.", "Live/shared/secret/normal data or hashes affected."]
+    },
+    "evidence": ["Earlier run proved functional path.", "Link href/route query wiring are exact.", "Current spec lacks explicit client navigation wait."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One spec and serial isolated lifecycle/oracles."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Passing cooking E2E", "Full/protected/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T083 done.", "Activate one test-only Worker.", "Require final Judge after all gates."]
+  }
+}

@@ -7,7 +7,7 @@ import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   RecipeConflictError,
   RecipeNotFoundError,
-  updateRecipeTags,
+  updateRecipeTagsWithIntegrations,
 } from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
@@ -31,14 +31,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ recip
 
   try {
     const { recipeId } = await context.params;
-    return NextResponse.json({
-      recipe: updateRecipeTags(
+    return NextResponse.json(
+      updateRecipeTagsWithIntegrations(
         recipeId,
         parsed.data.tags,
         actor.profileId,
         parsed.data.expectedRevision,
       ),
-    });
+    );
   } catch (error) {
     if (error instanceof RecipeNotFoundError)
       return jsonError(404, 'recipe_not_found', error.message);

@@ -1,0 +1,25 @@
+{
+  "result": "done",
+  "task_id": "T062",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-diary-lifecycle-service.ts",
+    "tests/integration/nutrition-diary-lifecycle-service.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused lifecycle service/API integration tests", "status": "pass", "summary": "7 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "174 unit and 97 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Preflight-bounded private export reads and semantically redacted cross-profile command history now prevent identifier/result leakage.",
+  "note": "notes/T062-diary-export-repair.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file repair as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

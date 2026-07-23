@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T028",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The failure is harness-only. HTML returns an empty string for the present open attribute, and the helper's truthiness test toggles an already-open details element closed. Replace only the presence test with an explicit null comparison; preserve all product code, keyboard/focus behavior, assertions, and timeout.",
+    "worker_package": {
+      "objective": "Make the helper open the disclosure only when the open attribute is absent, then complete Pantry browser/accessibility/screenshots, disposable DB, port, and diff evidence.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": ["Hash guards", "One-line condition change", "Spec Prettier", "Fresh Pantry Playwright", "Two axe scans and five screenshots", "Disposable db:migrate/db:check", "Port and diff integrity"],
+      "stop_if": ["Hash differs or change broadens.", "Assertions/keyboard/timeout/accessibility weakens.", "Two fresh runs fail.", "Isolation/ownership fails or live/shared state would be used."]
+    },
+    "evidence": [
+      "Both attempts persisted the first batch and location and then failed only on the second hidden select.",
+      "Screenshots show the disclosure open; getAttribute(open) returns empty string, which the helper misclassifies.",
+      "The uncontrolled product details element is not closed by product code."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, port, browser output, and disposable DB." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing Pantry browser workflow", "Axe and five screenshots", "Disposable DB checks", "Port/diff integrity"],
+    "required_board_updates": ["Record T028 approved.", "Activate T029 Worker.", "Keep T999 queued until passing receipt."]
+  }
+}

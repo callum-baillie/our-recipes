@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T032",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The failure is harness-only. The test clicks a nonexistent Week of heading, so focus never leaves the quantity input and the real onBlur save/PATCH never occurs. Replace only that click with quantityInput.press('Tab'); preserve the PATCH wait and all 60/manual-override assertions.",
+    "worker_package": {
+      "objective": "Use semantic keyboard Tab to trigger the real blur/PATCH path, then complete browser/axe/screenshots, disposable DB, port, and diff evidence.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": ["Hash guard", "Exact one-line Tab repair", "Spec Prettier/mirror refresh", "Fresh full Pantry Playwright", "PATCH/manual/obsolete/axe/five screenshots", "Disposable DB", "Port/diff integrity"],
+      "stop_if": ["Hash or scope differs.", "PATCH/assertions/timeouts/product weaken.", "Two runs fail.", "Isolation/ownership fails."]
+    },
+    "evidence": [
+      "The input remains focused and the page has no Week of heading.",
+      "ShoppingListEditor saves only on quantity input blur and issues the awaited PATCH.",
+      "Database remained at quantity 50/manual override false, proving no PATCH occurred."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, port, browser output, and disposable DB." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Real PATCH/persisted manual override", "Complete Pantry workflow/axe/screenshots", "Disposable DB", "Port/diff integrity"],
+    "required_board_updates": ["Record T032 approved.", "Activate T033 Worker.", "Keep T999 queued until passing receipt."]
+  }
+}

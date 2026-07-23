@@ -1,0 +1,65 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T999",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "not_complete",
+    "full_outcome_complete": false,
+    "rationale": "T037 proves a valuable integrated happy path, but the original brief remains materially incomplete: advanced inventory management, truthful expiry presentation, cooked-meal demand exclusion, staple/manual-extra/purchased-coverage grocery math, recipe insight/actions, rich purchased intake, batch-aware cooking/substitution/recalculation/leftovers, broader accessibility, and a current full suite are missing.",
+    "worker_package": {
+      "objective": "Complete the household inventory-management vertical slice using existing Pantry schema/APIs: product/alias/staple editing; detailed batches; recent/multi-add; location management; full lifecycle/split/combine/undo actions; inactive browsing; filters/sorts/groups; and truthful expiry/storage-history presentation, with focused and rendered evidence.",
+      "allowed_files": [
+        "src/lib/domain/pantry.ts",
+        "src/lib/services/pantry-service.ts",
+        "src/app/api/v1/pantry/batches/[batchId]/actions/route.ts",
+        "src/components/pantry-manager.tsx",
+        "src/components/pantry-manager.module.css",
+        "tests/unit/pantry.test.ts",
+        "tests/integration/pantry-service.test.ts",
+        "tests/e2e/pantry-inventory-management.spec.ts",
+        "docs/openapi.yaml",
+        "docs/api.md",
+        "docs/architecture.md",
+        "docs/data-model.md",
+        "docs/security.md",
+        "docs/testing.md",
+        "docs/decisions/0028-pantry-inventory-foundation.md"
+      ],
+      "verify": [
+        "Focused domain/service regressions for full inventory actions and semantics",
+        "Rendered desktop/tablet/mobile management workflow with keyboard, axe, overflow, screenshots, and persistence",
+        "Scoped and full quality gates",
+        "Isolated webpack build and old+new Pantry E2E",
+        "Disposable migration/database checks and diff integrity"
+      ],
+      "stop_if": [
+        "Schema or applied migrations must change.",
+        "Security or transaction boundaries weaken.",
+        "Files outside scope or concurrent Nutrition overlap are required.",
+        "Live/shared/secret/provider/device/backup state would be used."
+      ]
+    },
+    "evidence": [
+      "Existing persistence and focused tests prove canonical products, aliases/identifiers, nested locations, batches, events, versions, FEFO, mapping, uncertainty, grocery provenance, intake, cooking, undo, migrations, and security boundaries.",
+      "PantryManager lacks product editing, most batch/location actions, inactive views, requested discovery controls, and truthful expiry semantics.",
+      "Projected demand includes cooked linked meals; grocery lacks staple/manual-extra/purchased coverage and exclusion controls.",
+      "Purchased intake and cooking controls are materially narrower than the brief; leftover selectors also read the wrong nested summary shape.",
+      "T037 proves the integrated 400/350/50 happy path, manual/obsolete behavior, intake, confirmed FEFO/history, responsive rendering, axe, build, and disposable migrations."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "The inventory slice is coupled across domain, transactions, manager, tests, and one browser workflow." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Complete inventory management and expiry semantics",
+      "Recipe/planner demand completion semantics and insights",
+      "Full grocery formula/controls and purchased intake fields",
+      "Batch-aware cooking/substitution/recalculation/leftovers/linked-meal flow",
+      "Broader accessibility and current full-suite evidence"
+    ],
+    "required_board_updates": [
+      "Record T999 not_complete.",
+      "Activate T038 Worker exactly from this package.",
+      "Require another Judge before selecting later completion slices."
+    ]
+  }
+}

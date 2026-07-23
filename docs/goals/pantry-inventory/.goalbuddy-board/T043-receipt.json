@@ -1,0 +1,42 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T043",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The failure is harness-only: Playwright substring label matching makes Location resolve both the Location select and Shelf or sub-location. An exhaustive remaining-label audit found no other unresolved collision, so only exact:true on that locator is authorized.",
+    "worker_package": {
+      "objective": "Add exact:true only to the Add Pantry item Location locator, preserve every other behavior, then complete the two independent browser workflows and remaining evidence.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source/mirror pre-edit SHA256 39475D4955A7EDF589D0EB1F41BD50F032645410C47A711EE6181CCED4DC974A.",
+        "Change only add.getByLabel('Location') to exact:true; preserve all other locators/assertions.",
+        "Run scoped format/lint and one-file mirror hash equality.",
+        "Run fresh management workflow with all actions, three axe/overflow/screenshots, and no browser errors.",
+        "Release port, prepare fresh, run old integrated workflow with 400/350/50, provenance/manual/intake/FEFO/history, two axe, five screenshots, and no browser errors.",
+        "Inspect persistence read-only, run disposable migrate/db check, release port, and record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-edit hash differs or any other selector/product/fixture/assertion/timeout/file change is required.",
+        "Strict semantic locator behavior weakens.",
+        "Workflows share state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": [
+      "Rendered error resolved Location to the exact select and Shelf or sub-location input.",
+      "Quantity already uses exact:true; all other static/dynamic labels are unique within their existing scopes.",
+      "T042 passed the exact nested Basket path before this collision."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, DB path, artifact family, and port require serial lifecycles." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Passing management and integrated workflows with accessibility/screenshots",
+      "Persistence, disposable DB, port, and diff proof",
+      "Later full original-outcome audit"
+    ],
+    "required_board_updates": ["Record T043 done.", "Activate T044 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

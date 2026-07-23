@@ -1,0 +1,40 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T067",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "This is a product contract defect. Under Zod 4, isoDate.default('') bypasses the transform, so omitted useByDate persists as an empty string. Availability uses useByDate ?? bestBeforeDate, causing the empty sentinel to mask a valid best-before date. Normalize omitted dates to null and defensively select the first non-empty use-by/best-before value without changing precedence or implying food safety.",
+    "worker_package": {
+      "objective": "Fix omitted Pantry ISO-date normalization and defensive availability expiry projection, add focused unit/integration persistence-to-recipe-availability regressions, preserve the accepted E2E unchanged, then complete every remaining isolated browser/full/build/database/integrity gate.",
+      "allowed_files": ["src/lib/domain/pantry.ts", "src/lib/services/pantry-availability-service.ts", "tests/unit/pantry.test.ts", "tests/integration/pantry-availability-service.test.ts"],
+      "verify": [
+        "Require protected pre-hashes including E2E EA421DFB174F59CAAA1ED1CB998F91168686498AD59291F0C20D5A52FD7E2F7D.",
+        "Prove omitted dates normalize to null and supplied best-before remains 2027-04-02.",
+        "Prove batch persistence and recipe matchingBatches expose expiryDate 2027-04-02.",
+        "Run scoped format/lint and focused unit/integration tests.",
+        "Prepare isolated mirror and prove hashes; run complete unchanged 390/768/1280 Playwright evidence.",
+        "Run full tests/lint/typecheck/OpenAPI and isolated build.",
+        "Run disposable migrations/db check, release port, and prove diff/status/protected hashes."
+      ],
+      "stop_if": [
+        "Any migration/schema/API/renderer/E2E fixture/assertion/action/timeout/viewport must change.",
+        "Use-by precedence or safety meaning would change.",
+        "Any grocery/cooking/inventory-management/Nutrition/docs or outside file is required.",
+        "E2E protected hash differs or verification would touch shared/live/secret/normal data."
+      ]
+    },
+    "evidence": [
+      "The E2E posts bestBeforeDate 2027-04-02 and receives 201.",
+      "Zod 4 default bypasses the isoDate transform, retaining an empty omitted useByDate.",
+      "Persistence writes both parsed values directly and availability nullish-coalesces the empty use-by value ahead of best-before.",
+      "Both browser attempts failed identically with no expiry recorded."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": {"safe": false, "rationale": "Normalization, projection, regression, and isolated verification are one serial contract repair."},
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Focused repair proof", "Complete browser evidence", "Full gates", "Isolated build", "Disposable DB", "Final integrity", "Later grocery/cooking UI"],
+    "required_board_updates": ["Record T067 done.", "Activate one Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

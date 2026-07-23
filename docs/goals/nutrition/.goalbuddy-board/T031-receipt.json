@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T031",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T031-rendered-review.md"],
+  "commands": [{ "cmd": "read-only privacy, aggregation, semantic markup, responsive CSS and evidence-boundary audit", "status": "pass" }],
+  "summary": "Approved T030's code-level rendered boundary: private server selection, latest-confirmed-only totals, planned separation, quality labels, six substantive views, safe household discovery and chart/table semantics pass. Live browser, responsive/focus/contrast/a11y and current global gates remain explicitly unverified due concurrent Pantry compile ownership.",
+  "note": "notes/T031-rendered-review.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."],
+  "remaining_blockers": ["Direct live browser, responsive, keyboard, contrast and automated accessibility proof after the shared dev server recovers.", "Current global type/test recheck after Pantry T015 repairs its owned compile defect."],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

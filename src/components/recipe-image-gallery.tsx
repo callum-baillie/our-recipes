@@ -1,8 +1,10 @@
 'use client';
 
-import { ImagePlus, LoaderCircle, Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+
+import { InlineSkeleton } from '@/components/skeleton';
 import { FormEvent, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
@@ -24,7 +26,7 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
   const [converting, setConverting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [editingPhotos, setEditingPhotos] = useState(false);
-  const showEditor = images.length === 0 || editingPhotos;
+  const showEditor = editingPhotos;
 
   async function chooseImage(selected: File | null) {
     if (!selected) {
@@ -135,7 +137,19 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
           <p className="eyebrow">LOCAL RECIPE PHOTOS</p>
           <h2 id="recipe-photos-heading">A little visual memory</h2>
         </div>
-        <span>{images.length} saved</span>
+        <div className="recipe-media-heading-actions">
+          <span>{images.length} saved</span>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => setEditingPhotos((current) => !current)}
+            aria-expanded={showEditor}
+            aria-controls="recipe-image-editor"
+          >
+            <ImagePlus size={16} aria-hidden="true" />
+            {showEditor ? 'Close photo tools' : 'Add/manage photos'}
+          </button>
+        </div>
       </div>
       {images.length > 0 && (
         <div className="recipe-image-grid">
@@ -218,7 +232,7 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
         )}
         <button className="text-button" type="submit" disabled={pending || converting || !file}>
           {pending || converting ? (
-            <LoaderCircle className="spin" size={16} />
+            <InlineSkeleton label="Preparing image" width="1rem" />
           ) : (
             <ImagePlus size={16} />
           )}
@@ -230,7 +244,11 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
           onClick={() => void generateWithOpenAi()}
           disabled={generating || pending || converting}
         >
-          {generating ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+          {generating ? (
+            <InlineSkeleton label="Generating image" width="1rem" />
+          ) : (
+            <Sparkles size={16} />
+          )}
           Generate serving image with OpenAI
         </button>
       </form>

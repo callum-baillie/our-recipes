@@ -1,0 +1,54 @@
+{
+  "result": "done",
+  "task_id": "T106",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/lib/services/nutrition-weight-trend-service.ts",
+    "src/lib/domain/nutrition-weight-trend.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-advanced-chart-panels.tsx",
+    "src/components/nutrition-advanced-chart-panels.module.css",
+    "tests/unit/nutrition-weight-trend.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-weight-trend-service.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused weight domain, component and service tests",
+      "status": "pass",
+      "summary": "25 tests passed"
+    },
+    {
+      "cmd": "query-count integration assertions",
+      "status": "pass",
+      "summary": "disabled path used 2 queries and enabled path used 3"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "222 unit and 123 integration tests passed"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped allowed-file checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with the existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered an opt-in three-query measurement-authorized weight trend with latest-per-local-day smoothing, server units and safe axis, separately protected target, and accessible non-clinical tables and visual markers.",
+  "note": "notes/T106-weight-trend-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must audit measurement authorization, disabled query suppression, target privacy, smoothing, units/axis and accessible rendering.",
+    "Card/planner display flags, household analysis, offline/performance documentation and rendered final evidence remain later slices."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

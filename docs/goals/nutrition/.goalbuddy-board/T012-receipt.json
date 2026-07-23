@@ -1,0 +1,32 @@
+{
+  "result": "done",
+  "task_id": "T012",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T012-reference-source-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "browse official NIH ODS, National Academies, FDA/eCFR, and USDA FoodData Central primary sources",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped authoritative source/version evidence and safe semantics for DRI/RDA/AI/EAR/UL/AMDR/CDRR, FDA Daily Values, calorie-factor labeling rules, and USDA FoodData Central data types/releases/API/licensing. Recorded life-stage/privacy boundaries, unit/form gaps, disclaimers, and exact unresolved Judge decisions without implementing numbers or making a provider call.",
+  "evidence": [
+    "https://ods.od.nih.gov/healthinformation/nutrientrecommendations.aspx",
+    "https://nap.nationalacademies.org/collection/57/dietary-reference-intakes",
+    "https://www.fda.gov/food/nutrition-facts-label/daily-value-nutrition-and-supplement-facts-labels",
+    "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-101/subpart-A/section-101.9",
+    "https://fdc.nal.usda.gov/data-documentation/",
+    "https://fdc.nal.usda.gov/download-datasets/",
+    "https://fdc.nal.usda.gov/api-guide/"
+  ],
+  "note": "notes/T012-reference-source-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit without a receipt, so the PM completed the same read-only primary-source mapping as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

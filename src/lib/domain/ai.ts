@@ -39,7 +39,7 @@ const aiStructuredIngredientSchema = z
   })
   .strict();
 
-const aiStructuredRecipeSchema = z
+export const aiStructuredRecipeSchema = z
   .object({
     title: z.string().min(1).max(160),
     summary: z.string().max(800),

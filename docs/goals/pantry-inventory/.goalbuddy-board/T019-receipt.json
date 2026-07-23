@@ -1,0 +1,39 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T019",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [
+      "src/lib/services/pantry-grocery-cooking-service.ts",
+      "src/components/shopping-list-editor.tsx",
+      "tests/unit/pantry-grocery-cooking.test.ts",
+      "tests/integration/pantry-grocery-cooking-service.test.ts",
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/security.md",
+      "docs/testing.md",
+      "docs/decisions/0032-pantry-grocery-cooking.md"
+    ],
+    "commands": [
+      { "cmd": "pnpm exec prettier --check <expanded T019 allowed source, tests, and docs>", "status": "pass", "summary": "All scoped files use Prettier style." },
+      { "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts tests/unit/cooking.test.ts", "status": "pass", "summary": "7 tests passed." },
+      { "cmd": "pnpm exec vitest run --project integration tests/integration/pantry-grocery-cooking-service.test.ts tests/integration/pantry-grocery-cooking-api.test.ts", "status": "pass", "summary": "12 tests passed." },
+      { "cmd": "pnpm test", "status": "pass", "summary": "161 unit and 77 integration tests passed." },
+      { "cmd": "pnpm lint", "status": "pass" },
+      { "cmd": "pnpm typecheck", "status": "pass" },
+      { "cmd": "pnpm openapi:validate", "status": "pass", "summary": "Valid with 11 existing warnings." },
+      { "cmd": "git diff --check", "status": "pass" }
+    ],
+    "summary": "Retained obsolete-manual rows preserve user values and override flags while clearing sourceRecipeIds, generated numeric values, uncertainty, formula inputs, and provenance; rendering suppresses obsolete contributions. Intake keys persist synchronously before dispatch, survive concurrent and unknown-outcome retries, rotate only after matching confirmed success, and resist late-response rotation. Multi-recipe and edge regressions pass without protected-boundary changes.",
+    "deviations": [
+      "Used a lazy stable React state initializer for the synchronous operation tracker after the refs lint rule rejected render-time ref initialization.",
+      "Expanded the placeholder Prettier command to all T019 allowed paths."
+    ],
+    "remaining_blockers": [
+      "Production build, rendered workflow, and accessibility evidence remain unverified while shared .next is owned by an active development process."
+    ],
+    "verification_attempts": 2,
+    "stopped_because": null
+  }
+}

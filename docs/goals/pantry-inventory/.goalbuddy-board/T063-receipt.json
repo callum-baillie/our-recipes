@@ -1,0 +1,103 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T063",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Accept the inventory-management and integrated happy-path milestone. T038-T062 prove complete inventory actions, accessibility, responsive rendering, persistence, migrations, protected-work integrity, 190 unit and 114 integration tests, isolated build, and the 400/350/50 integrated workflow. The original outcome remains incomplete because cards expose only a coarse state, the library has no Pantry filters, recipe details lack batch/location and planned-demand context, and projected demand includes completed meals with no skipped/cancelled status or expiry-conflict semantics.",
+    "worker_package": {
+      "objective": "Complete one recipe-and-planner Pantry vertical slice without reopening proven inventory management: add compact truthful recipe-card insights and Pantry library filters; enrich serving-scaled recipe details with required, exact available, shortage, optionality, matching locations/batches, planned-period commitments, projected remaining stock, and expiry context; add durable planned/skipped/cancelled meal status and derive cooked status from completed linked cook sessions; exclude skipped, cancelled, and cooked meals from projected demand; allocate projected demand chronologically without mutating stock; expose covered, shortage, uncertainty, later-week exhaustion, earliest relevant expiry, and stock-expiring-before-meal conflicts without food-safety claims. Preserve recipe text, required-first allocation, compatible-unit rules, ActorContext, trusted origins, profiles-not-auth, and all proven inventory behavior. Leave grocery formula/intake and cooking confirmation UI for later.",
+      "allowed_files": [
+        "src/lib/db/schema.ts",
+        "drizzle/0025_pantry_recipe_planner_status.sql",
+        "drizzle/meta/_journal.json",
+        "src/lib/domain/recipe.ts",
+        "src/lib/domain/planning.ts",
+        "src/lib/domain/pantry-availability.ts",
+        "src/lib/services/recipe-service.ts",
+        "src/lib/services/planning-service.ts",
+        "src/lib/services/pantry-availability-service.ts",
+        "src/app/api/v1/meal-plan/[entryId]/route.ts",
+        "src/app/api/v1/pantry/recipes/[recipeId]/availability/route.ts",
+        "src/app/api/v1/pantry/demand/route.ts",
+        "src/app/recipes/page.tsx",
+        "src/app/recipes/[recipeId]/page.tsx",
+        "src/app/planner/page.tsx",
+        "src/components/pantry-availability-pill.tsx",
+        "src/components/pantry-availability-pill.module.css",
+        "src/components/recipe-summary-card.tsx",
+        "src/components/recipe-library-filters.tsx",
+        "src/components/recipe-pantry-panel.tsx",
+        "src/components/recipe-pantry-panel.module.css",
+        "src/components/meal-planner.tsx",
+        "src/components/meal-planner-types.ts",
+        "src/components/meal-planner.module.css",
+        "src/components/meal-plan-pantry-demand.tsx",
+        "src/components/meal-plan-pantry-demand.module.css",
+        "tests/unit/pantry-availability.test.ts",
+        "tests/unit/recipe-schema.test.ts",
+        "tests/unit/pantry-recipe-planner-components.test.ts",
+        "tests/integration/pantry-availability-service.test.ts",
+        "tests/integration/household-service.test.ts",
+        "tests/integration/pantry-recipe-planner-service.test.ts",
+        "tests/e2e/pantry-recipe-planner.spec.ts",
+        "docs/openapi.yaml",
+        "docs/api.md",
+        "docs/architecture.md",
+        "docs/data-model.md",
+        "docs/security.md",
+        "docs/testing.md",
+        "docs/decisions/0031-pantry-availability-and-demand.md"
+      ],
+      "verify": [
+        "Scoped Prettier over every changed recipe/planner Pantry file",
+        "Focused Pantry availability, schema, component, service, and household tests",
+        "pnpm test",
+        "pnpm lint",
+        "pnpm typecheck",
+        "pnpm openapi:validate",
+        "Isolated production build without using shared .next",
+        "Focused isolated Playwright at 390, 768, and 1280 with keyboard, axe, persisted reload, screenshots, responsive containment, and no browser errors",
+        "Fresh disposable db:migrate and db:check",
+        "git diff --check and protected-work integrity"
+      ],
+      "stop_if": [
+        "Existing meal-plan state can durably represent planned, skipped, and cancelled semantics; omit 0025 rather than adding redundant persistence.",
+        "Any migration beyond one additive meal_plan_entries status column and supporting index is required, or an applied migration would change.",
+        "Recipe filtering would duplicate or weaken Pantry uncertainty, required-first allocation, compatible-unit, or optional-ingredient semantics.",
+        "Expiry handling would infer food safety, count stock as usable after a recorded conflict without disclosure, or mutate physical inventory.",
+        "Cooked exclusion cannot be derived from completed cook_sessions linked by meal_plan_entry_id without modifying the proven cooking transaction.",
+        "Implementation requires grocery, intake, cooking, deduction, undo, leftover, Nutrition, or files outside allowed_files.",
+        "ActorContext, exact trusted-origin checks, recipe text, profiles-not-auth, protected hashes, or concurrent dirty work would be weakened or overwritten.",
+        "Verification requires live/shared data, credentials, provider calls, or disruption of another active process."
+      ]
+    },
+    "evidence": [
+      "T062 proves the full 400/350/50 integrated flow, provenance/manual behavior, intake, confirmed FEFO history, accessibility, screenshots, persistence, disposable migrations, and no browser errors.",
+      "T038-T058 prove advanced inventory management and truthful expiry presentation across desktop, tablet, and mobile.",
+      "RecipeSummaryCard currently exposes only a coarse Pantry state and RecipeLibraryFilters has no Pantry filter.",
+      "RecipePantryPanel lacks matching batches/locations, other planned demand, projected remainder, and expiry conflict context.",
+      "Projected demand currently includes every linked meal in range and meal_plan_entries has no status, while completed cook sessions can derive cooked exclusion."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": {
+      "safe": false,
+      "rationale": "Recipe filters, availability calculations, planner status, chronological allocation, shared UI, migration, and browser proof form one coupled vertical slice."
+    },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Pantry library filters and richer card insights",
+      "Recipe detail batch/location/planned-demand/projected-remainder/expiry context",
+      "Persisted skipped/cancelled controls and derived cooked status",
+      "Chronological shared-stock allocation and expiry conflict evidence",
+      "Later grocery and cooking UI slices",
+      "Final full-oracle audit"
+    ],
+    "required_board_updates": [
+      "Record T063 done and accept the inventory milestone.",
+      "Create and activate T064 Worker exactly from worker_package.",
+      "Keep T999 blocked and require another Judge after T064."
+    ]
+  }
+}

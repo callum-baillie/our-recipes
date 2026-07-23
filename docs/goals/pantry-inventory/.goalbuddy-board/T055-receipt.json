@@ -1,0 +1,35 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T055",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Axe proves a product defect. Five exposed and four conditional/placeholder-only action controls lack stable accessible names; exactly nine product-specific aria-label additions are required.",
+    "worker_package": {
+      "objective": "Add exactly nine product-specific accessible names to Pantry action controls, then run full static/build and independent browser/persistence gates.",
+      "allowed_files": ["src/components/pantry-manager.tsx"],
+      "verify": [
+        "Require PantryManager source/mirror pre-hash 3380114A9E235B9080F053C4B92C36FB198A5BA4EF91A660D9B0BB7A09A9CEF2 and unchanged management-spec hash 46EF395A289F2A518E4875869350F94BA4F6E302BA272F093D4BBC0BBB4F3027.",
+        "Add exactly nine product-specific aria-labels: Correct unit/approximate/reason; Split unit/location; Discard reason; Donation reason; Restore unit/approximate.",
+        "Preserve all element types/names/placeholders/defaults/payloads/actions/layout and existing labels; run scoped format/lint and mirror hash equality.",
+        "Run format:check, lint, typecheck, test, and isolated mirror build.",
+        "Run fresh management with all behavior, zero axe at three scans, three overflow/screenshots, no errors.",
+        "Release port, fresh integrated 400/350/50 flow, zero axe at two scans, five screenshots, no errors.",
+        "Inspect persistence read-only, disposable migrate/dbcheck, final port/diff/status."
+      ],
+      "stop_if": [
+        "Pre-hashes differ or any change beyond nine aria-label attributes is required.",
+        "Any name is generic/duplicated/lacks product identity or existing behavior changes.",
+        "Static/build/axe/workflow fails twice or axe weakening is proposed.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": ["Five critical axe nodes were exposed in Correct/Split.", "Exhaustive audit adds Discard, Donate, and conditional Restore controls for nine total.", "All management behaviors passed before axe."],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One product component/mirror/DB/artifact/port lifecycle must be serial." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Static/build proof after repair", "Passing browser accessibility/screenshots", "Persistence/migration/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T055 done.", "Activate T056 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T101",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T101-advanced-aggregate-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only latest-revision, index, goal privacy, plan, formula, performance and accessible-scope review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved the bounded advanced chart vertical after preserving the existing manage-goals read boundary through a shared server access context.",
+  "note": "notes/T101-advanced-aggregate-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The bounded at-most-five-query workspace and five advanced non-weight views must be delivered and audited.",
+    "Weight, card/planner preferences, household analysis and rendered final evidence remain later slices."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

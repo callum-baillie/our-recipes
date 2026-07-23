@@ -1,0 +1,23 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T049",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T049-planned-allocation-review.md"
+  ],
+  "commands": [
+    { "cmd": "read-only explicit-allocation, privacy aggregate, current-calculation, history, transaction, UI and regression audit", "status": "pass" }
+  ],
+  "summary": "Approved T048 and required a read-only map for prepared yield plus atomic idempotent intake-and-eaten-allocation confirmation.",
+  "note": "notes/T049-planned-allocation-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Planner-page adapter remains deferred while concurrent Pantry work owns the dirty planner files."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

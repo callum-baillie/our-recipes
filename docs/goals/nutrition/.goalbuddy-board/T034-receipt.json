@@ -1,0 +1,30 @@
+{
+  "result": "done",
+  "task_id": "T034",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-view.ts",
+    "src/lib/domain/nutrition-insights.ts",
+    "src/lib/services/nutrition-comparison-service.ts",
+    "src/app/nutrition/page.tsx",
+    "tests/unit/nutrition-view.test.ts",
+    "tests/unit/nutrition-insights.test.ts",
+    "tests/integration/nutrition-comparison-service.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused Prettier and ESLint", "status": "pass" },
+    { "cmd": "focused Nutrition view/insight unit tests", "status": "pass", "summary": "6 tests passed" },
+    { "cmd": "focused comparison integration", "status": "pass", "summary": "1 test passed" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "154 unit and 68 integration tests passed" },
+    { "cmd": "scoped git diff --check", "status": "pass" }
+  ],
+  "summary": "Unified profile-local day buckets and made insight completeness nutrient-specific. Near-midnight days and mixed-completeness regressions pass; no stored timestamps or API/UI shapes changed; full repository gates pass.",
+  "note": "notes/T034-quality-timezone-repair.md",
+  "deviations": ["The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact repair as permitted fallback."],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

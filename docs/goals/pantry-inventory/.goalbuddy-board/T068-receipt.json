@@ -1,0 +1,28 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T068",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["src/lib/domain/pantry.ts", "src/lib/services/pantry-availability-service.ts", "tests/unit/pantry.test.ts", "tests/integration/pantry-availability-service.test.ts"],
+    "commands": [
+      {"cmd": "pre-hash and protected E2E guards", "status": "pass"},
+      {"cmd": "scoped Prettier and ESLint", "status": "pass"},
+      {"cmd": "focused unit and integration expiry regressions", "status": "pass"},
+      {"cmd": "unchanged isolated recipe/planner Playwright", "status": "pass", "summary": "390/768/1280, recorded date, keyboard persistence, 3 axe/screenshot/containment checks, zero browser errors"},
+      {"cmd": "pnpm test", "status": "pass", "summary": "223 unit and 124 integration"},
+      {"cmd": "pnpm lint and pnpm typecheck", "status": "pass"},
+      {"cmd": "pnpm openapi:validate", "status": "pass", "summary": "valid with 11 pre-existing warnings"},
+      {"cmd": "isolated next build --webpack", "status": "pass"},
+      {"cmd": "fresh disposable migrate and db check", "status": "pass"},
+      {"cmd": "diff, port, mirror, screenshot, and protected-hash integrity", "status": "pass"}
+    ],
+    "summary": "Omitted dates normalize to null, supplied best-before dates persist, and availability selects the first non-empty use-by then best-before date. Focused regressions and the unchanged browser oracle pass. All 347 tests, static/OpenAPI gates, isolated build, disposable DB, and integrity checks pass.",
+    "deviations": [
+      "Isolated pnpm build refused an external node_modules junction before compilation.",
+      "Default Turbopack also rejected the out-of-root junction; isolated webpack build passed."
+    ],
+    "remaining_blockers": [],
+    "verification_attempts": 1,
+    "stopped_because": null
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T101",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "complete",
+    "full_outcome_complete": true,
+    "rationale": "The complete integrated Pantry outcome is proven across inventory management, recipe/planner demand, grocery formula and rich intake, confirmed cooking/leftovers/undo, security and attribution, responsive accessibility, additive migrations, full tests/OpenAPI/build, disposable databases, independent browser oracles, and final integrity. No safe local core gap or implementation task remains.",
+    "worker_package": null,
+    "evidence": [
+      "Inventory management and truthful expiry/history passed management and integrated browser oracles.",
+      "Recipe cards/details/filters and planner exclusions, chronological allocation, uncertainty, and expiry conflicts passed focused and 390/768/1280 browser proof.",
+      "Grocery no-double-count formula, staples, manual extras, purchased coverage, controls, and rich explicit idempotent intake passed focused/full and rendered proof.",
+      "Linked-meal cooking, batch/location/expiry review, 120 correction with FEFO 100+20, explicit confirmation, multiple leftovers, refresh, and guarded undo passed cooking and protected workflow oracles.",
+      "Trusted-origin validation, signed ActorContext attribution, profiles-not-auth, atomicity, and no automatic deduction were preserved.",
+      "Current gates: OpenAPI, lint, typecheck, 235 unit, 133 integration, isolated full-source webpack build, disposable migrations/database checks.",
+      "Management, grocery, recipe/planner, cooking, and integrated E2Es cover desktop/tablet/mobile, keyboard, axe, screenshots, persistence, containment, and strict browser errors.",
+      "Final source/mirror/protected hashes, diff/status, port release, and live PID preservation passed."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": null,
+    "blocked_tasks": [],
+    "missing_evidence": [],
+    "required_board_updates": [
+      "Record T101 done and full outcome complete.",
+      "Set goal status complete with no active task.",
+      "Retain T999 as historical not-complete evidence superseded by this audit."
+    ]
+  }
+}

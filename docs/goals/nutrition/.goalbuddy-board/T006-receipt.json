@@ -1,0 +1,58 @@
+{
+  "result": "done",
+  "task_id": "T006",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "Approve pantryProducts provisionally as the reusable food/product nutrition anchor, keep physical batches availability-only, and migrate existing recipe fields later as unverified unknown-provenance per-serving legacy data. Persistence must wait for the active Pantry schema package. The largest safe next Worker is a four-new-file privacy kernel: memory-hard local credential hashing, signed expiring versioned Nutrition sessions, optional-sensitive profile and goal validation, and deny-by-default owner/guardian/granular-viewer authorization. It materially advances server-enforced privacy without overlapping Pantry or dirty files.",
+  "worker_package": {
+    "objective": "Implement and test the real local Nutrition access/session boundary plus optional-sensitive Nutrition profile, goal-version, body-measurement, privacy and granular permission validation in four new files only.",
+    "allowed_files": [
+      "src/lib/nutrition-access.ts",
+      "src/lib/domain/nutrition-profile.ts",
+      "tests/unit/nutrition-access.test.ts",
+      "tests/unit/nutrition-profile.test.ts"
+    ],
+    "verify": [
+      "pnpm exec prettier --check src/lib/nutrition-access.ts src/lib/domain/nutrition-profile.ts tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "pnpm exec eslint src/lib/nutrition-access.ts src/lib/domain/nutrition-profile.ts tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "pnpm typecheck",
+      "pnpm vitest run --project unit tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts",
+      "git diff --check -- src/lib/nutrition-access.ts src/lib/domain/nutrition-profile.ts tests/unit/nutrition-access.test.ts tests/unit/nutrition-profile.test.ts"
+    ],
+    "stop_if": [
+      "Need files outside allowed_files.",
+      "Need to modify config, cookie routes, schema, migrations, Pantry or UI before the domain contract is verified.",
+      "Any design would treat ActorContext or a switchable profile as authorization.",
+      "Ambiguity would require inventing a medical/reference target or inferring a sensitive property.",
+      "A live provider call, credential read, external write or paid action would be required.",
+      "Verification fails twice for a cause not fixable within allowed_files."
+    ]
+  },
+  "evidence": [
+    "docs/goals/nutrition/notes/T003-architecture-decision.md",
+    "docs/goals/nutrition/notes/T005-pantry-refresh.md",
+    "docs/goals/nutrition/notes/T006-privacy-architecture.md",
+    "docs/goals/pantry-inventory/state.yaml",
+    "Current git status and migration journal"
+  ],
+  "subgoal_contract": null,
+  "parallel_safety": {
+    "safe": false,
+    "rationale": "One Nutrition Worker owns only four new files; Pantry continues separate overlapping schema work."
+  },
+  "blocked_tasks": [],
+  "missing_evidence": [
+    "Implemented and verified Nutrition privacy/access kernel",
+    "Accepted Pantry foundation and migration review",
+    "Normalized Nutrition persistence and legacy backfill",
+    "Profiles/goals services and UI, recipe calculations, allocation/consumption, charts, integrations and full oracle"
+  ],
+  "required_board_updates": [
+    "Populate T007 exactly from worker_package and activate it.",
+    "After T007, re-check Pantry completion before any schema package.",
+    "Require a migration/historical-integrity Judge boundary and later a detailed-route privacy review."
+  ],
+  "note": "notes/T006-privacy-architecture.md",
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,70 @@
+{
+  "result": "done",
+  "task_id": "T082",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/db/schema.ts",
+    "drizzle/0023_nutrition_insight_feedback.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/domain/nutrition-recommendations.ts",
+    "src/lib/services/nutrition-recommendation-service.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/recommendations/[recommendationKey]/feedback/route.ts",
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-dashboard.module.css",
+    "tests/unit/nutrition-recommendations.test.ts",
+    "tests/integration/nutrition-recommendation-service.test.ts",
+    "tests/integration/nutrition-recommendation-api.test.ts",
+    "tests/unit/nutrition-components.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "fresh migration through 0023 and direct nutrition_insight_feedback inspection",
+      "status": "pass"
+    },
+    {
+      "cmd": "focused recommendation unit and component tests",
+      "status": "pass",
+      "summary": "9 tests passed"
+    },
+    {
+      "cmd": "focused recommendation service and API integration tests",
+      "status": "pass",
+      "summary": "2 tests passed"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "184 unit and 110 integration tests passed"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    {
+      "cmd": "focused Prettier, ESLint and scoped diff checks",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm openapi:validate",
+      "status": "pass",
+      "summary": "valid with 11 existing warnings"
+    },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered private deterministic quality-gated recurring/planned gap recommendations, evidence explanations, append-only feedback and confirm-before-grocery actions without automatic mutation.",
+  "note": "notes/T082-recommendation-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "Repository-wide formatting remains non-green solely because unrelated existing files are not Prettier-clean; T082's scoped formatting check passed."
+  ],
+  "remaining_blockers": [
+    "T083 must independently audit recommendation privacy, safeguards, deterministic evidence and non-mutation behavior."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

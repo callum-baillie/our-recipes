@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T084", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["tests/e2e/pantry-cooking-confirmation.spec.ts"],
+    "commands": [{"cmd": "scoped Prettier and ESLint", "status": "pass"}, {"cmd": "exact linked-meal URL synchronization", "status": "pass"}, {"cmd": "scoped diff, protected hashes, port/live PID integrity", "status": "pass"}],
+    "summary": "Exact URL wait around the real Cook link passed, but the destination returned HTTP500/Next build overlay because cooking-mode.module.css contains an impure global selector. Start cooking could not render; mirror cleaned and live PID untouched.",
+    "deviations": ["Mechanical E2E formatting repair.", "Fresh run exposed CSS Module purity error at cooking-mode.module.css line 16."],
+    "remaining_blockers": ["CSS purity repair", "Cooking/full/protected/build/disposable/integrity gates"],
+    "verification_attempts": 1, "stopped_because": "HTTP500 from out-of-scope CSS compilation error after exact navigation passed."
+  }
+}

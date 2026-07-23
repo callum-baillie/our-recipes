@@ -2,10 +2,11 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
-import { shoppingListGenerateSchema } from '@/lib/domain/planning';
+import { shoppingListCreateSchema, shoppingListGenerateSchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   generateShoppingList,
+  createManualShoppingList,
   listShoppingLists,
   PlanningNotFoundError,
 } from '@/lib/services/planning-service';
@@ -27,8 +28,17 @@ export async function POST(request: Request) {
       'profile_selection_required',
       'Choose a household profile before generating a list.',
     );
-  const parsed = shoppingListGenerateSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return jsonError(400, 'invalid_week', 'Use a valid week range.');
+  const raw = await request.json().catch(() => null);
+  const manual = shoppingListCreateSchema.safeParse(raw);
+  if (manual.success) {
+    return NextResponse.json(
+      { list: createManualShoppingList(manual.data.name, actor.profileId) },
+      { status: 201 },
+    );
+  }
+  const parsed = shoppingListGenerateSchema.safeParse(raw);
+  if (!parsed.success)
+    return jsonError(400, 'invalid_list', 'Use a list name or valid week range.');
   try {
     return NextResponse.json(
       { list: generateShoppingList(parsed.data.weekStart, parsed.data.weekEnd, actor.profileId) },

@@ -1,0 +1,32 @@
+{
+  "result": "blocked",
+  "task_id": "T010",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "drizzle/0016_nutrition_foundation.sql",
+    "drizzle/meta/_journal.json",
+    "docs/architecture.md",
+    "docs/data-model.md",
+    "docs/testing.md",
+    "docs/decisions/0029-nutrition-foundation.md"
+  ],
+  "commands": [
+    {
+      "cmd": "pnpm typecheck after withdrawing conflicting schema/service/test edits",
+      "status": "pass"
+    }
+  ],
+  "summary": "Stopped the first persistence Worker when Pantry's integrity repair concurrently reserved the same schema and migration journal. Retained the additive Nutrition SQL and documentation because Pantry ordered its own migration after that entry, but withdrew incomplete schema/service/test files so the external Worker can verify safely. A fresh Judge must audit the settled combined migrations before resuming; this is not a completed persistence slice.",
+  "note": "notes/T010-concurrency-block.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit, so the PM began the approved package as permitted fallback before the external Pantry board changed ownership."
+  ],
+  "remaining_blockers": [
+    "Pantry T007 must finish and provide a verified combined migration/schema baseline.",
+    "Nutrition schema mappings, service, and integration tests were withdrawn and must be restored only after re-review."
+  ],
+  "verification_attempts": 2,
+  "blocked_reason": "Pantry T007 activated during implementation and concurrently owns src/lib/db/schema.ts and drizzle/meta/_journal.json, triggering T010's external-change stop condition.",
+  "stopped_because": "Current external changes made the approved shared-file scope unsafe.",
+  "harness": "codex-pm-fallback"
+}

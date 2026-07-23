@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T041",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T041-intake-repair-review.md"],
+  "commands": [
+    { "cmd": "read-only bypass, dedicated-route, source-continuity, history, tests and ownership audit", "status": "pass" }
+  ],
+  "summary": "Approved the bypass repair. Copied calculation identity cannot control browser nutrient snapshots, correction source type is stable, and the next safe boundary is server-built product/manual/correction Food Diary flows.",
+  "note": "notes/T041-intake-repair-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Checkout-wide lint remains externally blocked by active Pantry T019 shopping-list-editor.tsx."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

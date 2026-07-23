@@ -1,0 +1,27 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T039",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The location and combined-test failures are harness-only. Whole-details text filtering inherited location names from nested parent selects, matching seven disclosures. Both specs assume first-run state and must run with separate prepare/database/server lifecycles.",
+    "worker_package": {
+      "objective": "Use exact direct-summary-to-parent details locators for Cold room and Basket, then run management and integrated Pantry workflows separately with complete browser/accessibility/screenshots/persistence/disposable DB/diff evidence.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": ["Hash guard", "Exact two semantic locators", "Spec format/lint/mirror refresh", "Fresh management workflow", "Fresh old integrated workflow", "Read-only persistence", "Disposable DB", "Port/diff integrity"],
+      "stop_if": ["Scope/assertions/strictness changes.", "Shared state/server or port failure.", "Either workflow fails twice.", "Live/shared/unrelated state would change."]
+    },
+    "evidence": [
+      "Exactly one direct summary is Cold room; nested parent selects cause seven subtree text matches.",
+      "Basket uses the same defective pattern.",
+      "Product creation, batches, product edit, and location creation succeeded before the locator failure.",
+      "prepare-e2e resets once, so the two first-run specs require separate invocations."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, database, output family, and port; serial independent runs required." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Complete management workflow/axe/screenshots/persistence", "Independent integrated workflow", "Disposable DB and final port/diff", "Later brief slices"],
+    "required_board_updates": ["Record T039 done.", "Activate T040 Worker.", "Require another Judge after both workflows pass."]
+  }
+}

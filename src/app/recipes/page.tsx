@@ -1,16 +1,33 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
-import { RecipePortabilityActions } from '@/components/recipe-portability-actions';
+import { RecipeLibraryFilters } from '@/components/recipe-library-filters';
+import { RecipeSummaryCard } from '@/components/recipe-summary-card';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { DEFAULT_NUTRITION_CARD_NUTRIENTS } from '@/lib/domain/nutrition-profile';
 import { recipeLibraryQuerySchema } from '@/lib/domain/recipe';
 import { listCollections } from '@/lib/services/collection-service';
 import { getHouseholdState } from '@/lib/services/household-service';
+import { listRecipePantryAvailability } from '@/lib/services/pantry-availability-service';
+import { listRecipeNutritionPresentations } from '@/lib/services/nutrition-recipe-calculation-service';
+import { listAccessibleNutritionProfiles } from '@/lib/services/nutrition-profile-service';
+import { getAppPreferences } from '@/lib/services/app-preferences-service';
+import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
 import { listRecipeLibrary, listRecipeTags } from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
 
 type SearchParams = Record<string, string | string[] | undefined>;
+
+const DEFAULT_NUTRITION_FIELDS = DEFAULT_NUTRITION_CARD_NUTRIENTS;
+const NUTRITION_FIELD_LABELS = {
+  energy_kcal: { label: 'Calories', unit: 'kcal', digits: 0 },
+  protein: { label: 'Protein', unit: 'g', digits: 1 },
+  carbohydrate: { label: 'Carbohydrate', unit: 'g', digits: 1 },
+  total_fat: { label: 'Fat', unit: 'g', digits: 1 },
+  fiber: { label: 'Fiber', unit: 'g', digits: 1 },
+  sodium: { label: 'Sodium', unit: 'mg', digits: 0 },
+} as const;
 
 function recipeLibraryUrl(search: URLSearchParams, page: number): string {
   const next = new URLSearchParams(search);
@@ -26,176 +43,166 @@ export default async function RecipeLibraryPage({
   const rawSearch = await searchParams;
   const search = new URLSearchParams(
     Object.entries(rawSearch).flatMap(([key, value]) =>
-      typeof value === 'string' && value ? [[key, value]] : [],
+      typeof value === 'string'
+        ? value
+          ? [[key, value]]
+          : []
+        : Array.isArray(value)
+          ? value.filter(Boolean).map((item) => [key, item])
+          : [],
     ),
   );
-  const query = recipeLibraryQuerySchema.parse(Object.fromEntries(search.entries()));
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  search.delete('nutritionProfile');
+  search.delete('profileId');
+  const recipePreferences = getAppPreferences().recipes;
+  const query = recipeLibraryQuerySchema.parse({
+    ...Object.fromEntries(search.entries()),
+    sort: search.get('sort') ?? recipePreferences.defaultSort,
+    nutritionFields: rawSearch.nutritionFields,
+  });
+  const cookieStore = await cookies();
+  const actor = getActorContext(cookieStore.get(ACTIVE_PROFILE_COOKIE)?.value);
+  const nutritionHousehold = resolveNutritionHouseholdContext(actor);
+  const activeNutritionProfile = listAccessibleNutritionProfiles(
+    nutritionHousehold.compatibilityPrincipalId,
+  ).find((profile) => profile.id === nutritionHousehold.activeNutritionProfile.id)!;
+  const selectedNutritionFields = query.nutritionFields ??
+    activeNutritionProfile?.recipeCardNutrientCodes ?? [...DEFAULT_NUTRITION_FIELDS];
+  const showRecipeCardNutrition = activeNutritionProfile?.showRecipeCardNutrition ?? true;
   const { profiles } = getHouseholdState();
   const tags = listRecipeTags();
   const collections = listCollections();
-  const library = listRecipeLibrary(query, actor.profileId);
+  const pageSize = 24;
+  const firstLibraryPage = listRecipeLibrary(
+    { ...query, page: query.pantry ? 1 : query.page },
+    actor.profileId,
+    query.pantry ? 500 : pageSize,
+  );
+  const candidateRecipes = query.pantry
+    ? [
+        ...firstLibraryPage.recipes,
+        ...Array.from({ length: firstLibraryPage.totalPages - 1 }, (_, index) => index + 2).flatMap(
+          (page) => listRecipeLibrary({ ...query, page }, actor.profileId, 500).recipes,
+        ),
+      ]
+    : firstLibraryPage.recipes;
+  const pantryAvailability = Object.assign(
+    {},
+    ...Array.from({ length: Math.ceil(candidateRecipes.length / 500) }, (_, index) =>
+      listRecipePantryAvailability(
+        candidateRecipes.slice(index * 500, index * 500 + 500).map((recipe) => recipe.id),
+      ),
+    ),
+  );
+  const filteredRecipes = query.pantry
+    ? candidateRecipes.filter((recipe) => pantryAvailability[recipe.id]?.state === query.pantry)
+    : candidateRecipes;
+  const filteredTotalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+  const filteredPage = Math.min(query.page, filteredTotalPages);
+  const library = query.pantry
+    ? {
+        ...firstLibraryPage,
+        recipes: filteredRecipes.slice((filteredPage - 1) * pageSize, filteredPage * pageSize),
+        total: filteredRecipes.length,
+        page: filteredPage,
+        totalPages: filteredTotalPages,
+      }
+    : firstLibraryPage;
+  const nutritionPresentations = showRecipeCardNutrition
+    ? listRecipeNutritionPresentations(library.recipes.map((recipe) => recipe.id))
+    : {};
   return (
     <main className="recipe-page">
-      <header className="recipe-header">
-        <Link className="wordmark" href="/">
-          <span className="wordmark-mark" aria-hidden="true" />
-          <span>Our Recipes</span>
-        </Link>
-        <div className="header-actions">
-          <RecipePortabilityActions />
-          <Link className="primary-button compact" href="/recipes/new">
-            Add a recipe
-          </Link>
-        </div>
-      </header>
-      <section className="library-heading">
-        <div>
-          <p className="eyebrow">THE SHARED COOKBOOK</p>
-          <h1>Your recipe library</h1>
-          <p className="muted">
-            {library.total
-              ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
-              : 'A place for every recipe your household returns to.'}
-          </p>
-        </div>
-        <form className="library-filters">
-          <label className="search-filter">
-            <span className="sr-only">Search recipes</span>
-            <input name="q" defaultValue={query.q} placeholder="Search recipes or ingredients" />
-          </label>
-          <div className="filter-grid">
-            <label>
-              <span>Sort</span>
-              <select name="sort" defaultValue={query.sort}>
-                <option value="recently-updated">Recently updated</option>
-                <option value="recently-added">Recently added</option>
-                <option value="alphabetical">Alphabetical</option>
-                <option value="highest-rated">Your highest rated</option>
-                <option value="most-recently-cooked">Most recently cooked</option>
-                <option value="shortest-time">Shortest time</option>
-              </select>
-            </label>
-            <label>
-              <span>Creator</span>
-              <select name="creator" defaultValue={query.creator ?? ''}>
-                <option value="">Everyone</option>
-                {profiles.map((profile) => (
-                  <option value={profile.id} key={profile.id}>
-                    {profile.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Tag</span>
-              <select name="tag" defaultValue={query.tag ?? ''}>
-                <option value="">Any tag</option>
-                {tags.map((tag) => (
-                  <option value={tag} key={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Collection</span>
-              <select name="collection" defaultValue={query.collection ?? ''}>
-                <option value="">Any collection</option>
-                {collections.map((collection) => (
-                  <option value={collection.id} key={collection.id}>
-                    {collection.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Status</span>
-              <select name="status" defaultValue={query.status}>
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-                <option value="trash">Trash</option>
-                <option value="all">All statuses</option>
-              </select>
-            </label>
-            <label>
-              <span>Category</span>
-              <input
-                name="category"
-                defaultValue={query.category ?? ''}
-                placeholder="e.g. Dinner"
-              />
-            </label>
-            <label>
-              <span>Cuisine</span>
-              <input name="cuisine" defaultValue={query.cuisine ?? ''} placeholder="e.g. Italian" />
-            </label>
-            <label>
-              <span>Maximum minutes</span>
-              <input
-                name="maxTotalMinutes"
-                type="number"
-                min="1"
-                defaultValue={query.maxTotalMinutes ?? ''}
-              />
-            </label>
-            <div className="filter-checks">
-              <label>
-                <input
-                  name="favorite"
-                  type="checkbox"
-                  value="true"
-                  defaultChecked={Boolean(query.favorite)}
-                />{' '}
-                Favorites
-              </label>
-              <label>
-                <input
-                  name="cooked"
-                  type="checkbox"
-                  value="true"
-                  defaultChecked={Boolean(query.cooked)}
-                />{' '}
-                Cooked by me
-              </label>
-            </div>
-          </div>
-          <div className="filter-actions">
-            <button className="primary-button compact" type="submit">
-              Apply filters
-            </button>
-            <Link className="text-button" href="/recipes">
-              Reset
+      <section className="library-heading" aria-labelledby="library-title">
+        <p className="eyebrow">THE SHARED COOKBOOK</p>
+        <div className="library-title-row">
+          <h1 id="library-title">Your recipe library</h1>
+          <div className="library-title-actions">
+            <p className="muted">
+              {library.total
+                ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
+                : 'A place for every recipe your household returns to.'}
+            </p>
+            <Link className="text-button" href="/collections">
+              Collections
             </Link>
           </div>
-        </form>
+        </div>
+        <RecipeLibraryFilters
+          filters={{
+            q: query.q,
+            sort: query.sort,
+            creator: query.creator ?? '',
+            tag: query.tag ?? '',
+            collection: query.collection ?? '',
+            status: query.status,
+            category: query.category ?? '',
+            cuisine: query.cuisine ?? '',
+            maxTotalMinutes: query.maxTotalMinutes ?? '',
+            favorite: Boolean(query.favorite),
+            cooked: Boolean(query.cooked),
+            pantry: query.pantry ?? '',
+            maxCaloriesPerServing: query.maxCaloriesPerServing ?? '',
+            minProteinPerServing: query.minProteinPerServing ?? '',
+            minFiberPerServing: query.minFiberPerServing ?? '',
+            maxSodiumPerServing: query.maxSodiumPerServing ?? '',
+            minNutritionCompleteness: query.minNutritionCompleteness ?? '',
+            supportsNutrient: query.supportsNutrient ?? '',
+            nutritionFields: selectedNutritionFields,
+          }}
+          profiles={profiles.map((profile) => ({
+            value: profile.id,
+            label: profile.displayName,
+          }))}
+          tags={tags}
+          collections={collections.map((collection) => ({
+            value: collection.id,
+            label: collection.name,
+          }))}
+        />
+        {activeNutritionProfile && !showRecipeCardNutrition ? (
+          <p className="muted">
+            Compact Nutrition facts are hidden in {activeNutritionProfile.displayName}&apos;s
+            Nutrition settings.
+          </p>
+        ) : null}
       </section>
       {library.recipes.length ? (
         <>
-          <section className="recipe-grid" aria-label="Recipe results">
-            {library.recipes.map((recipe) => (
-              <Link className="recipe-card" href={`/recipes/${recipe.id}`} key={recipe.id}>
-                <p>
-                  {recipe.status === 'active'
-                    ? recipe.tags.join(' · ') || recipe.category || 'HOUSE RECIPE'
-                    : recipe.status}
-                </p>
-                <h2>{recipe.title}</h2>
-                <span>
-                  {recipe.summary ||
-                    `${recipe.servings} · ${recipe.prepMinutes + recipe.cookMinutes + recipe.restMinutes} min`}
-                </span>
-                <small>
-                  {recipe.createdByName} ·
-                  {recipe.personalRating !== null
-                    ? ` Your rating ${recipe.personalRating}/5 ·`
-                    : ''}
-                  {recipe.isFavorite ? ' Favorite ·' : ''}
-                  {recipe.lastCookedAt
-                    ? `Cooked ${recipe.lastCookedAt.toLocaleDateString()}`
-                    : `Revision ${recipe.currentRevision}`}
-                </small>
-              </Link>
+          <section
+            className="home-recipe-grid all-recipes-grid library-recipe-grid"
+            aria-label="Recipe results"
+          >
+            {library.recipes.map((recipe, index) => (
+              <RecipeSummaryCard
+                recipe={{
+                  ...recipe,
+                  pantryAvailability: pantryAvailability[recipe.id]?.state,
+                  pantryInsight: pantryAvailability[recipe.id]
+                    ? `${pantryAvailability[recipe.id]!.counts.ready} covered · ${pantryAvailability[recipe.id]!.counts.partial} short · ${pantryAvailability[recipe.id]!.counts.unknown} unknown`
+                    : undefined,
+                  normalizedNutrition: (() => {
+                    if (!showRecipeCardNutrition) return undefined;
+                    const presentation = nutritionPresentations[recipe.id];
+                    if (!presentation) return undefined;
+                    return {
+                      status: presentation.status,
+                      completeness: presentation.completeness,
+                      facts: selectedNutritionFields.flatMap((code) => {
+                        const amount = presentation.values.find(
+                          (value) => value.nutrientCode === code,
+                        )?.perServing;
+                        const metadata = NUTRITION_FIELD_LABELS[code];
+                        return amount === null || amount === undefined
+                          ? []
+                          : [{ code, amount, ...metadata }];
+                      }),
+                    };
+                  })(),
+                }}
+                eager={index === 0}
+                key={recipe.id}
+              />
             ))}
           </section>
           {library.totalPages > 1 && (

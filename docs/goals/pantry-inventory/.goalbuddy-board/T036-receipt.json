@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T036",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Attempt 1 reveals a product contract defect: the summary route returns dashboard.products/locations while ShoppingListEditor reads top-level fields, yielding empty intake options. Attempt 2 is a planner hydration race: the server-rendered generation button is enabled before its client handler attaches, so the click is lost. Repair both with focused regressions and exact response/render boundaries.",
+    "worker_package": {
+      "objective": "Fix nested summary parsing and disabled-until-mounted generation, add focused regressions, update exact E2E readiness, then complete build/browser/axe/screenshots/disposable DB/diff verification.",
+      "allowed_files": ["src/components/shopping-list-editor.tsx", "src/components/meal-plan-pantry-demand.tsx", "tests/unit/pantry-grocery-cooking.test.ts", "tests/e2e/pantry-workflow.spec.ts"],
+      "verify": ["Focused regressions", "Exact POST/listId/link and summary/option waits", "Scoped format/lint/unit/type", "Four-file mirror refresh/build", "Full Pantry browser proof", "Disposable DB", "Port/diff integrity"],
+      "stop_if": ["API/schema/formula/assertion/timeouts change.", "Nonsemantic bypass/wait used.", "Response/render boundary fails or scope broadens.", "Two browser runs fail or ownership fails."]
+    },
+    "evidence": [
+      "Summary route returns nested dashboard while ShoppingListEditor reads top-level arrays.",
+      "Persisted Basement shelf exists but intake options are empty.",
+      "Pre-hydration Make shortage list click produced no list, item, link, or error despite valid demand."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "Coupled response/render contracts share one workflow/mirror/port/database." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Focused hydration regressions", "Exact response/render browser proof", "Complete intake/cooking/axe/screenshots", "Disposable DB/build/port/diff"],
+    "required_board_updates": ["Record T036 done.", "Activate T037 Worker.", "Keep T999 queued until all evidence passes."]
+  }
+}

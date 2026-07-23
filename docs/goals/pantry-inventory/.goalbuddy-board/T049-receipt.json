@@ -1,0 +1,40 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T049",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Exact action-button containment is the correct semantic form contract. All 19 text-filtered occurrences share one root cause and must be replaced together, resolving each runtime form once with strict count one.",
+    "worker_package": {
+      "objective": "Add one exact button-containment actionForm helper, replace all 19 broad action-form text scopes, then complete all independent browser and persistence gates.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source/mirror pre-hash 5B6B65DCF0C0B53FFBE6EBE3EBFF5904FA15B37D6E50ACCB0B8D018156BC0ABF.",
+        "Add actionForm using form containment of page.getByRole button exact accessible name; no hasText/CSS/name/position/force.",
+        "Replace all 19 scopes across Combine, Move, Freeze, Thaw, Correct, Split, Discard, two Restore phases, and Donate; resolve ten runtime forms once and assert count one.",
+        "Preserve every input/select/click/exact button/mutation/assertion/fixture/timeout/other locator; require zero affected hasText scopes.",
+        "Run scoped format/lint and one-file mirror hash equality.",
+        "Run fresh management workflow with all actions, three axe/overflow/screenshots, no browser errors.",
+        "Release port, fresh prepare, run integrated workflow with 400/350/50, provenance/manual/intake/FEFO/history, two axe, five screenshots, no browser errors.",
+        "Inspect persistence read-only, run disposable migrate/dbcheck, release port, record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any semantic action form is not uniquely resolved.",
+        "Any unrelated locator/action/assertion/timeout/product/file changes.",
+        "Workflows share state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": [
+      "Freeze text scope resolved a hidden control through inherited descendant text.",
+      "Sibling action forms expose unique exact accessible button names.",
+      "There are exactly 19 affected occurrences and ten runtime resolutions."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, DB, artifacts, and port require serial lifecycles." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing workflows/accessibility/screenshots", "Persistence/migration/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T049 done.", "Activate T050 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

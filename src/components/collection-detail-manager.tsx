@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useState } from 'react';
 
+import { useToast } from '@/components/toast-provider';
+import { BordIcon } from '@/components/bord-brand';
 import type { CollectionDetail } from '@/lib/services/collection-service';
 
 type RecipeOption = { id: string; title: string };
@@ -18,6 +20,7 @@ export function CollectionDetailManager({
   recipes: RecipeOption[];
 }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [collection, setCollection] = useState(initialCollection);
   const [name, setName] = useState(initialCollection.name);
   const [description, setDescription] = useState(initialCollection.description);
@@ -45,10 +48,13 @@ export function CollectionDetailManager({
         error?: { message?: string };
       } | null;
       if (!response.ok || !body?.collection) {
-        setError(body?.error?.message ?? 'We could not save this collection.');
+        const message = body?.error?.message ?? 'We could not save this collection.';
+        setError(message);
+        showToast(message, 'error');
         return;
       }
       setCollection((current) => ({ ...current, ...body.collection! }));
+      showToast('Collection details saved.', 'success');
       router.refresh();
     } finally {
       setPending(false);
@@ -69,11 +75,14 @@ export function CollectionDetailManager({
         error?: { message?: string };
       } | null;
       if (!response.ok || !body?.collection) {
-        setError(body?.error?.message ?? 'We could not save the recipe order.');
+        const message = body?.error?.message ?? 'We could not save the recipe order.';
+        setError(message);
+        showToast(message, 'error');
         return;
       }
       setCollection(body.collection);
       setCoverImageId(body.collection.coverImageId ?? '');
+      showToast('Collection recipes updated.', 'success');
       router.refresh();
     } finally {
       setPending(false);
@@ -102,8 +111,10 @@ export function CollectionDetailManager({
           ← All collections
         </Link>
         <Link className="wordmark" href="/">
-          <span className="wordmark-mark" aria-hidden="true" />
-          <span>Our Recipes</span>
+          <span className="wordmark-mark custom" aria-hidden="true">
+            <BordIcon size={21} />
+          </span>
+          <span>Bòrd</span>
         </Link>
       </header>
       <section className="settings-intro">

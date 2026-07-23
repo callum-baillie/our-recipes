@@ -25,9 +25,8 @@ import {
 } from '@/lib/db/client';
 import { backupIdSchema, backupManifestSchema, type BackupManifest } from '@/lib/domain/backup';
 import { getHouseholdState } from '@/lib/services/household-service';
+import { APPLICATION_VERSION, SCHEMA_VERSION } from '@/lib/release';
 
-const APPLICATION_VERSION = '0.1.0';
-const SCHEMA_VERSION = '0004_recipe_images';
 const MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRY_BYTES = 512 * 1024 * 1024;
 
@@ -161,6 +160,18 @@ function databaseIntegrity(databasePath: string): void {
     if (result.length !== 1 || result[0]?.integrity_check !== 'ok') {
       throw new BackupValidationError('SQLite integrity check did not return ok.');
     }
+  } finally {
+    database.close();
+  }
+}
+
+function removeTransientFoodData(databasePath: string): void {
+  const database = new Database(databasePath, { fileMustExist: true });
+  try {
+    database.transaction(() => {
+      database.prepare('DELETE FROM food_provider_cache').run();
+      database.prepare('DELETE FROM food_provider_rate_limits').run();
+    })();
   } finally {
     database.close();
   }
@@ -307,6 +318,7 @@ export async function createBackup(reason: BackupReason = 'manual'): Promise<Bac
   try {
     await mkdir(backupsDirectory(), { recursive: true });
     await getSqliteDatabase().backup(join(stagingDirectory, 'database.sqlite'));
+    removeTransientFoodData(join(stagingDirectory, 'database.sqlite'));
     await copyDirectoryIfPresent(
       join(getDataDirectory(), 'uploads'),
       join(stagingDirectory, 'uploads'),
@@ -317,8 +329,8 @@ export async function createBackup(reason: BackupReason = 'manual'): Promise<Bac
     );
     const household = getHouseholdState().household;
     const safeConfiguration = {
-      householdName: household?.name ?? null,
-      appName: household?.appName ?? null,
+      kitchenName: household?.kitchenName ?? null,
+      kitchenIcon: household?.kitchenIcon ?? null,
     };
     await writeFile(
       join(stagingDirectory, 'config.json'),
@@ -326,7 +338,7 @@ export async function createBackup(reason: BackupReason = 'manual'): Promise<Bac
     );
     const files = await listRegularFiles(stagingDirectory);
     const manifest: BackupManifest = {
-      formatVersion: 1,
+      formatVersion: 2,
       id,
       applicationVersion: APPLICATION_VERSION,
       schemaVersion: SCHEMA_VERSION,

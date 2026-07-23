@@ -1,0 +1,26 @@
+.marker {
+  display: inline-grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  border-radius: 0.75rem;
+}
+
+.marker svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke-width: 2.1;
+}
+
+.compact {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.55rem;
+}
+
+.compact svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}

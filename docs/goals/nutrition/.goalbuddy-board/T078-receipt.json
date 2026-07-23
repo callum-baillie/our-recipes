@@ -1,0 +1,38 @@
+{
+  "result": "done",
+  "task_id": "T078",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/recipe.ts",
+    "src/lib/services/recipe-service.ts",
+    "src/app/recipes/page.tsx",
+    "src/components/recipe-library-filters.tsx",
+    "src/components/recipe-summary-card.tsx",
+    "src/app/planner/page.tsx",
+    "src/components/meal-planner.tsx",
+    "src/components/meal-planner.module.css",
+    "src/components/nutrition-meal-planning.tsx",
+    "tests/unit/recipe-schema.test.ts",
+    "tests/unit/nutrition-recipe-components.test.ts",
+    "tests/integration/household-service.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused recipe schema/component unit tests", "status": "pass", "summary": "9 tests passed" },
+    { "cmd": "focused recipe query/performance/private planner integration tests", "status": "pass", "summary": "14 tests passed" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "180 unit and 108 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Added correct pre-pagination factual recipe Nutrition discovery and a signed private explicit-allocation panel on the primary planner.",
+  "note": "notes/T078-recipe-planner-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Personalized remaining-target recipe matching remains in the deterministic recommendation slice."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

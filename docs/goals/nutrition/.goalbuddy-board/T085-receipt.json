@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T085",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T085-profile-settings-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only profile settings privacy, optional-input, unit, conflict and truthful-estimator boundary review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a schema-free private profile-settings UI over the existing authorized optimistic PATCH contract.",
+  "note": "notes/T085-profile-settings-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same read-only review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Personalized reference and energy estimates require a separate sourced/reviewed package after the settings UI."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

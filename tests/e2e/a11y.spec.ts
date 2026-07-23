@@ -9,16 +9,30 @@ test('first-run setup and household organization have no automatically detectabl
   const setupResults = await new AxeBuilder({ page }).analyze();
   expect(setupResults.violations).toEqual([]);
 
-  await page.getByLabel('Household name').fill('The Garden Table');
+  await page.getByLabel('Kitchen name').fill('The Garden Table');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Open the cookbook' }).click();
 
   await page.goto('/settings/profiles');
   const profileResults = await new AxeBuilder({ page }).analyze();
   expect(profileResults.violations).toEqual([]);
   await page.getByRole('button', { name: 'Add another profile' }).click();
-  await page.getByLabel('Display name').last().fill('Jon');
-  await page.getByRole('button', { name: 'Create profile' }).click();
+  const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
+  await expect(profileOnboarding).toBeVisible();
+  const profileOnboardingResults = await new AxeBuilder({ page })
+    .include('#profile-onboarding-dialog')
+    .analyze();
+  expect(profileOnboardingResults.violations).toEqual([]);
+  await profileOnboarding.getByLabel('Display name').fill('Jon');
+  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
 
   await page.goto('/recipes/new');
   await page.getByLabel('Recipe name').fill('Accessible rich soup');
@@ -41,6 +55,7 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByLabel('Collection name').fill('Weeknight keepers');
   await page.getByRole('button', { name: 'Create collection' }).click();
   await page.getByRole('link', { name: 'Open collection' }).click();
+  await expect(page.getByRole('heading', { name: 'Weeknight keepers', level: 1 })).toBeVisible();
   const collectionDetailResults = await new AxeBuilder({ page }).analyze();
   expect(collectionDetailResults.violations).toEqual([]);
 

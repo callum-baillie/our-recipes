@@ -39,28 +39,61 @@ test('a fresh household can complete the supported local release acceptance work
   testInfo.setTimeout(180_000);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Make this kitchen yours.' })).toBeVisible();
-  await page.getByLabel('Household name').fill('The Garden Table');
+  await page.getByLabel('Kitchen name').fill('The Garden Table');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('checkbox', { name: /Feel organized at mealtime/u }).click();
+  await page
+    .getByLabel(/Why does this matter to you right now/u)
+    .fill('Plan calmer weekday meals and learn new recipes.');
+  await page
+    .getByLabel(/What tends to get in the way/u)
+    .fill('Busy evenings make last-minute decisions stressful.');
+  await page
+    .getByLabel(/Imagine this is working well/u)
+    .fill('Weeknight meals feel calm and planned.');
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Open the cookbook' }).click();
   await expect(
     page.getByRole('heading', { name: 'Welcome to the kitchen, Callum.' }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make the week feel lighter.' })).toBeVisible();
   await page.goto('/settings/ai');
-  await expect(page).toHaveURL('/settings#ai');
-  await expect(page.getByRole('heading', { name: 'Your kitchen, your way.' })).toBeVisible();
-  const aiStatus = (await (await page.request.get('/api/v1/ai/status')).json()) as {
-    status: { message: string };
-  };
-  await expect(page.locator('#ai').getByRole('status')).toHaveText(aiStatus.status.message);
+  await expect(page).toHaveURL('/settings/ai');
+  await expect(
+    page.getByRole('heading', { name: 'Control what the assistant uses.' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save AI settings' })).toBeVisible();
+  await page.goto('/settings/lists');
+  await page.getByLabel('Store name').fill('Garden Market');
+  await page.getByLabel('Section 1 name').fill('Produce');
+  await page.getByLabel('Section 1 keywords').fill('lemons, fruit, vegetables, herbs');
+  await page.getByRole('button', { name: 'Add supermarket', exact: true }).click();
+  await expect(page.locator('.toast').filter({ hasText: 'Supermarket added.' })).toBeVisible();
+  await page.getByLabel('Default supermarket').selectOption({ label: 'Garden Market' });
+  await page.getByRole('button', { name: 'Save preferences' }).click();
+  await expect(page.locator('.toast').filter({ hasText: 'List preferences saved.' })).toBeVisible();
   await page.goto('/recipes/new');
   await expect(page.getByRole('heading', { name: 'Add it your way.' })).toBeVisible();
   await expect(page.getByLabel('Recipe name')).toBeVisible();
   await page.goto('/settings/profiles');
-  await expect(page.getByRole('heading', { name: 'The people around the table.' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Make the app feel right for each person.' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add another profile' }).click();
-  await page.getByLabel('Display name').last().fill('Jon');
-  await page.getByRole('button', { name: 'Create profile' }).click();
+  const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
+  await profileOnboarding.getByLabel('Display name').fill('Jon');
+  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('checkbox', { name: /Cook at home more/u }).click();
+  await profileOnboarding
+    .getByLabel(/Why does this matter to you right now/u)
+    .fill('Bake more often.');
+  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
   await expect(page.getByRole('heading', { name: 'Jon' })).toBeVisible();
   const jonProfile = page.locator('.profile-editor', {
     has: page.getByRole('heading', { name: 'Jon', exact: true }),
@@ -449,10 +482,11 @@ test('a fresh household can complete the supported local release acceptance work
   const markdownExport = await page.request.get(`/api/v1/recipes/${recipeId}/export/markdown`);
   expect(markdownExport.ok()).toBe(true);
   await expect(markdownExport.text()).resolves.toContain('# Weeknight tomato soup');
-  await page.goto('/recipes');
-  const portableDownload = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Download recipe archive' }).click();
-  expect((await portableDownload).suggestedFilename()).toBe('our-recipes-portable-recipes.tar.gz');
+  const portableDownload = await page.request.get('/api/v1/exports/recipes');
+  expect(portableDownload.ok()).toBe(true);
+  expect(portableDownload.headers()['content-disposition']).toContain(
+    'bord-portable-recipes.tar.gz',
+  );
   await page.goto('/collections');
   await expect(
     page.getByRole('heading', { name: 'A shelf for the recipes that belong together.' }),
@@ -469,13 +503,16 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('link', { name: 'Lemon pasta' })).toBeVisible();
   await page.getByLabel('A small note (optional)').fill('A shelf for busy evenings.');
   await page.getByRole('button', { name: 'Save collection' }).click();
-  await expect(page.getByText('A shelf for busy evenings.')).toBeVisible();
+  await expect(
+    page.locator('p').filter({ hasText: /^A shelf for busy evenings\.$/u }),
+  ).toBeVisible();
   await page.goto(recipeUrl);
   const tinyRecipePhoto = await sharp({
     create: { width: 2, height: 2, channels: 3, background: '#9f482f' },
   })
     .png()
     .toBuffer();
+  await page.getByRole('button', { name: 'Add/manage photos' }).click();
   await page.getByLabel('Add a recipe photo').setInputFiles({
     name: 'tomato-soup.png',
     mimeType: 'image/png',
@@ -488,6 +525,39 @@ test('a fresh household can complete the supported local release acceptance work
   await expect
     .poll(() => uploadedPhoto.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBe(2);
+  await page.goto('/');
+  const homeRecipeCard = page
+    .locator('.recipe-summary-card')
+    .filter({ hasText: 'Weeknight tomato soup' })
+    .first();
+  const likeReaction = homeRecipeCard.getByRole('button', {
+    name: 'Like this recipe (score 3)',
+  });
+  const savedReaction = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PATCH' &&
+      new URL(response.url()).pathname === `/api/v1/recipes/${recipeId}/preference`,
+  );
+  await likeReaction.click();
+  const reactionResponse = await savedReaction;
+  expect(reactionResponse.status()).toBe(200);
+  await expect(reactionResponse.json()).resolves.toMatchObject({
+    preference: { rating: 3 },
+  });
+  await expect(likeReaction).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(
+    page
+      .locator('.recipe-summary-card')
+      .filter({ hasText: 'Weeknight tomato soup' })
+      .first()
+      .getByRole('button', { name: 'Like this recipe (score 3)' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await homeRecipeCard
+    .getByRole('button', { name: 'Mark this recipe as a staple (score 5)' })
+    .click();
+  await page.goto(recipeUrl);
+  await expect(page.getByLabel('Your rating')).toHaveValue('5');
   await page.goto('/collections');
   await page.getByRole('link', { name: 'Open collection' }).click();
   await page.getByLabel('Cover photo').selectOption({ index: 1 });
@@ -515,6 +585,7 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'Finish' })).toBeVisible();
   await expect(page.getByText('Oven-Roasted', { exact: true })).toBeVisible();
   await expect(page.getByText('Sheet pan', { exact: true })).toBeVisible();
+  await page.getByText('Review source values', { exact: true }).click();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
   await page.getByLabel('Your rating').selectOption('5');
   await page.getByLabel('Personal note').fill('Use extra basil next time.');
@@ -533,7 +604,7 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.locator('.recipe-revision-badge')).toHaveText('Revision 3');
   await expect(page.getByText('Oven-Roasted', { exact: true })).not.toBeVisible();
   await page.getByRole('link', { name: 'Cook this recipe' }).click();
-  await page.getByRole('button', { name: 'Save favorite' }).click();
+  await expect(page.getByRole('button', { name: 'Favorite' })).toBeVisible();
   await page.getByRole('button', { name: 'Start cooking' }).click();
   await page.getByLabel('Timer minutes').fill('1');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -541,36 +612,49 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Finish cooking' }).click();
   await page.getByRole('link', { name: '← Recipe card' }).click();
   await page.goto('/planner');
-  const weekRange = await page.locator('.week-plan .eyebrow').textContent();
-  const [weekStart, weekEnd] = weekRange?.split(' TO ').map((value) => value.trim()) ?? [];
-  if (!weekStart || !weekEnd) throw new Error('Planner did not render a week range.');
-  await page.getByLabel('Date').fill(weekStart);
-  await page.locator('select[name="recipeId"]').selectOption({ label: 'Weeknight tomato soup' });
-  await page.getByLabel('Servings').fill('4');
-  await page.getByRole('button', { name: 'Add to plan' }).click();
-  await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
-  await page.getByLabel('A free-form meal').check();
-  await page.locator('select[name="meal"]').selectOption('snack');
-  await page.locator('input[name="title"]').fill('Leftovers board');
-  await page.getByRole('button', { name: 'Add to plan' }).click();
-  await expect(page.getByRole('heading', { name: 'Leftovers board' })).toBeVisible();
+  const weekStart = await page.getByLabel('Start date').inputValue();
+  const weekEndDate = new Date(`${weekStart}T12:00:00Z`);
+  weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+  const weekEnd = weekEndDate.toISOString().slice(0, 10);
+  await page.getByRole('button', { name: 'Select recipes' }).click();
+  const recipeSelector = page.getByRole('dialog', { name: 'Select recipes' });
+  await expect(recipeSelector).toBeVisible();
+  await recipeSelector.getByRole('tab', { name: /Dinner/u }).click();
+  await recipeSelector
+    .getByPlaceholder('Search recipes, tags, categories, or collections')
+    .fill('Weeknight tomato soup');
+  await recipeSelector
+    .locator('article', { hasText: 'Weeknight tomato soup' })
+    .getByRole('button', { name: 'Select' })
+    .click();
+  await recipeSelector.getByRole('button', { name: 'Add 1 recipe to plan' }).click();
+  await expect(
+    page
+      .getByRole('region', { name: 'This week at the table' })
+      .getByText('Weeknight tomato soup', { exact: true })
+      .filter({ visible: true }),
+  ).toBeVisible();
   const calendarResponse = await page.request.get(
     `/api/v1/meal-plan/export?start=${weekStart}&end=${weekEnd}`,
   );
   expect(calendarResponse.ok()).toBe(true);
   await expect(calendarResponse.text()).resolves.toContain('BEGIN:VCALENDAR');
-  await page.getByRole('button', { name: 'Copy to next week' }).click();
+  await page.getByText('More actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Copy week' }).click();
   await expect(page).toHaveURL(/\/planner\?week=/);
-  await expect(page.getByRole('heading', { name: 'Leftovers board' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'This week at the table' })
+      .getByText('Weeknight tomato soup', { exact: true })
+      .filter({ visible: true }),
+  ).toBeVisible();
   await page.goto(`/planner?week=${weekStart}`);
-  await page.getByRole('button', { name: 'Generate an editable shopping list' }).click();
-  await expect(page.getByRole('heading', { name: /^Week of \d{4}-\d{2}-\d{2}$/u })).toBeVisible();
+  await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
+  await expect(
+    page.getByRole('heading', { name: /^Pantry shortages · \d{4}-\d{2}-\d{2}$/u }),
+  ).toBeVisible();
   await page.getByLabel('New shopping item').fill('lemons');
   await page.getByRole('button', { name: 'Add item' }).click();
-  await expect(page.locator('input[value="lemons"]')).toBeVisible();
-  await page.getByLabel('New shopping aisle').fill('Produce');
-  await page.getByRole('button', { name: 'Add aisle' }).click();
-  await page.getByLabel('Aisle for lemons').selectOption({ label: 'Produce' });
   await expect(
     page.getByRole('region', { name: 'Produce' }).locator('input[value="lemons"]'),
   ).toBeVisible();
@@ -578,7 +662,7 @@ test('a fresh household can complete the supported local release acceptance work
   const manifestResponse = await page.request.get('/manifest.webmanifest');
   expect(manifestResponse.ok()).toBe(true);
   await expect(manifestResponse.json()).resolves.toMatchObject({
-    name: 'Our Recipes',
+    name: 'The Garden Table',
     display: 'standalone',
   });
   const workerResponse = await page.request.get('/sw.js');
@@ -601,6 +685,11 @@ test('a fresh household can complete the supported local release acceptance work
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Tomato soup in a cream bowl' })).toBeVisible();
+    await expect(
+      page.getByText('Offline reading only. Changes are unavailable and will not be queued.', {
+        exact: true,
+      }),
+    ).toBeVisible();
   } finally {
     await page.context().setOffline(false);
   }

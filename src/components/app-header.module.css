@@ -1,0 +1,302 @@
+.shell.shell {
+  background: color-mix(in srgb, var(--field) 96%, transparent);
+  border-bottom-color: var(--line);
+  backdrop-filter: blur(14px);
+}
+
+.header.header {
+  max-width: 114rem;
+  min-height: 5.5rem;
+  gap: clamp(1.1rem, 2.4vw, 2rem);
+}
+
+.wordmark.wordmark {
+  position: relative;
+  padding-right: clamp(1.35rem, 2.4vw, 2rem);
+}
+
+.wordmark.wordmark::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 1px;
+  height: 3rem;
+  background: var(--line);
+  content: '';
+  transform: translateY(-50%);
+}
+
+.desktopNavigation.desktopNavigation {
+  justify-content: flex-start;
+  gap: clamp(0.35rem, 1vw, 0.8rem);
+}
+
+.desktopNavigation.desktopNavigation > a {
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  color: var(--ink);
+  border-radius: 999px;
+  font-size: 0.94rem;
+  font-weight: 650;
+  transition:
+    color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.desktopNavigation.desktopNavigation > a:hover,
+.desktopNavigation.desktopNavigation > a:focus-visible,
+.desktopNavigation.desktopNavigation > a:global(.active) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--leaf-pale) 76%, var(--field));
+}
+
+.desktopNavigation.desktopNavigation > a:global(.active) {
+  font-weight: 800;
+}
+
+.controls.controls {
+  gap: 0.65rem;
+}
+
+.utilityButton.utilityButton {
+  width: 3rem;
+  min-width: 3rem;
+  height: 3rem;
+  color: var(--ink);
+  background: transparent;
+  border-color: var(--line-strong);
+  border-radius: 0.72rem;
+}
+
+.utilityButton.utilityButton:hover,
+.utilityButton.utilityButton:focus-visible,
+.utilityButton.utilityButton:global(.active) {
+  color: var(--ink);
+  background: var(--surface-hover);
+  border-color: var(--leaf);
+}
+
+.createMenu {
+  position: relative;
+  z-index: 3;
+}
+
+.createMenu > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-width: 9rem;
+  min-height: 3rem;
+  padding: 0 1rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.72rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.95rem;
+  font-weight: 800;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.createMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.createMenu > summary:hover,
+.createMenu > summary:focus-visible,
+.createMenu[open] > summary {
+  background: var(--surface-hover);
+  border-color: var(--leaf);
+}
+
+.createMenuChevron {
+  margin-left: auto;
+  transition: transform 0.16s ease;
+}
+
+.createMenu[open] .createMenuChevron {
+  transform: rotate(180deg);
+}
+
+.createMenuPanel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  display: grid;
+  gap: 0.18rem;
+  width: 13.5rem;
+  padding: 0.45rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.72rem;
+  box-shadow: var(--shadow);
+}
+
+.createMenuPanel > a,
+.createMenuPanel > button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.7rem 0.8rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0.42rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.createMenuPanel > a:hover,
+.createMenuPanel > a:focus-visible,
+.createMenuPanel > button:hover,
+.createMenuPanel > button:focus-visible {
+  background: var(--surface-hover);
+}
+
+.controlDivider.controlDivider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 3rem;
+  margin: 0 0.4rem;
+  background: var(--line);
+}
+
+.header.header :global(.profile-switcher),
+.mobileNavigation.mobileNavigation {
+  z-index: 2;
+}
+
+.mobileSettingsLink.mobileSettingsLink {
+  display: none;
+}
+
+.header.header :global(.profile-switcher) > summary {
+  gap: 0.65rem;
+  min-height: 3rem;
+  color: var(--ink);
+  font-size: 0.94rem;
+  font-weight: 800;
+}
+
+.header.header :global(.profile-switcher) > summary :global(.profile-dot) {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 0.88rem;
+}
+
+.header.header :global(.profile-menu) {
+  z-index: 30;
+}
+
+@media (max-width: 1120px) {
+  .header.header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .header.header .wordmark.wordmark {
+    padding-right: 0;
+  }
+
+  .header.header .wordmark.wordmark::after {
+    display: none;
+  }
+
+  .desktopNavigation.desktopNavigation {
+    display: none;
+  }
+
+  .mobileNavigation.mobileNavigation {
+    display: block;
+  }
+
+  .mobileNavigation.mobileNavigation > nav {
+    width: min(19rem, calc(100vw - 2rem));
+  }
+}
+
+@media (max-width: 650px) {
+  .header.header {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .header.header .wordmark.wordmark {
+    position: absolute;
+    z-index: 1;
+    left: 50%;
+    width: 6.75rem;
+    justify-self: auto;
+    min-height: 3rem;
+    padding: 0;
+    transform: translateX(-50%);
+  }
+
+  .header.header .wordmark.wordmark :global(.bord-header-lockup) {
+    width: 100%;
+  }
+
+  .controls.controls {
+    grid-column: 2;
+    gap: 0.15rem;
+  }
+
+  .settingsUtility.settingsUtility {
+    display: none;
+  }
+
+  .mobileNavigation.mobileNavigation {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+  }
+
+  .mobileNavigation.mobileNavigation > nav {
+    right: auto;
+    left: 0;
+  }
+
+  .mobileSettingsLink.mobileSettingsLink {
+    display: flex;
+  }
+
+  .createMenu.createMenu {
+    display: none;
+  }
+
+  .createMenuLabel,
+  .createMenuChevron,
+  .controlDivider {
+    display: none;
+  }
+
+  .createMenuPanel {
+    right: auto;
+    left: 0;
+  }
+
+  .utilityButton.utilityButton {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .header.header :global(.profile-switcher) > summary :global(.profile-dot) {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .header.header .wordmark.wordmark {
+    width: 5.2rem;
+  }
+}

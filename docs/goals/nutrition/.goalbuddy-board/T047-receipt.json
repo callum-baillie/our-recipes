@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T047",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T047-planner-projection-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only planned projection, allocation history, privacy aggregate, transactional capacity and ownership audit",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a Nutrition-owned planned projection/allocation slice with transactional capacity enforcement and identity-minimal cross-profile aggregation.",
+  "note": "notes/T047-planner-projection-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only approval gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Planner-page adapter remains deferred while concurrent Pantry work owns dirty planner files."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

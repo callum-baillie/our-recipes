@@ -1,0 +1,16 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T075", "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "The default missing mode still performs the established shortage action, but T070 replaced its accessible name. Preserve the visible new missing/all wording and give only the initial missing-mode button a compatible accessible name containing both Make shortage list and Make missing-items list.",
+    "worker_package": {
+      "objective": "Add one conditional compatible accessible name in MealPlanPantryDemand, then run focused/type/build and all three unchanged E2E oracles plus integrity.",
+      "allowed_files": ["src/components/meal-plan-pantry-demand.tsx"],
+      "verify": ["Require component pre-hash C1D3B05545F8EB7F603EE9CF81E2FAE6F3383A1893460C0724CCCCA1BBB709E5 and protected hashes.", "Only initial missing-mode label includes both phrases; visible text and all modes/states unchanged.", "Run scoped format/lint, focused unit, typecheck, mirror/build.", "Run unchanged grocery/workflow/recipe-planner E2Es.", "Release port and prove component-only diff/protected hashes."],
+      "stop_if": ["Any visible text/mode/request/formula/test/CSS/outside file changes.", "Label-in-name or exact unique locator fails.", "Protected oracle needs edit or shared/live/secret/normal data touched."]
+    },
+    "evidence": ["Default mode remains missing and posts the same endpoint.", "Protected workflow selects established Make shortage list.", "New grocery test does not depend on button text; label can preserve visible wording and semantics."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One component, build, and three oracles share a serial lifecycle."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Focused compile", "Three E2Es", "Final integrity", "Later cooking UI"],
+    "required_board_updates": ["Record T075 done.", "Activate one Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

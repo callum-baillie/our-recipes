@@ -1,0 +1,22 @@
+{
+  "result": "blocked",
+  "task_id": "T016",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [],
+  "commands": [
+    {
+      "cmd": "render Nutrition and Pantry active tasks and inspect scoped git ownership",
+      "status": "pass"
+    }
+  ],
+  "summary": "Stopped before editing because active Pantry Worker T009 also owns docs/data-model.md, inside T016's allowed files. Protected migrations and journal remain externally dirty; no files were changed and verification was not started.",
+  "note": "notes/T016-doc-ownership-block.md",
+  "deviations": [],
+  "remaining_blockers": [
+    "Pantry T009 must finish or the persistence package must exclude docs/data-model.md and defer documentation reconciliation."
+  ],
+  "verification_attempts": 0,
+  "blocked_reason": "Another active Worker may edit docs/data-model.md, triggering the Worker parallel-safety and concurrent-writability stop condition.",
+  "stopped_because": "Shared documentation file became concurrently writable.",
+  "harness": "goalbuddy-worker"
+}

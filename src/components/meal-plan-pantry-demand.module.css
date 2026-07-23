@@ -1,0 +1,102 @@
+.panel {
+  margin-top: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.1rem;
+  background: var(--linen);
+  color: var(--ink);
+}
+
+.panel header p,
+.panel header h2 {
+  margin: 0;
+}
+
+.panel header p {
+  color: var(--leaf);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+
+.panel header span,
+.lines small,
+.lines em {
+  color: var(--muted);
+}
+
+.lines,
+.unknown {
+  display: grid;
+  gap: 0.65rem;
+  padding-left: 1.2rem;
+}
+
+.lines li {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.lines em {
+  font-style: normal;
+}
+
+.uncertainLine {
+  border-left: 0.2rem solid var(--tomato);
+  padding-left: 0.65rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.actions label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.actions select {
+  min-height: 2.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  padding: 0.35rem 0.55rem;
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+}
+
+.actions button,
+.actions a {
+  border: 1px solid var(--leaf);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: var(--leaf);
+  color: var(--page);
+  font: inherit;
+  text-decoration: none;
+}
+
+.actions button:hover:not(:disabled),
+.actions button:focus-visible,
+.actions a:hover,
+.actions a:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--leaf-pale);
+  color: var(--ink);
+}
+
+.actions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.actions span {
+  color: var(--warning-ink);
+}

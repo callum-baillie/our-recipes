@@ -1,0 +1,247 @@
+.workspace {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+}
+
+.panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: 1rem;
+}
+
+.profileList {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profileList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.profileList li[data-focused='true'] {
+  background: var(--leaf-pale);
+  border-color: var(--leaf);
+  box-shadow: inset 0.22rem 0 0 var(--leaf);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 1rem 0;
+}
+
+.controls > div {
+  min-width: 0;
+}
+
+.controlLabel {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+
+.controlLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.controlLinks a {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.controlLinks a[aria-current='true'] {
+  border-width: 2px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.visuals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 1rem 0;
+}
+
+.visualPanel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.visualPanel h3 {
+  margin-top: 0;
+}
+
+.metricList,
+.servingList {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.metricLabel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.metricLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.barTrack {
+  height: 0.75rem;
+  overflow: hidden;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, currentcolor 4px 5px);
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: currentcolor;
+}
+
+.status_below {
+  color: var(--danger);
+}
+
+.status_within,
+.status_met {
+  color: var(--success);
+}
+
+.status_above {
+  color: var(--warning);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.statGrid div {
+  border-inline-start: 0.25rem solid var(--border);
+  padding-inline-start: 0.5rem;
+}
+
+.statGrid dt {
+  font-size: 0.85rem;
+}
+
+.statGrid dd {
+  margin: 0.15rem 0 0;
+  font-weight: 700;
+}
+
+.note {
+  margin-bottom: 0;
+  font-size: 0.85rem;
+}
+
+.servingList li {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.servingTrack {
+  grid-column: 2 / -1;
+  height: 0.35rem;
+  overflow: hidden;
+  background: var(--paper-deep);
+  border-radius: 999px;
+}
+
+.servingTrack b {
+  display: block;
+  height: 100%;
+  background: var(--nutrition-mineral);
+  border-radius: inherit;
+}
+
+.tableDisclosure {
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+}
+
+.tableDisclosure summary {
+  cursor: pointer;
+  color: var(--label);
+  font-weight: 800;
+}
+
+.servingList li > :last-child {
+  overflow-wrap: anywhere;
+}
+
+.stateMarker {
+  display: inline-grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  border: 1px solid currentcolor;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.tableWrap {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.tableWrap table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.tableWrap caption {
+  padding: 0.75rem 0;
+  text-align: left;
+  font-weight: 700;
+}
+
+.tableWrap th,
+.tableWrap td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}

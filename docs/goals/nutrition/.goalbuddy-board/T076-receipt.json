@@ -1,0 +1,28 @@
+{
+  "result": "done",
+  "task_id": "T076",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "summary": "Mapped pre-pagination normalized recipe discovery and signed private primary-planner Nutrition integration with Pantry-disjoint ownership.",
+  "note": "notes/T076-recipe-planner-map.md",
+  "evidence": [
+    "src/lib/domain/recipe.ts",
+    "src/lib/services/recipe-service.ts",
+    "src/app/recipes/page.tsx",
+    "src/components/recipe-library-filters.tsx",
+    "src/components/recipe-summary-card.tsx",
+    "src/app/planner/page.tsx",
+    "src/components/meal-planner.tsx",
+    "src/lib/services/nutrition-meal-planning-service.ts",
+    "src/app/nutrition/page.tsx",
+    "docs/goals/pantry-inventory/state.yaml T038"
+  ],
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Personalized remaining-target discovery must be completed with the deterministic recommendation slice and sufficient-data/privacy/allergy evidence."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

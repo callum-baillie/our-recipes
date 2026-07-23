@@ -1,0 +1,37 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T037",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [
+      "src/components/shopping-list-editor.tsx",
+      "src/components/meal-plan-pantry-demand.tsx",
+      "tests/unit/pantry-grocery-cooking.test.ts",
+      "tests/e2e/pantry-workflow.spec.ts"
+    ],
+    "commands": [
+      { "cmd": "Pre-edit source/mirror SHA256 guards", "status": "pass" },
+      { "cmd": "pnpm exec prettier --check <four T037 files>", "status": "pass" },
+      { "cmd": "pnpm exec eslint <four T037 files>", "status": "pass" },
+      { "cmd": "pnpm exec vitest run --project unit tests/unit/pantry-grocery-cooking.test.ts", "status": "pass", "summary": "7 tests passed" },
+      { "cmd": "pnpm typecheck", "status": "pass" },
+      { "cmd": "Mirror audit, four-file refresh, and source/mirror hash equality", "status": "pass" },
+      { "cmd": "mirror pnpm build -- --webpack", "status": "pass" },
+      { "cmd": "pantry-workflow.spec.ts final fresh-state run", "status": "pass", "summary": "1 test passed in 1.2m; two axe scans and five screenshots passed" },
+      { "cmd": "Rendered formula/provenance/manual/obsolete/intake/FEFO/history assertions", "status": "pass", "summary": "400 required, 350 available, 50 shortage; PATCH 60; Basement shelf intake 201; confirmed cooking history" },
+      { "cmd": "Owned server cleanup and port 3100 release", "status": "pass" },
+      { "cmd": "Disposable mirror db:migrate and db:check", "status": "pass" },
+      { "cmd": "Scoped and full git diff --check plus status", "status": "pass" }
+    ],
+    "summary": "Repaired nested Pantry summary parsing and mounted-state shortage generation, with focused regressions and exact browser readiness checks. Scoped formatting/lint, focused tests, types, isolated webpack build, full rendered Pantry workflow, axe, five screenshots, disposable migrations/database check, port cleanup, and diff integrity pass.",
+    "deviations": [
+      "Used a zero-delay mount-effect timer with cleanup because scoped ESLint rejects synchronous setState inside effects.",
+      "Used fixed-path cleanup only for authorized mirror-generated outputs after shell policy rejected native recursive removal.",
+      "Used a manually owned webpack dev server because the repository Playwright webServer defaults to Turbopack.",
+      "An initial fresh browser attempt missed the mapping-saved status; the permitted second fresh-state run passed the complete workflow without retries."
+    ],
+    "remaining_blockers": [],
+    "verification_attempts": 2,
+    "stopped_because": null
+  }
+}

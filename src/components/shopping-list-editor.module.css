@@ -1,0 +1,1138 @@
+.page:global(.shopping-list-focus-page) {
+  --page: #fbfaf7;
+  --paper: #fffefa;
+  --linen: #f4f1eb;
+  --ink: #23392c;
+  --muted: #756f67;
+  --line: #ded7cd;
+  --line-strong: #cfc6bb;
+}
+
+:global(body:has(.shopping-list-focus-page)) {
+  --page: #fbfaf7;
+  --paper: #fffefa;
+  --linen: #f4f1eb;
+  --ink: #23392c;
+  --muted: #756f67;
+  --line: #ded7cd;
+  --line-strong: #cfc6bb;
+  color: #23392c;
+  background: #fbfaf7;
+}
+
+:global(body:has(.shopping-list-focus-page) .app-header-shell) {
+  color: #23392c;
+  background: rgb(251 250 247 / 96%);
+  border-bottom-color: #ded7cd;
+}
+
+:global(body:has(.shopping-list-focus-page) .app-header-shell a),
+:global(body:has(.shopping-list-focus-page) .app-header-shell button),
+:global(body:has(.shopping-list-focus-page) .app-header-shell summary) {
+  color: #23392c;
+}
+
+.page {
+  --list-green: #43642f;
+  --list-green-dark: #23392c;
+  --list-pale: #eaf0e3;
+  --list-rust: #bf5739;
+  --list-line: #ded7cd;
+  max-width: none;
+  min-height: calc(100vh - 5.25rem);
+  padding: 0 clamp(1.25rem, 5vw, 5.5rem) 5rem;
+  color: var(--list-green-dark);
+  background: #fbfaf7;
+}
+
+.hero,
+.shoppingMode {
+  width: min(100%, 82rem);
+  margin-inline: auto;
+}
+
+.hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2rem;
+  align-items: end;
+  padding: 1rem 0 0.85rem;
+}
+
+.heroCopy p {
+  margin: 0;
+  color: var(--list-green);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.heroCopy h1 {
+  max-width: none;
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(3.25rem, 4.5vw, 4.25rem);
+  font-weight: 500;
+  line-height: 0.94;
+  letter-spacing: -0.045em;
+}
+
+.heroCopy > span {
+  display: block;
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.heroMeta {
+  display: flex;
+  gap: 0.55rem;
+  padding-right: 13rem;
+}
+
+.heroMeta > span {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.05rem 0.6rem;
+  align-items: center;
+  min-height: 3.2rem;
+  padding: 0.65rem 0.9rem;
+  font-family: var(--font-sans);
+  border: 1px solid var(--list-line);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--paper) 92%, white);
+}
+
+.heroMeta svg {
+  grid-row: 1 / 3;
+  width: 1.35rem;
+  color: var(--list-green);
+}
+
+.heroMeta strong,
+.heroMeta small {
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.heroMeta small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.allListsLink {
+  position: absolute;
+  top: 3rem;
+  right: 0;
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--list-green);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mobileHeader,
+.mobileSummary,
+.mobileDock,
+.mobileAddPanel {
+  display: none;
+}
+
+.shoppingMode {
+  display: grid;
+  gap: 1rem;
+  font-family: var(--font-sans);
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  gap: 0.8rem;
+}
+
+.addItem,
+.storePanel {
+  min-height: 6rem;
+  padding: 1rem;
+  border: 1px solid var(--list-line);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--paper) 94%, white);
+}
+
+.addItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.6rem;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.addItem input {
+  height: 2.7rem;
+  min-width: 0;
+  padding: 0 0.8rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--list-line);
+  border-radius: 0.45rem;
+  background: white;
+}
+
+.addItem button,
+.retryControls button,
+.mobileAddPanel button {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  justify-content: center;
+  height: 2.7rem;
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 800;
+  border-radius: 0.45rem;
+  background: var(--list-rust);
+  box-shadow: 0 5px 14px rgb(154 66 42 / 15%);
+}
+
+.storePanel {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0;
+  overflow: hidden;
+}
+
+.storePanel label {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem 0.5rem;
+}
+
+.storePanel label > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.storePanel select {
+  min-width: 0;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 0;
+  background: transparent;
+}
+
+.storePanel > a {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  color: var(--list-green);
+  font-size: 0.76rem;
+  font-weight: 800;
+  border-top: 1px solid var(--list-line);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--list-line);
+}
+
+.search {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  height: 2.7rem;
+  padding: 0 0.85rem;
+  color: var(--muted);
+  border: 1px solid var(--list-line);
+  border-radius: 0.5rem;
+  background: white;
+}
+
+.search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.filters,
+.desktopSort {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.filters button,
+.desktopSort button {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0 1rem;
+  color: var(--list-green-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid var(--list-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 94%, white);
+}
+
+.filters .activeFilter {
+  color: white;
+  border-color: var(--list-green);
+  background: var(--list-green);
+  box-shadow: 0 4px 12px rgb(67 100 47 / 20%);
+}
+
+.desktopSort {
+  justify-content: end;
+}
+
+.desktopSort button {
+  min-width: 9.5rem;
+  justify-content: space-between;
+  border-radius: 0.45rem;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 2rem;
+  align-items: start;
+}
+
+.listColumn,
+.sideRail {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.listSection,
+.retryPanel,
+.sideRail > section {
+  overflow: hidden;
+  border: 1px solid var(--list-line);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--paper) 95%, white);
+}
+
+.listSection > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+  padding: 0.6rem 1.15rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.87rem;
+  font-weight: 850;
+}
+
+.listSection > summary::-webkit-details-marker {
+  display: none;
+}
+
+.listSection > summary small {
+  color: var(--muted);
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.mobileSectionTitle {
+  display: none;
+}
+
+.listSection:not([open]) > summary svg {
+  transform: rotate(-90deg);
+}
+
+.items {
+  padding: 0 1.15rem;
+}
+
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2rem minmax(11rem, 1fr) 5.6rem 6.2rem 2rem;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 4rem;
+  border-top: 1px solid color-mix(in srgb, var(--list-line) 78%, transparent);
+}
+
+.sourceToggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  cursor: pointer;
+  color: white;
+  border: 1.5px solid #a8a49c;
+  border-radius: 50%;
+}
+
+.sourceToggle input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sourceToggleActive {
+  border-color: #73945d;
+  background: #73945d;
+}
+
+.itemThumb {
+  display: none;
+}
+
+.itemIdentity {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1.5fr) minmax(4rem, 0.75fr) minmax(5rem, 0.65fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.itemIdentity strong {
+  overflow: hidden;
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemIdentity span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.aisleBadge {
+  justify-self: start;
+  padding: 0.25rem 0.5rem;
+  color: #52703d;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  border-radius: 0.3rem;
+  background: var(--list-pale);
+}
+
+.stateButton {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.5rem;
+  color: var(--list-green-dark);
+  font-size: 0.68rem;
+  font-weight: 750;
+  border: 1px solid var(--list-line);
+  border-radius: 0.45rem;
+  background: white;
+}
+
+.stateButtonActive {
+  color: #41682f;
+  border-color: #ccd9c1;
+  background: var(--list-pale);
+}
+
+.cantFindActive {
+  color: #9a4b34;
+  border-color: #e6c7bd;
+  background: #fbefea;
+}
+
+.itemMenu {
+  position: relative;
+  justify-self: end;
+}
+
+.itemMenu > summary {
+  padding: 0.35rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 850;
+}
+
+.itemEditor {
+  position: absolute;
+  z-index: 8;
+  top: 2rem;
+  right: 0;
+  display: grid;
+  grid-template-columns: 1fr 5rem 5rem;
+  gap: 0.45rem;
+  width: min(30rem, calc(100vw - 3rem));
+  padding: 0.75rem;
+  border: 1px solid var(--list-line);
+  border-radius: 0.65rem;
+  background: white;
+  box-shadow: 0 14px 32px rgb(31 38 30 / 15%);
+}
+
+.itemEditor input,
+.itemEditor select,
+.retryControls select {
+  min-width: 0;
+  min-height: 2.3rem;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  border: 1px solid var(--list-line);
+  border-radius: 0.4rem;
+  background: white;
+}
+
+.itemEditor select {
+  grid-column: 1 / -1;
+}
+
+.itemEditor button {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  font-size: 0.72rem;
+}
+
+.provenance,
+.intake {
+  grid-column: 2 / -1;
+  margin: -0.3rem 0 0.65rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.provenance summary,
+.intake summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.sourcedItem .itemIdentity,
+.sourcedItem .aisleBadge {
+  opacity: 0.55;
+}
+
+.sourcedItem .itemIdentity strong {
+  text-decoration: line-through;
+}
+
+.intake {
+  padding: 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--list-pale);
+}
+
+.intakeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.intakeGrid input,
+.intakeGrid select,
+.intakeGrid textarea,
+.intakeGrid button {
+  min-width: 0;
+  padding: 0.45rem;
+  font: inherit;
+  border: 1px solid #c7cdbf;
+  border-radius: 0.4rem;
+  background: white;
+}
+
+.intakeGrid label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.intakeGrid textarea,
+.intakeGrid [role='status'] {
+  grid-column: 1 / -1;
+}
+
+.intakeGrid button {
+  color: white;
+  background: var(--list-green);
+}
+
+.emptyState {
+  margin: 0;
+  padding: 1rem 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.inCartSection {
+  background: color-mix(in srgb, var(--list-pale) 30%, var(--paper));
+}
+
+.sourcedSection {
+  background: color-mix(in srgb, var(--list-pale) 18%, var(--paper));
+}
+
+.cantFindSection {
+  border-color: #e5c8bd;
+  background: #fffaf7;
+}
+
+.retryPanel {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.15rem;
+  border-color: #e5c8bd;
+  background: #fff8f4;
+}
+
+.retryPanel > div:first-child,
+.retryPanel > div:first-child > span {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.retryPanel > div:first-child > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.retryPanel small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.retryControls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.retryControls select {
+  max-width: 13rem;
+  font-size: 0.75rem;
+}
+
+.retryControls button {
+  height: 2.35rem;
+  padding: 0 0.8rem;
+  white-space: nowrap;
+}
+
+.sideRail > section {
+  padding: 1rem;
+}
+
+.sideRail h2 {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  margin: 0 0 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+}
+
+.sideRail p,
+.sideRail small {
+  color: var(--muted);
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.sideRail p {
+  margin: 0.55rem 0;
+}
+
+.sideRail a {
+  color: var(--list-green);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.railProgress {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.progressRing {
+  --progress: 0deg;
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: conic-gradient(var(--list-green) var(--progress), #e9e6df 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 0.5rem), #000 0);
+}
+
+.railProgress strong,
+.railProgress strong small {
+  display: block;
+}
+
+.railProgress strong {
+  font-size: 0.9rem;
+}
+
+.progressBar {
+  height: 0.32rem;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9e6df;
+}
+
+.progressBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--list-green);
+}
+
+.sideRail footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.8rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+@media (max-width: 1050px) {
+  .heroMeta {
+    padding-right: 0;
+  }
+
+  .allListsLink {
+    top: 1.8rem;
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(13rem, 1fr) auto;
+  }
+
+  .desktopSort {
+    grid-column: 1 / -1;
+  }
+
+  .item {
+    grid-template-columns: 2rem minmax(9rem, 1fr) 5rem 5.5rem 2rem;
+  }
+}
+
+@media (max-width: 760px) {
+  :global(body:has(.shopping-list-focus-page) .app-header-shell),
+  :global(body:has(.shopping-list-focus-page) .app-footer) {
+    display: none !important;
+  }
+
+  :global(body:has(.shopping-list-focus-page)) {
+    background: #fffefa;
+  }
+
+  .page {
+    min-height: 100vh;
+    padding: 0 1.35rem calc(6.6rem + env(safe-area-inset-bottom));
+    background: #fffefa;
+  }
+
+  .mobileHeader {
+    display: grid;
+    grid-template-columns: 3rem 1fr 3rem;
+    align-items: center;
+    min-height: 4rem;
+  }
+
+  .mobileHeader > a,
+  .mobileHeader > button {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    color: var(--list-green-dark);
+    border-radius: 50%;
+  }
+
+  .mobileHeader > button {
+    background: #f2eee7;
+  }
+
+  .mobileHeader svg {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .mobileBrand {
+    justify-self: center;
+    width: 9rem;
+    height: 2.8rem;
+  }
+
+  .hero {
+    display: block;
+    padding: 0 0 1rem;
+  }
+
+  .heroCopy p {
+    font-size: 0.73rem;
+  }
+
+  .heroCopy h1 {
+    margin-top: 0.6rem;
+    font-size: clamp(2.65rem, 11.5vw, 3.2rem);
+    line-height: 0.92;
+  }
+
+  .heroCopy > span,
+  .heroMeta,
+  .allListsLink {
+    display: none;
+  }
+
+  .shoppingMode {
+    gap: 0.95rem;
+  }
+
+  .mobileSummary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+  }
+
+  .mobileProgressCard,
+  .mobileSettings {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+    min-height: 5.15rem;
+    padding: 0.8rem;
+    border: 1px solid var(--list-line);
+    border-radius: 0.7rem;
+    background: white;
+  }
+
+  .mobileProgressCard .progressRing {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .mobileProgressCard strong,
+  .mobileProgressCard small {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .mobileProgressCard strong {
+    font-size: 0.78rem;
+  }
+
+  .mobileProgressCard small {
+    margin-top: 0.2rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .mobileSettings {
+    justify-content: center;
+    color: var(--list-green-dark);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .mobileSettings > svg:last-child {
+    margin-left: auto;
+    transform: rotate(-90deg);
+  }
+
+  .topGrid {
+    display: none;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    padding: 0.5rem 0 0;
+    border-top: 0;
+  }
+
+  .search {
+    height: 3.55rem;
+    border-radius: 0.55rem;
+  }
+
+  .search input {
+    font-size: 0.92rem;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    justify-content: start;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+  }
+
+  .filters button {
+    min-height: 3rem;
+    padding: 0 1rem;
+    font-size: 0.78rem;
+  }
+
+  .desktopSort,
+  .sideRail {
+    display: none;
+  }
+
+  .contentGrid {
+    display: block;
+  }
+
+  .listColumn {
+    gap: 0.65rem;
+  }
+
+  .listSection,
+  .retryPanel {
+    border-radius: 0.72rem;
+  }
+
+  .listSection > summary {
+    min-height: 3.5rem;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.95rem;
+  }
+
+  .desktopSectionTitle {
+    display: none;
+  }
+
+  .mobileSectionTitle {
+    display: inline;
+  }
+
+  .items {
+    padding: 0 0.9rem;
+  }
+
+  .item {
+    grid-template-columns: 2rem 3.25rem minmax(0, 1fr) 3.8rem 3.8rem;
+    grid-template-rows: minmax(4.35rem, auto) auto;
+    gap: 0.45rem;
+    min-height: 5.15rem;
+    padding: 0.6rem 0;
+  }
+
+  .sourceToggle {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
+  .itemThumb {
+    display: grid;
+    place-items: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    color: #718067;
+    border-radius: 0.55rem;
+    background: linear-gradient(145deg, #f4f2ec, #ebe7dd);
+  }
+
+  .itemIdentity {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .itemIdentity strong {
+    font-size: 0.92rem;
+  }
+
+  .itemIdentity span {
+    font-size: 0.78rem;
+  }
+
+  .aisleBadge {
+    position: static;
+    justify-self: start;
+    max-width: 5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .unassignedBadge {
+    display: none;
+  }
+
+  .stateButton {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    min-height: 3.65rem;
+    padding: 0.3rem;
+    font-size: 0.64rem;
+  }
+
+  .stateButton svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .cantFindButton span {
+    line-height: 1.05;
+    text-align: center;
+  }
+
+  .itemMenu {
+    display: none;
+  }
+
+  .provenance,
+  .intake {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0 0 0.35rem;
+  }
+
+  .intakeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sourcedItem {
+    min-height: 4.35rem;
+  }
+
+  .sourcedItem .stateButton {
+    min-height: 3.7rem;
+  }
+
+  .retryPanel {
+    display: grid;
+    padding: 1rem;
+  }
+
+  .retryControls {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .retryControls select {
+    max-width: none;
+  }
+
+  .mobileAddPanel {
+    position: fixed;
+    z-index: 61;
+    right: 1rem;
+    bottom: calc(5.8rem + env(safe-area-inset-bottom));
+    left: 1rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--list-line);
+    border-radius: 0.7rem;
+    background: white;
+    box-shadow: 0 -8px 25px rgb(31 38 30 / 12%);
+  }
+
+  .mobileAddPanel input {
+    min-width: 0;
+    padding: 0 0.8rem;
+    border: 1px solid var(--list-line);
+    border-radius: 0.45rem;
+  }
+
+  .mobileDock {
+    position: fixed;
+    z-index: 60;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.65fr;
+    gap: 0.45rem;
+    padding: 0.75rem 1.35rem calc(0.75rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--list-line);
+    border-radius: 1rem 1rem 0 0;
+    background: rgb(255 255 255 / 96%);
+    box-shadow: 0 -8px 24px rgb(31 38 30 / 9%);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobileDock > span,
+  .mobileDock > button {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 0.05rem 0.55rem;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.4rem;
+    border: 1px solid var(--list-line);
+    border-radius: 0.55rem;
+  }
+
+  .mobileDock > span svg {
+    grid-row: 1 / 3;
+    color: var(--list-green);
+  }
+
+  .mobileDock > span small {
+    color: var(--muted);
+    font-size: 0.68rem;
+  }
+
+  .mobileDock > button {
+    display: flex;
+    gap: 0.55rem;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 800;
+    border-color: var(--list-rust);
+    background: var(--list-rust);
+  }
+}
+
+@media (max-width: 430px) {
+  .page {
+    padding-inline: 1rem;
+  }
+
+  .mobileSummary {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+
+  .mobileProgressCard,
+  .mobileSettings {
+    padding: 0.65rem;
+  }
+
+  .item {
+    grid-template-columns: 1.9rem 3rem minmax(0, 1fr) 3.65rem 3.65rem;
+    gap: 0.35rem;
+  }
+
+  .itemThumb {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .mobileDock {
+    padding-inline: 0.8rem;
+  }
+}

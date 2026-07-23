@@ -1,0 +1,38 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T047",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The eight remaining unnamed action-button queries are one bounded harness defect. Every intended action has a unique rendered accessible name, so adding exact names preserves scope and behavior while preventing serial ambiguity.",
+    "worker_package": {
+      "objective": "Add exact rendered accessible names to exactly eight bare action-button queries, then complete all independent browser and persistence gates.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source/mirror pre-hash 0CD9B123278027151887ED3CB0EDD552896648B0541BD7A2A208EBC215A085B4.",
+        "Name exactly eight buttons: Freeze batch, Thaw batch, Correct quantity, Split batch, Discard batch, Restore batch, Donate batch, Restore batch, all exact:true.",
+        "Preserve form scopes, clicks, every other locator/assertion/mutation/timeout/file; run scoped format/lint and mirror hash equality.",
+        "Run fresh management workflow with all actions, three axe/overflow/screenshots, and no browser errors.",
+        "Release port, fresh prepare, run integrated workflow with 400/350/50, provenance/manual/intake/FEFO/history, two axe, five screenshots, no browser errors.",
+        "Inspect persistence read-only, run disposable migrate/db check, release port, record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any change beyond the eight exact names is required.",
+        "Any exact named query fails or resolves multiple controls.",
+        "Workflows share state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": [
+      "Freeze's bare query resolved four buttons.",
+      "Exactly eight bare button queries remain and each intended rendered name is known.",
+      "T046 passed all earlier locator repairs and mutations through Move."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One mirror, DB path, artifacts, and port require serial lifecycles." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing workflows/accessibility/screenshots", "Persistence/migration/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T047 done.", "Activate T048 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

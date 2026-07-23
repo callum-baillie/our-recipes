@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "task_id": "T096",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T096-advanced-individual-chart-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only profile/schema/API/settings, diary/source, goal-history, projection, measurement, chart and test map",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped the additive preference seam and trustworthy/query-bounded inputs for all remaining individual charts; selected a four-preference current-view vertical before richer aggregate work.",
+  "note": "notes/T096-advanced-individual-chart-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must approve the exact preference schema/defaults and current-view behavior before migration work.",
+    "The bounded aggregate/source service, weight privacy slice and card/planner preference selection remain later tasks."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

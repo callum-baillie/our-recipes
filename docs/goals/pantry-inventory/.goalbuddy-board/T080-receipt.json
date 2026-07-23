@@ -1,0 +1,11 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T080", "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml", "changed_files": [],
+    "commands": [
+      {"cmd": "Nutrition stability sampling", "status": "pass"}, {"cmd": "initial and final full typecheck", "status": "pass"}, {"cmd": "truthful full-source mirror hashes", "status": "pass"}, {"cmd": "isolated webpack build", "status": "pass"}, {"cmd": "grocery/intake E2E", "status": "pass", "summary": "1/1 in 28.8s"}, {"cmd": "unchanged workflow E2E", "status": "pass", "summary": "1/1 in 45.8s"}, {"cmd": "unchanged recipe/planner E2E", "status": "pass", "summary": "1/1 in 27.2s"}, {"cmd": "diff/status/hash/port integrity", "status": "pass"}
+    ],
+    "summary": "No-edit verification passed: stable concurrent state, full typecheck, truthful full-source build, updated grocery and both protected browser oracles in independent lifecycles, and final integrity.",
+    "evidence": ["Zero source edits; stable concurrent Nutrition hash; full-source type/build; three passing independent Pantry browser oracles; final port/hash/diff integrity."],
+    "deviations": ["Existing local-ocr createRequire build warnings only."], "remaining_blockers": [], "verification_attempts": 1, "stopped_because": null
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "result": "done",
+  "task_id": "T040",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/services/nutrition-intake-service.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/intake/route.ts",
+    "tests/integration/nutrition-intake-service.test.ts",
+    "tests/integration/nutrition-recipe-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused intake service and recipe API integration tests", "status": "pass", "summary": "6 tests passed" },
+    { "cmd": "focused ESLint, Prettier and scoped diff check", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "161 unit and 77 integration tests passed" }
+  ],
+  "summary": "Closed the generic client-built recipe/product snapshot bypass and source-type correction evasion. Focused evidence, full tests and types pass; full lint is externally blocked by active Pantry T019 code.",
+  "note": "notes/T040-generic-intake-repair.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact repair as permitted fallback.",
+    "Checkout-wide lint is blocked by an active Pantry-owned file; the focused T040 lint passes."
+  ],
+  "remaining_blockers": [
+    "Rerun full lint after Pantry T019 settles."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

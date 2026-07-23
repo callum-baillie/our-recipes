@@ -1,0 +1,59 @@
+{
+  "result": "done",
+  "task_id": "T086",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/app/nutrition/page.tsx",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-dashboard.module.css",
+    "src/components/nutrition-profile-settings.tsx",
+    "src/components/nutrition-profile-settings.module.css",
+    "tests/unit/nutrition-components.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused settings, profile schema, component and canonical conversion unit tests",
+      "status": "pass",
+      "summary": "27 tests passed"
+    },
+    {
+      "cmd": "focused profile service and API integration tests",
+      "status": "pass",
+      "summary": "8 tests passed"
+    },
+    {
+      "cmd": "pnpm test:unit",
+      "status": "pass",
+      "summary": "187 tests passed"
+    },
+    {
+      "cmd": "pnpm test:integration",
+      "status": "pass",
+      "summary": "110 tests passed after one unrelated Windows backup-file-lock retry"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    {
+      "cmd": "focused Prettier and scoped diff checks",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered an authorized full private-profile settings form with optional-sensitive-input explanations, canonical unit conversion and truthful estimator non-application wording.",
+  "note": "notes/T086-private-settings-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "The first full integration attempt hit a transient Windows EPERM in the unrelated backup restore test; the focused retry and next full suite passed without code changes."
+  ],
+  "remaining_blockers": [
+    "Personalized reference/energy target generation remains a separately sourced and reviewed package.",
+    "Private sharing-management UI and persisted display/chart preferences remain open settings work."
+  ],
+  "verification_attempts": 2,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

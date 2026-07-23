@@ -1,0 +1,40 @@
+{
+  "result": "done",
+  "task_id": "T060",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "drizzle/0022_nutrition_diary_commands.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/db/schema.ts",
+    "src/lib/domain/nutrition-diary-lifecycle.ts",
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/lib/services/nutrition-diary-lifecycle-service.ts",
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/diary-commands/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/export/route.ts",
+    "src/components/nutrition-dashboard.tsx",
+    "src/components/nutrition-dashboard.module.css",
+    "tests/unit/nutrition-diary-lifecycle.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-diary-lifecycle-service.test.ts",
+    "tests/integration/nutrition-diary-lifecycle-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused lifecycle unit tests", "status": "pass", "summary": "7 tests passed with Nutrition component coverage" },
+    { "cmd": "focused lifecycle and foundation integration tests", "status": "pass", "summary": "11 tests passed" },
+    { "cmd": "fresh pnpm db:migrate through 0022 plus sqlite_master probe", "status": "pass", "summary": "nutrition_diary_commands exists" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "174 unit and 96 integration tests passed" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Delivered atomic, immutable, idempotent private Food Diary copy, move, restore and reassign workflows plus a bounded permission-gated secret-free JSON export.",
+  "note": "notes/T060-diary-lifecycle-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

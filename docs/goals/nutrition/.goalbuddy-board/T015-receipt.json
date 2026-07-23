@@ -1,0 +1,29 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T015",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T015-persistence-rejoin-decision.md"
+  ],
+  "commands": [
+    {
+      "cmd": "audit all 35 FDA DV rows/units/citation and reference-system validation",
+      "status": "pass"
+    },
+    {
+      "cmd": "DATABASE_URL=.test-data/nutrition-rejoin-6e25d5f146b0492aa5d843bf5c255765.db pnpm db:migrate && pnpm db:check",
+      "status": "pass",
+      "summary": "Fresh disposable database migrated through Nutrition 0016 and Pantry 0017 and was reachable"
+    }
+  ],
+  "summary": "Approved the source-verified label-only FDA reference layer and rejoined the retained Nutrition persistence work after proving stable Nutrition 0016 -> Pantry 0017 order with fresh migration checks. Defined an exact schema/service/test completion package that cannot edit migrations, journal, Pantry behavior or unrelated files.",
+  "note": "notes/T015-persistence-rejoin-decision.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

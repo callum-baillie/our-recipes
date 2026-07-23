@@ -4,10 +4,13 @@ import { Merge, Plus, Save, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
+import { useToast } from '@/components/toast-provider';
+
 type Tag = { name: string; color: string | null; usageCount: number };
 
 export function TagManager({ initialTags }: { initialTags: Tag[] }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [tags, setTags] = useState(initialTags);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState('#5B713E');
@@ -28,7 +31,9 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
         error?: { message?: string };
       };
       if (!response.ok) {
-        setError(payload?.error?.message ?? 'We could not save that tag.');
+        const message = payload?.error?.message ?? 'We could not save that tag.';
+        setError(message);
+        showToast(message, 'error');
         return null;
       }
       return payload;
@@ -43,6 +48,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
     if (!payload?.tag) return;
     setTags((current) => [...current, payload.tag!].sort((a, b) => a.name.localeCompare(b.name)));
     setNewName('');
+    showToast('Tag added.', 'success');
     router.refresh();
   }
 
@@ -57,6 +63,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
         .map((tag) => (tag.name === source ? payload.tag! : tag))
         .sort((left, right) => left.name.localeCompare(right.name)),
     );
+    showToast('Tag updated.', 'success');
     router.refresh();
   }
 
@@ -74,6 +81,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
         left.name.localeCompare(right.name),
       );
     });
+    showToast(`${source} merged into ${payload.tag.name}.`, 'success');
     router.refresh();
   }
 
@@ -82,6 +90,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
     const payload = await request(`/api/v1/tags/${encodeURIComponent(name)}`, 'DELETE');
     if (payload === null) return;
     setTags((current) => current.filter((tag) => tag.name !== name));
+    showToast(`${name} removed.`, 'success');
     router.refresh();
   }
 
@@ -117,6 +126,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
           <button
             className="primary-button compact"
             type="submit"
+            aria-busy={pending}
             disabled={pending || !newName.trim()}
           >
             <Plus size={16} /> Add tag

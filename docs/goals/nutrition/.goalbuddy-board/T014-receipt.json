@@ -1,0 +1,41 @@
+{
+  "result": "done",
+  "task_id": "T014",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/lib/domain/nutrition-reference.ts",
+    "tests/unit/nutrition-reference.test.ts",
+    "docs/decisions/0030-nutrition-reference-systems.md"
+  ],
+  "commands": [
+    {
+      "cmd": "pnpm exec prettier --check src/lib/domain/nutrition-reference.ts tests/unit/nutrition-reference.test.ts docs/decisions/0030-nutrition-reference-systems.md",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm exec eslint src/lib/domain/nutrition-reference.ts tests/unit/nutrition-reference.test.ts",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm exec vitest run --project unit tests/unit/nutrition-reference.test.ts tests/unit/nutrition.test.ts tests/unit/nutrition-profile.test.ts",
+      "status": "pass",
+      "summary": "60 tests passed"
+    },
+    {
+      "cmd": "pnpm typecheck",
+      "status": "pass"
+    },
+    {
+      "cmd": "git diff --check -- src/lib/domain/nutrition-reference.ts tests/unit/nutrition-reference.test.ts docs/decisions/0030-nutrition-reference-systems.md",
+      "status": "pass"
+    }
+  ],
+  "summary": "Implemented a validated pure-domain reference system with exact source/version metadata, DV/DRI kind separation, amount/range/percent-energy forms, life-stage matching, UL source scope, explicit canonical gaps, general-information disclaimers, consent-gated estimated-energy disclosure, and all 35 FDA adult/children 4+ Daily Values from the cited current FDA page. Added seven focused tests and decision 0030 without touching persistence, Pantry, profiles, routes, UI or providers.",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit without writing files, so the PM executed the same three-file package as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

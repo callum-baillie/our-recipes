@@ -1,0 +1,57 @@
+import { forwardRef } from 'react';
+import type { LucideProps } from 'lucide-react';
+
+type BrandAssetProps = {
+  className?: string;
+  label?: string;
+};
+
+const BORD_TABLE_PATH =
+  'M741.0001 360.596c13.8314-.037 27.1628-.082 40.4942-.1064 8.209-.015 11.4755 3.1482 11.5346 11.5004.0979 13.831.091 27.6631.0468 41.4946-.0243 7.6368-3.5856 11.318-11.3391 11.5246-6.8276.1818-13.664.036-20.4964.035-7.1533-.001-7.3461.1493-7.3473 7.2019-.0064 36.6624.0776 73.3251-.0041 109.9874-.0698 31.324-.2563 62.6483-.5405 93.971-.0664 7.3246 1.0218 14.6103.2296 21.9698-.4531 4.2107-2.487 5.9798-6.4068 5.9907-13.165.0368-26.3308.085-39.4952-.0192-5.0303-.0398-6.816-2.1227-6.8442-7.7178-.0698-13.8315-.041-27.6635-.0412-41.4953-.0014-57.6603.0067-115.3207-.0176-172.981-.001-2.463.4014-4.9832-.9175-8.4486-124.3962 23.9165-249.0887 22.6261-373.482.0584-1.9351 2.7475-1.3512 5.323-1.3516 7.7401-.0127 70.6588.0175 141.3177.0447 211.9765.0038 9.9101-.9916 10.926-10.7772 10.9226-11.1655-.004-22.331.0214-33.4964-.013-7.5149-.0233-8.9597-1.5005-8.9598-9.1717-.0011-73.8253.0123-147.6506.0192-221.4759.0008-8.4859-.0057-8.4767-8.4515-8.478-6.4993-.001-13.0005.0659-19.4973-.0699-7.314-.1528-10.8661-3.5062-10.9522-10.732-.1728-14.4964-.1887-28.9967-.0772-43.494.0567-7.3743 3.3565-10.154 11.6805-10.1563 60.66-.0165 121.3202.0098 181.9802.0087 104.655-.002 209.3102-.0141 314.4653-.0227';
+
+export const BordIcon = forwardRef<SVGSVGElement, LucideProps>(function BordIcon(
+  {
+    color = 'currentColor',
+    size = 24,
+    className,
+    strokeWidth: _strokeWidth,
+    absoluteStrokeWidth: _absoluteStrokeWidth,
+    ...props
+  },
+  ref,
+) {
+  void _strokeWidth;
+  void _absoluteStrokeWidth;
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 1024 1024"
+      fill={color}
+      stroke="none"
+      className={['lucide', 'lucide-bord-table', className].filter(Boolean).join(' ')}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d={BORD_TABLE_PATH} />
+    </svg>
+  );
+});
+
+export function BordLockup({ className, label = 'Bòrd' }: BrandAssetProps) {
+  return (
+    <span
+      className={`bord-lockup${className ? ` ${className}` : ''}`}
+      role="img"
+      aria-label={label}
+    />
+  );
+}
+
+export function BordHeaderLockup({ className }: Pick<BrandAssetProps, 'className'>) {
+  return (
+    <span className={`bord-header-lockup${className ? ` ${className}` : ''}`} aria-hidden="true" />
+  );
+}

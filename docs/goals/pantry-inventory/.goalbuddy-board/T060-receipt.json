@@ -1,0 +1,19 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T060",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+    "commands": [
+      { "cmd": "Authorized exact add/location selectors, scoped Prettier/ESLint, source/mirror/protected hashes", "status": "pass" },
+      { "cmd": "Fresh integrated attempt 1", "status": "fail", "summary": "Page-vs-details containment root fixed within authorized Add location contract" },
+      { "cmd": "Attempt-1 cleanup, fresh prepare, final integrated attempt 2", "status": "fail", "summary": "Full flow and four screenshots passed; final persisted-mobile .first history assertion selected hidden duplicate" },
+      { "cmd": "Final owned cleanup, port 3100 release, hash integrity", "status": "pass" }
+    ],
+    "summary": "All authorized exact selectors now pass and the final run completed the full integrated business flow through persisted cooking events and four screenshots. Only the last mobile history visibility assertion is stale: positional first selects a hidden batch-history duplicate instead of the visible Recent history entries.",
+    "deviations": ["Disposable migrate/dbcheck stopped after the required two-attempt limit."],
+    "remaining_blockers": ["Semantic visible Recent history assertion", "Fifth screenshot/final axe/overflow/browser-error and disposable DB gates"],
+    "verification_attempts": 2,
+    "stopped_because": "The integrated flow failed twice, exhausting T060's stop limit."
+  }
+}

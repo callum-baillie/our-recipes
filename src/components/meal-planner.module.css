@@ -1,0 +1,4426 @@
+.plannerHeading {
+  align-items: center;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  max-width: 94rem;
+  margin: clamp(2rem, 4vw, 3.5rem) auto 1.5rem;
+}
+
+.plannerHeadingCopy {
+  min-width: 0;
+}
+
+.plannerHeading h1 {
+  max-width: none;
+  font-size: clamp(3rem, 4vw, 3.6rem);
+  line-height: 0.98;
+}
+
+.plannerHeading :global(.muted) {
+  max-width: 44rem;
+  font-size: 1rem;
+}
+
+.plannerHeading > button {
+  align-self: flex-start;
+  margin-top: 1rem;
+}
+
+.plannerLayout {
+  display: grid;
+  grid-template-columns: minmax(19rem, 22rem) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2.4vw, 2.25rem);
+  width: min(100%, 94rem);
+  margin: 0 auto;
+  color: var(--ink);
+}
+
+.setupPanel,
+.weekPlan {
+  min-width: 0;
+  background: color-mix(in srgb, var(--linen) 82%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+}
+
+.setupPanel {
+  align-self: start;
+  overflow: hidden;
+}
+
+.setupPanel > h2 {
+  margin: 0;
+  padding: 1.55rem 1.45rem 1rem;
+  font-size: 1.75rem;
+}
+
+.setupStep {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1.15rem 1.45rem;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.setupStep legend {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding-top: 1.15rem;
+  color: var(--label);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.setupStep legend > span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  color: var(--on-selection);
+  background: var(--selection-surface);
+  border-radius: 50%;
+  font-size: 0.78rem;
+}
+
+.fieldLabel,
+.durationField {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--label);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fieldLabel input,
+.filterRow select {
+  width: 100%;
+  min-height: 2.85rem;
+  padding: 0.7rem 0.78rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.durationField > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.durationField label {
+  min-width: 0;
+}
+
+.durationField label + label {
+  border-left: 1px solid var(--line);
+}
+
+.durationField input,
+.mealChoices input,
+.profileChoices input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.durationField label > span {
+  display: grid;
+  min-height: 2.65rem;
+  place-items: center;
+  padding: 0.55rem 0.35rem;
+  background: color-mix(in srgb, var(--linen) 90%, transparent);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.durationField input:checked + span {
+  color: var(--on-selection);
+  background: var(--selection-surface);
+}
+
+.durationField input:focus-visible + span,
+.mealChoices input:focus-visible ~ span,
+.profileChoices input:focus-visible ~ span {
+  outline: 3px solid color-mix(in srgb, var(--leaf) 55%, transparent);
+  outline-offset: -3px;
+}
+
+.mealChoices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.mealChoices label,
+.profileChoices label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.8rem;
+  padding: 0.55rem 0.65rem;
+  color: var(--label);
+  background: color-mix(in srgb, var(--linen) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.mealChoices label:has(input:checked),
+.profileChoices label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--leaf) 80%, var(--line));
+}
+
+.checkMark {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.28rem;
+  height: 1.28rem;
+  color: var(--on-selection);
+  background: color-mix(in srgb, var(--field) 85%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.22rem;
+}
+
+input:checked ~ .checkMark {
+  background: var(--selection-surface);
+  border-color: var(--selection-surface);
+}
+
+.profileChoices {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+}
+
+.profileChoices label {
+  border: 0;
+  border-radius: 0;
+}
+
+.profileChoices label + label {
+  border-top: 1px solid var(--line);
+}
+
+.profileChoices label > span:nth-child(3) {
+  flex: 1;
+}
+
+.profileAvatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.profileAvatar1 {
+  background: #3b6d78;
+}
+.profileAvatar2 {
+  background: #73598d;
+}
+.profileAvatar3 {
+  background: #a45534;
+}
+.profileAvatar4 {
+  background: #5d753b;
+}
+
+.setupFooter {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem 1.45rem 1.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.setupFooter > p,
+.setupHint {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.primaryButton,
+.secondaryButton,
+.shoppingButton,
+.selectedButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.85rem;
+  padding: 0.72rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.primaryButton,
+.shoppingButton {
+  color: white;
+  background: var(--tomato);
+  border: 1px solid var(--tomato);
+  box-shadow: 0 9px 22px rgb(168 80 50 / 18%);
+}
+
+.primaryButton:not(:disabled):hover,
+.shoppingButton:not(:disabled):hover {
+  background: var(--tomato-dark);
+  border-color: var(--tomato-dark);
+  transform: translateY(-1px);
+}
+
+.primaryButton:disabled,
+.shoppingButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.secondaryButton {
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.selectedButton {
+  color: var(--on-selection);
+  background: var(--selection-surface);
+  border: 1px solid var(--selection-surface);
+}
+
+.weekPlan {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.weekHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.weekHeader > div:first-child p {
+  margin: 0 0 0.3rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.weekHeader h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
+}
+
+.weekControls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.weekNavigation {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.weekNavigation button,
+.moreActions summary,
+.moreActions a,
+.moreActions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  color: var(--label);
+  background: color-mix(in srgb, var(--linen) 88%, transparent);
+  border: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.weekNavigation button + button {
+  border-left: 1px solid var(--line);
+}
+
+.moreActions {
+  position: relative;
+}
+
+.moreActions summary {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  list-style: none;
+  cursor: pointer;
+}
+
+.moreActions summary::-webkit-details-marker {
+  display: none;
+}
+
+.moreActions > div {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  display: grid;
+  min-width: 12rem;
+  overflow: hidden;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  box-shadow: var(--shadow);
+}
+
+.moreActions a,
+.moreActions button {
+  justify-content: flex-start;
+  width: 100%;
+  border-radius: 0;
+}
+
+.moreActions a + button,
+.moreActions button + a {
+  border-top: 1px solid var(--line);
+}
+
+.shoppingButton {
+  min-height: 2.75rem;
+  font-size: 0.78rem;
+}
+
+.feedback,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.84rem;
+}
+
+.feedback {
+  color: var(--notice-ink);
+  background: color-mix(in srgb, var(--leaf-pale) 78%, transparent);
+  border: 1px solid var(--notice-border);
+}
+
+.error {
+  color: var(--warning-ink);
+  background: var(--error-surface);
+  border: 1px solid var(--warning-border);
+}
+
+.desktopSchedule {
+  display: grid;
+  grid-template-columns: minmax(4.75rem, 0.66fr) repeat(7, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.scheduleCorner,
+.dayHeading,
+.mealHeading,
+.scheduleSlot {
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.dayHeading:last-of-type,
+.scheduleSlot:last-child {
+  border-right: 0;
+}
+
+.dayHeading {
+  display: grid;
+  gap: 0.18rem;
+  place-content: center;
+  min-height: 3.8rem;
+  padding: 0.55rem;
+  text-align: center;
+}
+
+.dayHeading strong {
+  font-size: 0.8rem;
+}
+.dayHeading span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.scheduleRow {
+  display: contents;
+}
+
+.scheduleRow:last-child > * {
+  border-bottom: 0;
+}
+
+.mealHeading {
+  display: grid;
+  place-items: center start;
+  min-height: 8.5rem;
+  padding: 0.65rem;
+  color: var(--label);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.scheduleSlot {
+  display: grid;
+  align-content: stretch;
+  gap: 0.3rem;
+  min-height: 8.5rem;
+  padding: 0.4rem;
+}
+
+.emptySlot {
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.45rem;
+}
+
+.emptySlot:hover {
+  color: var(--leaf);
+  background: color-mix(in srgb, var(--leaf-pale) 56%, transparent);
+}
+
+.plannedMeal {
+  position: relative;
+  display: grid;
+  grid-template-rows: 3.6rem auto;
+  min-width: 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--linen) 94%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+}
+
+.mealThumb {
+  overflow: hidden;
+  background: var(--leaf-pale);
+}
+
+.mealThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mealPlaceholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--leaf);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.5rem;
+}
+
+.plannedMealCopy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.45rem 1.75rem 0.5rem 0.5rem;
+}
+
+.plannedMealCopy strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+}
+
+.plannedMealCopy span {
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
+.cookLink {
+  width: fit-content;
+  color: var(--accent, #52643b);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+}
+
+.refreshRecipeButton {
+  width: fit-content;
+  padding: 0;
+  color: var(--warning-ink);
+  background: transparent;
+  border: 0;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.14rem;
+}
+
+.plannedMealCopy select {
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+}
+
+.removeButton,
+.iconButton {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+}
+
+.removeButton {
+  position: absolute;
+  right: 0.2rem;
+  bottom: 0.25rem;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.removeButton:hover,
+.iconButton:hover {
+  color: var(--ink);
+  background: var(--leaf-pale);
+}
+
+.mobileSchedule {
+  display: none;
+}
+
+.emptyPlan {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 1.4rem;
+  color: var(--muted);
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 0.65rem;
+}
+
+.emptyPlan h3,
+.emptyPlan p {
+  margin: 0;
+}
+.emptyPlan h3 {
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+.emptyPlan p {
+  max-width: 34rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.selectorDialog {
+  width: min(94vw, 86rem);
+  height: min(90dvh, 58rem);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  color: var(--ink);
+  background: var(--linen);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.9rem;
+  box-shadow: 0 30px 90px rgb(0 0 0 / 48%);
+}
+
+.selectorDialog::backdrop {
+  background: rgb(9 16 10 / 72%);
+  backdrop-filter: blur(2px);
+}
+
+.dialogShell {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 0.8rem;
+}
+
+.dialogHeader h2 {
+  margin: 0;
+  font-size: 2.25rem;
+}
+
+.dialogHeader p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.iconButton {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.dialogTools {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1fr) auto;
+  gap: 0.6rem;
+  padding: 0 1.5rem 0.9rem;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.8rem;
+  padding: 0 0.8rem;
+  color: var(--muted);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.searchField input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.7rem;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 0.86rem;
+}
+
+.filterRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filterRow select {
+  min-width: 9rem;
+}
+
+.collectionRow {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.collectionRow > span {
+  flex: 0 0 auto;
+  margin-right: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.collectionRow button {
+  flex: 0 0 auto;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--label);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.collectionRow button[aria-pressed='true'] {
+  color: var(--on-selection);
+  background: var(--selection-surface);
+  border-color: var(--selection-surface);
+}
+
+.mealTabs {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.mealTabs button {
+  flex: 1 0 auto;
+  min-height: 3.2rem;
+  padding: 0.7rem 1rem;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mealTabs button span {
+  margin-left: 0.3rem;
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.mealTabs button[aria-selected='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--selection-surface);
+}
+
+.dialogContent {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.recipeResults {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.9rem 1.5rem;
+}
+
+.recipeChoice {
+  display: grid;
+  grid-template-rows: 7.5rem auto;
+  min-width: 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--linen) 92%, var(--page));
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.selectedRecipe {
+  border-color: var(--selection-surface);
+  box-shadow: inset 0 0 0 1px var(--selection-surface);
+}
+
+.recipeChoiceMedia {
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+}
+
+.recipeChoiceMedia img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recipeChoiceBody {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.recipeChoiceBody h3 {
+  min-height: 2.25rem;
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.08;
+}
+
+.recipeLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-height: 1.4rem;
+}
+
+.recipeLabels span {
+  padding: 0.2rem 0.35rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.62rem;
+}
+
+.recipeChoiceBody > p {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.recipeChoiceBody button {
+  width: 100%;
+  min-height: 2.55rem;
+}
+
+.noResults {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 3rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.noResults h3,
+.noResults p {
+  margin: 0;
+}
+.noResults h3 {
+  color: var(--ink);
+}
+
+.assignmentRail {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.8rem 1.5rem;
+  background: color-mix(in srgb, var(--page) 72%, var(--linen));
+  border-top: 1px solid var(--line);
+}
+
+.assignmentRail > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.assignmentRail h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.assignmentRail > div:first-child span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.assignmentSlots {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.assignmentSlots button {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  min-height: 3.6rem;
+  padding: 0.5rem;
+  color: var(--muted);
+  text-align: left;
+  background: var(--linen);
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.45rem;
+}
+
+.assignmentSlots button > span {
+  font-size: 0.65rem;
+}
+.assignmentSlots button > strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assignmentSlots .activeSlot {
+  border-style: solid;
+  border-color: var(--selection-surface);
+  box-shadow: inset 0 0 0 1px var(--selection-surface);
+}
+
+.dialogFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  background: var(--linen);
+  border-top: 1px solid var(--line);
+}
+
+.dialogFooter > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.dialogFooter > div {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 1180px) {
+  .plannerLayout {
+    grid-template-columns: 1fr;
+  }
+  .setupPanel {
+    width: 100%;
+  }
+  .setupPanel > h2 {
+    padding-bottom: 1.2rem;
+  }
+  .setupPanel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .setupPanel > h2,
+  .setupFooter {
+    grid-column: 1 / -1;
+  }
+  .setupStep {
+    border-top: 1px solid var(--line);
+  }
+  .setupStep + .setupStep {
+    border-left: 1px solid var(--line);
+  }
+  .recipeResults {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .plannerHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1.15rem;
+    margin: 2.2rem auto 1.4rem;
+  }
+  .plannerHeading h1 {
+    max-width: 9ch;
+    font-size: clamp(2.8rem, 13vw, 4.2rem);
+  }
+  .plannerLayout {
+    gap: 1rem;
+  }
+  .setupPanel {
+    display: block;
+  }
+  .setupStep + .setupStep {
+    border-left: 0;
+  }
+  .weekPlan {
+    padding: 0.85rem;
+  }
+  .weekHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .weekControls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    justify-content: stretch;
+  }
+  .weekNavigation {
+    grid-column: 1 / -1;
+  }
+  .weekNavigation button {
+    flex: 1;
+    min-height: 2.9rem;
+  }
+  .moreActions summary,
+  .shoppingButton {
+    width: 100%;
+    min-height: 2.9rem;
+  }
+  .desktopSchedule {
+    display: none;
+  }
+  .mobileSchedule {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+  }
+  .mobileSchedule details + details {
+    border-top: 1px solid var(--line);
+  }
+  .mobileSchedule summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 3.2rem;
+    padding: 0.75rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .mobileSchedule summary::-webkit-details-marker {
+    display: none;
+  }
+  .mobileSchedule summary > span {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+  .mobileSchedule summary strong {
+    color: var(--ink);
+    font-size: 0.9rem;
+  }
+  .mobileSchedule details[open] > summary {
+    background: color-mix(in srgb, var(--leaf-pale) 50%, transparent);
+  }
+  .mobileSchedule details > div {
+    display: grid;
+  }
+  .mobileSchedule section {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    min-height: 4.2rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+  .mobileSchedule section > span {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+  .mobileSchedule section > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+    padding: 0.6rem;
+    color: var(--leaf);
+    background: transparent;
+    border: 1px dashed var(--line-strong);
+    border-radius: 0.45rem;
+  }
+  .mobileSchedule .plannedMeal {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    grid-template-rows: 3.6rem;
+  }
+  .selectorDialog {
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .dialogHeader {
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 0.7rem;
+  }
+  .dialogHeader h2 {
+    font-size: 2rem;
+  }
+  .dialogTools {
+    grid-template-columns: 1fr;
+    padding: 0 1rem 0.75rem;
+  }
+  .filterRow {
+    overflow-x: auto;
+  }
+  .filterRow label {
+    flex: 0 0 auto;
+  }
+  .collectionRow {
+    grid-column: auto;
+  }
+  .mealTabs {
+    padding: 0 1rem;
+  }
+  .mealTabs button {
+    min-width: 7.5rem;
+    min-height: 3.5rem;
+  }
+  .recipeResults {
+    grid-template-columns: 1fr;
+    padding: 0.75rem 1rem;
+  }
+  .recipeChoice {
+    grid-template-columns: minmax(8.5rem, 42%) minmax(0, 1fr);
+    grid-template-rows: minmax(9.5rem, auto);
+  }
+  .recipeChoiceBody h3 {
+    min-height: auto;
+  }
+  .assignmentRail {
+    padding: 0.75rem 1rem;
+  }
+  .assignmentSlots {
+    display: flex;
+    overflow-x: auto;
+  }
+  .assignmentSlots button {
+    flex: 0 0 8.5rem;
+  }
+  .dialogFooter {
+    align-items: stretch;
+    padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+    flex-direction: column;
+  }
+  .dialogFooter > div {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .mealChoices {
+    grid-template-columns: 1fr 1fr;
+  }
+  .weekControls {
+    grid-template-columns: 1fr;
+  }
+  .weekNavigation {
+    grid-column: auto;
+  }
+  .shoppingButton {
+    grid-row: 2;
+  }
+  .moreActions {
+    grid-row: 3;
+  }
+  .dialogFooter > div {
+    grid-template-columns: 1fr;
+  }
+  .dialogFooter .secondaryButton {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton,
+  .shoppingButton,
+  .selectedButton {
+    transition: none;
+  }
+}
+
+.nutritionBridge {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+}
+
+.nutritionBridge > header,
+.nutritionBridge > nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.nutritionBridge h2,
+.nutritionBridge p {
+  margin: 0;
+}
+
+.nutritionBridge > nav a {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.nutritionBridge > nav a[aria-current='page'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.nutritionPrivacyNote {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media print {
+  .setupPanel,
+  .weekControls,
+  .feedback,
+  .error,
+  .emptyPlan {
+    display: none !important;
+  }
+  .nutritionBridge {
+    display: none !important;
+  }
+  .plannerLayout {
+    display: block;
+  }
+  .weekPlan {
+    border: 0;
+  }
+}
+
+/* Planner refinement: denser command center, softer grid, contextual drawer */
+.plannerHeading {
+  min-height: 4.5rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
+
+.plannerHeading h1 {
+  font-size: clamp(2rem, 2.7vw, 2.55rem);
+  line-height: 1;
+}
+
+.plannerHeading :global(.muted) {
+  margin-top: 0.35rem;
+  color: color-mix(in srgb, var(--ink) 68%, var(--muted));
+  font-size: 0.86rem;
+}
+
+.plannerLayout {
+  grid-template-columns: 18rem minmax(0, 1fr) 17rem;
+  height: min(52rem, calc(100dvh - 12rem));
+  min-height: 32rem;
+  margin-top: -0.65rem;
+}
+
+.plannerLayout button,
+.plannerLayout select,
+.plannerLayout input {
+  font-weight: 600;
+}
+
+.setupPanel,
+.insightsRail {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.setupHeading h2 {
+  padding-top: 1.25rem;
+  font-size: 1.45rem;
+}
+
+.setupStep {
+  gap: 0.55rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.setupStep legend {
+  gap: 0.45rem;
+  padding-top: 0.65rem;
+  font-weight: 600;
+}
+
+.setupStep legend > span {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.72;
+  font-size: 0.58rem;
+}
+
+.mealChoiceActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: -1.45rem;
+}
+
+.mealChoiceActions button {
+  padding: 0;
+  color: var(--leaf);
+  background: transparent;
+  border: 0;
+  font-size: 0.66rem;
+}
+
+.mealChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mealChoices label {
+  min-height: 2rem;
+  padding: 0.34rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.mealChoices .checkMark {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+}
+
+.profileChoiceWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.profileChoices {
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.profileChoices label {
+  min-height: 2.15rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.profileAvatar {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.manageMembersButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.15rem;
+  min-height: 2.15rem;
+  color: var(--leaf);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.manageMembersButton span {
+  display: none;
+}
+
+.setupFooter {
+  gap: 0.45rem;
+  padding-top: 0.7rem;
+}
+
+.setupFooter .setupHint {
+  display: block;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--ink) 62%, var(--muted));
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.primaryButton,
+.shoppingButton {
+  color: white;
+  background: var(--tomato);
+  border-color: var(--tomato);
+}
+
+.selectedButton,
+.durationField input:checked + span,
+.weekNavigation button:hover {
+  color: var(--on-selection);
+  background: var(--selection-surface);
+}
+
+.weekPlan {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  min-height: 0;
+  padding: 1rem 0.75rem 0.75rem;
+  overflow: hidden;
+}
+
+.weekHeader {
+  grid-template-columns: minmax(12.5rem, 1fr) auto;
+  align-items: center;
+}
+
+.weekHeader h2 {
+  font-size: 1.65rem;
+  font-weight: 500;
+}
+
+.weekHeader > div:first-child p {
+  color: color-mix(in srgb, var(--ink) 63%, var(--muted));
+}
+
+.weekControls {
+  flex: 0 0 auto;
+}
+
+.weekNavigation,
+.weekNavigation button,
+.moreActions summary,
+.shoppingButton {
+  min-height: 2.75rem;
+}
+
+.weekNavigation button,
+.moreActions summary,
+.shoppingButton {
+  padding: 0.55rem 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.weekNavigation button:first-child,
+.weekNavigation button:last-child {
+  color: var(--leaf);
+}
+
+.moreActions > div {
+  min-width: 13.5rem;
+}
+
+.moreActions > div > button,
+.moreActions > div > a {
+  min-height: 2.4rem;
+  font-weight: 600;
+}
+
+.moreActions > div > button:first-child {
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.emptyPlan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--leaf-pale) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--leaf) 22%, var(--line));
+  border-radius: 0.6rem;
+  text-align: left;
+}
+
+.emptyPlan > div:last-child {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.45rem;
+}
+
+.emptyPlan h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.emptyPlan p {
+  font-size: 0.7rem;
+}
+
+.emptyPlan button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.7rem;
+}
+
+.desktopSchedule {
+  grid-template-columns: 5.7rem repeat(7, minmax(0, 1fr));
+  grid-template-rows: 4.25rem;
+  grid-auto-rows: minmax(3.75rem, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--linen) 94%, var(--page));
+  border-color: color-mix(in srgb, var(--line) 82%, transparent);
+}
+
+.scheduleCorner,
+.dayHeading,
+.mealHeading,
+.scheduleSlot {
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.scheduleCorner,
+.dayHeading {
+  border-bottom: 1px solid var(--line);
+}
+
+.dayHeading {
+  min-height: 4.25rem;
+}
+
+.dayHeading strong {
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.dayHeading span {
+  color: color-mix(in srgb, var(--ink) 62%, var(--muted));
+  font-size: 0.76rem;
+}
+
+.dayHeading.currentDay {
+  color: var(--leaf);
+  background: color-mix(in srgb, var(--leaf-pale) 58%, transparent);
+  box-shadow: inset 0 3px 0 var(--selection-surface);
+}
+
+.mealHeading,
+.scheduleSlot {
+  min-height: 0;
+}
+
+.mealHeading {
+  align-items: center;
+  padding-left: 0.8rem;
+  color: color-mix(in srgb, var(--ink) 78%, var(--muted));
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.scheduleSlot {
+  padding: 0.3rem;
+}
+
+.alternateCell {
+  background: color-mix(in srgb, var(--leaf-pale) 18%, transparent);
+}
+
+.scheduleSlot.currentDay {
+  background: color-mix(in srgb, var(--leaf-pale) 38%, transparent);
+}
+
+.emptySlot {
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--ink) 48%, transparent);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.emptySlot::after {
+  content: none;
+}
+
+.emptySlot span {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  font-size: 0.64rem;
+  transition:
+    max-height 140ms ease,
+    opacity 140ms ease;
+}
+
+.emptySlot:hover,
+.emptySlot:focus-visible,
+.scheduleSlot:has(.emptySlot):focus-within {
+  color: var(--leaf);
+  background: color-mix(in srgb, var(--leaf-pale) 62%, transparent);
+  border-color: color-mix(in srgb, var(--leaf) 36%, var(--line));
+}
+
+.emptySlot:hover span,
+.emptySlot:focus-visible span {
+  max-height: 1rem;
+  opacity: 1;
+}
+
+.emptySlot:focus-visible,
+.scheduleSlot:focus-visible,
+.weekNavigation button:focus-visible,
+.mealActions summary:focus-visible,
+.servingEditor input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--leaf) 50%, transparent);
+  outline-offset: 2px;
+}
+
+.plannedMeal {
+  height: 100%;
+  cursor: grab;
+  border-color: color-mix(in srgb, var(--line) 78%, transparent);
+  box-shadow: 0 2px 8px rgb(48 39 29 / 4%);
+}
+
+.plannedMeal:active {
+  cursor: grabbing;
+}
+
+.mealTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  justify-content: space-between;
+}
+
+.pantryDot {
+  flex: 0 0 auto;
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-top: 0.15rem;
+  background: var(--muted);
+  border-radius: 50%;
+}
+
+.pantryDotcovered {
+  background: var(--selection-surface);
+}
+
+.pantryDotshortage {
+  background: var(--tomato);
+}
+
+.pantryDotuncertain {
+  background: #d99a32;
+}
+
+.pantryDotunknown {
+  opacity: 0.45;
+}
+
+.servingEditor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.16rem;
+}
+
+.servingEditor input {
+  width: 1.65rem;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font-size: inherit;
+  text-align: center;
+}
+
+.servingEditor > span {
+  display: none;
+}
+
+.mealActions > div {
+  width: 16rem;
+  max-height: min(28rem, 68vh);
+  overflow-y: auto;
+}
+
+.mealActions label {
+  gap: 0.3rem;
+  padding: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.mealActions label > span,
+.dragHint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mealActions label button {
+  justify-content: center;
+  min-height: 1.9rem;
+  color: var(--leaf);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+}
+
+.destructiveAction {
+  color: var(--tomato) !important;
+  border-top: 1px solid var(--line) !important;
+}
+
+.planSummary {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  grid-template-columns: 1.65fr repeat(3, 1fr);
+  min-height: 3.7rem;
+  background: color-mix(in srgb, var(--linen) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.planSummary > div {
+  padding: 0.45rem 0.6rem;
+}
+
+.insightsRail {
+  gap: 0.6rem;
+  padding: 0.65rem;
+}
+
+.insightCard {
+  gap: 0.6rem;
+  padding: 0.8rem;
+}
+
+.insightCard strong {
+  font-weight: 600;
+}
+
+.summaryEmpty {
+  margin: 0;
+  color: color-mix(in srgb, var(--ink) 66%, var(--muted));
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.summarySkeleton {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.recipeLoading {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+.railButton:disabled,
+.mobilePantryCard button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.selectorDialog {
+  inset: 0 0 0 auto;
+  width: min(42rem, 100vw);
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  border-width: 0 0 0 1px;
+  border-radius: 1rem 0 0 1rem;
+  transform: translateX(0);
+}
+
+.selectorDialog::backdrop {
+  background: rgb(19 27 20 / 34%);
+  backdrop-filter: blur(1px);
+}
+
+.dialogShell {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.dialogHeader {
+  padding: 1.15rem 1.2rem 0.75rem;
+}
+
+.dialogHeader h2 {
+  font-size: 1.75rem;
+  font-weight: 500;
+}
+
+.dialogTools {
+  grid-template-columns: 1fr;
+  padding: 0 1.2rem 0.75rem;
+}
+
+.filterRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.recipeResults {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.75rem 1.2rem;
+}
+
+.recipeChoice {
+  grid-template-rows: 6.5rem auto;
+}
+
+.assignmentRail {
+  padding: 0.7rem 1.2rem;
+}
+
+.assignmentSlots {
+  display: flex;
+  overflow-x: auto;
+}
+
+.assignmentSlots button {
+  flex: 0 0 7.5rem;
+}
+
+@media (max-width: 1400px) {
+  .plannerLayout {
+    grid-template-columns: 14.5rem minmax(0, 1fr) 15.5rem;
+  }
+
+  .weekHeader h2 {
+    font-size: 1.45rem;
+  }
+
+  .weekNavigation button,
+  .shoppingButton {
+    padding-right: 0.62rem;
+    padding-left: 0.62rem;
+  }
+}
+
+@media (max-width: 1100px) {
+  .plannerLayout {
+    grid-template-columns: 13.75rem minmax(0, 1fr);
+  }
+
+  .insightsRail {
+    display: none;
+  }
+
+  .weekPlan {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .plannerHeading {
+    display: none;
+  }
+
+  .plannerLayout {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .setupPanel,
+  .weekHeader,
+  .desktopSchedule,
+  .insightsRail {
+    display: none;
+  }
+
+  .setupPanel.mobileSetupOpen {
+    display: block;
+  }
+
+  .weekPlan {
+    display: grid;
+    grid-template-rows: none;
+    gap: 1rem;
+    min-height: 0;
+    padding: 1.5rem 0 2rem;
+    overflow: visible;
+    border: 0;
+  }
+
+  .mobileDayHeader,
+  .mobileToolbar,
+  .mobileInsights,
+  .mobileSchedule {
+    display: grid;
+  }
+
+  .emptyPlan {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .emptyPlan > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .emptyMobileMeal {
+    grid-template-columns: 1fr !important;
+  }
+
+  .emptyMobileMeal .mobileMealLabel {
+    padding: 0.25rem 0 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .emptyMobileMeal .mobileMealContent {
+    min-height: 5.5rem;
+    padding: 0.75rem 0 0;
+  }
+
+  .mobileSchedule .servingEditor > span {
+    display: inline;
+  }
+
+  .planSummary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .planSummary > div:first-child {
+    display: none;
+  }
+
+  .planSummary > div:nth-child(2) {
+    border-left: 0;
+  }
+
+  .selectorDialog {
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+/* Planner mockup-aligned surface */
+.plannerHeading {
+  width: auto;
+  max-width: none;
+  margin-right: -1.5rem;
+  margin-left: -1.5rem;
+  margin-top: 1rem;
+  margin-bottom: 0;
+}
+
+.plannerHeading h1 {
+  font-size: clamp(2.35rem, 3vw, 2.8rem);
+  letter-spacing: -0.035em;
+}
+
+.plannerHeading :global(.muted) {
+  margin-top: 0.45rem;
+  font-size: 0.95rem;
+}
+
+.plannerLayout {
+  grid-template-columns: 18.4rem minmax(0, 1fr) 14.25rem;
+  gap: 0;
+  width: auto;
+  max-width: none;
+  margin-right: -1.5rem;
+  margin-left: -1.5rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--linen) 91%, var(--page));
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.setupPanel,
+.weekPlan {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.setupPanel {
+  height: 100%;
+}
+
+.setupHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setupHeading h2 {
+  margin: 0;
+  padding: 1.8rem 1.55rem 0.8rem;
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+.setupHeading button {
+  display: none;
+}
+
+.setupStep {
+  gap: 0.75rem;
+  padding: 1rem 1.55rem;
+  border-top: 0;
+}
+
+.setupStep legend {
+  gap: 0.55rem;
+  padding-top: 1rem;
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.setupStep legend > span {
+  width: 1.2rem;
+  height: 1.2rem;
+  font-size: 0.65rem;
+}
+
+.fieldLabel input {
+  min-height: 2.55rem;
+  background: color-mix(in srgb, var(--linen) 96%, white);
+}
+
+.durationField > div {
+  border-radius: 0.45rem;
+}
+
+.durationField label > span {
+  min-height: 2.35rem;
+  font-size: 0.73rem;
+}
+
+.mealChoices {
+  gap: 0.45rem;
+}
+
+.mealChoices label {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.profileChoices {
+  display: flex;
+  gap: 0.45rem;
+  overflow: visible;
+  border: 0;
+}
+
+.profileChoices label {
+  min-width: 0;
+  min-height: 2.45rem;
+  padding: 0.35rem 0.55rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+}
+
+.profileChoices label + label {
+  border-top: 1px solid var(--line);
+}
+
+.profileChoices .checkMark {
+  display: none;
+}
+
+.profileChoices label > span:nth-child(3) {
+  font-size: 0.72rem;
+}
+
+.setupFooter {
+  gap: 0.7rem;
+  padding: 1rem 1.55rem 1.55rem;
+  border-top: 0;
+}
+
+.setupFooter > p:first-child,
+.setupFooter > p:nth-child(2) {
+  display: none;
+}
+
+.setupFooter .primaryButton {
+  width: 100%;
+}
+
+.setupFooter .setupHint {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.weekPlan {
+  gap: 0.85rem;
+  padding: 1.6rem 0.9rem 1.45rem;
+  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.weekHeader {
+  display: grid;
+  grid-template-columns: minmax(13.75rem, 1fr) auto;
+  align-items: flex-start;
+}
+
+.weekHeader > div:first-child {
+  flex: 1 1 13rem;
+  min-width: 0;
+}
+
+.weekHeader h2 {
+  font-size: clamp(1.55rem, 1.8vw, 1.8rem);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.weekHeader > div:first-child p {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+}
+
+.weekControls {
+  flex: 1 1 27rem;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+}
+
+.weekNavigation button,
+.moreActions summary,
+.shoppingButton {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.68rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.aiPlanAction :global(button) {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.45rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.moreActions summary {
+  width: 2.5rem;
+  padding: 0;
+  font-size: 0;
+}
+
+.shoppingButton {
+  box-shadow: none;
+}
+
+.desktopSchedule {
+  grid-template-columns: 4.55rem repeat(7, minmax(0, 1fr));
+  border-radius: 0.65rem;
+}
+
+.dayHeading {
+  min-height: 3.55rem;
+}
+
+.mealHeading,
+.scheduleSlot {
+  min-height: 7.85rem;
+}
+
+.mealHeading {
+  padding: 0.5rem;
+  font-size: 0.7rem;
+}
+
+.scheduleSlot {
+  padding: 0.35rem;
+}
+
+.emptySlot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.65rem;
+}
+
+.emptySlot::after {
+  content: 'Add recipe';
+}
+
+.plannedMeal {
+  grid-template-rows: 3.45rem auto;
+  border-radius: 0.4rem;
+}
+
+.plannedMealCopy {
+  gap: 0.35rem;
+  padding: 0.42rem 0.42rem 0.5rem;
+}
+
+.plannedMealCopy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.67rem;
+  line-height: 1.18;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mealMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.6rem !important;
+}
+
+.mealServingText > span {
+  display: none;
+}
+
+.mealActions {
+  position: absolute;
+  z-index: 4;
+  top: 0.12rem;
+  right: 0.12rem;
+}
+
+.mealActions summary {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  color: var(--ink);
+  background: rgb(250 248 242 / 82%);
+  border-radius: 999px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mealActions summary::-webkit-details-marker {
+  display: none;
+}
+
+.mealActions > div {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  right: 0;
+  display: grid;
+  min-width: 9.5rem;
+  padding: 0.35rem;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow);
+}
+
+.mealActions button,
+.mealActions a,
+.mealActions label,
+.mealActions > div > span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.45rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  font-size: 0.7rem;
+  text-align: left;
+}
+
+.mealActions label {
+  display: grid;
+}
+
+.mealActions select {
+  width: 100%;
+  min-height: 1.8rem;
+  border: 1px solid var(--line);
+}
+
+.planSummary {
+  display: grid;
+  grid-template-columns: 1.65fr repeat(4, 1fr);
+  min-height: 4.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.planSummary > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.65rem;
+  text-align: left;
+}
+
+.planSummary > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.planSummary span,
+.planSummary > div:not(:first-child) {
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: flex-start;
+}
+
+.planSummary span {
+  display: flex;
+}
+
+.planSummary strong {
+  font-size: 0.85rem;
+}
+
+.planSummary small {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.insightsRail {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  padding: 0.85rem;
+}
+
+.insightCard {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--linen) 95%, white);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+.insightCard header {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.insightCard header strong {
+  font-size: 0.78rem;
+}
+
+.insightCard header span,
+.insightCard small {
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
+.nutritionLine {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.nutritionLine > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.nutritionLine strong {
+  font-size: 0.68rem;
+}
+
+.nutritionLine i,
+.mobileNutritionCard i {
+  display: block;
+  height: 0.26rem;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 99px;
+}
+
+.nutritionLine i b,
+.mobileNutritionCard i b {
+  display: block;
+  height: 100%;
+  background: var(--selection-surface);
+  border-radius: inherit;
+}
+
+.insightCard > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--leaf);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.pantryCoverage {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.coverageRing {
+  flex: 0 0 auto;
+  width: 3.5rem;
+  height: 3.5rem;
+  background: conic-gradient(
+    var(--selection-surface) var(--coverage),
+    color-mix(in srgb, var(--line) 75%, transparent) 0
+  );
+  border-radius: 50%;
+}
+
+.coverageRing::after {
+  display: block;
+  width: 70%;
+  height: 70%;
+  margin: 15%;
+  background: var(--linen);
+  border-radius: 50%;
+  content: '';
+}
+
+.pantryCoverage p {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+}
+
+.pantryCoverage p strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+}
+
+.pantryCoverage p span,
+.missingIngredients {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.missingIngredients {
+  margin: 0;
+}
+
+.railButton {
+  justify-content: center !important;
+  min-height: 2.3rem;
+  color: var(--ink) !important;
+  background: var(--leaf-pale);
+  border-radius: 0.45rem;
+}
+
+.insightCard dl {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+.insightCard dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+}
+
+.insightCard dt {
+  color: var(--muted);
+}
+
+.insightCard dd {
+  margin: 0;
+  text-align: right;
+}
+
+.planOverviewCard {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.insightCard .planOverviewHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.planOverviewHeader > span:last-child {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.planOverviewIcon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+  border-radius: 50%;
+}
+
+.planOverviewMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.planOverviewMetrics > div {
+  display: grid;
+  align-content: center;
+  gap: 0.18rem;
+  min-width: 0;
+  min-height: 4.1rem;
+  padding: 0.65rem 0.5rem;
+}
+
+.planOverviewMetrics > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.planOverviewMetrics strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.planOverviewMetrics span {
+  color: var(--muted);
+  font-size: 0.61rem;
+  line-height: 1.25;
+}
+
+.mobilePlannerCommand,
+.mobileDayHeader,
+.mobileToolbar,
+.mobileInsights {
+  display: none;
+}
+
+.emptyPlan {
+  display: none;
+}
+
+@media (max-width: 1400px) {
+  .plannerLayout {
+    grid-template-columns: 15.5rem minmax(0, 1fr) 12.5rem;
+  }
+
+  .setupPanel {
+    display: block;
+  }
+
+  .setupHeading h2,
+  .setupStep,
+  .setupFooter {
+    padding-right: 1.1rem;
+    padding-left: 1.1rem;
+  }
+
+  .weekControls {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+
+  .weekHeader {
+    grid-template-columns: minmax(12.5rem, 1fr) auto;
+  }
+
+  .aiPlanAction {
+    display: none;
+  }
+
+  .emptyPlan {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .plannerLayout {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    margin-right: 0;
+    margin-left: 0;
+  }
+
+  .setupPanel {
+    display: block;
+  }
+
+  .setupStep + .setupStep {
+    border-left: 0;
+  }
+
+  .insightsRail {
+    display: none;
+  }
+
+  .weekPlan {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .plannerHeading {
+    display: none;
+  }
+
+  .plannerLayout {
+    display: block;
+    width: 100%;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .setupPanel,
+  .weekHeader,
+  .desktopSchedule,
+  .monthSchedule,
+  .emptyPlan {
+    display: none;
+  }
+
+  .setupPanel.mobileSetupOpen {
+    position: fixed;
+    z-index: 70;
+    top: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    display: block;
+    width: min(22rem, calc(100vw - 2rem));
+    height: auto;
+    overflow-y: auto;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 28px 90px rgb(18 25 19 / 28%);
+  }
+
+  .mobileSetupOpen .setupHeading {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+    background: var(--linen);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobileSetupOpen .setupHeading button {
+    display: grid;
+    width: 2.7rem;
+    height: 2.7rem;
+    margin-right: 1rem;
+    place-items: center;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+  }
+
+  .weekPlan {
+    display: grid;
+    gap: 1rem;
+    padding: 1.5rem 0 2rem;
+    border: 0;
+  }
+
+  .weekHeader {
+    display: none;
+  }
+
+  .mobileDayHeader {
+    display: grid;
+    grid-template-columns: 5.2rem minmax(0, 1fr);
+    gap: 0 1.15rem;
+    align-items: center;
+  }
+
+  .mobileDateBadge {
+    display: grid;
+    grid-row: 1 / span 2;
+    min-height: 5.6rem;
+    place-content: center;
+    color: var(--leaf);
+    background: var(--leaf-pale);
+    border: 1px solid color-mix(in srgb, var(--leaf) 34%, var(--line));
+    border-radius: 1.1rem;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .mobileDateBadge span {
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .mobileDateBadge strong {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 2.4rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .mobileDayHeader h2 {
+    margin: 0;
+    font-size: clamp(2.35rem, 11vw, 3.4rem);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .mobileDayHeader > div:nth-child(2) p {
+    margin: 0.55rem 0 0;
+    color: var(--muted);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.5rem;
+  }
+
+  .mobileDayHeader > p {
+    grid-column: 1 / -1;
+    margin: 1.35rem 0 0;
+    color: var(--muted);
+    font-size: 1.1rem;
+  }
+
+  .mobileToolbar {
+    display: grid;
+    grid-template-columns: 3.2rem minmax(5.4rem, auto) 3.2rem 3.2rem minmax(8.5rem, 1fr);
+    gap: 0.5rem;
+    padding: 0.85rem;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 12px 30px rgb(52 42 31 / 5%);
+  }
+
+  .mobileHistoryControls {
+    display: flex;
+    grid-column: 1 / -1;
+    gap: 0.45rem;
+    justify-content: flex-end;
+  }
+
+  .mobileHistoryControls button {
+    display: grid;
+    width: 2.7rem;
+    min-height: 2.7rem;
+    place-items: center;
+    color: var(--label);
+    background: color-mix(in srgb, var(--linen) 88%, var(--leaf-pale));
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+  }
+
+  .mobileHistoryControls button:disabled {
+    opacity: 0.42;
+  }
+
+  .mobileHistoryControls button:focus-visible,
+  .mobileHistoryControls button:hover:not(:disabled) {
+    color: var(--leaf-dark);
+    background: var(--leaf-pale);
+  }
+
+  .mobileToolbar > button,
+  .mobileDayPicker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.3rem;
+    padding: 0.5rem;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .mobileToolbar .mobileAddButton {
+    gap: 0.45rem;
+    color: white;
+    background: var(--tomato);
+    border-color: var(--tomato);
+    font-size: 0.9rem;
+  }
+
+  .mobileInsights {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(8.7rem, 1fr);
+    gap: 0.75rem;
+  }
+
+  .mobileNutritionCard,
+  .mobilePantryCard {
+    min-width: 0;
+    padding: 1rem;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+
+  .mobileNutritionCard header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .mobileNutritionCard header strong {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+  }
+
+  .mobileNutritionCard header span {
+    color: var(--muted);
+    font-size: 0.7rem;
+  }
+
+  .mobileNutritionCard > div {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 1rem;
+  }
+
+  .mobileNutritionCard > div > div {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0 0.65rem;
+  }
+
+  .mobileNutritionCard > div > div:first-child {
+    padding-left: 0;
+  }
+
+  .mobileNutritionCard > div > div + div {
+    border-left: 1px solid var(--line);
+  }
+
+  .mobileNutritionCard strong,
+  .mobileNutritionCard span,
+  .mobileNutritionCard small {
+    overflow: hidden;
+    font-size: 0.66rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileNutritionCard span,
+  .mobileNutritionCard small {
+    color: var(--muted);
+  }
+
+  .mobilePantryCard {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.3rem 0.65rem;
+    align-items: center;
+  }
+
+  .mobilePantryCard .coverageRing {
+    grid-row: 1 / span 2;
+  }
+
+  .mobilePantryCard .coverageRing {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .mobilePantryCard .coverageRing::after {
+    position: absolute;
+    inset: 15%;
+    width: auto;
+    height: auto;
+    margin: 0;
+  }
+
+  .mobilePantryCard .coverageRing span {
+    position: relative;
+    z-index: 1;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .mobilePantryCard p {
+    margin: 0;
+    font-size: 0.82rem;
+  }
+
+  .mobilePantryCard > span {
+    grid-column: 1 / -1;
+    padding: 0.65rem;
+    color: var(--muted);
+    border: 1px dashed var(--line-strong);
+    border-radius: 0.55rem;
+    font-size: 0.7rem;
+  }
+
+  .mobilePantryCard a {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.2rem;
+    color: var(--leaf);
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .mobileSchedule {
+    display: grid;
+    gap: 0.75rem;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .mobileSchedule section {
+    display: grid;
+    grid-template-columns: 6.6rem minmax(0, 1fr);
+    gap: 0;
+    min-height: 8.1rem;
+    padding: 0.8rem;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+
+  .mobileMealLabel {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding-right: 0.8rem;
+    border-right: 1px solid var(--line);
+  }
+
+  .mobileMealLabel > span {
+    display: grid;
+    flex: 0 0 auto;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    color: var(--leaf);
+    background: var(--leaf-pale);
+    border-radius: 999px;
+  }
+
+  .mobileMealLabel strong {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.05rem;
+    font-weight: 500;
+  }
+
+  .mobileMealContent {
+    display: grid;
+    gap: 0.55rem;
+    padding-left: 0.8rem;
+  }
+
+  .mobileMealContent > button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 100%;
+    color: var(--muted);
+    background: transparent;
+    border: 1px dashed var(--line-strong);
+    border-radius: 0.65rem;
+    font-size: 0.9rem;
+  }
+
+  .mobileSchedule .plannedMeal {
+    grid-template-columns: minmax(6.8rem, 42%) minmax(0, 1fr);
+    grid-template-rows: minmax(6.4rem, 1fr);
+    border: 0;
+  }
+
+  .mobileSchedule .plannedMeal + .plannedMeal {
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+  }
+
+  .mobileSchedule .mealThumb {
+    border-radius: 0.65rem;
+  }
+
+  .mobileSchedule .plannedMealCopy {
+    align-content: center;
+    gap: 0.65rem;
+    padding: 0.8rem 2rem 0.8rem 1rem;
+  }
+
+  .mobileSchedule .plannedMealCopy strong {
+    font-size: 1rem;
+    -webkit-line-clamp: 2;
+  }
+
+  .mobileSchedule .mealMeta {
+    gap: 0.35rem;
+    font-size: 0.78rem !important;
+  }
+
+  .mobileSchedule .mealServingText > span {
+    display: inline;
+  }
+
+  .mobileSchedule .mealActions {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .planSummary {
+    grid-template-columns: repeat(4, 1fr);
+    min-height: 6rem;
+    padding: 0.75rem 0;
+    background: var(--linen);
+    border-radius: 1rem;
+  }
+
+  .planSummary > div:first-child {
+    display: none;
+  }
+
+  .planSummary > div {
+    align-items: center !important;
+    justify-content: center;
+    padding: 0.45rem;
+    text-align: center;
+  }
+
+  .planSummary > div:nth-child(2) {
+    border-left: 0;
+  }
+
+  .planSummary strong {
+    font-size: 1.1rem;
+  }
+
+  .planSummary small {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 520px) {
+  .mobileToolbar {
+    grid-template-columns: 3rem minmax(4.5rem, 1fr) 3rem 3rem minmax(7rem, 1.4fr);
+  }
+
+  .mobileToolbar .mobileAddButton {
+    grid-column: auto;
+    font-size: 0.78rem;
+  }
+
+  .mobileToolbar > button {
+    font-size: 0.72rem;
+  }
+
+  .mobileInsights {
+    grid-template-columns: minmax(0, 1.2fr) minmax(9.5rem, 1fr);
+  }
+
+  .mobileNutritionCard,
+  .mobilePantryCard {
+    min-height: 0;
+    padding: 0.8rem;
+  }
+
+  .mobilePantryCard:has(> .summaryEmpty) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .mobilePantryCard:has(> .summaryEmpty) button {
+    width: 100%;
+    min-height: 2.6rem;
+    white-space: normal;
+  }
+
+  .mobileSchedule section {
+    grid-template-columns: 6.6rem minmax(0, 1fr);
+  }
+
+  .mobileMealLabel {
+    align-items: center;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .mobileMealLabel strong {
+    font-size: 0.95rem;
+  }
+}
+
+@media print {
+  .insightsRail,
+  .mobilePlannerCommand,
+  .mobileDayHeader,
+  .mobileToolbar,
+  .mobileInsights,
+  .planSummary {
+    display: none !important;
+  }
+}
+
+/* Final cascade lock for the refined planner */
+.plannerHeading {
+  align-items: center;
+  width: auto;
+  max-width: none;
+  min-height: 4.5rem;
+  margin: 0.35rem -1.5rem 0;
+}
+
+.plannerHeading h1 {
+  font-size: clamp(2rem, 2.7vw, 2.55rem);
+  line-height: 1;
+}
+
+.plannerLayout {
+  grid-template-columns: 18rem minmax(0, 1fr) 17rem;
+  width: auto;
+  max-width: none;
+  height: min(52rem, calc(100dvh - 9.5rem));
+  min-height: 30rem;
+  margin-top: 1rem;
+  margin-right: -1.5rem;
+  margin-left: -1.5rem;
+}
+
+.setupPanel {
+  display: block;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: color-mix(in srgb, var(--leaf) 38%, var(--line)) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.setupPanel::-webkit-scrollbar {
+  width: 0.55rem;
+}
+
+.setupPanel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.setupPanel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--leaf) 38%, var(--line));
+  background-clip: padding-box;
+  border: 0.14rem solid transparent;
+  border-radius: 999px;
+}
+
+.setupPanel::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--leaf) 58%, var(--line));
+  background-clip: padding-box;
+}
+
+.setupHeading h2 {
+  padding: 1.25rem 1.2rem 0.55rem;
+  font-size: 1.45rem;
+}
+
+.setupStep,
+.setupFooter {
+  padding-right: 1.2rem;
+  padding-left: 1.2rem;
+}
+
+.setupStep {
+  min-inline-size: 0;
+  border-right: 0;
+  border-left: 0;
+  box-shadow: none;
+}
+
+.setupStep + .setupStep {
+  border-left: 0;
+}
+
+.autoPlanAction > button {
+  width: 100%;
+  min-height: 2.7rem;
+  color: #fff;
+  background: var(--tomato);
+  border-color: var(--tomato);
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.autoPlanAction > button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--tomato-dark);
+  border-color: var(--tomato-dark);
+}
+
+.dateRangeField {
+  position: relative;
+  display: block;
+}
+
+.dateRangeVisual {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 2.9rem;
+  align-items: center;
+  padding: 0.65rem 0.8rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--linen) 96%, white);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dateRangeVisual > svg:first-child {
+  color: var(--leaf);
+}
+
+.dateRangeVisual > svg:last-child {
+  color: var(--muted);
+  transition: transform 160ms ease;
+}
+
+.dateRangeChevronOpen {
+  transform: rotate(180deg);
+}
+
+.dateRangeVisual:hover {
+  background: color-mix(in srgb, var(--leaf-pale) 34%, var(--field));
+  border-color: color-mix(in srgb, var(--leaf) 48%, var(--line));
+}
+
+.dateRangeVisual:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--leaf) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.dateRangePicker {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.55rem;
+  padding: 0.75rem;
+  background: var(--field);
+  border: 1px solid color-mix(in srgb, var(--leaf) 34%, var(--line));
+  border-radius: 0.65rem;
+  box-shadow: 0 0.65rem 1.5rem rgb(24 38 25 / 9%);
+}
+
+.dateRangePicker label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.dateRangePicker input {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.55rem 0.65rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--linen) 94%, white);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.dateRangePicker input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--leaf) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.dateRangePickerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.dateRangePickerFooter button {
+  min-height: 2.25rem;
+  padding: 0.45rem 0.85rem;
+  color: var(--on-selection);
+  background: var(--selection-surface);
+  border: 1px solid var(--selection-surface);
+  border-radius: 0.5rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profileRemove {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.setupFooter > .setupHint:last-child {
+  display: block;
+  overflow: visible;
+  line-height: 1.4;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+@media (min-width: 901px) {
+  .setupPanel {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background: color-mix(in srgb, var(--linen) 96%, white);
+  }
+
+  .setupHeading {
+    flex: 0 0 auto;
+  }
+
+  .setupHeading h2 {
+    padding: 1.55rem 1.25rem 1rem;
+    color: var(--leaf-dark);
+    font-size: 1.75rem;
+    line-height: 1;
+  }
+
+  .setupStep {
+    flex: 0 0 auto;
+    gap: 0.85rem;
+    min-inline-size: 0;
+    margin: 0 1.2rem;
+    padding: 1rem 0 1.15rem;
+    border: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+    box-shadow: none;
+  }
+
+  .setupStep legend {
+    gap: 0.7rem;
+    padding-top: 1rem;
+    color: var(--ink);
+    font-size: 0.88rem;
+    font-weight: 500;
+  }
+
+  .setupStep legend > span {
+    width: 1.45rem;
+    height: 1.45rem;
+    color: var(--leaf-dark);
+    background: var(--leaf-pale);
+    font-size: 0.75rem;
+    opacity: 1;
+  }
+
+  .dateRangeVisual {
+    min-height: 3rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .durationField > div {
+    border-radius: 0.65rem;
+  }
+
+  .durationField label > span {
+    min-height: 2.75rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+
+  .mealChoiceActions {
+    gap: 0.45rem;
+    margin-top: -2.05rem;
+  }
+
+  .mealChoiceActions button {
+    min-height: 1.8rem;
+    font-size: 0.69rem;
+    font-weight: 500;
+  }
+
+  .mealChoices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .mealChoices label {
+    min-height: 2.65rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+
+  .mealChoices label:has(input:checked) {
+    background: color-mix(in srgb, var(--leaf-pale) 44%, var(--field));
+    border-color: color-mix(in srgb, var(--leaf) 76%, var(--line));
+  }
+
+  .mealChoices .checkMark {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .profileChoiceWrap {
+    gap: 0.7rem;
+  }
+
+  .profileChoices label {
+    min-height: 2.85rem;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.65rem;
+    font-weight: 500;
+  }
+
+  .profileAvatar {
+    width: 1.7rem;
+    height: 1.7rem;
+    font-weight: 500;
+  }
+
+  .manageMembersButton {
+    min-width: 2.85rem;
+    min-height: 2.85rem;
+    border-radius: 0.65rem;
+  }
+
+  .setupFooter {
+    position: sticky;
+    z-index: 2;
+    bottom: 0;
+    flex: 0 0 auto;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding: 1.1rem 1.2rem 1.25rem;
+    background: color-mix(in srgb, var(--linen) 97%, white);
+    border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    box-shadow: 0 -0.75rem 1.25rem color-mix(in srgb, var(--linen) 88%, transparent);
+  }
+
+  .autoPlanAction > button {
+    min-height: 3.35rem;
+    border-radius: 0.65rem;
+    font-size: 0.9rem;
+  }
+
+  .setupFooter > .setupHint:last-child {
+    display: block;
+    overflow: visible;
+    color: color-mix(in srgb, var(--ink) 58%, var(--muted));
+    font-size: 0.82rem;
+    line-height: 1.45;
+    text-align: center;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
+.weekPlan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+  padding: 1rem 0.75rem 0.75rem;
+  overflow: hidden;
+}
+
+.weekHeader {
+  display: grid;
+  grid-template-columns: minmax(12.5rem, 1fr) auto;
+  align-items: center;
+}
+
+.weekHeader h2 {
+  font-size: 1.65rem;
+}
+
+.emptyPlan {
+  display: flex;
+}
+
+.emptySlot::after {
+  content: none;
+}
+
+.emptySlot span {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.emptySlot:hover span,
+.emptySlot:focus-visible span {
+  max-height: 1rem;
+  opacity: 1;
+}
+
+.desktopSchedule {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 5.7rem repeat(var(--planner-columns, 7), minmax(0, 1fr));
+  grid-template-rows: 4.25rem;
+  grid-auto-rows: minmax(3rem, 1fr);
+  min-height: 0;
+}
+
+.monthSchedule {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: minmax(6.4rem, 1fr);
+  min-height: 0;
+  background: color-mix(in srgb, var(--line) 52%, transparent);
+  gap: 1px;
+}
+
+.monthWeekday {
+  display: grid;
+  min-height: 2.35rem;
+  place-items: center;
+  color: var(--muted);
+  background: var(--field);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.monthBlankDay,
+.monthDay {
+  min-width: 0;
+  background: color-mix(in srgb, var(--linen) 97%, white);
+}
+
+.monthBlankDay {
+  opacity: 0.55;
+}
+
+.monthDay {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.35rem;
+  padding: 0.45rem;
+}
+
+.monthDay > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.monthDay > header button {
+  display: grid;
+  min-width: 1.85rem;
+  min-height: 1.85rem;
+  place-items: center;
+  padding: 0.2rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font: inherit;
+  cursor: pointer;
+}
+
+.monthDay > header button:hover,
+.monthDay > header button:focus-visible {
+  background: var(--leaf-pale);
+}
+
+.currentMonthDay > header button:first-child {
+  color: var(--on-selection);
+  background: var(--selection-surface);
+}
+
+.monthDay > div {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.monthDay > div button {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+  padding: 0.28rem 0.35rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--leaf-pale) 58%, var(--field));
+  border: 0;
+  border-left: 2px solid var(--leaf);
+  border-radius: 0.28rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.monthDay > div button span,
+.monthDay > div button strong,
+.monthDay > div small {
+  overflow: hidden;
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monthDay > div button span,
+.monthDay > div small {
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 400;
+}
+
+/* Planner interaction refinements */
+.setupStep {
+  position: relative;
+}
+
+.dateRangePicker {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  left: 0;
+  margin-top: 0;
+  max-height: min(32rem, calc(100vh - 12rem));
+  overflow-y: auto;
+}
+
+.dateRangeQuickActions {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.dateRangeQuickActions > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.dateRangeQuickActions > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.dateRangeQuickActions button {
+  min-height: 2.35rem;
+  padding: 0.35rem 0.2rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--linen) 94%, white);
+  border: 0;
+  font: inherit;
+  font-size: 0.69rem;
+  cursor: pointer;
+}
+
+.dateRangeQuickActions button + button {
+  border-left: 1px solid var(--line);
+}
+
+.dateRangeQuickActions button:hover,
+.dateRangeQuickActions button:focus-visible {
+  background: var(--leaf-pale);
+}
+
+.setupStep legend > .stepTitle {
+  display: inline;
+  width: auto;
+  height: auto;
+  color: inherit;
+  background: transparent;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.legendAction {
+  min-height: 2rem;
+  margin-left: auto;
+  padding: 0.25rem 0;
+  color: var(--leaf-dark);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.legendAction:hover,
+.legendAction:focus-visible {
+  color: var(--leaf);
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.mealTypeSettings {
+  position: absolute;
+  z-index: 28;
+  top: 3.45rem;
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 0.75rem;
+  max-height: min(35rem, calc(100vh - 10rem));
+  padding: 0.85rem;
+  overflow-y: auto;
+  background: var(--field);
+  border: 1px solid color-mix(in srgb, var(--leaf) 34%, var(--line));
+  border-radius: 0.7rem;
+  box-shadow: 0 0.85rem 2rem rgb(24 38 25 / 14%);
+}
+
+.mealTypeSettingsHeader,
+.mealTypeSettingsHeader > div {
+  display: flex;
+}
+
+.mealTypeSettingsHeader {
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.mealTypeSettingsHeader > div {
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.mealTypeSettingsHeader strong {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.mealTypeSettingsHeader span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.mealTypeSettingsHeader > button,
+.mealTypeOptionList label > button {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 2rem;
+  min-height: 2rem;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.mealTypeOptionList {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.mealTypeOptionList > label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.45rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.mealTypeOptionList > label:hover {
+  background: color-mix(in srgb, var(--leaf-pale) 36%, transparent);
+}
+
+.mealTypeOptionList > label > span {
+  display: grid;
+  gap: 0.05rem;
+}
+
+.mealTypeOptionList strong {
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.mealTypeOptionList small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.mealTypeOptionList input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--leaf);
+}
+
+.customMealTypeForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: end;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+}
+
+.customMealTypeForm label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.customMealTypeForm input {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.55rem;
+  color: var(--ink);
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  font: inherit;
+}
+
+.customMealTypeForm button,
+.mealTypeSaveButton {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.7rem;
+  color: var(--on-selection);
+  background: var(--selection-surface);
+  border: 1px solid var(--selection-surface);
+  border-radius: 0.45rem;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.mealTypeSaveButton {
+  width: 100%;
+}
+
+.historyControls {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+}
+
+.historyControls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.72rem;
+  color: var(--label);
+  background: color-mix(in srgb, var(--linen) 90%, transparent);
+  border: 0;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.historyControls button + button {
+  border-left: 1px solid var(--line);
+}
+
+.historyControls button:hover:not(:disabled),
+.historyControls button:focus-visible,
+.weekNavigation button:hover,
+.viewModeControl:focus-within {
+  color: var(--leaf-dark);
+  background: var(--leaf-pale);
+}
+
+.historyControls button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.viewModeControl {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: stretch;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+.viewModeControl button {
+  min-width: 3.45rem;
+  padding: 0.55rem 0.65rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--linen) 90%, transparent);
+  border: 0;
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.viewModeControl button + button {
+  border-left: 1px solid var(--line);
+}
+
+.viewModeControl button[aria-pressed='true'] {
+  color: var(--on-selection);
+  background: var(--selection-surface);
+}
+
+@media (max-width: 1120px) {
+  .viewModeControl button {
+    min-width: 2.9rem;
+    padding-right: 0.42rem;
+    padding-left: 0.42rem;
+    font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 1300px) {
+  .weekHeader h2 {
+    font-size: 1.45rem;
+  }
+
+  .historyControls button,
+  .weekNavigation > button {
+    min-width: 2.75rem;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+  }
+
+  .historyControls button span,
+  .weekNavigation > button span {
+    display: none;
+  }
+}
+
+.scheduleCorner,
+.dayHeading,
+.mealHeading,
+.scheduleSlot {
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.scheduleCorner,
+.dayHeading {
+  border-bottom: 1px solid var(--line);
+}
+
+.dayHeading {
+  min-height: 4.25rem;
+}
+
+.mealHeading,
+.scheduleSlot {
+  min-height: 0;
+}
+
+.planSummary {
+  grid-template-columns: 1.65fr repeat(3, 1fr);
+  min-height: 3.7rem;
+  padding: 0;
+}
+
+.insightsRail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.railGroceryButton {
+  width: 100%;
+  margin-top: auto;
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.selectorDialog {
+  inset: 0 0 0 auto;
+  width: min(42rem, 100vw);
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  border-width: 0 0 0 1px;
+  border-radius: 1rem 0 0 1rem;
+}
+
+.recipeResults {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assignmentSlots {
+  display: flex;
+  overflow-x: auto;
+}
+
+@media (max-width: 1400px) {
+  .plannerLayout {
+    grid-template-columns: 14.5rem minmax(0, 1fr) 15.5rem;
+  }
+}
+
+@media (max-width: 1100px) {
+  .plannerLayout {
+    grid-template-columns: 13.75rem minmax(0, 1fr);
+  }
+
+  .insightsRail {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .plannerHeading {
+    display: none;
+  }
+
+  .plannerLayout {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+  }
+
+  .setupPanel,
+  .weekHeader,
+  .desktopSchedule,
+  .monthSchedule,
+  .insightsRail {
+    display: none;
+  }
+
+  .setupPanel.mobileSetupOpen {
+    display: block;
+  }
+
+  .weekPlan {
+    display: grid;
+    grid-template-rows: none;
+    gap: 1rem;
+    min-height: 0;
+    padding: 1.5rem 0 2rem;
+    overflow: visible;
+    border: 0;
+  }
+
+  .mobilePlannerCommand,
+  .mobileDayHeader,
+  .mobileToolbar,
+  .mobileInsights,
+  .mobileSchedule {
+    display: grid;
+  }
+
+  .emptyPlan {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .emptyMobileMeal {
+    grid-template-columns: 1fr !important;
+  }
+
+  .emptyMobileMeal .mobileMealLabel {
+    padding: 0.25rem 0 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .emptyMobileMeal .mobileMealContent {
+    min-height: 5.5rem;
+    padding: 0.75rem 0 0;
+  }
+
+  .planSummary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .planSummary > div:first-child {
+    display: none;
+  }
+
+  .selectorDialog {
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .mobilePlannerCommand {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--linen);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 12px 30px rgb(52 42 31 / 5%);
+  }
+
+  .mobilePlannerPeriod {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .mobilePlannerPeriod .mobileDateBadge {
+    grid-row: auto;
+    min-height: 4.5rem;
+    border-radius: 0.85rem;
+  }
+
+  .mobilePlannerPeriod .mobileDateBadge span {
+    font-size: 0.72rem;
+  }
+
+  .mobilePlannerPeriod .mobileDateBadge strong {
+    font-size: 2rem;
+  }
+
+  .mobilePeriodControls {
+    display: grid;
+    grid-template-rows: 2.25rem minmax(2.25rem, 1fr);
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .mobileViewModeControl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+  }
+
+  .mobileViewModeControl button {
+    min-width: 0;
+    padding: 0.35rem;
+    color: var(--label);
+    background: transparent;
+    border: 0;
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+
+  .mobileViewModeControl button + button {
+    border-left: 1px solid var(--line);
+  }
+
+  .mobileViewModeControl button[aria-pressed='true'] {
+    color: var(--leaf-dark);
+    background: var(--leaf-pale);
+  }
+
+  .mobilePeriodNavigation {
+    display: grid;
+    grid-template-columns: 2.35rem minmax(0, 1fr) 2.35rem;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+  }
+
+  .mobilePeriodNavigation button {
+    display: grid;
+    height: 100%;
+    min-height: 2.25rem;
+    place-items: center;
+    padding: 0;
+    color: var(--leaf-dark);
+    background: transparent;
+    border: 0;
+  }
+
+  .mobilePeriodNavigation button:first-child {
+    border-right: 1px solid var(--line);
+  }
+
+  .mobilePeriodNavigation button:last-child {
+    border-left: 1px solid var(--line);
+  }
+
+  .mobilePeriodNavigation > span {
+    overflow: hidden;
+    padding: 0 0.4rem;
+    color: var(--muted);
+    font-size: 0.68rem;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileCommandActions {
+    display: grid;
+    grid-template-columns: auto 2.65rem minmax(5.8rem, 0.8fr) minmax(7.5rem, 1.2fr);
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .mobileCommandActions .mobileHistoryControls {
+    display: flex;
+    grid-column: auto;
+    gap: 0.35rem;
+    justify-content: flex-start;
+  }
+
+  .mobileCommandActions .mobileHistoryControls button,
+  .mobileCommandActions > button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 0;
+    min-height: 2.65rem;
+    padding: 0.4rem;
+    color: var(--label);
+    background: color-mix(in srgb, var(--linen) 88%, var(--leaf-pale));
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+
+  .mobileCommandActions .mobileHistoryControls button {
+    width: 2.65rem;
+  }
+
+  .mobileCommandActions button:focus-visible,
+  .mobileCommandActions button:hover:not(:disabled),
+  .mobilePeriodNavigation button:focus-visible,
+  .mobilePeriodNavigation button:hover,
+  .mobileViewModeControl button:focus-visible,
+  .mobileViewModeControl button:hover {
+    color: var(--leaf-dark);
+    background: var(--leaf-pale);
+    outline: 2px solid color-mix(in srgb, var(--leaf) 42%, transparent);
+    outline-offset: -2px;
+  }
+
+  .mobileCommandActions .mobileNutritionAction {
+    gap: 0.35rem;
+  }
+
+  .mobileCommandActions .mobileNutritionAction[aria-expanded='true'] {
+    color: var(--leaf-dark);
+    background: var(--leaf-pale);
+    border-color: color-mix(in srgb, var(--leaf) 42%, var(--line));
+  }
+
+  .mobileCommandActions .mobileAddButton {
+    gap: 0.35rem;
+    color: white;
+    background: var(--tomato);
+    border-color: var(--tomato);
+  }
+
+  .mobileCommandActions .mobileAddButton:hover,
+  .mobileCommandActions .mobileAddButton:focus-visible {
+    color: white;
+    background: color-mix(in srgb, var(--tomato) 88%, black);
+  }
+}
+
+@media (max-width: 520px) {
+  .mobilePlannerCommand {
+    gap: 0.65rem;
+    padding: 0.65rem;
+  }
+
+  .mobilePlannerPeriod {
+    grid-template-columns: 4.1rem minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .mobilePlannerPeriod .mobileDateBadge {
+    min-height: 4.1rem;
+  }
+
+  .mobilePeriodNavigation > span {
+    font-size: 0.62rem;
+  }
+
+  .mobileCommandActions {
+    grid-template-columns: auto 2.45rem 2.45rem minmax(6.8rem, 1fr);
+    gap: 0.32rem;
+  }
+
+  .mobileCommandActions .mobileHistoryControls {
+    gap: 0.28rem;
+  }
+
+  .mobileCommandActions .mobileHistoryControls button,
+  .mobileCommandActions > button {
+    min-height: 2.45rem;
+  }
+
+  .mobileCommandActions .mobileHistoryControls button {
+    width: 2.35rem;
+  }
+
+  .mobileCommandActions .mobileNutritionAction span {
+    display: none;
+  }
+}

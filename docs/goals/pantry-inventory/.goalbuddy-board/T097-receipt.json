@@ -1,0 +1,11 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done", "task_id": "T097", "board_path": "docs/goals/pantry-inventory/state.yaml", "decision": "approved", "full_outcome_complete": false,
+    "rationale": "Accessible-name compatibility: combine ordinal, ingredient-specific, and visible quantity label phrases; also proactively combine old/new confirmation button phrases. Preserve visible text and all behavior, avoiding another protected-oracle loop.",
+    "worker_package": {"objective": "Change only two CookingMode aria-labels, then run focused/type/build, cooking/workflow E2Es, disposable DB, final integrity; retain exact-hash grocery/recipe passes.", "allowed_files": ["src/components/cooking-mode.tsx"], "verify": ["Require T097 hashes and two-attribute diff.", "Run scoped format/lint, focused unit, typecheck, isolated build.", "Run unchanged cooking and workflow E2Es independently.", "Run disposable DB and final live PID/port/hash/diff/status integrity."], "stop_if": ["Hashes differ or names omit visible/old/new phrases.", "Any behavior/text/CSS/test change or E2E failure.", "Live/shared/protected/unrelated state touched."]},
+    "evidence": ["Workflow failure is only old quantity name.", "New cooking locator uses ingredient name.", "Next old/new confirmation names also differ.", "Combined names satisfy label-in-name."],
+    "subgoal_contract": null, "parallel_safety": {"safe": false, "rationale": "One naming contract and two serial oracles."},
+    "blocked_tasks": ["T999"], "missing_evidence": ["Cooking/workflow/build/database/integrity", "Final audit"],
+    "required_board_updates": ["Record T097 done.", "Activate component Worker.", "Retain exact-hash grocery/recipe passes.", "Require final Judge."]
+  }
+}

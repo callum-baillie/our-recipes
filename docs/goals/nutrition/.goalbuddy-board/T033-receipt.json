@@ -1,0 +1,15 @@
+{
+  "result": "done",
+  "decision": "rejected",
+  "task_id": "T033",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T033-insights-comparison-review.md"],
+  "commands": [{ "cmd": "read-only privacy, goal-quality, timezone, normalization, API and communication audit", "status": "pass" }],
+  "summary": "Rejected calculation readiness: privacy, normalization shape and non-clinical communication pass, but active insights use global rather than nutrient-specific completeness and comparison/page day buckets use UTC instead of profile diary timezones.",
+  "note": "notes/T033-insights-comparison-review.md",
+  "deviations": ["The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."],
+  "remaining_blockers": ["Use nutrient-specific completeness and profile-local date buckets consistently."],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

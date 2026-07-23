@@ -1,0 +1,39 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T022",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "T021 closes the final intake race. Late old completions are stale and valueless and return before UI mutation; matching success alone rotates the key. Controlled promises prove concurrency, rotation, and late suppression. All prior Pantry milestone boundaries remain intact. Build and rendered acceptance remain unverified.",
+    "worker_package": {
+      "objective": "Run complete isolated final Pantry verification with one focused rendered workflow test, full gates, production build, accessibility, screenshots, and disposable migrations without touching live .next or the normal database.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": [
+        "pnpm exec prettier --check tests/e2e/pantry-workflow.spec.ts",
+        "Create secret-free isolated mirror",
+        "Run full format, lint, type, tests, OpenAPI, and build in mirror",
+        "Run focused Playwright workflow on port 3100",
+        "Run disposable db:migrate and db:check",
+        "git diff --check"
+      ],
+      "stop_if": [
+        "Isolation, port, or secret/data exclusion cannot be proven.",
+        "Product source or existing files must change.",
+        "Live provider, Docker, device, or backup mutation would occur.",
+        "Any final verification gate fails twice."
+      ]
+    },
+    "evidence": [
+      "Late old-key results are stale and cannot update any current intake UI state.",
+      "Focused and full safe gates pass with 163 unit and 78 integration tests.",
+      "Prior provenance, obsolete cleanup, atomic transactions, uncertainty, FEFO, attribution, origins, migrations, recipe text, and dirty-work boundaries remain intact."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "Final verification uses one mirror, database, port, and evidence directory." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Isolated full gates and build", "Rendered desktop/mobile workflow and accessibility", "Disposable migration/database checks", "Final oracle"],
+    "required_board_updates": ["Mark T022 approved.", "Activate T023 Worker.", "Activate T999 only after T023."
+    ]
+  }
+}

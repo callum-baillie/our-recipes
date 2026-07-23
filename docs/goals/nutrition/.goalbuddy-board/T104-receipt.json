@@ -1,0 +1,26 @@
+{
+  "result": "done",
+  "task_id": "T104",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T104-weight-trend-map.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only profile permission/settings, measurement schema/service/API/test and Trends chart map",
+      "status": "pass"
+    }
+  ],
+  "summary": "Mapped a three-query opt-in measurement-authorized weight trend with separately protected target, daily smoothing and safe axis semantics.",
+  "note": "notes/T104-weight-trend-map.md",
+  "deviations": [
+    "The exact GoalBuddy Scout exceeded the single-wait limit and was interrupted; the PM completed the same read-only map as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must approve the measurement/profile authorization split, smoothing and safe-axis formula before implementation.",
+    "Card/planner preferences, household analysis, offline/performance documentation and rendered final evidence remain later tasks."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

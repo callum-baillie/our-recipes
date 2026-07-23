@@ -1,0 +1,27 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T109",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T109-card-preference-review.md"
+  ],
+  "commands": [
+    {
+      "cmd": "read-only preference schema, signed selection, compact presentation and batch-query review",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved additive surface preferences and fixed-query recipe-library presentation, incorporating the missing carbohydrate/fat presentation repair and deferring planner rendering.",
+  "note": "notes/T109-card-preference-review.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit and was interrupted; the PM performed the same review as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "The approved preference and bounded recipe-library slice must be delivered and audited.",
+    "Planner preview rendering/projection performance, household analysis/charts, documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

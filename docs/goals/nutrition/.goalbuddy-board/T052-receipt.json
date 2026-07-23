@@ -1,0 +1,40 @@
+{
+  "result": "done",
+  "task_id": "T052",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "drizzle/0021_nutrition_prepared_consumption.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/db/schema.ts",
+    "src/lib/domain/nutrition-prepared-consumption.ts",
+    "src/lib/services/nutrition-intake-service.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/lib/services/nutrition-prepared-consumption-service.ts",
+    "src/app/api/v1/nutrition/_shared.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/route.ts",
+    "src/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/[preparedId]/consume/route.ts",
+    "tests/unit/nutrition-prepared-consumption.test.ts",
+    "tests/integration/nutrition-prepared-consumption-service.test.ts",
+    "tests/integration/nutrition-prepared-consumption-api.test.ts"
+  ],
+  "commands": [
+    { "cmd": "focused prepared command unit tests", "status": "pass", "summary": "2 tests passed" },
+    { "cmd": "focused prepared service and API integration tests", "status": "pass", "summary": "5 tests passed" },
+    { "cmd": "combined prepared, intake and foundation integration tests", "status": "pass", "summary": "15 tests passed" },
+    { "cmd": "fresh pnpm db:migrate through 0021", "status": "pass" },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "170 unit and 87 integration tests passed" },
+    { "cmd": "focused Prettier and scoped diff checks", "status": "pass" }
+  ],
+  "summary": "Delivered immutable prepared snapshots and a trusted idempotent atomic actual-yield-scaled recipe intake plus eaten-allocation command with fresh migration and full gates passing.",
+  "note": "notes/T052-prepared-consumption-persistence.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "Prepared serving allocation currently requires a planned-meal or completed-cook link; unplanned recipes remain loggable through the existing dedicated recipe Food Diary route."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

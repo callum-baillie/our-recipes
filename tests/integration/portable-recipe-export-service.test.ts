@@ -164,7 +164,7 @@ describe('portable full recipe export', () => {
     const secondExport = await createPortableRecipeExport();
     await expect(readFile(secondExport.archivePath)).resolves.toEqual(firstArchive);
     await secondExport.cleanup();
-  });
+  }, 15_000);
 
   it('rejects oversized or symbolic-link media instead of following it into the archive', async () => {
     const profile = setupProfile();

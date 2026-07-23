@@ -1,0 +1,108 @@
+.panel {
+  padding: clamp(1.15rem, 3vw, 1.8rem);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 28px rgb(65 53 39 / 8%);
+}
+
+.panel h2,
+.panel h3 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.panel > header p,
+.batches header p,
+.empty {
+  color: var(--muted);
+}
+
+.batches {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.batches > li {
+  padding: 1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.batches > li > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.batches > li > header span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.allocations,
+.newPortion {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.allocations article,
+.allocations form,
+.newPortion form {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.allocations article > form {
+  padding: 0.7rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.allocations label,
+.newPortion label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--label);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.warning {
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--tomato) 8%, var(--paper));
+  border-left: 3px solid var(--tomato);
+}
+
+.confirmed {
+  color: var(--leaf-dark);
+  font-weight: 800;
+}
+
+.status {
+  min-height: 1.4rem;
+  color: var(--tomato-dark);
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .allocations,
+  .newPortion {
+    grid-template-columns: 1fr;
+  }
+
+  .batches > li > header {
+    display: grid;
+  }
+}

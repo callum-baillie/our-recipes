@@ -1,19 +1,21 @@
 services:
-  our-recipes:
-    image: ghcr.io/callum-baillie/our-recipes:latest
-    container_name: our-recipes
+  bord:
+    image: ghcr.io/callum-baillie/bord:latest
+    container_name: bord
     restart: unless-stopped
     ports:
       - '3000:3000'
     environment:
       DATA_DIR: /data
-      DATABASE_URL: /data/our-recipes.db
-      APP_ORIGIN: http://recipes.lan:3000
+      DATABASE_URL: /data/bord.db
+      APP_ORIGIN: https://recipes.tower
       COOKIE_SECRET: replace-with-a-unique-secret-of-at-least-32-characters
       TZ: America/Los_Angeles
       HOMEPAGE_INTEGRATION_TOKEN: ${HOMEPAGE_INTEGRATION_TOKEN:-}
       BACKUP_INTERVAL_HOURS: 24
       BACKUP_RETENTION_DAYS: 30
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPEN_FOOD_FACTS_ENABLED: ${OPEN_FOOD_FACTS_ENABLED:-true}
+      USDA_FDC_API_KEY: ${USDA_FDC_API_KEY:-}
     volumes:
-      - /mnt/user/appdata/our-recipes:/data
+      - /mnt/user/appdata/bord:/data

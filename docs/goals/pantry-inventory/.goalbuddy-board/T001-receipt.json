@@ -1,0 +1,31 @@
+{
+  "result": "done",
+  "task_id": "T001",
+  "board_path": "C:\\Users\\Callum\\Documents\\Recipe\\docs\\goals\\pantry-inventory\\state.yaml",
+  "decision": "approved",
+  "full_outcome_complete": false,
+  "rationale": "The supplied brief is a coherent existing plan with an observable end-to-end oracle. It is approved for continuous execution, but implementation scope must remain evidence-dependent. A read-only Scout must first map current schema, household and ActorContext seams, ingredient and unit behavior, planner and grocery calculations, APIs, UI patterns, tests, dirty state, and baseline gates. Required Judge boundaries are architecture selection, migration and data integrity, cross-feature calculation correctness, UX integration, and final acceptance. Planning or isolated Pantry CRUD cannot satisfy the outcome.",
+  "worker_package": null,
+  "evidence": [
+    "C:/Users/Callum/.codex/attachments/8d30c889-30e5-4301-b697-89f6bba4abc8/pasted-text-1.txt",
+    "docs/goals/pantry-inventory/goal.md",
+    "docs/goals/pantry-inventory/notes/T001-plan-validation.md",
+    "AGENTS.md"
+  ],
+  "subgoal_contract": null,
+  "parallel_safety": {
+    "safe": false,
+    "rationale": "The next task is one read-only architecture map; write parallelism is neither needed nor authorized."
+  },
+  "blocked_tasks": [],
+  "missing_evidence": [
+    "Repository architecture and baseline gate map",
+    "Implementation, migration, rendered workflow, and full-oracle verification evidence"
+  ],
+  "required_board_updates": [
+    "Mark T001 done with this receipt and note.",
+    "Activate T002 exactly as the read-only repository mapping package already queued.",
+    "Keep T003 as the architecture-boundary Judge and do not populate T004 allowed_files until T003 approves a Worker package."
+  ],
+  "note": "notes/T001-plan-validation.md"
+}

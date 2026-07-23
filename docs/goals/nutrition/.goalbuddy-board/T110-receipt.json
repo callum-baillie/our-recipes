@@ -1,0 +1,62 @@
+{
+  "result": "done",
+  "task_id": "T110",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "drizzle/0026_nutrition_surface_preferences.sql",
+    "drizzle/meta/_journal.json",
+    "src/lib/db/schema.ts",
+    "src/lib/domain/nutrition-profile.ts",
+    "src/lib/domain/recipe.ts",
+    "src/lib/domain/nutrition-recipe-presentation.ts",
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/app/nutrition/page.tsx",
+    "src/app/recipes/page.tsx",
+    "src/components/recipe-library-filters.tsx",
+    "src/components/nutrition-profile-settings.tsx",
+    "tests/unit/nutrition-profile.test.ts",
+    "tests/unit/recipe-schema.test.ts",
+    "tests/unit/nutrition-recipe-presentation.test.ts",
+    "tests/unit/nutrition-components.test.ts",
+    "tests/integration/nutrition-profile-service.test.ts",
+    "tests/integration/nutrition-recipe-calculation-service.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused profile, schema, presentation, component and service tests",
+      "status": "pass",
+      "summary": "51 tests passed"
+    },
+    {
+      "cmd": "101-recipe batch query-count regression",
+      "status": "pass",
+      "summary": "one prepared statement with stale and unavailable projections"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "223 unit and 125 integration tests passed"
+    },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "focused Prettier and scoped allowed-file checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with the existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Persisted card/planner surface preferences and delivered a separately signed, one-query recipe-library Nutrition projection with all six factual compact fields.",
+  "note": "notes/T110-card-preference-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "A Judge must audit migration round-trip, signed profile selection, batch equivalence and compact-card semantics.",
+    "Planner preview/bounded projection, household analysis/charts, documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

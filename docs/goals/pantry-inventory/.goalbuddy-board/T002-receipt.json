@@ -1,0 +1,54 @@
+{
+  "result": "done",
+  "task_id": "T002",
+  "board_path": "C:\\Users\\Callum\\Documents\\Recipe\\docs\\goals\\pantry-inventory\\state.yaml",
+  "summary": "Mapped the full Pantry-relevant architecture. The app is a single-household Next/SQLite service architecture with structured but non-canonical recipe ingredients, dimension-limited scaling helpers, server-side meal planning, snapshot shopping lists, and profile-specific cook sessions. No product, batch, location, event, mapping, allocation, override, purchase-intake, or deduction layer exists. Lint, types, 50 unit tests, 30 integration tests, OpenAPI, and build pass; checkout-wide Prettier is pre-existing Windows noise. The recommended first slice is an additive, event-backed Pantry vertical slice with optimistic batch versioning, trusted APIs, native UI, tests, and docs.",
+  "evidence": [
+    "docs/goals/pantry-inventory/notes/T002-repository-map.md",
+    "src/lib/db/schema.ts",
+    "src/lib/db/client.ts",
+    "src/lib/actor-context.ts",
+    "src/lib/http.ts",
+    "src/lib/domain/ingredient-scaling.ts",
+    "src/lib/domain/planning.ts",
+    "src/lib/services/planning-service.ts",
+    "src/lib/services/cooking-service.ts",
+    "src/components/app-header.tsx",
+    "src/components/meal-planner.tsx",
+    "src/components/shopping-list-editor.tsx",
+    "tests/integration/household-service.test.ts",
+    "tests/e2e/setup.spec.ts",
+    "docs/architecture.md",
+    "docs/data-model.md",
+    "docs/security.md",
+    "docs/testing.md"
+  ],
+  "facts": [
+    "One physical database represents one household; profiles are signed attribution preferences, not access control.",
+    "Recipe ingredients preserve structured quantity/unit/item/note but have no canonical identity or optional flag.",
+    "Generated shopping lists aggregate exact raw unit/item/note keys into independent editable snapshots and retain only source recipe IDs.",
+    "Cook completion has no planned-meal link or inventory transaction.",
+    "The UI uses server components plus local React state/fetch, shared plain CSS primitives, and no global client state library.",
+    "Current green gates: lint, typecheck, 50 unit tests, 30 integration tests, OpenAPI valid with warnings, and production build."
+  ],
+  "contradictions": [
+    "pnpm verify is red only because checkout-wide Prettier reports 95 unchanged Windows-format files; formatting must be separated from Pantry-owned diffs.",
+    "The brief asks for household isolation, while repository architecture deliberately provides one trusted household per deployment rather than multi-tenant authorization."
+  ],
+  "ambiguity_requiring_judge": [
+    "Choose the exact boundary of the first inventory vertical slice, especially split/combine/donation/undo UI.",
+    "Decide whether singleton household ownership or explicit household_id best preserves current architecture.",
+    "Schedule planned-meal status and optional product images without deferring full acceptance."
+  ],
+  "commands": [
+    { "cmd": "git status --short", "status": "pass", "summary": "Only docs/goals/pantry-inventory is untracked." },
+    { "cmd": "pnpm verify", "status": "fail", "summary": "Stopped at pre-existing checkout-wide Prettier warnings across 95 unchanged files." },
+    { "cmd": "pnpm lint", "status": "pass" },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    { "cmd": "pnpm test", "status": "pass", "summary": "50 unit and 30 integration tests passed." },
+    { "cmd": "pnpm openapi:validate", "status": "pass", "summary": "Valid with eight existing warnings." },
+    { "cmd": "pnpm build", "status": "pass", "summary": "Production build passed with one existing backup NFT trace warning." }
+  ],
+  "note_needed": true,
+  "note": "notes/T002-repository-map.md"
+}

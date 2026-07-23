@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T026",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The Turbopack failure is specific to the mirror's external node_modules junction; webpack exposed five real pure-global CSS Module selectors in concurrent planner redesign work. A hash-guarded two-file repair is safe: localize the heading selectors and combine the new local class with the existing global class without changing declarations or behavior.",
+    "worker_package": {
+      "objective": "Perform the exact two-file planner heading purity repair, refresh only those files into the isolated mirror, then complete webpack build, planner and Pantry browser/accessibility/screenshots, disposable DB checks, port release, and diff evidence.",
+      "allowed_files": ["src/components/meal-planner.module.css", "src/app/planner/page.tsx"],
+      "verify": ["Hash guards", "Exact five-selector and one className repair", "Focused format/lint/type", "Isolated webpack build", "Planner and Pantry Playwright", "Disposable db:migrate/db:check", "Diff integrity"],
+      "stop_if": ["Hashes differ.", "Repair broadens beyond exact selectors/import/class.", "Mirror/port/disposable ownership fails.", "Build or browser fails twice.", "Live or shared state would be used."]
+    },
+    "evidence": [
+      "Webpack reports the first impure selector and the stylesheet contains five pure-global heading selectors.",
+      "The planner page retains the global planner-heading class and can safely add an exported local class.",
+      "Source and mirror hashes match for both files; Nutrition scope excludes planner files."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One repair then one mirror/port/database verification sequence." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Focused repair checks", "Webpack build", "Planner/Pantry rendered accessibility/screenshots", "Disposable DB checks", "Port release and diff integrity"],
+    "required_board_updates": ["Record T026 approved.", "Activate T027 Worker.", "Keep T999 queued until all gates pass."]
+  }
+}

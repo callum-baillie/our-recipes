@@ -1,0 +1,21 @@
+{
+  "result": "done",
+  "decision": "repair_required",
+  "task_id": "T071",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T071-preparation-calculation-judge.md"],
+  "commands": [
+    { "cmd": "read-only T070 food-science, immutability, portion and evidence audit", "status": "repair_required" }
+  ],
+  "summary": "Preparation core passes except for an unsupported confidence penalty and missing direct final-weight mass-invariance oracle.",
+  "note": "notes/T071-preparation-calculation-judge.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [
+    "Remove unsupported factor confidence penalty and prove final-weight mass invariance directly."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

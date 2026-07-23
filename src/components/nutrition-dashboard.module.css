@@ -1,0 +1,1550 @@
+.page {
+  width: min(100%, var(--content-width));
+  min-height: 70dvh;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 4.5rem) var(--page-gutter) 5rem;
+}
+
+.hero,
+.dashboardHeader {
+  margin-bottom: 2rem;
+}
+
+.hero {
+  max-width: 52rem;
+}
+
+.hero h1,
+.dashboardHeader h1 {
+  max-width: 18ch;
+  margin: 0.2rem 0 0.65rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  line-height: 1.02;
+}
+
+.hero p,
+.dashboardHeader p,
+.panel p {
+  line-height: 1.65;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--leaf);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme='light'])) .eyebrow {
+    color: var(--accent-text);
+  }
+}
+
+:global(html[data-theme='dark']) .eyebrow {
+  color: var(--accent-text);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.accessGrid,
+.twoColumn {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.panel,
+.metric {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 28px rgb(65 53 39 / 8%);
+}
+
+.panel {
+  padding: clamp(1.15rem, 3vw, 1.8rem);
+}
+
+.panel h2 {
+  margin: 0 0 0.6rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionHeading h2,
+.sectionHeading p {
+  margin-top: 0;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.form label,
+.headerActions label {
+  display: grid;
+  gap: 0.42rem;
+  color: var(--label);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.status {
+  min-height: 1.5rem;
+  margin: 1rem 0 0;
+  color: var(--tomato-dark);
+  font-weight: 700;
+}
+
+.dashboardHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.headerActions {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.headerActions select {
+  min-width: 12rem;
+}
+
+.secondaryButton {
+  min-height: 2.9rem;
+  padding: 0.65rem 0.9rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  font-weight: 800;
+}
+
+.dangerZone {
+  margin-top: 1.25rem;
+  border-color: color-mix(in srgb, var(--tomato) 55%, var(--line));
+}
+
+.dangerZone > summary {
+  cursor: pointer;
+  color: var(--tomato-dark);
+  font-weight: 900;
+}
+
+.dangerZone h2 {
+  margin-top: 1.25rem;
+}
+
+.dangerButton {
+  min-height: 2.9rem;
+  padding: 0.65rem 0.9rem;
+  color: white;
+  background: var(--tomato-dark);
+  border: 1px solid var(--tomato-dark);
+  border-radius: 0.4rem;
+  font-weight: 900;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 0 1.5rem;
+  padding: 0.35rem;
+  overflow-x: auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.7rem;
+  padding: 0.6rem 0.85rem;
+  white-space: nowrap;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.tabs a[aria-current='page'] {
+  color: white;
+  background: var(--tomato);
+}
+
+.stack {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.metric {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 1.2rem;
+}
+
+.metric > span,
+.nutrientGrid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metricLabel,
+.nutrientLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.metricLabel > span,
+.nutrientLabel > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.actionDisclosure {
+  align-content: start;
+}
+
+.actionDisclosure > summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.actionDisclosure[open] > summary {
+  margin-bottom: 1rem;
+}
+
+.metric strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.2rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.metric small,
+.nutrientGrid small {
+  color: var(--muted);
+}
+
+.callout {
+  padding: 0.9rem 1rem;
+  background: var(--paper);
+  border-left: 4px solid var(--leaf);
+  border-radius: 0.35rem;
+}
+
+.diaryList,
+.profileList,
+.goalList,
+.insightList {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diaryList li,
+.profileList li,
+.goalList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.diaryList div,
+.profileList li,
+.goalList li {
+  min-width: 0;
+}
+
+.diaryList span,
+.profileList span,
+.goalList span {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.insightList li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.insightList span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.recommendationList {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recommendationList > li {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.recommendationList header,
+.shortageList form,
+.feedbackActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.recommendationList h3,
+.recommendationList p {
+  margin: 0;
+}
+
+.recommendationList header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.shortageList {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.shortageList form {
+  padding: 0.65rem;
+  background: var(--field);
+  border-radius: 0.5rem;
+}
+
+.shortageList label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.feedbackActions {
+  justify-content: flex-start;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.comparisonList {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.comparisonList article {
+  padding: 0.9rem;
+  background: var(--paper);
+  border-radius: 0.55rem;
+}
+
+.comparisonList header,
+.comparisonList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.comparisonList header span,
+.comparisonList p {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.comparisonList ul {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comparisonList li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.84rem;
+}
+
+.nutrientGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.nutrientGrid article {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  background: var(--paper);
+  border-radius: 0.55rem;
+}
+
+.nutrientGrid strong {
+  font-size: 1.2rem;
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(2.5rem, 1fr));
+  gap: 0.65rem;
+  align-items: end;
+  height: 16rem;
+  margin: 2rem 0 1.5rem;
+  padding: 1rem;
+  background: var(--paper);
+  border-radius: 0.65rem;
+}
+
+.chart > div {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.4rem;
+  align-items: end;
+  height: 100%;
+  text-align: center;
+}
+
+.chart span,
+.chart time {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.chart i {
+  display: block;
+  width: min(100%, 2.4rem);
+  min-height: 0.25rem;
+  margin: 0 auto;
+  background: var(--tomato);
+  border: 2px solid var(--tomato-dark);
+  border-radius: 0.3rem 0.3rem 0 0;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dataTable caption {
+  padding: 0.6rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.dataTable th,
+.dataTable td {
+  padding: 0.65rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.disclaimer {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.disclaimer code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboardHeader {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 680px) {
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .tabs a {
+    justify-content: center;
+    min-width: 0;
+    padding-inline: 0.45rem;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .accessGrid,
+  .twoColumn,
+  .nutrientGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .metricGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .headerActions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chart {
+    gap: 0.3rem;
+    padding: 0.65rem 0.35rem;
+  }
+
+  .chart span {
+    writing-mode: vertical-rl;
+    justify-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mockup-aligned overview */
+.page {
+  width: min(100%, 94rem);
+  overflow-x: clip;
+  padding-top: clamp(2rem, 3vw, 3rem);
+}
+
+.dashboardHeader {
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.dashboardHeader h1 {
+  max-width: none;
+  font-size: clamp(3rem, 4vw, 3.6rem);
+  letter-spacing: -0.035em;
+}
+
+.dashboardHeader p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.headerTools {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0.6rem;
+  justify-items: end;
+}
+
+.headerSelectors,
+.headerButtons {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.profileSelector,
+.dateSelector,
+.headerButtons a {
+  align-items: center;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 800;
+  min-height: 2.75rem;
+}
+
+.profileSelector {
+  position: relative;
+}
+
+.profileSelector > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.55rem;
+  list-style: none;
+  min-width: 9.5rem;
+  padding: 0.55rem 0.8rem;
+}
+
+.profileSelector > summary::-webkit-details-marker {
+  display: none;
+}
+
+.profileSelector > summary svg:last-child {
+  margin-left: auto;
+}
+
+.profileSelector > p {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  box-shadow: 0 16px 36px rgb(32 40 30 / 14%);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  padding: 0.75rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  width: 15rem;
+  z-index: 30;
+}
+
+.dateSelector {
+  gap: 0.6rem;
+  min-width: 13.5rem;
+  padding: 0.55rem 0.85rem;
+}
+
+.dateSelector svg:last-child {
+  margin-left: auto;
+}
+
+.headerButtons a {
+  gap: 0.45rem;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+}
+
+.headerButtons .primaryAction {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: var(--page);
+  min-width: 7.8rem;
+}
+
+.headerButtons .secondaryButton {
+  background: var(--field);
+  min-width: 7.7rem;
+}
+
+.tabs {
+  gap: 1.65rem;
+  margin-bottom: 0.7rem;
+  padding: 0 0.9rem;
+  background: var(--field);
+  border-radius: 0.65rem;
+}
+
+.tabs a {
+  border-radius: 0;
+  font-size: 0.875rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 0.1rem;
+  position: relative;
+}
+
+.tabs a[aria-current='page'] {
+  background: transparent;
+  color: var(--ink);
+}
+
+.tabs a[aria-current='page']::after {
+  background: var(--leaf);
+  bottom: 0;
+  content: '';
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.overview {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.overview .metricGrid {
+  gap: 0.75rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.overview .metric,
+.overview .panel {
+  background: var(--field);
+  border-radius: 0.65rem;
+  box-shadow: 0 5px 16px rgb(65 53 39 / 5%);
+}
+
+.overview .metric {
+  align-content: start;
+  gap: 0.35rem;
+  min-height: 6.5rem;
+  padding: 0.85rem;
+}
+
+.overview .metricLabel {
+  gap: 0.55rem;
+}
+
+.overview .metricLabel > span {
+  color: var(--ink);
+  font-size: 0.875rem;
+  text-transform: none;
+}
+
+.overview .metricLabel > :first-child {
+  width: 2.35rem;
+  height: 2.35rem;
+}
+
+.metricValue {
+  align-items: baseline;
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 0 2.8rem !important;
+}
+
+.metricValue strong {
+  font-family: inherit;
+  font-size: 1.9rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.metricValue span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.overview .metric > small {
+  margin-left: 2.8rem;
+  font-size: 0.8rem;
+}
+
+.macroMetric {
+  min-width: 0;
+}
+
+.macroSummary {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) 3.8rem;
+  margin-left: 2.8rem;
+}
+
+.macroSummary ul {
+  display: grid;
+  gap: 0.2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.macroSummary li {
+  align-items: center;
+  display: grid;
+  font-size: 0.75rem;
+  gap: 0.35rem;
+  grid-template-columns: 0.4rem 1fr auto;
+}
+
+.macroSummary li i {
+  border-radius: 50%;
+  height: 0.4rem;
+  width: 0.4rem;
+}
+
+.macroDonut {
+  border-radius: 50%;
+  display: block;
+  height: 3.35rem;
+  position: relative;
+  width: 3.35rem;
+}
+
+.macroDonut::after {
+  background: var(--field);
+  border-radius: 50%;
+  content: '';
+  inset: 0.62rem;
+  position: absolute;
+}
+
+.overviewColumns {
+  align-items: start;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+}
+
+.overviewMain,
+.overviewRail {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.overview .panel {
+  padding: 1rem 1.1rem;
+}
+
+.overview .panel h2 {
+  font-family: inherit;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.overviewHeading {
+  align-items: baseline;
+  display: flex;
+  gap: 1.25rem;
+}
+
+.overviewHeading h2 {
+  color: var(--leaf);
+  font-size: 1.15rem !important;
+}
+
+.overviewHeading p,
+.panelHeadingRow p,
+.contextPanel > p {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.glanceBody {
+  align-items: center;
+  display: grid;
+  gap: 1.35rem;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  margin: 0.65rem 0 0.5rem;
+}
+
+.calorieRing,
+.qualityRing {
+  align-items: center;
+  background: conic-gradient(var(--leaf) 0 var(--progress), var(--paper-deep) var(--progress) 100%);
+  border-radius: 50%;
+  display: grid;
+  height: 7.4rem;
+  justify-self: center;
+  place-items: center;
+  position: relative;
+  width: 7.4rem;
+}
+
+.calorieRing::after,
+.qualityRing::after {
+  background: var(--field);
+  border-radius: 50%;
+  content: '';
+  inset: 0.65rem;
+  position: absolute;
+}
+
+.calorieRing > span,
+.qualityRing > strong,
+.qualityRing > small {
+  position: relative;
+  z-index: 1;
+}
+
+.calorieRing > span {
+  display: grid;
+  text-align: center;
+}
+
+.calorieRing strong {
+  font-size: 1.8rem;
+  font-weight: 500;
+}
+
+.calorieRing small,
+.calorieRing b {
+  font-size: 0.75rem;
+}
+
+.calorieRing b {
+  margin-top: 0.3rem;
+}
+
+.progressWorkspace {
+  min-width: 0;
+}
+
+.calorieFigures {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 0.6rem;
+}
+
+.calorieFigures > span {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.78rem;
+  gap: 0.2rem;
+}
+
+.calorieFigures strong {
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+.calorieFigures small {
+  color: inherit;
+  font-size: 0.75rem;
+}
+
+.calorieFigures .remainingFigure strong {
+  color: var(--tomato-dark);
+}
+
+.goalTrack {
+  background: var(--paper-deep);
+  border-radius: 999px;
+  height: 0.62rem;
+  overflow: visible;
+  position: relative;
+}
+
+.goalTrack > span {
+  background: var(--leaf);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.goalTrack > i {
+  background: var(--ink);
+  height: 1.1rem;
+  left: 76%;
+  position: absolute;
+  top: -0.25rem;
+  width: 1px;
+}
+
+.goalScale {
+  color: var(--muted);
+  display: flex;
+  font-size: 0.7rem;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+}
+
+.macroProgressTitle {
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0.55rem 0 0.3rem !important;
+}
+
+.macroProgress {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.macroProgress article {
+  background: var(--paper);
+  display: grid;
+  font-size: 0.72rem;
+  gap: 0.18rem;
+  padding: 0.6rem 0.7rem;
+  position: relative;
+}
+
+.macroProgress article > div {
+  background: var(--paper-deep);
+  border-radius: 99px;
+  height: 0.25rem;
+}
+
+.macroProgress article > div i {
+  background: var(--nutrition-protein);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.macroProgress article:nth-child(2) > div i {
+  background: var(--nutrition-carbohydrate);
+}
+
+.macroProgress article:nth-child(3) > div i {
+  background: var(--nutrition-fat);
+}
+
+.macroProgress article > small {
+  bottom: 0.55rem;
+  position: absolute;
+  right: 0.6rem;
+}
+
+.goalSummary {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  font-size: 0.75rem;
+  gap: 0.75rem;
+  grid-template-columns: auto repeat(4, 1fr) auto;
+  padding-top: 0.5rem;
+}
+
+.goalSummary > span {
+  color: var(--muted);
+  display: grid;
+}
+
+.goalSummary b {
+  color: var(--ink);
+}
+
+.goalSummary a,
+.panelHeadingRow a,
+.railHeading a,
+.railLink,
+.qualityPanel > a,
+.contextPanel > a {
+  align-items: center;
+  color: var(--leaf);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  gap: 0.35rem;
+}
+
+.exactData,
+.planDisclosure,
+.recommendationDisclosure {
+  border-top: 1px solid var(--line);
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+}
+
+.exactData > summary,
+.planDisclosure > summary,
+.recommendationDisclosure > summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.panelHeadingRow,
+.railHeading,
+.householdSnapshot > header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+}
+
+.panelHeadingRow h2 {
+  margin-bottom: 0.25rem !important;
+}
+
+.plannedMetrics {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 0.55rem;
+}
+
+.plannedMetrics article {
+  align-items: flex-start;
+  background: var(--paper);
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.65rem;
+}
+
+.plannedMetrics article > div {
+  display: grid;
+  font-size: 0.7rem;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.plannedMetrics article > div > strong {
+  font-size: 0.78rem;
+}
+
+.plannedMetrics article span {
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.plannedMetrics article b {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.overviewRail .panel {
+  padding: 0.9rem 1rem;
+}
+
+.railHeading a {
+  margin-top: 0.1rem;
+}
+
+.recentEntries {
+  list-style: none;
+  margin: 0.45rem 0;
+  padding: 0;
+}
+
+.recentEntries li {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+  padding: 0.38rem 0;
+}
+
+.recentEntries li:first-child {
+  border-top: 0;
+}
+
+.entryIcon {
+  align-items: center;
+  background: var(--leaf-pale);
+  border-radius: 50%;
+  color: var(--leaf);
+  display: flex;
+  height: 1.8rem;
+  justify-content: center;
+  width: 1.8rem;
+}
+
+.recentEntries li > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+}
+
+.recentEntries strong,
+.recentEntries b {
+  font-size: 0.75rem;
+}
+
+.recentEntries small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.qualityPanel > div {
+  align-items: center;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 4.4rem 1fr;
+  margin: 0.45rem 0;
+}
+
+.qualityRing {
+  height: 4.2rem;
+  width: 4.2rem;
+}
+
+.qualityRing::after {
+  inset: 0.42rem;
+}
+
+.qualityRing > strong {
+  font-size: 1.45rem;
+}
+
+.qualityRing > small {
+  font-size: 0.6rem;
+  margin-top: 1.65rem;
+}
+
+.qualityPanel > div > span:last-child {
+  display: grid;
+}
+
+.qualityPanel > div > span:last-child > strong {
+  color: var(--leaf);
+  font-size: 1rem;
+}
+
+.qualityPanel p {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin: 0.2rem 0 0;
+}
+
+.householdSnapshot > header > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.householdSnapshot > div {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.avatarStack {
+  display: flex;
+}
+
+.avatarStack i {
+  align-items: center;
+  background: var(--paper-deep);
+  border: 2px solid var(--field);
+  border-radius: 50%;
+  display: flex;
+  font-size: 0.7rem;
+  font-style: normal;
+  height: 1.75rem;
+  justify-content: center;
+  margin-left: -0.3rem;
+  width: 1.75rem;
+}
+
+.avatarStack i:first-child {
+  background: var(--leaf);
+  color: var(--page);
+  margin-left: 0;
+}
+
+.householdSnapshot p {
+  display: grid;
+  font-size: 0.7rem;
+  margin: 0;
+}
+
+.householdSnapshot p span {
+  color: var(--muted);
+}
+
+.contextGrid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: 0.9fr 1.05fr 1.25fr;
+}
+
+.contextPanel {
+  min-height: 0;
+}
+
+.contextPanel h2 {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9rem !important;
+  margin-bottom: 0.3rem !important;
+}
+
+.contextPanel > p {
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.contextPanel > a {
+  margin-top: 0.45rem;
+}
+
+.compactEmpty {
+  background: var(--paper);
+  border-radius: 0.45rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  margin: 0.4rem 0 !important;
+  padding: 0.4rem;
+}
+
+.trendPreview {
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(7, 1fr);
+  height: 3rem;
+  margin: 0.4rem 0 0.25rem;
+}
+
+.trendPreview > span {
+  align-items: center;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  justify-items: center;
+}
+
+.trendPreview i {
+  align-self: end;
+  background: var(--leaf);
+  border-radius: 99px 99px 0 0;
+  display: block;
+  min-height: 0.25rem;
+  width: 0.35rem;
+}
+
+.trendPreview .missingTrend {
+  background: var(--line-strong);
+}
+
+.trendPreview small {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+.contextPanel > strong,
+.contextPanel > span {
+  font-size: 0.72rem;
+}
+
+.recipeIdeas {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0.4rem;
+}
+
+.recipeIdeas > a {
+  background: var(--paper);
+  border-radius: 0.45rem;
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  grid-template-rows: auto auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.recipeIdeas > a > span {
+  align-items: center;
+  background: var(--leaf-pale);
+  color: var(--leaf);
+  display: flex;
+  grid-row: 1 / 3;
+  justify-content: center;
+}
+
+.recipeIdeas small,
+.recipeIdeas strong {
+  overflow: hidden;
+  padding: 0.25rem 0.4rem 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview + .disclaimer {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.recipeIdeas small {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+.recipeIdeas strong {
+  font-size: 0.68rem;
+  padding-bottom: 0.25rem;
+  padding-top: 0;
+}
+
+.recommendationDisclosure[open] {
+  max-height: 34rem;
+  overflow: auto;
+}
+
+@media (max-width: 1180px) {
+  .dashboardHeader {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .headerTools {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .overview .metricGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .overviewColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewRail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .headerSelectors,
+  .headerButtons {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .dateSelector {
+    min-width: 0;
+  }
+
+  .headerButtons .primaryAction {
+    grid-column: 1 / -1;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 1rem;
+    margin-inline: calc(-1 * var(--page-gutter));
+    overflow-x: auto;
+    padding-inline: var(--page-gutter);
+  }
+
+  .tabs a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .overview .metricGrid {
+    display: flex;
+    margin-inline: calc(-1 * var(--page-gutter));
+    overflow-x: auto;
+    padding: 0 var(--page-gutter) 0.35rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .overview .metric {
+    flex: 0 0 13rem;
+    scroll-snap-align: start;
+  }
+
+  .glanceBody {
+    grid-template-columns: 1fr;
+  }
+
+  .calorieFigures,
+  .macroProgress,
+  .plannedMetrics,
+  .overviewRail,
+  .contextGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .goalSummary {
+    align-items: start;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .goalSummary > strong,
+  .goalSummary > a {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 500px) {
+  .page {
+    padding-inline: var(--page-gutter);
+  }
+
+  .headerSelectors,
+  .headerButtons {
+    grid-template-columns: 1fr;
+  }
+
+  .headerButtons .primaryAction {
+    grid-column: auto;
+  }
+
+  .profileSelector > summary,
+  .dateSelector,
+  .headerButtons a {
+    width: 100%;
+  }
+
+  .glancePanel,
+  .plannedPanel {
+    padding: 0.85rem !important;
+  }
+
+  .overviewHeading,
+  .panelHeadingRow {
+    align-items: start;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .calorieFigures {
+    gap: 0.55rem;
+  }
+
+  .calorieFigures strong {
+    font-size: 0.82rem;
+  }
+
+  .recipeIdeas {
+    grid-template-columns: 1fr;
+  }
+}

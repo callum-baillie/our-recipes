@@ -1,0 +1,10 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked", "task_id": "T092", "board_path": "docs/goals/pantry-inventory/state.yaml", "changed_files": ["tests/e2e/pantry-cooking-confirmation.spec.ts"],
+    "commands": [{"cmd": "pre-hash guards", "status": "pass"}, {"cmd": "scoped Prettier/ESLint", "status": "pass"}, {"cmd": "fresh isolated cooking E2E", "status": "pass", "summary": "1/1 in 51.3s; strict zero errors, full function, axe, screenshots"}, {"cmd": "scoped diff/protected hash/port/live PID integrity", "status": "pass"}],
+    "summary": "Only caret initial was added and the complete cooking E2E passes. Full gate then stopped on an out-of-scope OpenAPI YAML flow-map description containing commas without quotes.",
+    "deviations": ["Mirror-owned server used.", "Full-gate sequence stopped on OpenAPI structure before remaining gates."],
+    "remaining_blockers": ["OpenAPI syntax repair", "Build/protected E2Es/disposable/full integrity"],
+    "verification_attempts": 1, "stopped_because": "OpenAPI structural error outside test-only scope; cooking oracle/cleanup passed."
+  }
+}

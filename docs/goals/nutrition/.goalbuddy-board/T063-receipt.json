@@ -1,0 +1,19 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T063",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": ["docs/goals/nutrition/notes/T063-diary-lifecycle-approval.md"],
+  "commands": [
+    { "cmd": "read-only T060 plus T062 selected-profile privacy and preflight-bound audit", "status": "pass" }
+  ],
+  "summary": "Approved immutable private diary lifecycle and preflight-bounded redacted export; destructive Worker B may proceed under exact confirmation/version/dependency gates.",
+  "note": "notes/T063-diary-lifecycle-approval.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

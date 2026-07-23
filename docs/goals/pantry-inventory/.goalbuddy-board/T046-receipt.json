@@ -1,0 +1,22 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T046",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "changed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+    "commands": [
+      { "cmd": "Source/mirror pre-edit hash guard", "status": "pass", "summary": "Both matched 13B92897151FAC48051797CDB11B3FBDA9434C7F60F3DA225352C390B7B883B1" },
+      { "cmd": "Authorized exact Location combobox locator", "status": "pass" },
+      { "cmd": "Scoped Prettier and ESLint", "status": "pass" },
+      { "cmd": "One-file mirror refresh/hash equality", "status": "pass", "summary": "Both matched 0CD9B123278027151887ED3CB0EDD552896648B0541BD7A2A208EBC215A085B4" },
+      { "cmd": "Fresh isolated management workflow", "status": "fail", "summary": "Exact Location passed; workflow reached Freeze, where an unnamed button query resolved Save, Move, Freeze, and Split buttons" },
+      { "cmd": "Owned server cleanup/port release", "status": "pass" },
+      { "cmd": "Scoped diff integrity", "status": "pass" }
+    ],
+    "summary": "The exact Location combobox worked and the flow completed numerous product, location, and stock mutations. It stopped at the first unnamed action-button query because the rendered form scope contains several buttons.",
+    "deviations": [],
+    "remaining_blockers": ["Exact accessible-name hardening for every affected unnamed action button", "Complete independent workflows and remaining evidence"],
+    "verification_attempts": 1,
+    "stopped_because": "A separate action-button selector package is required outside T046 scope."
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "result": "done",
+  "task_id": "T113",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "src/app/planner/page.tsx",
+    "src/components/nutrition-meal-planning.tsx",
+    "src/lib/services/nutrition-meal-planning-service.ts",
+    "tests/unit/nutrition-recipe-components.test.ts",
+    "tests/integration/nutrition-meal-planning-service.test.ts"
+  ],
+  "commands": [
+    {
+      "cmd": "focused planner service and preview component tests",
+      "status": "pass",
+      "summary": "8 tests passed"
+    },
+    {
+      "cmd": "five-query exact-local-date and 200-history regression",
+      "status": "pass"
+    },
+    {
+      "cmd": "pnpm test",
+      "status": "pass",
+      "summary": "225 unit and 129 integration tests passed"
+    },
+    { "cmd": "pnpm typecheck", "status": "pass" },
+    {
+      "cmd": "pnpm lint",
+      "status": "pass",
+      "summary": "no errors; one concurrent Pantry unused-parameter warning"
+    },
+    { "cmd": "focused Prettier and scoped allowed-file checks", "status": "pass" },
+    {
+      "cmd": "pnpm build",
+      "status": "pass",
+      "summary": "production build passed with the existing backup-service NFT trace warning"
+    }
+  ],
+  "summary": "Delivered a max-five-query exact-local-date planner Nutrition projection and preview-only visibility without hiding or conflating allocations, capacity, quality, preparation or consumption truth.",
+  "note": "notes/T113-planner-projection-delivery.md",
+  "deviations": [
+    "The exact GoalBuddy Worker exceeded the single-wait limit and was interrupted; the PM completed the exact allowed-file package as permitted fallback.",
+    "A concurrent Pantry migration created a duplicate 0026 journal index after T110; T113 preserved Pantry ownership and deferred coordinated renumbering."
+  ],
+  "remaining_blockers": [
+    "A Judge must audit query bounds, state semantics, local confirmed totals and preview-only rendering.",
+    "The concurrent 0026 migration numbering conflict must be repaired after Pantry releases schema/journal ownership.",
+    "Household analysis/charts, documentation and rendered final evidence remain."
+  ],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

@@ -1,0 +1,165 @@
+.workspace {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--paper) 94%, var(--leaf) 6%);
+}
+
+.workspace header p,
+.help {
+  max-width: 74ch;
+  color: var(--muted);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.card,
+.form,
+.calculation {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.card {
+  align-content: start;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 0.65rem;
+  background: var(--field);
+  color: inherit;
+}
+
+.form textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.form button {
+  justify-self: start;
+  min-height: 2.6rem;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  font-weight: 800;
+}
+
+.form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.inlineFields,
+.nutrients,
+.valueGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.preparationGrid {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.preparationGrid details {
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+}
+
+.preparationGrid summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.nutrients,
+.valueGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quality,
+.warning,
+.status {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--leaf-pale) 74%, var(--card));
+  font-size: 0.86rem;
+}
+
+.warning,
+.warningList {
+  color: var(--nutrition-grain);
+  background: var(--nutrition-grain-soft);
+}
+
+.warningList {
+  margin: 0;
+  padding: 0.8rem 0.8rem 0.8rem 1.8rem;
+  border-radius: 0.75rem;
+}
+
+.valueGrid {
+  margin: 0;
+}
+
+.valueGrid div {
+  padding: 0.65rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--leaf-pale) 55%, var(--card));
+}
+
+.valueGrid dt {
+  font-weight: 800;
+}
+
+.valueGrid dd {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+  .columns,
+  .inlineFields,
+  .nutrients,
+  .valueGrid {
+    grid-template-columns: 1fr;
+  }
+}

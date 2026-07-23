@@ -1,0 +1,32 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T070",
+    "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/pantry-inventory/state.yaml",
+    "changed_files": [
+      "src/lib/db/schema.ts", "drizzle/0026_pantry_grocery_formula.sql", "drizzle/meta/_journal.json", "src/lib/domain/pantry-grocery-cooking.ts", "src/lib/services/pantry-grocery-cooking-service.ts", "src/lib/services/pantry-availability-service.ts", "src/lib/services/planning-service.ts", "src/app/api/v1/shopping-lists/pantry-shortages/route.ts", "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-controls/route.ts", "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-intake/route.ts", "src/components/meal-plan-pantry-demand.tsx", "src/components/meal-plan-pantry-demand.module.css", "src/components/shopping-list-editor.tsx", "src/components/shopping-list-editor.module.css", "tests/unit/pantry-grocery-cooking.test.ts", "tests/integration/pantry-grocery-cooking-service.test.ts", "tests/integration/pantry-grocery-cooking-api.test.ts", "tests/e2e/pantry-grocery-intake.spec.ts", "docs/openapi.yaml", "docs/api.md", "docs/architecture.md", "docs/data-model.md", "docs/security.md", "docs/testing.md", "docs/decisions/0032-pantry-grocery-cooking.md"
+    ],
+    "commands": [
+      {"cmd": "scoped Prettier and ESLint", "status": "pass"},
+      {"cmd": "focused grocery unit tests", "status": "pass", "summary": "8/8"},
+      {"cmd": "focused availability/grocery/API/household integration tests", "status": "pass", "summary": "31/31"},
+      {"cmd": "pnpm test", "status": "pass", "summary": "225 unit and 129 integration"},
+      {"cmd": "pnpm lint and pnpm typecheck", "status": "pass"},
+      {"cmd": "pnpm openapi:validate", "status": "pass", "summary": "valid with 11 existing warnings"},
+      {"cmd": "isolated webpack build", "status": "pass"},
+      {"cmd": "fresh disposable db migrate/check", "status": "pass"},
+      {"cmd": "disposable SQLite formula readback", "status": "pass", "summary": "manual extra 50 g; recipe 200, staple 500, Pantry 100, final 450 g"},
+      {"cmd": "owned port 3100 cleanup", "status": "pass"}
+    ],
+    "summary": "The grocery/intake slice is implemented and all non-browser gates pass. The final browser attempt proved the PATCH and 50g/450g persistence, then an explicit test reload overlapped the application's reload and aborted navigation. Protected oracles and final hash integrity remain.",
+    "deviations": [
+      "Attempt 1 did not open the rich-intake details before filling.",
+      "Attempt 2 lacked synchronization around the manual-extra control.",
+      "Attempt 3 proved PATCH 200 and persisted 50g/450g, then failed page.reload with net::ERR_ABORTED due overlapping reloads.",
+      "Isolated pnpm build needed PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false for the node_modules junction; webpack build passed."
+    ],
+    "remaining_blockers": ["Passing new grocery/intake E2E", "Unchanged protected E2E oracles", "Final mirror/protected hash and diff/status integrity"],
+    "verification_attempts": 3,
+    "stopped_because": "Browser repair allowance exhausted on an overlapping application/test reload race; port released."
+  }
+}

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { CaptureWizard } from '@/components/capture-wizard';
+import { BordIcon } from '@/components/bord-brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,10 @@ export default async function CapturePage({
     <main className="recipe-page">
       <header className="recipe-header">
         <Link className="wordmark" href="/">
-          <span className="wordmark-mark" aria-hidden="true" />
-          <span>Our Recipes</span>
+          <span className="wordmark-mark custom" aria-hidden="true">
+            <BordIcon size={21} />
+          </span>
+          <span>Bòrd</span>
         </Link>
         <Link className="quiet-link" href="/recipes">
           Recipe library

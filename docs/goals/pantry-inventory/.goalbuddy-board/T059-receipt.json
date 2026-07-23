@@ -1,0 +1,34 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T059",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The management milestone is proven. The old integrated spec needs exact Quantity/Unit/Location roles and exact Manage locations/create-form semantics; no other getByLabel collision is evidenced.",
+    "worker_package": {
+      "objective": "Harden only the three add controls and Manage locations/create-form selectors in the old integrated spec, then run integrated and disposable-DB gates.",
+      "allowed_files": ["tests/e2e/pantry-workflow.spec.ts"],
+      "verify": [
+        "Require old-spec source/mirror pre-hash 1F839D4FF294C999458C307F8560674DC30B5F58EE24BEF7FF1409F46AD0EAC4 and preserve management component/spec hashes.",
+        "Replace Quantity with exact spinbutton, Unit/Location with exact comboboxes; preserve actions.",
+        "Use exact Manage locations summary/disclosure counts and create form containing exact Add location button; exact Name textbox/Storage type combobox/button, preserving keyboard open and values.",
+        "Preserve every other locator/request/mutation/assertion/fixture/screenshot/axe/intentional batch choice/180s timeout; run scoped format/lint and mirror hash.",
+        "Run fresh integrated 400/350/50/provenance/manual/intake/FEFO/history/two axe/five screenshots/responsive/no errors.",
+        "Release port, disposable migrate/dbcheck, final diff/status/hash integrity."
+      ],
+      "stop_if": [
+        "Pre-hash differs or any change beyond authorized selectors is required.",
+        "Any behavior/assertion/timeout/product/management hash changes.",
+        "Integrated flow fails twice or selector semantics weaken.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": ["Old workflow failed before mutation at Quantity/Original quantity.", "Unit and Location have the same current substring conflicts.", "Nested location management requires exact summary and Add location form containment."],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "One integrated mirror/DB/artifact/port lifecycle must be serial." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Passing integrated workflow/axe/screenshots", "Disposable DB/port/diff proof", "Later full audit"],
+    "required_board_updates": ["Record T059 done.", "Activate T060 Worker.", "Keep T999 blocked and require another Judge."]
+  }
+}

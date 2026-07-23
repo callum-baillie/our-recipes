@@ -1,0 +1,37 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T024",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The Pantry E2E spec and preserved mirror are acceptable. All 75 full-format failures are unrelated: 73 tracked-clean pre-Pantry baseline files and two concurrent Nutrition files. No Pantry path or the new spec failed. Continue remaining verification in the preserved mirror without formatting or repairing unrelated files.",
+    "worker_package": {
+      "objective": "Complete scoped formatting, full quality/build gates, focused Playwright accessibility/screenshots, disposable migration/database checks, and source diff integrity in the preserved isolated mirror without source edits.",
+      "allowed_files": [],
+      "verify": [
+        "Re-audit mirror isolation, junction, spec hash, and port 3100",
+        "Run scoped Pantry formatting",
+        "Run full lint, typecheck, tests, OpenAPI, and build",
+        "Run focused Pantry Playwright workflow with accessibility and screenshots",
+        "Run disposable db:migrate and db:check",
+        "Run source git diff --check"
+      ],
+      "stop_if": [
+        "Audited mirror state differs.",
+        "Any gate fails twice.",
+        "Unrelated source edits, live provider/credentials, Docker/device/backup, normal DB, shared .next, or non-disposable persistence is required."
+      ]
+    },
+    "evidence": [
+      "The mirror excludes Git, .next, data, test artifacts, credentials, environment, and logs and has one intended node_modules junction.",
+      "Source and mirror E2E spec hashes match and port 3100 is clear.",
+      "Exactly 75 full-format failures are unrelated baseline or concurrent Nutrition ownership; zero are Pantry-owned."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": { "safe": false, "rationale": "Verification uses one mirror, port, generated state, and disposable database." },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": ["Scoped Pantry formatting", "Full lint/type/tests/OpenAPI/build", "Rendered workflow/accessibility/screenshots", "Disposable migration/database checks", "Source diff check"],
+    "required_board_updates": ["Record T024 approved for continuation.", "Activate one T025 verification Worker.", "Do not activate T999 until all gates pass."]
+  }
+}

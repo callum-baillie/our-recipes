@@ -1,0 +1,24 @@
+{
+  "result": "done",
+  "decision": "approved",
+  "task_id": "T013",
+  "board_path": "C:/Users/Callum/Documents/Recipe/docs/goals/nutrition/state.yaml",
+  "changed_files": [
+    "docs/goals/nutrition/notes/T013-reference-decision.md"
+  ],
+  "commands": [
+    {
+      "cmd": "audit T012 primary-source map against current Nutrition domain and Pantry ownership",
+      "status": "pass"
+    }
+  ],
+  "summary": "Approved a three-file pure-domain package for versioned reference metadata, life-stage and UL scope, disclosures, gap detection, and the current FDA adult/children 4+ Daily Value table. Deferred numeric DRI rows and persisted canonical-code expansion to later evidence/migration reviews.",
+  "note": "notes/T013-reference-decision.md",
+  "deviations": [
+    "The exact GoalBuddy Judge exceeded the single-wait limit without returning, so the PM performed the same read-only gate as permitted fallback."
+  ],
+  "remaining_blockers": [],
+  "verification_attempts": 1,
+  "stopped_because": null,
+  "harness": "codex-pm-fallback"
+}

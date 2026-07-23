@@ -1,0 +1,285 @@
+[
+  {
+    "method": "DELETE",
+    "path": "/ai/chat/threads/{threadId}",
+    "reason": "First-party assistant UI storage command; no external compatibility contract."
+  },
+  {
+    "method": "DELETE",
+    "path": "/nutrition/profiles/{profileId}/data",
+    "reason": "Destructive first-party Nutrition maintenance command."
+  },
+  {
+    "method": "DELETE",
+    "path": "/nutrition/session",
+    "reason": "Retired compatibility endpoint that returns 410."
+  },
+  {
+    "method": "DELETE",
+    "path": "/shopping-lists/aisles/{aisleId}",
+    "reason": "Deprecated compatibility alias; use the documented unambiguous canonical route."
+  },
+  {
+    "method": "DELETE",
+    "path": "/shopping-lists/{listId}",
+    "reason": "First-party list lifecycle command pending a stable external contract."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/actions/{actionId}/image",
+    "reason": "Ephemeral first-party assistant preview asset."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/chat/threads",
+    "reason": "First-party assistant UI storage query."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/chat/threads/{threadId}",
+    "reason": "First-party assistant UI storage query."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/settings",
+    "reason": "First-party settings UI query; external callers use the documented readiness endpoint."
+  },
+  { "method": "GET", "path": "/ai/summaries", "reason": "First-party assistant dashboard query." },
+  {
+    "method": "GET",
+    "path": "/branding/icons/v1/{palette}/{icon}/{size}",
+    "reason": "Versioned browser asset route, not an application API contract."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/household",
+    "reason": "First-party Nutrition dashboard projection."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/products/{productId}/records",
+    "reason": "First-party normalized Nutrition data workspace query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles",
+    "reason": "First-party profile-linked Nutrition query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}",
+    "reason": "First-party profile-linked Nutrition query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/allocations",
+    "reason": "First-party append-only Nutrition allocation query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/export",
+    "reason": "First-party profile-scoped data export pending a stable external format."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/goals",
+    "reason": "First-party Nutrition goals query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/intake",
+    "reason": "First-party immutable Nutrition diary query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/measurements",
+    "reason": "First-party Nutrition measurement query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/permissions",
+    "reason": "Retired compatibility state; profiles are not an authorization boundary."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/prepared-recipes",
+    "reason": "First-party prepared-food workflow query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/recipes/{recipeId}/calculations",
+    "reason": "First-party normalized calculation query."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/session",
+    "reason": "First-party bridge from signed household profile to linked Nutrition profile."
+  },
+  {
+    "method": "GET",
+    "path": "/settings/preferences",
+    "reason": "First-party application preferences query."
+  },
+  {
+    "method": "PATCH",
+    "path": "/ai/actions/{actionId}",
+    "reason": "First-party reviewed assistant confirmation command."
+  },
+  {
+    "method": "PATCH",
+    "path": "/ai/settings",
+    "reason": "First-party AI configuration command; credentials are never a browser API."
+  },
+  {
+    "method": "PATCH",
+    "path": "/nutrition/profiles/{profileId}",
+    "reason": "First-party linked Nutrition profile command."
+  },
+  {
+    "method": "PATCH",
+    "path": "/settings/preferences",
+    "reason": "First-party application preferences command."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/chat/threads",
+    "reason": "First-party assistant UI storage command."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/chat/threads/{threadId}/messages",
+    "reason": "First-party assistant command with review-gated actions."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/meal-plans/generate",
+    "reason": "First-party deterministic proposal endpoint; not a stable external provider API."
+  },
+  { "method": "POST", "path": "/ai/summaries", "reason": "First-party assistant summary command." },
+  { "method": "POST", "path": "/diagnostics", "reason": "First-party redacted support download." },
+  {
+    "method": "POST",
+    "path": "/meal-plan/batch",
+    "reason": "First-party atomic Planner batch command."
+  },
+  {
+    "method": "POST",
+    "path": "/meal-plan/{entryId}/refresh-recipe",
+    "reason": "First-party explicit pinned-plan refresh command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/identity",
+    "reason": "Retired compatibility endpoint that returns 410."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/products/{productId}/records",
+    "reason": "First-party immutable normalized Nutrition record command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles",
+    "reason": "Retired compatibility endpoint that returns 410."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/allocations",
+    "reason": "First-party append-only Nutrition allocation command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/diary-commands",
+    "reason": "First-party immutable Nutrition diary lifecycle command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/goals",
+    "reason": "First-party versioned Nutrition goals command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/goals/estimate",
+    "reason": "First-party deterministic non-medical estimate command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/intake",
+    "reason": "First-party immutable Nutrition intake compatibility command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/intake/manual",
+    "reason": "First-party explicit manual diary command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/intake/product",
+    "reason": "First-party confirmed product diary command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/intake/recipe",
+    "reason": "First-party confirmed recipe diary command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/intake/{revisionId}/delete",
+    "reason": "First-party append-only diary correction command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/measurements",
+    "reason": "First-party versioned Nutrition measurement command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/permissions",
+    "reason": "Retired compatibility endpoint; profiles are not access control."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/prepared-recipes",
+    "reason": "First-party cooking-to-prepared Nutrition command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/prepared-recipes/{preparedId}/allocations",
+    "reason": "First-party prepared-portion state command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/prepared-recipes/{preparedId}/consume",
+    "reason": "First-party explicit prepared-consumption command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/recommendations/{recommendationKey}/feedback",
+    "reason": "First-party recommendation feedback command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/recipes/{recipeId}/calculations",
+    "reason": "First-party normalized recipe calculation command."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/session",
+    "reason": "Retired compatibility endpoint that returns 410."
+  },
+  {
+    "method": "POST",
+    "path": "/profiles/onboarding",
+    "reason": "First-party profile onboarding command."
+  },
+  {
+    "method": "POST",
+    "path": "/settings/fresh-install",
+    "reason": "Destructive first-party local installation maintenance command."
+  },
+  {
+    "method": "PUT",
+    "path": "/recipes/{recipeId}/favorite",
+    "reason": "First-party profile-scoped preference command."
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T041",
+    "board_path": "docs/goals/pantry-inventory/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Full-path rendering is intentional: the service constructs ancestor-qualified paths, PantryManager renders location.path directly, and the accessibility evidence exposed Cold room shelf / Basket. The brief supports nested locations, so only the exact full-path E2E locator should change.",
+    "worker_package": {
+      "objective": "Replace only the Basket summary regex with the exact full nested path, preserve direct-summary-to-parent-details scope and strict count, then complete management and old integrated workflows with independent fresh-state lifecycles and all required evidence.",
+      "allowed_files": ["tests/e2e/pantry-inventory-management.spec.ts"],
+      "verify": [
+        "Require source and mirror pre-edit SHA256 CECBF4256AB5089C14D5FFD5E65ED9FB2F40C56F4C0389799F77737FC46B20E9.",
+        "Replace only /^Basket$/u with /^Cold room shelf \\/ Basket$/u and retain direct-summary parent and strict count.",
+        "Run scoped Prettier/ESLint and refresh only the spec with hash equality.",
+        "Run fresh management workflow alone with all actions, three axe checks, three overflow widths, and three screenshots.",
+        "Release port, independently prepare, then run old integrated workflow alone with full 400/350/50 behavior, two axe checks, and five screenshots.",
+        "Inspect management database read-only, run fresh disposable migrations/db check, release port, and record diff/status integrity."
+      ],
+      "stop_if": [
+        "Pre-edit hash differs or any other product, fixture, assertion, timeout, or file change is required.",
+        "Locator broadens, becomes positional/forced, or weakens strictness.",
+        "Workflows share prepared state/database/server or either fails twice.",
+        "Live/shared/secret/unrelated state would change."
+      ]
+    },
+    "evidence": [
+      "pantry-service.ts constructs names.join(' / ') paths.",
+      "PantryManager renders each location management summary as location.path.",
+      "The rendered direct summary was Cold room shelf / Basket while /^Basket$/u matched zero.",
+      "The brief explicitly supports nested locations."
+    ],
+    "subgoal_contract": null,
+    "parallel_safety": {
+      "safe": false,
+      "rationale": "One mirror, disposable data location, artifact family, and port require serial independently owned lifecycles."
+    },
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Passing management workflow with axe/overflow/screenshots",
+      "Independent passing integrated Pantry workflow",
+      "Read-only persistence and disposable DB proof",
+      "Final port and diff integrity",
+      "Later original-outcome completion audit"
+    ],
+    "required_board_updates": [
+      "Record T041 done.",
+      "Activate T042 Worker.",
+      "Keep T999 blocked and require a subsequent Judge."
+    ]
+  }
+}

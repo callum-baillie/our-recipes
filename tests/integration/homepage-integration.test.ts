@@ -10,7 +10,7 @@ import { completeSetup } from '@/lib/services/household-service';
 import { addMealPlanEntry } from '@/lib/services/planning-service';
 import { createRecipe } from '@/lib/services/recipe-service';
 
-const endpoint = 'http://our-recipes:3000/api/integrations/homepage/v1/summary';
+const endpoint = 'http://bord:3000/api/integrations/homepage/v1/summary';
 const integrationToken = 'homepage-test-token-with-enough-entropy';
 
 function setupHousehold() {
