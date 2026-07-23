@@ -229,6 +229,21 @@
   }
 
   .panel {
-    overflow-x: auto;
+    overflow-x: hidden;
+    border-radius: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .bullet > div {
+    gap: 0.35rem;
+  }
+
+  .coverageList article {
+    gap: 0.45rem;
+  }
+
+  .tableScroller {
+    margin-inline: -0.9rem;
+    padding-inline: 0.9rem;
   }
 }

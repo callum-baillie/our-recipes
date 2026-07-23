@@ -1548,3 +1548,713 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Unified responsive Nutrition workspace */
+.mobileViewButton {
+  display: none;
+}
+
+.headerButtons button,
+.viewIntro button,
+.dialogPrimary {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 1.1rem;
+}
+
+.headerButtons button {
+  font-size: 0.875rem;
+}
+
+.headerButtons .primaryAction,
+.viewIntro button {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: var(--page);
+}
+
+.headerButtons button:disabled,
+.emptyState button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.profileSelector {
+  cursor: pointer;
+  font-family: inherit;
+  justify-content: flex-start;
+  padding: 0.55rem 0.8rem;
+}
+
+.profileSelector svg:last-child {
+  margin-left: auto;
+}
+
+.viewIntro {
+  align-items: center;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--leaf-pale) 72%, var(--field)),
+    var(--field)
+  );
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-bottom: 0.8rem;
+  padding: 0.85rem 1rem;
+}
+
+.viewIntro h2,
+.viewIntro p {
+  margin: 0;
+}
+
+.viewIntro h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.viewIntro > p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  max-width: 72ch;
+}
+
+.viewEyebrow {
+  color: var(--leaf);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  margin: 0 0 0.15rem;
+  text-transform: uppercase;
+}
+
+.compactDialog,
+.logDialog {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: 0 24px 70px rgb(22 31 22 / 28%);
+  color: var(--ink);
+  margin: auto;
+  max-height: min(52rem, calc(100dvh - 2rem));
+  max-width: calc(100vw - 2rem);
+  overflow-x: hidden;
+  padding: 0;
+}
+
+.compactDialog {
+  width: min(32rem, calc(100vw - 2rem));
+}
+
+.logDialog {
+  width: min(46rem, calc(100vw - 2rem));
+}
+
+.compactDialog::backdrop,
+.logDialog::backdrop {
+  background: rgb(19 27 20 / 52%);
+  backdrop-filter: blur(3px);
+}
+
+.dialogHeader {
+  align-items: flex-start;
+  background: var(--field);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 1.1rem 1.2rem 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.dialogHeader h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 500;
+  margin: 0;
+}
+
+.iconButton {
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.65rem;
+  justify-content: center;
+  padding: 0;
+  width: 2.65rem;
+}
+
+.dialogLead {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0;
+  padding: 0.9rem 1.2rem 0;
+}
+
+.profileDialogActions {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.profileDialogActions a {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  display: flex;
+  min-height: 3rem;
+  padding: 0.7rem 0.85rem;
+}
+
+.profileDialogActions a:first-child {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: var(--page);
+}
+
+.viewDialogLinks {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.viewDialogLinks a {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+}
+
+.viewDialogLinks a[aria-current='page'] {
+  background: var(--leaf-pale);
+  border-color: var(--leaf);
+}
+
+.viewDialogLinks span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.viewDialogLinks small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.logOptions {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.logOptions button {
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  color: var(--ink);
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 5rem;
+  padding: 0.85rem;
+  text-align: left;
+}
+
+.logOptions button:hover,
+.logOptions button:focus-visible,
+.viewDialogLinks a:hover,
+.viewDialogLinks a:focus-visible {
+  background: var(--leaf-pale);
+  border-color: var(--leaf);
+}
+
+.logOptions button > svg:first-child {
+  color: var(--leaf);
+}
+
+.logOptions span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.logOptions small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.backButton {
+  background: transparent;
+  border: 0;
+  color: var(--leaf);
+  margin: 0.8rem 1.2rem 0;
+  padding: 0;
+}
+
+.dialogForm {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.9rem 1.2rem 1.2rem;
+}
+
+.dialogForm label {
+  color: var(--label);
+  display: grid;
+  font-size: 0.8rem;
+  gap: 0.35rem;
+}
+
+.dialogForm input,
+.dialogForm select {
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.6rem;
+  color: var(--ink);
+  min-height: 2.8rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  width: 100%;
+}
+
+.dialogFieldRow,
+.manualNutrients {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manualNutrients {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.8rem;
+}
+
+.manualNutrients legend {
+  color: var(--label);
+  font-size: 0.8rem;
+  padding-inline: 0.25rem;
+}
+
+.dialogPrimary {
+  background: var(--tomato);
+  border-color: var(--tomato);
+  color: white;
+  justify-self: stretch;
+}
+
+.formHint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.dialogEmpty {
+  background: var(--paper);
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.9rem 1.2rem 1.2rem;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.dialogEmpty p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.dialogEmpty a {
+  color: var(--leaf);
+  margin-top: 0.35rem;
+}
+
+.emptyState {
+  align-items: center;
+  background: linear-gradient(120deg, var(--paper), var(--field));
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.emptyState > svg {
+  color: var(--leaf);
+}
+
+.emptyState h3,
+.emptyState p {
+  margin: 0;
+}
+
+.emptyState h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.emptyState p {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin-top: 0.2rem;
+}
+
+.emptyState button,
+.emptyState a {
+  align-items: center;
+  background: var(--leaf);
+  border: 1px solid var(--leaf);
+  border-radius: 0.55rem;
+  color: var(--page);
+  display: inline-flex;
+  justify-content: center;
+  min-height: 2.65rem;
+  padding: 0.55rem 0.8rem;
+  text-align: center;
+}
+
+.stack > *,
+.twoColumn > *,
+.overviewMain > *,
+.overviewRail > * {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 780px) {
+  .page {
+    padding-top: 1.35rem;
+  }
+
+  .dashboardHeader {
+    gap: 1.15rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .dashboardHeader h1 {
+    font-size: clamp(2.5rem, 12vw, 3.4rem);
+    line-height: 0.98;
+  }
+
+  .dashboardHeader > div:first-child > .muted {
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .headerSelectors {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .headerButtons {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  }
+
+  .headerButtons .primaryAction {
+    grid-column: auto;
+  }
+
+  .profileSelector,
+  .dateSelector,
+  .headerButtons a,
+  .headerButtons button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .mobileViewButton {
+    align-items: center;
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 0.7rem;
+    color: var(--ink);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.7rem;
+    min-height: 3.25rem;
+    padding: 0.65rem 0.8rem;
+    width: 100%;
+  }
+
+  .mobileViewButton span {
+    display: grid;
+    gap: 0.08rem;
+    text-align: left;
+  }
+
+  .mobileViewButton small {
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 500;
+  }
+
+  .tabs {
+    display: none;
+  }
+
+  .viewIntro {
+    align-items: start;
+    gap: 0.45rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0.8rem;
+  }
+
+  .viewIntro > p {
+    grid-column: 1 / -1;
+  }
+
+  .viewIntro button {
+    display: none;
+  }
+
+  .overview .metricGrid {
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-inline: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .overview .metric {
+    flex: initial;
+    min-height: 7.4rem;
+    padding: 0.8rem;
+  }
+
+  .overview .metric:first-child {
+    grid-column: 1 / -1;
+    min-height: 6.7rem;
+  }
+
+  .metricValue,
+  .overview .metric > small,
+  .macroSummary {
+    margin-left: 0 !important;
+  }
+
+  .macroMetric {
+    grid-column: 1 / -1;
+  }
+
+  .macroSummary {
+    grid-template-columns: minmax(0, 1fr) 3.4rem;
+  }
+
+  .overviewColumns,
+  .overviewRail,
+  .contextGrid,
+  .twoColumn,
+  .nutrientGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewRail {
+    display: grid;
+  }
+
+  .glanceBody {
+    align-items: start;
+    grid-template-columns: 5.8rem minmax(0, 1fr);
+    gap: 0.9rem;
+  }
+
+  .calorieRing {
+    height: 5.6rem;
+    width: 5.6rem;
+  }
+
+  .calorieRing strong {
+    font-size: 1.25rem;
+  }
+
+  .calorieFigures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .macroProgress {
+    grid-template-columns: 1fr;
+  }
+
+  .plannedMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .contextPanel:nth-child(n + 3) {
+    display: none;
+  }
+
+  .panel,
+  .metric {
+    border-radius: 0.75rem;
+    box-shadow: 0 5px 16px rgb(65 53 39 / 5%);
+  }
+
+  .panel {
+    padding: 1rem;
+  }
+
+  .panel h2 {
+    font-size: 1.35rem;
+  }
+
+  .sectionHeading {
+    display: grid;
+  }
+
+  .sectionHeading .secondaryButton {
+    justify-self: start;
+  }
+
+  .diaryList > li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .diaryList > li details,
+  .diaryList > li form {
+    grid-column: 1 / -1;
+  }
+
+  .nutrientGrid {
+    gap: 0.65rem;
+    margin-top: 0.85rem;
+  }
+
+  .nutrientGrid article {
+    border: 1px solid var(--line);
+    border-radius: 0.7rem;
+  }
+
+  .emptyState {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .emptyState button,
+  .emptyState a {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+@media (max-width: 500px) {
+  .page {
+    padding-inline: 0.75rem;
+  }
+
+  .headerSelectors {
+    grid-template-columns: 1fr;
+  }
+
+  .headerButtons {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
+  }
+
+  .headerButtons a,
+  .headerButtons button {
+    padding-inline: 0.7rem;
+  }
+
+  .dateSelector {
+    justify-content: flex-start;
+  }
+
+  .logOptions,
+  .dialogFieldRow,
+  .manualNutrients {
+    grid-template-columns: 1fr;
+  }
+
+  .compactDialog,
+  .logDialog {
+    border-radius: 1rem 1rem 0 0;
+    margin: auto 0 0;
+    max-height: calc(100dvh - 0.75rem);
+    max-width: 100vw;
+    width: 100vw;
+  }
+
+  .dialogHeader {
+    padding-inline: 1rem;
+  }
+
+  .dialogLead,
+  .logOptions,
+  .dialogForm,
+  .viewDialogLinks,
+  .profileDialogActions {
+    padding-inline: 1rem;
+  }
+
+  .backButton {
+    margin-left: 1rem;
+  }
+
+  .overview .metric {
+    min-height: 6.8rem;
+  }
+
+  .metricValue strong {
+    font-size: 1.55rem;
+  }
+
+  .glanceBody {
+    grid-template-columns: 1fr;
+  }
+
+  .calorieRing {
+    height: 6.5rem;
+    width: 6.5rem;
+  }
+
+  .calorieFigures {
+    gap: 0.45rem;
+  }
+
+  .calorieFigures > span {
+    font-size: 0.68rem;
+  }
+
+  .plannedMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .goalSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .goalSummary > strong,
+  .goalSummary > a {
+    grid-column: auto;
+  }
+
+  .overview .panel,
+  .panel {
+    padding: 0.9rem;
+  }
+}

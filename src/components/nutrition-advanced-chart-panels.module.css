@@ -301,12 +301,34 @@
     grid-template-columns: 1fr;
   }
 
+  .panel {
+    overflow-x: hidden;
+    border-radius: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .chart,
+  .compactChart {
+    height: 14rem;
+    min-height: 14rem;
+  }
+
   .weightChart {
-    min-width: 26rem;
+    min-width: 0;
   }
 
   .weightAxis span:first-child,
   .weightAxis span:last-child {
     grid-column: 1;
+  }
+
+  .weightTrack {
+    min-width: 0;
+  }
+
+  .tableScroller {
+    margin-inline: -0.9rem;
+    overflow-x: auto;
+    padding-inline: 0.9rem;
   }
 }

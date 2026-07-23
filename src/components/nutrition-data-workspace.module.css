@@ -162,4 +162,19 @@
   .valueGrid {
     grid-template-columns: 1fr;
   }
+
+  .workspace {
+    border-radius: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .card {
+    border-radius: 0.7rem;
+    padding: 0.85rem;
+  }
+
+  .form button {
+    justify-self: stretch;
+    min-height: 2.85rem;
+  }
 }

@@ -4,17 +4,21 @@ import {
   ArrowRight,
   CalendarDays,
   ChefHat,
+  ClipboardCopy,
   ChevronDown,
+  CircleSlash2,
   Info,
   NotebookTabs,
   Plus,
+  Search,
   TrendingUp,
   UserCircle,
   Utensils,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-dashboard.module.css';
 import {
@@ -39,6 +43,30 @@ import type { NutritionWeightTrend } from '@/lib/domain/nutrition-weight-trend';
 
 const VIEWS = ['overview', 'diary', 'nutrients', 'trends', 'household', 'goals'] as const;
 export type NutritionView = (typeof VIEWS)[number];
+type LogMode = 'choose' | 'product' | 'recipe' | 'manual' | 'skipped' | 'copy';
+
+const VIEW_LABELS: Record<NutritionView, string> = {
+  overview: 'Overview',
+  diary: 'Food Diary',
+  nutrients: 'Nutrients',
+  trends: 'Trends',
+  household: 'Household',
+  goals: 'Goals',
+};
+
+const VIEW_EXPLAINERS: Record<NutritionView, string> = {
+  overview:
+    'A daily summary of confirmed intake, planned portions, goals, and the quality of the available data.',
+  diary:
+    'A factual history of food marked as eaten. Corrections preserve the earlier record instead of rewriting it.',
+  nutrients: 'Confirmed nutrient amounts and coverage. A missing value means unknown, never zero.',
+  trends:
+    'Patterns across recorded days. Trends appear only when enough comparable diary data exists.',
+  household:
+    'Separate, privacy-aware views of each person’s recorded intake and assigned meal portions.',
+  goals:
+    'Versioned targets used for planning and progress. They are guidance, not a medical assessment.',
+};
 type ProfileSummary = {
   id: string;
   displayName: string;
@@ -255,6 +283,13 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const router = useRouter();
   const [status, setStatus] = useState('');
   const [showOlderDiary, setShowOlderDiary] = useState(false);
+  const [logDialogOpen, setLogDialogOpen] = useState(false);
+  const [logMode, setLogMode] = useState<LogMode>('choose');
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const logDialogRef = useRef<HTMLDialogElement>(null);
+  const viewDialogRef = useRef<HTMLDialogElement>(null);
+  const profileDialogRef = useRef<HTMLDialogElement>(null);
   const retryKeys = useRef(new Map<string, string>());
   const { activeProfile, summary } = props;
   const definition = new Map(props.definitions.map((item) => [item.code, item]));
@@ -310,6 +345,37 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           (((summary.averageCompleteness ?? 0) + (summary.averageConfidence ?? 0)) / 2) * 100,
         );
   const trendMaximum = Math.max(1, ...summary.trend.map((day) => day.energyKcal ?? 0));
+  const dataWorkspace = props.dataWorkspace ?? { products: [], recipes: [] };
+  const loggableProducts = dataWorkspace.products.filter((product) => product.record);
+  const loggableRecipes = dataWorkspace.recipes.filter((recipe) => recipe.calculation);
+
+  useEffect(() => {
+    const dialog = logDialogRef.current;
+    if (logDialogOpen && dialog && !dialog.open) dialog.showModal();
+    if (!logDialogOpen && dialog?.open) dialog.close();
+  }, [logDialogOpen]);
+
+  useEffect(() => {
+    const dialog = viewDialogRef.current;
+    if (viewDialogOpen && dialog && !dialog.open) dialog.showModal();
+    if (!viewDialogOpen && dialog?.open) dialog.close();
+  }, [viewDialogOpen]);
+
+  useEffect(() => {
+    const dialog = profileDialogRef.current;
+    if (profileDialogOpen && dialog && !dialog.open) dialog.showModal();
+    if (!profileDialogOpen && dialog?.open) dialog.close();
+  }, [profileDialogOpen]);
+
+  function closeLogDialog() {
+    setLogDialogOpen(false);
+    setLogMode('choose');
+  }
+
+  function openLogDialog(mode: LogMode = 'choose') {
+    setLogMode(mode);
+    setLogDialogOpen(true);
+  }
 
   async function mutate(url: string, body: unknown) {
     setStatus('Saving…');
@@ -408,6 +474,71 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       })
     ) {
       form.reset();
+      closeLogDialog();
+    }
+  }
+
+  async function logQuickProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const product = loggableProducts.find((item) => item.id === String(data.get('productId')));
+    if (!product?.record) return;
+    if (
+      await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/intake/product`, {
+        productId: product.id,
+        quantity: Number(data.get('quantity')),
+        unit: data.get('unit'),
+        occurredAt: new Date(String(data.get('occurredAt'))).toISOString(),
+        mealSlot: data.get('mealSlot'),
+      })
+    ) {
+      form.reset();
+      closeLogDialog();
+    }
+  }
+
+  async function logQuickRecipe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const recipe = loggableRecipes.find((item) => item.id === String(data.get('recipeId')));
+    if (!recipe?.calculation) return;
+    if (
+      await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/intake/recipe`, {
+        recipeCalculationId: recipe.calculation.id,
+        servingCount: Number(data.get('servingCount')),
+        occurredAt: new Date(String(data.get('occurredAt'))).toISOString(),
+        mealSlot: data.get('mealSlot'),
+      })
+    ) {
+      form.reset();
+      closeLogDialog();
+    }
+  }
+
+  async function logQuickManual(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const values = ['energy_kcal', 'protein', 'carbohydrate', 'total_fat'].flatMap(
+      (nutrientCode) => {
+        const raw = String(data.get(`manual-${nutrientCode}`) ?? '').trim();
+        return raw ? [{ nutrientCode, amount: Number(raw) }] : [];
+      },
+    );
+    if (
+      await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/intake/manual`, {
+        sourceName: data.get('sourceName'),
+        quantity: Number(data.get('quantity')),
+        unit: data.get('unit'),
+        occurredAt: new Date(String(data.get('occurredAt'))).toISOString(),
+        mealSlot: data.get('mealSlot'),
+        values,
+      })
+    ) {
+      form.reset();
+      closeLogDialog();
     }
   }
 
@@ -478,13 +609,14 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       retryKeys.current.delete(scope);
       form?.reset();
     }
+    return completed;
   }
 
   async function copyDiaryDay(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
-    await runDiaryCommand(
+    const completed = await runDiaryCommand(
       `copy-day:${String(data.get('sourceDate'))}:${String(data.get('targetDate'))}:${String(data.get('targetProfileId'))}`,
       {
         command: 'copy_day',
@@ -494,6 +626,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       },
       form,
     );
+    if (completed && logDialogOpen) closeLogDialog();
   }
 
   async function entryLifecycleCommand(
@@ -1016,33 +1149,61 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
         </div>
         <div className={styles.headerTools}>
           <div className={styles.headerSelectors}>
-            <details className={styles.profileSelector}>
-              <summary>
-                <UserCircle size={18} aria-hidden="true" />
-                {activeProfile.displayName}
-                <ChevronDown size={15} aria-hidden="true" />
-              </summary>
-              <p>Switch people from the household profile control in the app header.</p>
-            </details>
+            <button
+              className={styles.profileSelector}
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setProfileDialogOpen(true)}
+            >
+              <UserCircle size={18} aria-hidden="true" />
+              {activeProfile.displayName}
+              <ChevronDown size={15} aria-hidden="true" />
+            </button>
             <span className={styles.dateSelector}>
               <CalendarDays size={17} aria-hidden="true" />
               {dateRangeLabel(mealProjection.range.start, mealProjection.range.end)}
-              <ChevronDown size={15} aria-hidden="true" />
             </span>
           </div>
           <div className={styles.headerButtons}>
-            <Link className={styles.primaryAction} href="/nutrition?view=diary">
-              <Plus size={17} aria-hidden="true" /> Log food
-            </Link>
-            <Link className={styles.secondaryButton} href="/nutrition?view=diary">
-              <Plus size={17} aria-hidden="true" /> Add entry
-            </Link>
-            <Link className={styles.secondaryButton} href="/nutrition?view=diary">
-              <NotebookTabs size={17} aria-hidden="true" /> View diary
+            <button
+              className={styles.primaryAction}
+              type="button"
+              aria-haspopup="dialog"
+              disabled={!activeProfile.canManageProfile}
+              onClick={() => openLogDialog()}
+            >
+              <Plus size={17} aria-hidden="true" /> Record nutrition
+            </button>
+            <Link
+              className={styles.secondaryButton}
+              href={props.view === 'diary' ? '/settings/nutrition' : '/nutrition?view=diary'}
+            >
+              {props.view === 'diary' ? (
+                <>
+                  <Info size={17} aria-hidden="true" /> Diary settings
+                </>
+              ) : (
+                <>
+                  <NotebookTabs size={17} aria-hidden="true" /> View diary
+                </>
+              )}
             </Link>
           </div>
         </div>
       </header>
+
+      <button
+        className={styles.mobileViewButton}
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setViewDialogOpen(true)}
+      >
+        <span>
+          <small>Nutrition view</small>
+          {VIEW_LABELS[props.view]}
+        </span>
+        <ChevronDown size={18} aria-hidden="true" />
+      </button>
 
       <nav className={styles.tabs} aria-label="Nutrition views">
         {VIEWS.map((view) => (
@@ -1051,10 +1212,390 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             href={`/nutrition?view=${view}`}
             aria-current={props.view === view ? 'page' : undefined}
           >
-            {view === 'diary' ? 'Food Diary' : view[0]!.toUpperCase() + view.slice(1)}
+            {VIEW_LABELS[view]}
           </Link>
         ))}
       </nav>
+
+      <section className={styles.viewIntro} aria-labelledby="nutrition-view-heading">
+        <div>
+          <p className={styles.viewEyebrow}>You are viewing</p>
+          <h2 id="nutrition-view-heading">{VIEW_LABELS[props.view]}</h2>
+        </div>
+        <p>{VIEW_EXPLAINERS[props.view]}</p>
+      </section>
+
+      <dialog
+        ref={profileDialogRef}
+        className={styles.compactDialog}
+        aria-labelledby="nutrition-profile-dialog-title"
+        onClose={() => setProfileDialogOpen(false)}
+        onCancel={() => setProfileDialogOpen(false)}
+      >
+        <div className={styles.dialogHeader}>
+          <div>
+            <p className={styles.viewEyebrow}>Active person</p>
+            <h2 id="nutrition-profile-dialog-title">{activeProfile.displayName}</h2>
+          </div>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Close person details"
+            onClick={() => setProfileDialogOpen(false)}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <p className={styles.dialogLead}>
+          Nutrition records, goals, and permissions stay attached to the selected household profile.
+        </p>
+        <div className={styles.profileDialogActions}>
+          <Link href="/settings/profiles">Manage household profiles</Link>
+          <Link href="/settings/nutrition">Nutrition settings</Link>
+        </div>
+      </dialog>
+
+      <dialog
+        ref={viewDialogRef}
+        className={styles.compactDialog}
+        aria-labelledby="nutrition-view-dialog-title"
+        onClose={() => setViewDialogOpen(false)}
+        onCancel={() => setViewDialogOpen(false)}
+      >
+        <div className={styles.dialogHeader}>
+          <div>
+            <p className={styles.viewEyebrow}>Explore your data</p>
+            <h2 id="nutrition-view-dialog-title">Choose a Nutrition view</h2>
+          </div>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Close Nutrition views"
+            onClick={() => setViewDialogOpen(false)}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <nav className={styles.viewDialogLinks} aria-label="Choose Nutrition view">
+          {VIEWS.map((view) => (
+            <Link
+              key={view}
+              href={`/nutrition?view=${view}`}
+              aria-current={props.view === view ? 'page' : undefined}
+              onClick={() => setViewDialogOpen(false)}
+            >
+              <span>
+                <strong>{VIEW_LABELS[view]}</strong>
+                <small>{VIEW_EXPLAINERS[view]}</small>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          ))}
+        </nav>
+      </dialog>
+
+      <dialog
+        ref={logDialogRef}
+        className={styles.logDialog}
+        aria-labelledby="nutrition-log-dialog-title"
+        onClose={closeLogDialog}
+        onCancel={closeLogDialog}
+      >
+        <div className={styles.dialogHeader}>
+          <div>
+            <p className={styles.viewEyebrow}>Food diary</p>
+            <h2 id="nutrition-log-dialog-title">
+              {logMode === 'choose' ? 'What would you like to record?' : 'Record nutrition'}
+            </h2>
+          </div>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Close record nutrition dialog"
+            onClick={closeLogDialog}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <p className={styles.dialogLead}>
+          Confirmed food contributes to totals. Skipped meals add history without adding nutrients.
+        </p>
+
+        {logMode === 'choose' ? (
+          <div className={styles.logOptions}>
+            <button type="button" onClick={() => setLogMode('product')}>
+              <Search size={22} aria-hidden="true" />
+              <span>
+                <strong>Food or packaged item</strong>
+                <small>Record a portion from a product with Nutrition data.</small>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => setLogMode('recipe')}>
+              <Utensils size={22} aria-hidden="true" />
+              <span>
+                <strong>Recipe or meal</strong>
+                <small>Record servings from a calculated recipe.</small>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => setLogMode('manual')}>
+              <NotebookTabs size={22} aria-hidden="true" />
+              <span>
+                <strong>Manual diary entry</strong>
+                <small>Add a food or meal when no saved record applies.</small>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => setLogMode('skipped')}>
+              <CircleSlash2 size={22} aria-hidden="true" />
+              <span>
+                <strong>Skipped meal</strong>
+                <small>Keep the diary accurate without adding nutrient values.</small>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => setLogMode('copy')}>
+              <ClipboardCopy size={22} aria-hidden="true" />
+              <span>
+                <strong>Copy a diary day</strong>
+                <small>Reuse confirmed entries from another date.</small>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
+          <button className={styles.backButton} type="button" onClick={() => setLogMode('choose')}>
+            ← All record types
+          </button>
+        )}
+
+        {logMode === 'product' ? (
+          loggableProducts.length ? (
+            <form className={styles.dialogForm} onSubmit={logQuickProduct}>
+              <label>
+                Product
+                <select name="productId" required>
+                  {loggableProducts.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className={styles.dialogFieldRow}>
+                <label>
+                  Quantity
+                  <input name="quantity" type="number" min="0.000001" step="any" required />
+                </label>
+                <label>
+                  Unit
+                  <input name="unit" defaultValue="g" maxLength={30} required />
+                </label>
+              </div>
+              <div className={styles.dialogFieldRow}>
+                <label>
+                  When
+                  <input name="occurredAt" type="datetime-local" required />
+                </label>
+                <label>
+                  Meal
+                  <select name="mealSlot" defaultValue="snack">
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Snack</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+              </div>
+              <button className={styles.dialogPrimary} type="submit">
+                Add to food diary
+              </button>
+            </form>
+          ) : (
+            <div className={styles.dialogEmpty}>
+              <strong>No foods are ready to record</strong>
+              <p>Add or import Nutrition data for a product first.</p>
+              <Link href="/pantry">Open Pantry</Link>
+            </div>
+          )
+        ) : null}
+
+        {logMode === 'recipe' ? (
+          loggableRecipes.length ? (
+            <form className={styles.dialogForm} onSubmit={logQuickRecipe}>
+              <label>
+                Recipe
+                <select name="recipeId" required>
+                  {loggableRecipes.map((recipe) => (
+                    <option key={recipe.id} value={recipe.id}>
+                      {recipe.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className={styles.dialogFieldRow}>
+                <label>
+                  Servings eaten
+                  <input
+                    name="servingCount"
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    defaultValue="1"
+                    required
+                  />
+                </label>
+                <label>
+                  Meal
+                  <select name="mealSlot" defaultValue="dinner">
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Snack</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                When
+                <input name="occurredAt" type="datetime-local" required />
+              </label>
+              <button className={styles.dialogPrimary} type="submit">
+                Add recipe to food diary
+              </button>
+            </form>
+          ) : (
+            <div className={styles.dialogEmpty}>
+              <strong>No calculated recipes are ready</strong>
+              <p>Calculate a recipe’s Nutrition data before recording a serving.</p>
+              <Link href="/nutrition?view=diary" onClick={closeLogDialog}>
+                Open diary tools
+              </Link>
+            </div>
+          )
+        ) : null}
+
+        {logMode === 'manual' ? (
+          <form className={styles.dialogForm} onSubmit={logQuickManual}>
+            <label>
+              Food or meal name
+              <input name="sourceName" maxLength={300} required />
+            </label>
+            <div className={styles.dialogFieldRow}>
+              <label>
+                Portion amount
+                <input
+                  name="quantity"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue="1"
+                  required
+                />
+              </label>
+              <label>
+                Portion unit
+                <input name="unit" defaultValue="portion" maxLength={30} required />
+              </label>
+            </div>
+            <div className={styles.dialogFieldRow}>
+              <label>
+                When
+                <input name="occurredAt" type="datetime-local" required />
+              </label>
+              <label>
+                Meal
+                <select name="mealSlot" defaultValue="snack">
+                  <option value="breakfast">Breakfast</option>
+                  <option value="lunch">Lunch</option>
+                  <option value="dinner">Dinner</option>
+                  <option value="snack">Snack</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
+            <fieldset className={styles.manualNutrients}>
+              <legend>Nutrition for this portion</legend>
+              {(['energy_kcal', 'protein', 'carbohydrate', 'total_fat'] as const).map((code) => (
+                <label key={code}>
+                  {definition.get(code)?.displayName ?? code} (
+                  {definition.get(code)?.canonicalUnit ?? ''})
+                  <input
+                    name={`manual-${code}`}
+                    type="number"
+                    min="0"
+                    step="any"
+                    required={code === 'energy_kcal'}
+                  />
+                </label>
+              ))}
+            </fieldset>
+            <p className={styles.formHint}>
+              Manual values are marked as estimates so their provenance stays visible.
+            </p>
+            <button className={styles.dialogPrimary} type="submit">
+              Add manual entry
+            </button>
+          </form>
+        ) : null}
+
+        {logMode === 'skipped' ? (
+          <form className={styles.dialogForm} onSubmit={recordSkipped}>
+            <label>
+              When
+              <input name="occurredAt" type="datetime-local" required />
+            </label>
+            <label>
+              Meal
+              <select name="mealSlot" defaultValue="dinner">
+                <option value="breakfast">Breakfast</option>
+                <option value="lunch">Lunch</option>
+                <option value="dinner">Dinner</option>
+                <option value="snack">Snack</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <button className={styles.dialogPrimary} type="submit">
+              Record skipped meal
+            </button>
+          </form>
+        ) : null}
+
+        {logMode === 'copy' ? (
+          <form className={styles.dialogForm} onSubmit={copyDiaryDay}>
+            <div className={styles.dialogFieldRow}>
+              <label>
+                Copy from
+                <input name="sourceDate" type="date" required />
+              </label>
+              <label>
+                Copy to
+                <input name="targetDate" type="date" required />
+              </label>
+            </div>
+            <label>
+              Person
+              <select name="targetProfileId" defaultValue={activeProfile.id}>
+                {props.profiles
+                  .filter((profile) => profile.canManageProfile)
+                  .map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.displayName}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <p className={styles.formHint}>
+              Only confirmed entries are copied; the original diary remains unchanged.
+            </p>
+            <button className={styles.dialogPrimary} type="submit">
+              Copy confirmed entries
+            </button>
+          </form>
+        ) : null}
+      </dialog>
 
       {props.view === 'overview' ? (
         <>
@@ -1297,7 +1838,23 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 ) : null}
               </div>
               {summary.currentEntries.length === 0 ? (
-                <p className={styles.muted}>No diary history is visible for this profile.</p>
+                <div className={styles.emptyState}>
+                  <NotebookTabs size={24} aria-hidden="true" />
+                  <div>
+                    <h3>Your food diary is ready</h3>
+                    <p>
+                      Record food, a skipped meal, or copy a previous day. Nothing is assumed until
+                      you confirm it.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!activeProfile.canManageProfile}
+                    onClick={() => openLogDialog()}
+                  >
+                    Record nutrition
+                  </button>
+                </div>
               ) : (
                 <ol className={styles.diaryList}>
                   {summary.currentEntries.slice(0, showOlderDiary ? undefined : 10).map((entry) => (
@@ -1633,7 +2190,23 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 ))}
             </div>
             {Object.keys(summary.todayTotals).length === 0 ? (
-              <p className={styles.callout}>No nutrient values have been confirmed today.</p>
+              <div className={styles.emptyState}>
+                <Info size={24} aria-hidden="true" />
+                <div>
+                  <h3>No confirmed nutrient data today</h3>
+                  <p>
+                    Record a food or meal to see amounts and coverage. Unknown nutrients stay blank
+                    rather than appearing as zero.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!activeProfile.canManageProfile}
+                  onClick={() => openLogDialog()}
+                >
+                  Record nutrition
+                </button>
+              </div>
             ) : null}
           </section>
           <NutritionChartPanels
@@ -1680,7 +2253,17 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           <section className={styles.panel}>
             <h2>Current goal history</h2>
             {props.goals.length === 0 ? (
-              <p className={styles.muted}>No goals configured.</p>
+              <div className={styles.emptyState}>
+                <TrendingUp size={24} aria-hidden="true" />
+                <div>
+                  <h3>No Nutrition goals yet</h3>
+                  <p>
+                    Add a target when you want progress comparisons. Recorded amounts remain useful
+                    without one.
+                  </p>
+                </div>
+                <Link href="/settings/nutrition">Set up Nutrition goals</Link>
+              </div>
             ) : (
               <ul className={styles.goalList}>
                 {props.goals.map((goal) => (
