@@ -4,6 +4,7 @@ import { Plus, Send, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 
 import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { createClientUuid } from '@/lib/client/client-uuid';
 
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
 import styles from './ai-assistant-drawer.module.css';
@@ -191,7 +192,7 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
     setDraft('');
     setMessages((current) => [
       ...current,
-      { id: crypto.randomUUID(), role: 'user', content: message },
+      { id: createClientUuid(), role: 'user', content: message },
     ]);
     setBusy(true);
     setStatus('Thinking…');
@@ -246,7 +247,7 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
             setMessages((current) => [
               ...current,
               {
-                id: event.messageId ?? crypto.randomUUID(),
+                id: event.messageId ?? createClientUuid(),
                 role: 'assistant',
                 content: assistantText,
                 actionId: event.actionId ?? lastActionId,

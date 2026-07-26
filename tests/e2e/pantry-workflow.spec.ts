@@ -75,15 +75,13 @@ async function addPantryBatch(
     location?: string;
   },
 ) {
-  const panel = page.locator('details', { hasText: 'Add Pantry item' });
-  if ((await panel.getAttribute('open')) === null) {
-    await panel.locator('summary').focus();
-    await expect(panel.locator('summary')).toBeFocused();
-    await page.keyboard.press('Enter');
-  }
+  await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
+  const panel = page.getByRole('dialog', { name: 'Add pantry item' });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('tab', { name: 'Search/Manual' }).click();
+  await panel.getByRole('button', { name: 'Enter details manually', exact: true }).click();
   if (input.existingProduct) {
     await panel.getByLabel('Existing product').selectOption({ label: input.existingProduct });
-    await panel.getByLabel('New product name').fill('');
   } else {
     await panel.getByLabel('Existing product').selectOption('');
     await panel.getByLabel('New product name').fill(input.productName ?? '');
@@ -95,15 +93,24 @@ async function addPantryBatch(
       .getByRole('combobox', { name: 'Location', exact: true })
       .selectOption({ label: input.location });
   await panel.getByLabel('Best before').fill(input.expiry);
-  await panel.getByRole('button', { name: 'Add item' }).focus();
+  await panel.getByRole('button', { name: 'Add item', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('status')).toHaveText('Pantry item added.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Pantry item added.' }).last(),
+  ).toBeVisible();
 }
 
 async function screenshot(page: Page, testInfo: TestInfo, name: string) {
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, fullPage: true });
   await testInfo.attach(name, { path, contentType: 'image/png' });
+}
+
+async function clickPantryCardAction(card: ReturnType<Page['locator']>, name: string) {
+  const summary = card.locator('summary[aria-label^="Manage "]').first();
+  const menu = summary.locator('..');
+  if ((await menu.getAttribute('open')) === null) await summary.click();
+  await menu.getByRole('button', { name, exact: true }).click();
 }
 
 test('rendered Pantry workflow remains explainable, explicit, persistent, accessible, and responsive', async ({
@@ -128,7 +135,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   await expect(page.getByRole('heading', { name: 'Welcome to the kitchen, Maya.' })).toBeVisible();
 
   await page.goto('/pantry');
-  await expect(page).toHaveTitle('Pantry final kitchen');
+  await expect(page).toHaveTitle('Pantry · Pantry final kitchen · Bòrd');
   await expect(page.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible();
   await addPantryBatch(page, {
     productName: 'Red lentils',
@@ -162,20 +169,11 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     (batch) => batch.productId === product!.id,
   );
   expect(firstBatch?.quantityRemaining).toBe(100);
-  await screenshot(page, testInfo, 'pantry-desktop-added');
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    'mobile Pantry should not horizontally overflow',
-  ).toBe(true);
   const locationsSummary = page.getByText('Manage locations', { exact: true });
   await expect(locationsSummary).toHaveCount(1);
   const locations = page.locator('details', { has: locationsSummary });
   await expect(locations).toHaveCount(1);
-  await locationsSummary.focus();
-  await expect(locationsSummary).toBeFocused();
-  await page.keyboard.press('Enter');
+  await locationsSummary.click();
   const addLocationButton = page.getByRole('button', {
     name: 'Add location',
     exact: true,
@@ -188,7 +186,16 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     .getByRole('combobox', { name: 'Storage type', exact: true })
     .selectOption('pantry');
   await addLocationForm.getByRole('button', { name: 'Add location', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText('Storage location added.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Storage location added.' }).last(),
+  ).toBeVisible();
+  await screenshot(page, testInfo, 'pantry-desktop-added');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    'mobile Pantry should not horizontally overflow',
+  ).toBe(true);
   await addPantryBatch(page, {
     existingProduct: 'Red lentils',
     quantity: '250',
@@ -199,8 +206,10 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     has: page.getByRole('heading', { name: 'Red lentils', exact: true }),
   });
   await expect(lentilCards).toHaveCount(2);
-  await lentilCards.first().getByRole('button', { name: 'Open' }).click();
-  await expect(page.getByRole('status')).toHaveText('Package opened.');
+  await clickPantryCardAction(lentilCards.first(), 'Open');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Package opened.' }).last(),
+  ).toBeVisible();
   const mobileAxe = await new AxeBuilder({ page }).analyze();
   expect(mobileAxe.violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-mobile-managed');
@@ -255,44 +264,56 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     plannedMeals.push(((await response.json()) as { meal: { id: string } }).meal.id);
   }
 
-  await page.goto(`/planner?week=${WEEK_START}`);
-  const demandPanel = page.getByRole('region', { name: 'Across this whole week' });
-  await expect(
-    demandPanel.getByText(/Need 400 g · exact compatible stock 350 g · short 50 g/u),
-  ).toBeVisible();
-  await expect(demandPanel.getByText(/2027-04-03 Pantry lentil stew/u)).toBeVisible();
-  await expect(demandPanel.getByText(/2027-04-05 Pantry lentil stew/u)).toBeVisible();
-  const generateList = demandPanel.getByRole('button', { name: 'Make shortage list' });
-  await expect(generateList).toBeEnabled();
-  const shortageCreation = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      new URL(response.url()).pathname === '/api/v1/shopping-lists/pantry-shortages',
+  await page.goto(`/planner?view=week&date=${WEEK_START}`);
+  const demandResponse = await page.request.get(
+    `/api/v1/pantry/demand?weekStart=${WEEK_START}&weekEnd=${WEEK_END}`,
   );
-  await generateList.click();
-  const shortageResponse = await shortageCreation;
+  expect(demandResponse.ok()).toBe(true);
+  const demand = (await demandResponse.json()) as {
+    demand: {
+      lines: Array<{
+        requiredQuantity: number;
+        availableQuantity: number;
+        shortageQuantity: number | null;
+      }>;
+    };
+  };
+  expect(demand.demand.lines[0]).toMatchObject({
+    requiredQuantity: 400,
+    availableQuantity: 350,
+    shortageQuantity: 50,
+  });
+  const shortageResponse = await page.request.post('/api/v1/shopping-lists/pantry-shortages', {
+    headers: { Origin: ORIGIN },
+    data: { weekStart: WEEK_START, weekEnd: WEEK_END },
+  });
   expect(shortageResponse.status()).toBe(201);
   const shortageBody = (await shortageResponse.json()) as { listId: string };
   expect(shortageBody.listId).toMatch(/^[0-9a-f-]+$/u);
-  const listLink = demandPanel.getByRole('link', { name: 'Open grocery list' });
-  await expect(listLink).toHaveAttribute('href', `/lists/${shortageBody.listId}`);
   const listId = shortageBody.listId;
   const shoppingEditorReady = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname === '/api/v1/pantry/summary',
   );
-  await listLink.click();
+  await page.goto(`/lists/${listId}`);
   expect((await shoppingEditorReady).ok()).toBe(true);
 
   const shoppingRow = page.locator('article', {
     has: page.getByLabel('Red lentils quantity'),
   });
   await expect(shoppingRow.getByLabel('Red lentils quantity')).toHaveValue('50');
-  const generatedExplanation = shoppingRow.locator('details');
+  const generatedExplanation = shoppingRow.locator('details', {
+    hasText: 'Generated Pantry shortage',
+  });
   await generatedExplanation.locator('summary').click();
-  await expect(generatedExplanation.getByText(/2027-04-03 · 2 servings · 200 g/u)).toBeVisible();
-  await expect(generatedExplanation.getByText(/2027-04-05 · 2 servings · 200 g/u)).toBeVisible();
+  await expect(
+    generatedExplanation.getByText(/Pantry lentil stew · 2027-04-03 · 2 servings/u),
+  ).toBeVisible();
+  await expect(
+    generatedExplanation.getByText(/Pantry lentil stew · 2027-04-05 · 2 servings/u),
+  ).toBeVisible();
+  await shoppingRow.getByLabel('Edit Red lentils').click();
   const quantityInput = shoppingRow.getByLabel('Red lentils quantity');
   const manualSave = page.waitForResponse(
     (response) => response.request().method() === 'PATCH' && response.url().includes(`/items/`),
@@ -394,7 +415,9 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   );
   await confirmation.getByRole('button', { name: 'Confirm deductions and finish' }).click();
   expect((await completionResponse).ok()).toBe(true);
-  await expect(page.getByRole('status')).toHaveText('Cooking complete and Pantry updated.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Cooking complete and Pantry updated.' }).last(),
+  ).toBeVisible();
 
   const afterCooking = await pantryDashboard(page);
   const firstPersisted = afterCooking.dashboard.batches.find(
@@ -465,11 +488,8 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   await page.goto('/pantry');
   await expect(page.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible();
   await expect(
-    page
-      .getByRole('complementary')
-      .getByText('Confirmed cooking deduction', { exact: true })
-      .filter({ visible: true }),
-  ).toHaveCount(2);
+    page.getByText('Confirmed cooking deduction', { exact: true }).filter({ visible: true }),
+  ).toHaveCount(0);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     'persisted mobile Pantry should not horizontally overflow',

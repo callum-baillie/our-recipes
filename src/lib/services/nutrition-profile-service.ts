@@ -51,6 +51,7 @@ export type AccessibleNutritionProfile = Pick<
   | 'measurementSystem'
   | 'preferredEnergyUnit'
   | 'dailyResetTimezone'
+  | 'weightTrackingEnabled'
   | 'showPlannedNutrition'
   | 'showRecipeCardNutrition'
   | 'showMealPlanNutrition'
@@ -680,6 +681,7 @@ export function listAccessibleNutritionProfiles(
           measurementSystem: profile.measurementSystem,
           preferredEnergyUnit: profile.preferredEnergyUnit,
           dailyResetTimezone: profile.dailyResetTimezone,
+          weightTrackingEnabled: profile.weightTrackingEnabled,
           visibleNutrientCodes: visibleNutrientCodes(profile.visibleNutrientCodes),
           trendRangeDays: profile.trendRangeDays as 7 | 14 | 30,
           showPlannedNutrition: profile.showPlannedNutrition,

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { createClientUuid } from '@/lib/client/client-uuid';
 import { convertTemperature, recipeYieldNumber, scaledQuantity } from '@/lib/domain/cooking';
 import type { RecipeDetail } from '@/lib/services/recipe-service';
 
@@ -293,7 +294,7 @@ export function CookingMode({
   };
   const createPreparedNutrition = async () => {
     if (!completedSessionId || !nutritionPreparation || preparedSaving) return;
-    preparedInstanceId.current ??= crypto.randomUUID();
+    preparedInstanceId.current ??= createClientUuid();
     setPreparedSaving(true);
     setPreparedStatus('Saving prepared Nutrition batch…');
     const response = await fetch(
@@ -341,7 +342,7 @@ export function CookingMode({
     setTimers((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        id: createClientUuid(),
         label: `Timer ${current.length + 1}`,
         remaining: seconds,
         running: true,
@@ -683,7 +684,7 @@ export function CookingMode({
                 setLeftovers((current) => [
                   ...current,
                   {
-                    id: crypto.randomUUID(),
+                    id: createClientUuid(),
                     productId: '',
                     locationId: '',
                     quantity: '',

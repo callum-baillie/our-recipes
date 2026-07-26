@@ -110,10 +110,14 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await generator.getByRole('button', { name: 'Close meal plan generator' }).click();
   await page.getByRole('button', { name: 'Plan settings' }).click();
   const setup = page.getByRole('region', { name: 'Build your meal plan' });
-  await expect(setup.getByText('2 people · 2 servings per meal')).toBeVisible();
-  await setup.getByText('Breakfast', { exact: true }).click();
-  await setup.getByText('Lunch', { exact: true }).click();
-  await setup.getByText('Dessert', { exact: true }).click();
+  await expect(setup.getByRole('checkbox', { name: 'Callum' })).toBeChecked();
+  await expect(setup.getByRole('checkbox', { name: 'Julia' })).toBeChecked();
+  await setup.getByText('Breakfast', { exact: true }).filter({ visible: true }).click();
+  await setup.getByText('Lunch', { exact: true }).filter({ visible: true }).click();
+  await setup.getByText('Dessert', { exact: true }).filter({ visible: true }).click();
+  await expect(setup.getByRole('checkbox', { name: 'Breakfast' })).not.toBeChecked();
+  await expect(setup.getByRole('checkbox', { name: 'Lunch' })).not.toBeChecked();
+  await expect(setup.getByRole('checkbox', { name: 'Dessert' })).toBeChecked();
   await setup.getByRole('button', { name: 'Close plan settings' }).click();
   await page
     .locator('[class*="mobileSchedule"]')
@@ -123,9 +127,11 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
 
   const selector = page.getByRole('dialog', { name: 'Select recipes' });
   await expect(selector).toBeVisible();
-  await expect(selector.getByRole('tab', { name: 'Dinner 0 of 7' })).toBeVisible();
-  await expect(selector.getByRole('tab', { name: 'Dessert 0 of 7' })).toBeVisible();
-  await expect(selector.getByRole('tab', { name: /Breakfast/u })).toHaveCount(0);
+  const dinnerTab = selector.getByRole('tab', { name: 'Dinner 0 of 1' });
+  await expect(dinnerTab).toBeVisible();
+  await expect(selector.getByRole('tab', { name: 'Dessert 0 of 1' })).toBeVisible();
+  await expect(selector.getByRole('tab', { name: 'Breakfast 0 of 1' })).toBeVisible();
+  await dinnerTab.click();
   await selector
     .getByPlaceholder('Search recipes, tags, categories, or collections')
     .fill('Dinner pasta');
@@ -142,6 +148,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   });
   await expect(plannedDinner.getByLabel('Servings for Dinner pasta')).toHaveValue('2');
 
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
   await expect(page.getByRole('heading', { name: /^Pantry shortages · /u })).toBeVisible();
   await expect(page.getByLabel('pasta quantity')).toHaveValue('200');

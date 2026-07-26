@@ -111,7 +111,8 @@ test('planned cooking reviews exact FEFO stock and only deducts after literal co
   const mealId = ((await mealResponse.json()) as { meal: { id: string } }).meal.id;
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/planner?week=2027-04-01');
+  await page.goto('/planner?view=week&date=2027-04-01');
+  await page.locator('summary[aria-label="Actions for Cooking lentil stew"]:visible').click();
   const cookLink = page.getByRole('link', {
     name: 'Cook Cooking lentil stew from this planned meal',
   });
@@ -120,9 +121,12 @@ test('planned cooking reviews exact FEFO stock and only deducts after literal co
     `/recipes/${recipe.recipe.id}/cook?mealPlanEntryId=${mealId}`,
   );
   await capture(page, testInfo, 'pantry-cooking-planner-1280');
+  await cookLink.focus();
   await Promise.all([
-    page.waitForURL(`**/recipes/${recipe.recipe.id}/cook?mealPlanEntryId=${mealId}`),
-    cookLink.click(),
+    page.waitForURL(`**/recipes/${recipe.recipe.id}/cook?mealPlanEntryId=${mealId}`, {
+      timeout: 15_000,
+    }),
+    page.keyboard.press('Enter'),
   ]);
   const startCooking = page.getByRole('button', { name: 'Start cooking' });
   await expect(startCooking).toBeVisible();

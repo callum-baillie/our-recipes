@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PageSkeleton } from '@/components/skeleton';
 import { FoodCatalogPicker } from '@/components/food-catalog-picker';
+import { useToast } from '@/components/toast-provider';
 import type { FoodRecord } from '@/lib/domain/food-data';
 
 import styles from './pantry-manager.module.css';
@@ -642,6 +643,7 @@ export function PantryManager({
     defaultGroup: 'none' | 'location' | 'category' | 'expiry';
   };
 }) {
+  const { showToast } = useToast();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [q, setQ] = useState('');
   const [view, setView] = useState(initialPreferences.defaultView);
@@ -669,10 +671,11 @@ export function PantryManager({
   const [manualSearchNotice, setManualSearchNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const addItemDialogRef = useRef<HTMLDialogElement>(null);
   const filterDialogRef = useRef<HTMLDialogElement>(null);
   const manualEntryRef = useRef<HTMLDivElement>(null);
+  const loadRequestRef = useRef(0);
 
   function openAddItemDialog() {
     setManualEntryOpen(false);
@@ -707,6 +710,7 @@ export function PantryManager({
   }, [addItemOpen]);
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     const query = new URLSearchParams({
       q,
       view,
@@ -717,44 +721,33 @@ export function PantryManager({
     if (category) query.set('category', category);
     if (status) query.set('status', status);
     if (expiry) query.set('expiry', expiry);
-    const response = await fetch(`/api/v1/pantry/summary?${query.toString()}`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) {
-      setError(await messageFor(response, 'Pantry could not be loaded.'));
-      return;
+    try {
+      const response = await fetch(`/api/v1/pantry/summary?${query.toString()}`, {
+        cache: 'no-store',
+      });
+      if (requestId !== loadRequestRef.current) return;
+      if (!response.ok) {
+        const message = await messageFor(response, 'Pantry could not be loaded.');
+        if (requestId === loadRequestRef.current) setError(message);
+        return;
+      }
+      const body = (await response.json()) as { dashboard: Dashboard };
+      if (requestId !== loadRequestRef.current) return;
+      setDashboard(body.dashboard);
+      setError(null);
+    } catch {
+      if (requestId === loadRequestRef.current) {
+        setError('Pantry could not be loaded. Check the server connection and try again.');
+      }
+    } finally {
+      if (requestId === loadRequestRef.current) setInitialLoadComplete(true);
     }
-    const body = (await response.json()) as { dashboard: Dashboard };
-    setDashboard(body.dashboard);
   }, [category, expiry, includeInactive, locationId, q, sort, status, view]);
 
   useEffect(() => {
-    let cancelled = false;
-    const query = new URLSearchParams({
-      q,
-      view,
-      sort,
-      includeInactive: String(includeInactive),
-    });
-    if (locationId) query.set('locationId', locationId);
-    if (category) query.set('category', category);
-    if (status) query.set('status', status);
-    if (expiry) query.set('expiry', expiry);
-    void fetch(`/api/v1/pantry/summary?${query.toString()}`, { cache: 'no-store' }).then(
-      async (response) => {
-        if (cancelled) return;
-        if (!response.ok) {
-          setError(await messageFor(response, 'Pantry could not be loaded.'));
-          return;
-        }
-        const body = (await response.json()) as { dashboard: Dashboard };
-        if (!cancelled) setDashboard(body.dashboard);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [category, expiry, includeInactive, locationId, q, sort, status, view]);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const defaultLocationId = dashboard?.locations[0]?.id ?? '';
   const productOptions = useMemo(() => dashboard?.products ?? [], [dashboard]);
@@ -880,20 +873,33 @@ export function PantryManager({
   async function mutate(url: string, body: unknown, success: string, method = 'POST') {
     setBusy(true);
     setError(null);
-    setNotice(null);
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    setBusy(false);
-    if (!response.ok) {
-      setError(await messageFor(response, 'That Pantry change could not be saved.'));
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        showToast(await messageFor(response, 'That Pantry change could not be saved.'), 'error');
+        return false;
+      }
+      showToast(success, 'success');
+      document
+        .querySelectorAll<HTMLDetailsElement>(`details.${styles.rowMenu}[open]`)
+        .forEach((menu) => {
+          menu.open = false;
+        });
+      await load();
+      return true;
+    } catch {
+      showToast(
+        'That Pantry change could not be saved. Check the connection and try again.',
+        'error',
+      );
       return false;
+    } finally {
+      setBusy(false);
     }
-    setNotice(success);
-    await load();
-    return true;
   }
 
   function productPayload(product: Product, formData: FormData) {
@@ -977,47 +983,58 @@ export function PantryManager({
     const unit = String(formData.get('unit') ?? 'each');
     setBusy(true);
     setError(null);
-    setNotice(null);
-    if (!productId) {
-      const productResponse = await fetch('/api/v1/pantry/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          displayName: formData.get('productName'),
-          brand: formData.get('brand'),
-          category: formData.get('category'),
-          defaultInventoryUnit: unit,
-          defaultPackageUnit: formData.get('packageUnit'),
-          defaultStorageType: formData.get('storageType'),
-          aliases: [],
-          isStaple: formData.get('isStaple') === 'on',
-        }),
-      });
-      if (!productResponse.ok) {
-        setBusy(false);
-        setError(await messageFor(productResponse, 'That product could not be created.'));
-        return;
+    try {
+      if (!productId) {
+        const productResponse = await fetch('/api/v1/pantry/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            displayName: formData.get('productName'),
+            brand: formData.get('brand'),
+            category: formData.get('category'),
+            defaultInventoryUnit: unit,
+            defaultPackageUnit: formData.get('packageUnit'),
+            defaultStorageType: formData.get('storageType'),
+            aliases: [],
+            isStaple: formData.get('isStaple') === 'on',
+          }),
+        });
+        if (!productResponse.ok) {
+          showToast(
+            await messageFor(productResponse, 'That product could not be created.'),
+            'error',
+          );
+          return;
+        }
+        const productBody = (await productResponse.json()) as { product: Product };
+        productId = productBody.product.id;
       }
-      const productBody = (await productResponse.json()) as { product: Product };
-      productId = productBody.product.id;
-    }
-    const batchCount = Math.min(20, Math.max(1, Number(formData.get('batchCount') ?? 1)));
-    for (let index = 0; index < batchCount; index += 1) {
-      const batchResponse = await fetch('/api/v1/pantry/batches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...batchPayload(formData), productId }),
-      });
-      if (!batchResponse.ok) {
-        setBusy(false);
-        setError(await messageFor(batchResponse, 'The stock amount could not be added.'));
-        return;
+      const batchCount = Math.min(20, Math.max(1, Number(formData.get('batchCount') ?? 1)));
+      for (let index = 0; index < batchCount; index += 1) {
+        const batchResponse = await fetch('/api/v1/pantry/batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...batchPayload(formData), productId }),
+        });
+        if (!batchResponse.ok) {
+          showToast(
+            await messageFor(batchResponse, 'The stock amount could not be added.'),
+            'error',
+          );
+          return;
+        }
       }
+      showToast(
+        batchCount > 1 ? `${batchCount} Pantry batches added.` : 'Pantry item added.',
+        'success',
+      );
+      closeAddItemDialog();
+      await load();
+    } catch {
+      showToast('The Pantry item could not be added. Check the connection and try again.', 'error');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
-    setNotice(batchCount > 1 ? `${batchCount} Pantry batches added.` : 'Pantry item added.');
-    closeAddItemDialog();
-    await load();
   }
 
   async function quickAddItem(formData: FormData) {
@@ -1143,8 +1160,32 @@ export function PantryManager({
     );
   }
 
-  if (!dashboard) {
+  if (!dashboard && !initialLoadComplete) {
     return <PageSkeleton as="div" variant="workspace" />;
+  }
+
+  if (!dashboard) {
+    return (
+      <div className="route-state-page">
+        <section className="route-state-card" aria-labelledby="pantry-load-error">
+          <p className="eyebrow">PANTRY UNAVAILABLE</p>
+          <h1 id="pantry-load-error">Your Pantry could not be loaded.</h1>
+          <p>{error ?? 'Check the server connection and try again.'}</p>
+          <div className="route-state-actions">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => {
+                setInitialLoadComplete(false);
+                void load();
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -1194,7 +1235,7 @@ export function PantryManager({
                   searchSuggestions={productOptions.map((product) => product.displayName)}
                   onManualRequest={showManualEntry}
                   onImported={() => {
-                    setNotice('Reviewed food data and Pantry batch added.');
+                    showToast('Reviewed food data and Pantry batch added.', 'success');
                     closeAddItemDialog();
                     void load();
                   }}
@@ -1572,12 +1613,6 @@ export function PantryManager({
           {error}
         </p>
       ) : null}
-      {notice ? (
-        <p className={styles.notice} role="status">
-          {notice}
-        </p>
-      ) : null}
-
       <section className={styles.summary} aria-label="Pantry summary">
         {summaryCards(dashboard).map(({ detail, icon: Icon, label, tone, value }) => (
           <article key={label}>

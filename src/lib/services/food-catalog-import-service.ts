@@ -161,10 +161,7 @@ export function importFoodCatalogRecord(args: {
       reusedProduct: boolean;
     };
   }
-  const parsedBatches =
-    destination === 'pantry'
-      ? (args.batches ?? []).map(parseCatalogBatch)
-      : [];
+  const parsedBatches = destination === 'pantry' ? (args.batches ?? []).map(parseCatalogBatch) : [];
   const now = new Date();
   const result = database.transaction((transaction) => {
     const identifier = record.canonicalGtin

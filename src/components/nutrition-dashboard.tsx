@@ -10,6 +10,7 @@ import {
   Info,
   NotebookTabs,
   Plus,
+  Scale,
   Search,
   TrendingUp,
   UserCircle,
@@ -37,13 +38,19 @@ import {
   NutritionPreparedWorkspace,
   type PreparedServingWorkspace,
 } from '@/components/nutrition-prepared-workspace';
+import {
+  NutritionSetupOverview,
+  NutritionWeightTrackerCard,
+} from '@/components/nutrition-setup-overview';
+import { createClientUuid } from '@/lib/client/client-uuid';
 import type { NutritionChartDatasets } from '@/lib/domain/nutrition-chart-datasets';
 import type { AdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
 import type { NutritionWeightTrend } from '@/lib/domain/nutrition-weight-trend';
 
 const VIEWS = ['overview', 'diary', 'nutrients', 'trends', 'household', 'goals'] as const;
+const POUNDS_PER_KILOGRAM = 2.2046226218;
 export type NutritionView = (typeof VIEWS)[number];
-type LogMode = 'choose' | 'product' | 'recipe' | 'manual' | 'skipped' | 'copy';
+type LogMode = 'choose' | 'product' | 'recipe' | 'manual' | 'skipped' | 'copy' | 'weight';
 
 const VIEW_LABELS: Record<NutritionView, string> = {
   overview: 'Overview',
@@ -79,8 +86,10 @@ type ProfileSummary = {
   canExportData?: boolean;
   canDeleteData?: boolean;
   version?: number;
+  measurementSystem?: 'metric' | 'imperial';
   trendRangeDays?: 7 | 14 | 30;
   showPlannedNutrition?: boolean;
+  weightTrackingEnabled?: boolean;
 };
 type DiaryEntry = {
   id: string;
@@ -282,6 +291,7 @@ async function errorMessage(response: Response) {
 export function NutritionDashboard(props: NutritionDashboardProps) {
   const router = useRouter();
   const [status, setStatus] = useState('');
+  const [saving, setSaving] = useState(false);
   const [showOlderDiary, setShowOlderDiary] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [logMode, setLogMode] = useState<LogMode>('choose');
@@ -305,6 +315,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const currentGoals = new Map(
     props.goals.filter((goal) => goal.state === 'active').map((goal) => [goal.nutrientCode, goal]),
   );
+  const hasConfiguredGoals = currentGoals.size > 0;
   const calorieGoal = goalBoundary(currentGoals.get('energy_kcal'));
   const caloriesConsumed = summary.todayTotals.energy_kcal;
   const caloriesPlanned = plannedToday.energy_kcal;
@@ -379,18 +390,28 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
 
   async function mutate(url: string, body: unknown) {
     setStatus('Saving…');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      setStatus(await errorMessage(response));
+    setSaving(true);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const message = await errorMessage(response);
+        setStatus(message);
+        return false;
+      }
+      setStatus('Saved.');
+      router.refresh();
+      return true;
+    } catch {
+      const message = 'Bòrd could not reach the Nutrition service. Try again.';
+      setStatus(message);
       return false;
+    } finally {
+      setSaving(false);
     }
-    setStatus('Saved.');
-    router.refresh();
-    return true;
   }
 
   async function recommendationFeedback(
@@ -542,6 +563,27 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     }
   }
 
+  async function recordWeight(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const enteredWeight = Number(data.get('weight'));
+    const unit = String(data.get('weightUnit'));
+    const weightKilograms = unit === 'lb' ? enteredWeight / POUNDS_PER_KILOGRAM : enteredWeight;
+    if (
+      await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/measurements`, {
+        measuredAt: new Date(String(data.get('measuredAt'))).toISOString(),
+        weightKilograms,
+        sourceType: 'manual',
+        approximate: data.get('approximate') === 'on',
+        note: data.get('note'),
+      })
+    ) {
+      form.reset();
+      closeLogDialog();
+    }
+  }
+
   async function correctDiaryEntry(event: FormEvent<HTMLFormElement>, entry: DiaryEntry) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -591,7 +633,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   function retryKey(scope: string) {
     const existing = retryKeys.current.get(scope);
     if (existing) return existing;
-    const created = crypto.randomUUID();
+    const created = createClientUuid();
     retryKeys.current.set(scope, created);
     return created;
   }
@@ -1028,6 +1070,13 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             </Link>
           </section>
 
+          <NutritionWeightTrackerCard
+            canManageProfile={activeProfile.canManageProfile}
+            weightTrend={props.weightTrend}
+            onRecordWeight={() => openLogDialog('weight')}
+            compact
+          />
+
           <section className={`${styles.panel} ${styles.householdSnapshot}`}>
             <header>
               <h2>Household snapshot</h2>
@@ -1303,9 +1352,15 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       >
         <div className={styles.dialogHeader}>
           <div>
-            <p className={styles.viewEyebrow}>Food diary</p>
+            <p className={styles.viewEyebrow}>
+              {logMode === 'weight' ? 'Weight tracker' : 'Food diary'}
+            </p>
             <h2 id="nutrition-log-dialog-title">
-              {logMode === 'choose' ? 'What would you like to record?' : 'Record nutrition'}
+              {logMode === 'choose'
+                ? 'What would you like to record?'
+                : logMode === 'weight'
+                  ? 'Record weight'
+                  : 'Record nutrition'}
             </h2>
           </div>
           <button
@@ -1318,7 +1373,9 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           </button>
         </div>
         <p className={styles.dialogLead}>
-          Confirmed food contributes to totals. Skipped meals add history without adding nutrients.
+          {logMode === 'weight'
+            ? 'Add one private observation. Existing check-ins remain in your history.'
+            : 'Confirmed food contributes to totals. Skipped meals add history without adding nutrients.'}
         </p>
 
         {logMode === 'choose' ? (
@@ -1363,12 +1420,76 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               </span>
               <ArrowRight size={18} aria-hidden="true" />
             </button>
+            {activeProfile.weightTrackingEnabled && activeProfile.canManageProfile ? (
+              <button type="button" onClick={() => setLogMode('weight')}>
+                <Scale size={22} aria-hidden="true" />
+                <span>
+                  <strong>Weight check-in</strong>
+                  <small>Record a private weight observation for the trend view.</small>
+                </span>
+                <ArrowRight size={18} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
         ) : (
           <button className={styles.backButton} type="button" onClick={() => setLogMode('choose')}>
             ← All record types
           </button>
         )}
+
+        {logMode === 'weight' ? (
+          <form className={styles.dialogForm} onSubmit={recordWeight} aria-busy={saving}>
+            <div className={styles.dialogFieldRow}>
+              <label>
+                Weight
+                <input
+                  name="weight"
+                  type="number"
+                  min="0.1"
+                  max={activeProfile.measurementSystem === 'imperial' ? 2204.6 : 1000}
+                  step="0.1"
+                  inputMode="decimal"
+                  required
+                />
+              </label>
+              <label>
+                Unit
+                <select
+                  name="weightUnit"
+                  defaultValue={activeProfile.measurementSystem === 'imperial' ? 'lb' : 'kg'}
+                >
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="lb">Pounds (lb)</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Measured at
+              <input name="measuredAt" type="datetime-local" required />
+            </label>
+            <label>
+              Note <span>Optional</span>
+              <input
+                name="note"
+                maxLength={500}
+                placeholder="e.g. Morning check-in"
+                autoComplete="off"
+              />
+            </label>
+            <label className={styles.dialogCheck}>
+              <input name="approximate" type="checkbox" />
+              This is an approximate observation
+            </label>
+            <p className={styles.formHint}>
+              Bòrd stores the canonical value in kilograms and displays it using this profile&apos;s
+              preferred unit.
+            </p>
+            <button className={styles.dialogPrimary} type="submit" disabled={saving}>
+              <Scale size={17} aria-hidden="true" />
+              {saving ? 'Saving…' : 'Save weight check-in'}
+            </button>
+          </form>
+        ) : null}
 
         {logMode === 'product' ? (
           loggableProducts.length ? (
@@ -1599,7 +1720,20 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
 
       {props.view === 'overview' ? (
         <>
-          {redesignedOverview}
+          {hasConfiguredGoals ? (
+            redesignedOverview
+          ) : (
+            <NutritionSetupOverview
+              profileName={activeProfile.displayName}
+              canManageGoals={activeProfile.canManageGoals}
+              canManageProfile={activeProfile.canManageProfile}
+              hasDiaryEntries={summary.currentEntries.length > 0}
+              hasPlannedMeals={mealProjection.meals.length > 0}
+              weightTrend={props.weightTrend}
+              onRecordNutrition={() => openLogDialog()}
+              onRecordWeight={() => openLogDialog('weight')}
+            />
+          )}
           {false ? (
             <div className={styles.stack}>
               <section className={styles.metricGrid} aria-label="Today's nutrition summary">

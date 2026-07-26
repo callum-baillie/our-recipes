@@ -81,7 +81,7 @@ describe('app preference contracts', () => {
       'AI SETTINGS',
       'PROFILE SETTINGS',
       'RECIPE SETTINGS',
-      'MEALPLAN SETTINGS',
+      'MEAL PLAN SETTINGS',
       'LIST SETTINGS',
       'PANTRY SETTINGS',
       'NUTRITION SETTINGS',

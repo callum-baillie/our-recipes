@@ -36,9 +36,9 @@ test('a fresh household can complete the supported local release acceptance work
 }, testInfo) => {
   // This intentionally covers the full supported household workflow. It takes
   // longer than Playwright's default in a fresh Linux CI environment.
-  testInfo.setTimeout(180_000);
+  testInfo.setTimeout(360_000);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Make this kitchen yours.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your kitchen.' })).toBeVisible();
   await page.getByLabel('Kitchen name').fill('The Garden Table');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -612,11 +612,13 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Finish cooking' }).click();
   await page.getByRole('link', { name: '← Recipe card' }).click();
   await page.goto('/planner');
+  await page.locator('button[aria-controls="planner-date-range-picker"]').click();
   const weekStart = await page.getByLabel('Start date').inputValue();
   const weekEndDate = new Date(`${weekStart}T12:00:00Z`);
   weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
   const weekEnd = weekEndDate.toISOString().slice(0, 10);
-  await page.getByRole('button', { name: 'Select recipes' }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.locator(`[data-planner-slot="${weekStart}:dinner"]`).click();
   const recipeSelector = page.getByRole('dialog', { name: 'Select recipes' });
   await expect(recipeSelector).toBeVisible();
   await recipeSelector.getByRole('tab', { name: /Dinner/u }).click();
@@ -641,23 +643,21 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(calendarResponse.text()).resolves.toContain('BEGIN:VCALENDAR');
   await page.getByText('More actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Copy week' }).click();
-  await expect(page).toHaveURL(/\/planner\?week=/);
+  await expect(page).toHaveURL(/\/planner\?view=week&date=/);
   await expect(
     page
       .getByRole('region', { name: 'This week at the table' })
       .getByText('Weeknight tomato soup', { exact: true })
       .filter({ visible: true }),
   ).toBeVisible();
-  await page.goto(`/planner?week=${weekStart}`);
+  await page.goto(`/planner?view=week&date=${weekStart}`);
   await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
   await expect(
     page.getByRole('heading', { name: /^Pantry shortages · \d{4}-\d{2}-\d{2}$/u }),
   ).toBeVisible();
   await page.getByLabel('New shopping item').fill('lemons');
   await page.getByRole('button', { name: 'Add item' }).click();
-  await expect(
-    page.getByRole('region', { name: 'Produce' }).locator('input[value="lemons"]'),
-  ).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'lemons' })).toBeVisible();
 
   const manifestResponse = await page.request.get('/manifest.webmanifest');
   expect(manifestResponse.ok()).toBe(true);

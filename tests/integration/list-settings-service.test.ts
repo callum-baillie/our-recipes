@@ -213,7 +213,9 @@ describe('list settings and supermarket profiles', () => {
       },
       profileId,
     );
-    const secondStore = listSupermarketProfiles().find((profile) => profile.name === 'Second Market')!;
+    const secondStore = listSupermarketProfiles().find(
+      (profile) => profile.name === 'Second Market',
+    )!;
     const source = createManualShoppingList('Weekend shop', profileId);
     setShoppingListSupermarket(source.id, firstStore.id, profileId);
     const banana = addShoppingListItem(source.id, {

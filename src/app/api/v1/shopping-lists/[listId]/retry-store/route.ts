@@ -4,17 +4,11 @@ import { NextResponse } from 'next/server';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { shoppingListRetryStoreSchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
-import {
-  createRetryShoppingList,
-  PlanningNotFoundError,
-} from '@/lib/services/planning-service';
+import { createRetryShoppingList, PlanningNotFoundError } from '@/lib/services/planning-service';
 
 export const runtime = 'nodejs';
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ listId: string }> },
-) {
+export async function POST(request: Request, context: { params: Promise<{ listId: string }> }) {
   if (!hasTrustedMutationOrigin(request))
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);

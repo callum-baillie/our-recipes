@@ -22,6 +22,8 @@ import { getAppPreferences } from '@/lib/services/app-preferences-service';
 import { getAiDataPolicy, getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { AI_WORKLOAD_DEFAULTS } from '@/lib/domain/ai-assistant';
 
+import styles from './layout.module.css';
+
 export const dynamic = 'force-dynamic';
 
 type PlannerView = 'day' | 'week' | 'month';
@@ -174,6 +176,11 @@ export default async function PlannerPage({
     : { ...AI_WORKLOAD_DEFAULTS.image_generation, enabled: true };
   return (
     <main className="recipe-page">
+      <section className={styles.pageHeading} aria-labelledby="planner-page-title">
+        <p className="eyebrow">MEAL PLANNER</p>
+        <h1 id="planner-page-title">Make the week feel lighter.</h1>
+        <p className="muted">Pull recipes from your recipebook into your weekly plan.</p>
+      </section>
       <MealPlanner
         key={`${viewMode}:${periodStart}:${periodEnd}`}
         weekStart={periodStart}

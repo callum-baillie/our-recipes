@@ -202,7 +202,7 @@ export default async function NutritionPage({
         )
       : null;
   const weightTrend =
-    view === 'trends' && activeProfile.canViewMeasurements
+    (view === 'overview' || view === 'trends') && activeProfile.canViewMeasurements
       ? buildNutritionWeightTrend(
           getNutritionWeightTrendWorkspace(activeProfile.id, principalId, {
             endDate: today,

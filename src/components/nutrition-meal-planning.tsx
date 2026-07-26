@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-meal-planning.module.css';
 import { NutritionVisualMarker } from '@/components/nutrition-visual-marker';
+import { createClientUuid } from '@/lib/client/client-uuid';
 
 export type NutritionMealProjectionView = {
   range: { start: string; end: string };
@@ -64,7 +65,7 @@ export function NutritionMealPlanning({
   const router = useRouter();
   const [status, setStatus] = useState('');
   const [preparedIds, setPreparedIds] = useState<Record<string, string>>(() =>
-    Object.fromEntries(projection.meals.map((meal) => [meal.mealPlanEntryId, crypto.randomUUID()])),
+    Object.fromEntries(projection.meals.map((meal) => [meal.mealPlanEntryId, createClientUuid()])),
   );
   const plannedToday = projection.totalsByDate[today] ?? {};
 
@@ -109,7 +110,7 @@ export function NutritionMealPlanning({
     event.preventDefault();
     if (!meal.calculationId) return;
     const data = new FormData(event.currentTarget);
-    const preparedInstanceId = preparedIds[meal.mealPlanEntryId] ?? crypto.randomUUID();
+    const preparedInstanceId = preparedIds[meal.mealPlanEntryId] ?? createClientUuid();
     const finalWeight = String(data.get('finalWeightGrams') ?? '').trim();
     setStatus('Saving prepared batch…');
     const response = await fetch(`/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes`, {
@@ -135,7 +136,7 @@ export function NutritionMealPlanning({
     }
     setPreparedIds((current) => ({
       ...current,
-      [meal.mealPlanEntryId]: crypto.randomUUID(),
+      [meal.mealPlanEntryId]: createClientUuid(),
     }));
     setStatus('Prepared batch saved. No food was recorded as eaten.');
     router.refresh();

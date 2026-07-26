@@ -12,9 +12,21 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string) {
 }
 
 async function expectCleanResponsivePage(page: Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
+  const overflow = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('body *')]
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          element: `${element.tagName.toLowerCase()}.${element.className}`,
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+        };
+      })
+      .filter((item) => item.left < -1 || item.right > window.innerWidth + 1)
+      .slice(0, 12),
   );
+  expect(overflow).toEqual([]);
   expect(await new AxeBuilder({ page }).analyze()).toMatchObject({ violations: [] });
 }
 

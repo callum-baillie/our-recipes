@@ -10,7 +10,7 @@ import { NutritionAccessPanel } from '@/components/nutrition-access-panel';
 import { NutritionDashboard, type NutritionDashboardProps } from '@/components/nutrition-dashboard';
 import { NutritionHouseholdWorkspace } from '@/components/nutrition-household-workspace';
 import { NutritionPreparedWorkspace } from '@/components/nutrition-prepared-workspace';
-import { buildNutritionChartDatasets } from '@/lib/domain/nutrition-chart-datasets';
+import { buildNutritionChartDatasets, type ChartGoal } from '@/lib/domain/nutrition-chart-datasets';
 import { buildAdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
 import { buildNutritionWeightTrend } from '@/lib/domain/nutrition-weight-trend';
 import {
@@ -52,6 +52,47 @@ const profileSettings: NutritionProfileSettingsValue = {
   showMealPlanNutrition: true,
 };
 
+const configuredGoals: ChartGoal[] = [
+  {
+    id: 'energy-goal',
+    nutrientCode: 'energy_kcal',
+    kind: 'target',
+    value: 2_000,
+    minimum: null,
+    maximum: null,
+    unit: 'kcal',
+    sourceType: 'manual',
+    state: 'active',
+    startsOn: '2026-07-01',
+    endsOn: null,
+  },
+  {
+    id: 'protein-goal',
+    nutrientCode: 'protein',
+    kind: 'minimum',
+    value: 80,
+    minimum: null,
+    maximum: null,
+    unit: 'g',
+    sourceType: 'manual',
+    state: 'active',
+    startsOn: '2026-07-01',
+    endsOn: null,
+  },
+];
+
+const disabledWeightTrend = buildNutritionWeightTrend({
+  profileLabel: 'Private Avery',
+  timeZone: 'America/Los_Angeles',
+  measurementSystem: 'metric',
+  startDate: '2026-07-13',
+  endDate: '2026-07-19',
+  days: 7,
+  targetWeightKilograms: null,
+  status: 'disabled',
+  measurements: [],
+});
+
 const props: NutritionDashboardProps = {
   principalId: '11111111-1111-4111-8111-111111111111',
   profiles: [
@@ -69,6 +110,8 @@ const props: NutritionDashboardProps = {
       version: 1,
       trendRangeDays: 7,
       showPlannedNutrition: true,
+      measurementSystem: 'metric',
+      weightTrackingEnabled: false,
     },
   ],
   activeProfile: {
@@ -83,6 +126,8 @@ const props: NutritionDashboardProps = {
     canExportData: true,
     canDeleteData: true,
     version: 1,
+    measurementSystem: 'metric',
+    weightTrackingEnabled: false,
   },
   view: 'overview',
   summary: {
@@ -102,7 +147,7 @@ const props: NutritionDashboardProps = {
     { code: 'energy_kcal', displayName: 'Calories', canonicalUnit: 'kcal', category: 'energy' },
     { code: 'protein', displayName: 'Protein', canonicalUnit: 'g', category: 'macronutrient' },
   ],
-  goals: [],
+  goals: configuredGoals,
   allocationCounts: { planned: 2 },
   insights: {
     goals: [],
@@ -130,34 +175,7 @@ const props: NutritionDashboardProps = {
     },
     planned: { energy_kcal: 600 },
     recentCompleteness: 0.6,
-    goals: [
-      {
-        id: 'energy-goal',
-        nutrientCode: 'energy_kcal',
-        kind: 'target',
-        value: 2_000,
-        minimum: null,
-        maximum: null,
-        unit: 'kcal',
-        sourceType: 'manual',
-        state: 'active',
-        startsOn: '2026-07-01',
-        endsOn: null,
-      },
-      {
-        id: 'protein-goal',
-        nutrientCode: 'protein',
-        kind: 'minimum',
-        value: 80,
-        minimum: null,
-        maximum: null,
-        unit: 'g',
-        sourceType: 'manual',
-        state: 'active',
-        startsOn: '2026-07-01',
-        endsOn: null,
-      },
-    ],
+    goals: configuredGoals,
   }),
   advancedCharts: buildAdvancedNutritionCharts({
     profileLabel: 'Private Avery',
@@ -214,6 +232,46 @@ describe('Nutrition rendered boundary', () => {
     expect(markup).toContain('Planned calories, not counted as consumed');
     expect(markup).toContain('Confirmed macro composition');
     expect(markup).toContain('Table equivalent for confirmed macro composition');
+  });
+
+  it('replaces the empty overview with guided setup when no goals are active', () => {
+    const markup = renderToStaticMarkup(
+      createElement(NutritionDashboard, {
+        ...props,
+        goals: [],
+        weightTrend: disabledWeightTrend,
+      }),
+    );
+
+    expect(markup).toContain('Build a useful nutrition baseline');
+    expect(markup).toContain('Set up nutrition goals');
+    expect(markup).toContain('Weight tracking is off');
+    expect(markup).toContain('What you will see after setup');
+    expect(markup).not.toContain('Today at a glance');
+    expect(markup).not.toContain('Calories consumed');
+  });
+
+  it('offers a weight check-in only when measurement tracking is enabled', () => {
+    const enabled = renderToStaticMarkup(
+      createElement(NutritionDashboard, {
+        ...props,
+        activeProfile: {
+          ...props.activeProfile,
+          weightTrackingEnabled: true,
+        },
+      }),
+    );
+    const disabled = renderToStaticMarkup(
+      createElement(NutritionDashboard, {
+        ...props,
+        weightTrend: disabledWeightTrend,
+      }),
+    );
+
+    expect(enabled).toContain('Weight check-in');
+    expect(enabled).toContain('Latest check-in');
+    expect(disabled).not.toContain('Weight check-in');
+    expect(disabled).toContain('Enable weight tracking');
   });
 
   it('renders configured nutrient semantics with a table equivalent', () => {

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-prepared-workspace.module.css';
+import { createClientUuid } from '@/lib/client/client-uuid';
 
 export type PreparedServingWorkspace = Array<{
   id: string;
@@ -30,7 +31,7 @@ export type PreparedServingWorkspace = Array<{
 }>;
 
 function createKeys(items: PreparedServingWorkspace, prefix: string) {
-  return Object.fromEntries(items.map((item) => [`${prefix}:${item.id}`, crypto.randomUUID()]));
+  return Object.fromEntries(items.map((item) => [`${prefix}:${item.id}`, createClientUuid()]));
 }
 
 async function responseError(response: Response) {
@@ -59,8 +60,8 @@ export function NutritionPreparedWorkspace({
     ...Object.fromEntries(
       workspace.flatMap((item) =>
         item.ownAllocations.flatMap((allocation) => [
-          [`eat:${allocation.id}`, crypto.randomUUID()],
-          [`state:${allocation.id}`, crypto.randomUUID()],
+          [`eat:${allocation.id}`, createClientUuid()],
+          [`state:${allocation.id}`, createClientUuid()],
         ]),
       ),
     ),
@@ -70,11 +71,11 @@ export function NutritionPreparedWorkspace({
   );
 
   function stableKey(key: string) {
-    return commandKeys[key] ?? crypto.randomUUID();
+    return commandKeys[key] ?? createClientUuid();
   }
 
   function rotateKey(key: string) {
-    setCommandKeys((current) => ({ ...current, [key]: crypto.randomUUID() }));
+    setCommandKeys((current) => ({ ...current, [key]: createClientUuid() }));
   }
 
   async function confirmEaten(

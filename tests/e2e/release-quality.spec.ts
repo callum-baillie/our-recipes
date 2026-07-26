@@ -44,7 +44,7 @@ async function homeThemeContrast(page: import('@playwright/test').Page): Promise
     };
 
     const root = getComputedStyle(document.documentElement);
-    const heading = document.querySelector('.home-hero h1');
+    const heading = document.querySelector('.home-hero h2');
     const planner = document.querySelector('.home-plan-card');
     if (!heading || !planner) throw new Error('Home contrast targets are missing.');
 
@@ -104,7 +104,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   expect(viewportContent).not.toMatch(/user-scalable=no|maximum-scale=1/u);
   const addRecipeTrigger = page.getByRole('link', { name: 'Add a recipe' });
   await expect(page.locator('.profile-switcher summary .profile-dot')).toHaveText('M');
-  await expect(page.locator('.app-footer')).toContainText('Built for a trusted household network.');
+  await expect(page.locator('.app-footer')).toContainText('The Release Table · Powered by Bòrd.');
   await expect(addRecipeTrigger).toHaveAttribute('href', '/?add=recipe');
   const touchTarget = await addRecipeTrigger.boundingBox();
   expect(touchTarget?.height).toBeGreaterThanOrEqual(44);
@@ -266,7 +266,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
 
   await page.goto('/recipes');
 
-  await expect(page).toHaveTitle('The Release Table');
+  await expect(page).toHaveTitle('Recipebook · The Release Table · Bòrd');
   await expect(page.getByRole('heading', { name: 'Your recipe library' })).toBeVisible();
   await expect(page.getByRole('main').getByRole('link', { name: 'Collections' })).toHaveAttribute(
     'href',
@@ -278,7 +278,11 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     await page.setViewportSize(surface.viewport);
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Your recipe library' })).toBeVisible();
-    await expect(page.locator('.create-menu > summary')).toBeVisible();
+    if (surface.name === 'mobile') {
+      await expect(page.locator('.create-menu > summary')).toBeHidden();
+    } else {
+      await expect(page.locator('.create-menu > summary')).toBeVisible();
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       `${surface.name} library viewport should not horizontally overflow`,

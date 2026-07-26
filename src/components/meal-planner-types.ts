@@ -1,5 +1,3 @@
-import type { MealType } from '@/lib/domain/meal-types';
-
 export {
   DEFAULT_VISIBLE_MEAL_TYPES,
   MEAL_OPTIONS,

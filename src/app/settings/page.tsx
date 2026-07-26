@@ -48,7 +48,7 @@ const categories = [
   },
   {
     href: '/settings/meal-plan',
-    eyebrow: 'MEALPLAN SETTINGS',
+    eyebrow: 'MEAL PLAN SETTINGS',
     title: 'Weeks, planning range, and meals',
     description: 'Choose how a fresh meal-planning session is laid out.',
     icon: CalendarDays,

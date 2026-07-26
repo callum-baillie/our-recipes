@@ -34,10 +34,45 @@ export async function generateMetadata(): Promise<Metadata> {
   const kitchenIcon = parseBrandIcon(household?.kitchenIcon);
   const kitchenName = household?.kitchenName ?? DEFAULT_KITCHEN_NAME;
   const title = brandedKitchenTitle(kitchenName);
+  const description = `${PRODUCT_NAME} is a self-hosted recipe keeper, meal planner, nutritional advisor, and grocery store helper.`;
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+  let metadataBase: URL;
+  try {
+    metadataBase = new URL(configuredUrl || 'http://localhost:3000');
+  } catch {
+    metadataBase = new URL('http://localhost:3000');
+  }
   return {
+    metadataBase,
     applicationName: PRODUCT_NAME,
     title: { default: title, template: `%s · ${title}` },
-    description: `${PRODUCT_NAME} is a recipe keeper, meal planner, nutritional advisor, and grocery store helper.`,
+    description,
+    authors: [{ name: PRODUCT_NAME }],
+    creator: PRODUCT_NAME,
+    publisher: PRODUCT_NAME,
+    category: 'food and drink',
+    keywords: [
+      'recipe manager',
+      'meal planner',
+      'grocery lists',
+      'pantry inventory',
+      'nutrition tracker',
+      'self-hosted',
+    ],
+    referrer: 'same-origin',
+    robots: { index: false, follow: false, noarchive: true },
+    openGraph: {
+      type: 'website',
+      locale: 'en_US',
+      siteName: PRODUCT_NAME,
+      title,
+      description,
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+    },
     manifest: `/manifest.webmanifest?palette=${palette}&icon=${kitchenIcon}`,
     appleWebApp: { capable: true, title: kitchenName, statusBarStyle: 'default' },
     formatDetection: { telephone: false },

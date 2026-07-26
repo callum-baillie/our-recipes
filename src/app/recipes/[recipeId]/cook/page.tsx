@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
@@ -11,6 +12,21 @@ import { getRecipePantryAvailability } from '@/lib/services/pantry-availability-
 import { getRecipe } from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ recipeId: string }>;
+}): Promise<Metadata> {
+  const recipe = getRecipe((await params).recipeId);
+
+  return {
+    title: recipe ? `Cook ${recipe.title}` : 'Cooking mode',
+    description: recipe
+      ? `Follow ${recipe.title} step by step in Bòrd cooking mode.`
+      : 'Follow a recipe step by step in Bòrd cooking mode.',
+  };
+}
 
 export default async function CookRecipePage({
   params,

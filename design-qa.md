@@ -47,6 +47,44 @@ passed
 
 ---
 
+# Design QA: landing-page definition introduction
+
+## Source visual truth
+
+- Dictionary-poster reference: `C:\Users\Callum\.codex\codex-remote-attachments\019f8677-3dec-7b00-91b2-21b20ab1226f\A323F84E-8D0C-4BA2-8167-F25D006A8475\1-Photo-1.jpg`
+- User direction: lead with the Bòrd logo, follow with a dictionary-style definition using the existing Bòrd wording, then state the goal of making it easier to bring families around the table.
+
+## Implementation evidence
+
+- Desktop at 1440 x 1000: `C:\Users\Callum\AppData\Local\Temp\bord-landing-definition-2026-07-24\04-after-desktop.png`
+- Mobile at 508 x 912: `C:\Users\Callum\AppData\Local\Temp\bord-landing-definition-2026-07-24\03-after-mobile-viewport.png`
+- Reference and desktop implementation comparison: `C:\Users\Callum\AppData\Local\Temp\bord-landing-definition-2026-07-24\05-reference-vs-implementation.png`
+
+## Findings
+
+- No actionable P0, P1, or P2 visual findings remain.
+- Hierarchy: the opening now reads in the requested sequence of logo, headword, language and part of speech, translation, communal-table definition, and family-table goal.
+- Brand fidelity: the intro uses the existing production Bòrd lockup and the tighter header-lockup mask bounds, avoiding a new or approximated logo.
+- Typography: Georgia carries the dictionary-poster character while the existing interface typeface remains in supporting labels and metadata.
+- Spacing: both viewports preserve the reference's deliberate whitespace without hiding the definition or introducing horizontal scrolling.
+- Responsive behavior: the logo is 331 px wide on desktop and 208 px wide on mobile. The definition stays within 736 px and 461 px respectively.
+- Semantics: the definition section owns the single page-level heading, the existing welcome heading is level two, the translation is a semantic definition list, and the decorative rule is ignored by assistive technology.
+- Theme consistency: the section uses the existing page, ink, muted, line, and leaf tokens rather than adding a separate palette.
+- Console and overflow: warning/error logs were empty at both checked viewports, and document scroll width matched client width.
+
+## Comparison history
+
+1. The prior landing page began directly with the household welcome dashboard and did not present the Bòrd logo or definition.
+2. The first implementation used the full lockup asset, whose wide view box made the visible logo undersized.
+3. The intro was refined to use the existing tightly cropped header lockup, producing a stronger logo at both desktop and mobile widths.
+4. The final comparison retains the poster reference's serif definition hierarchy and generous negative space while fitting the app's established landing-page system.
+
+## Final result
+
+passed
+
+---
+
 # Design QA: mobile planner generation action and footer
 
 ## Source visual truth

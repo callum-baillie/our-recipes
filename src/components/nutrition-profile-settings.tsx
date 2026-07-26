@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-profile-settings.module.css';
+import { createClientUuid } from '@/lib/client/client-uuid';
 
 const CENTIMETERS_PER_INCH = 2.54;
 const KILOGRAMS_PER_POUND = 0.45359237;
@@ -179,7 +180,7 @@ export function NutritionProfileSettings({
       return;
     }
     if (action === 'apply' && !estimateOperationId.current)
-      estimateOperationId.current = crypto.randomUUID();
+      estimateOperationId.current = createClientUuid();
     setStatus(
       action === 'preview' ? 'Calculating a server-owned preview…' : 'Applying the estimate…',
     );
@@ -443,7 +444,7 @@ export function NutritionProfileSettings({
           </div>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="nutrition-goals">
           <legend>Goals and tracking choices</legend>
           <div className={styles.grid}>
             <label>
@@ -479,17 +480,21 @@ export function NutritionProfileSettings({
               </select>
             </label>
           </div>
-          <label className={styles.inlineCheck}>
+          <label className={styles.inlineCheck} id="weight-tracking">
             <input
               name="weightTrackingEnabled"
               type="checkbox"
               defaultChecked={profile.weightTrackingEnabled}
             />
-            Show weight tracking for this profile
+            Enable weight tracking for this profile
           </label>
+          <p className={styles.notice}>
+            Weight check-ins stay private to people who can view this profile&apos;s measurements.
+            Each observation is stored separately so history is never overwritten.
+          </p>
         </fieldset>
 
-        <fieldset>
+        <fieldset id="food-choices">
           <legend>Food choices entered by you</legend>
           <p className={styles.notice}>
             These lists are used only as explicit factual inputs. Add one item per line or separate

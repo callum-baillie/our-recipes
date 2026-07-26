@@ -148,6 +148,43 @@
 .cameraPanel {
   padding: 1rem 1.2rem;
 }
+.cameraStart {
+  align-items: center;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 1rem 1.2rem;
+  padding: 1rem;
+}
+.cameraStart > svg {
+  color: var(--leaf);
+}
+.cameraStart strong,
+.cameraStart p {
+  margin: 0;
+}
+.cameraStart p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+}
+.cameraStart button {
+  align-items: center;
+  background: var(--leaf);
+  border: 0;
+  border-radius: 0.65rem;
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 2.65rem;
+  padding: 0.65rem 0.9rem;
+}
 .videoFrame {
   position: relative;
   overflow: hidden;
@@ -374,6 +411,13 @@
   }
   .lookupForm {
     grid-template-columns: 1fr;
+  }
+  .cameraStart {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .cameraStart button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
   .reviewGrid {
     grid-template-columns: 1fr;

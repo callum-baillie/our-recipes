@@ -10,13 +10,35 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
 }
 
 async function expectSaved(page: Page, text: string) {
-  await expect(page.getByRole('status')).toHaveText(text);
+  await expect(page.getByRole('status').filter({ hasText: text }).last()).toBeVisible();
+}
+
+async function openAddItemDialog(page: Page) {
+  await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Add pantry item' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('tab', { name: 'Search/Manual' }).click();
+  await dialog.getByRole('button', { name: 'Enter details manually', exact: true }).click();
+  await expect(dialog.getByText('Enter details manually', { exact: true }).last()).toBeVisible();
+  return dialog;
 }
 
 async function openDetails(details: ReturnType<Page['locator']>, summaryName: string) {
   await expect(async () => {
     await expect(details).toHaveCount(1);
-    const summary = details.getByText(summaryName, { exact: true });
+    const parentDetails = details.locator('xpath=ancestor::details[1]');
+    if ((await parentDetails.count()) === 1) {
+      const parentSummary = parentDetails.locator(':scope > summary');
+      await parentSummary.evaluate((element) => {
+        element.scrollIntoView({ block: 'start' });
+        window.scrollBy({ top: -96 });
+      });
+      if ((await parentDetails.getAttribute('open')) === null) {
+        await parentSummary.click();
+        await expect(parentDetails).toHaveAttribute('open', '');
+      }
+    }
+    const summary = details.locator(':scope > summary').filter({ hasText: summaryName });
     await expect(summary).toHaveCount(1);
     await expect(summary).toBeVisible();
     if ((await details.getAttribute('open')) === null) await summary.click();
@@ -28,6 +50,29 @@ function actionForm(page: Page, manage: ReturnType<Page['locator']>, buttonName:
   return manage.locator('form', {
     has: page.getByRole('button', { name: buttonName, exact: true }),
   });
+}
+
+function batchManagement(card: ReturnType<Page['locator']>) {
+  return card.locator('summary').filter({ hasText: 'Manage batch' }).locator('..');
+}
+
+async function openCardMenu(card: ReturnType<Page['locator']>) {
+  const summary = card.locator('summary[aria-label^="Manage "]').first();
+  const menu = summary.locator('..');
+  await summary.evaluate((element) => {
+    element.scrollIntoView({ block: 'start' });
+    window.scrollBy({ top: -96 });
+  });
+  if ((await menu.getAttribute('open')) === null) await summary.click();
+  await expect(menu).toHaveAttribute('open', '');
+  return menu;
+}
+
+async function clickCardAction(card: ReturnType<Page['locator']>, name: string) {
+  const action = (await openCardMenu(card)).getByRole('button', { name, exact: true });
+  await action.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  await expect(action).toBeInViewport();
+  await action.click();
 }
 
 test('Pantry inventory management is complete, persistent, accessible, and responsive', async ({
@@ -42,8 +87,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await completeInitialOnboarding(page, 'Inventory management kitchen', 'Morgan');
   await page.goto('/pantry');
 
-  const add = page.locator('details', { hasText: 'Add Pantry item' });
-  await openDetails(add, 'Add Pantry item');
+  let add = await openAddItemDialog(page);
   await add.getByLabel('New product name').fill('Management beans');
   await add.getByLabel('Quantity', { exact: true }).fill('12');
   await add.locator('select[name="unit"]').selectOption('each');
@@ -52,7 +96,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await add.getByLabel('Date precision').selectOption('estimated');
   await add.getByLabel('Notes').fill('UI-created inventory proof');
   await add.getByLabel('Staple product').check();
-  await add.getByRole('button', { name: 'Add item' }).click();
+  await add.getByRole('button', { name: 'Add item', exact: true }).click();
   await expectSaved(page, '2 Pantry batches added.');
 
   const products = page.locator('details', { hasText: 'Manage products and staples' });
@@ -76,9 +120,9 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await expectSaved(page, 'Storage location added.');
   await openDetails(locations, 'Manage locations');
   const coldRoom = locations
-    .locator('summary')
-    .filter({ hasText: /^Cold room$/u })
-    .locator('..');
+    .locator(':scope > div > details > summary > span')
+    .filter({ hasText: 'Cold room' })
+    .locator('../..');
   await expect(coldRoom).toHaveCount(1);
   await openDetails(coldRoom, 'Cold room');
   await coldRoom.getByLabel('Name').fill('Cold room shelf');
@@ -94,9 +138,9 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await expectSaved(page, 'Storage location added.');
   await openDetails(locations, 'Manage locations');
   const basket = locations
-    .locator('summary')
-    .filter({ hasText: /^Cold room shelf \/ Basket$/u })
-    .locator('..');
+    .locator(':scope > div > details > summary > span')
+    .filter({ hasText: 'Cold room shelf / Basket' })
+    .locator('../..');
   await expect(basket).toHaveCount(1);
   await openDetails(basket, 'Cold room shelf / Basket');
   await basket.getByLabel('Name').fill('Cold basket');
@@ -110,17 +154,17 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   });
   await expect(cards).toHaveCount(2);
   let card = cards.first();
-  let manage = card.locator('details', { hasText: 'Manage batch' });
+  let manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const combineForm = actionForm(page, manage, 'Combine batches');
   await expect(combineForm).toHaveCount(1);
   await combineForm.getByRole('combobox').selectOption({ index: 1 });
   await combineForm.getByRole('button', { name: 'Combine batches' }).click();
   await expectSaved(page, 'Batches combined.');
-  await cards.first().getByRole('button', { name: 'Undo' }).click();
+  await clickCardAction(cards.first(), 'Undo');
   await expectSaved(page, 'Last action undone.');
 
-  await openDetails(add, 'Add Pantry item');
+  add = await openAddItemDialog(page);
   await add.getByLabel('Existing product').selectOption({ label: 'Management beans' });
   await add.getByLabel('Quantity', { exact: true }).fill('');
   await add.getByLabel('Original quantity').fill('');
@@ -132,11 +176,11 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await add.getByLabel('Package unit').selectOption('package');
   await add.getByLabel('Use by').fill('2027-10-02');
   await add.getByLabel('Date precision').selectOption('exact');
-  await add.getByRole('button', { name: 'Add item' }).click();
+  await add.getByRole('button', { name: 'Add item', exact: true }).click();
   await expectSaved(page, 'Pantry item added.');
 
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   await manage.getByLabel('Shelf or sub-location').fill('Upper basket');
   await manage.getByLabel('Price in cents').fill('399');
@@ -147,15 +191,15 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
     has: page.getByRole('heading', { name: 'Management beans', exact: true }),
   });
   card = cards.first();
-  await card.getByRole('button', { name: 'Add another batch' }).click();
+  await clickCardAction(card, 'Add another batch');
   await expectSaved(page, 'Recent batch duplicated for unpacking.');
   await expect(cards).toHaveCount(4);
 
   card = cards.first();
-  await card.getByRole('button', { name: 'Open' }).click();
+  await clickCardAction(card, 'Open');
   await expectSaved(page, 'Package opened.');
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const moveForm = actionForm(page, manage, 'Move batch');
   await expect(moveForm).toHaveCount(1);
@@ -164,7 +208,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await expectSaved(page, 'Batch moved.');
 
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const freezeForm = actionForm(page, manage, 'Freeze batch');
   await expect(freezeForm).toHaveCount(1);
@@ -172,7 +216,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await freezeForm.getByRole('button', { name: 'Freeze batch', exact: true }).click();
   await expectSaved(page, 'Batch frozen.');
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const thawForm = actionForm(page, manage, 'Thaw batch');
   await expect(thawForm).toHaveCount(1);
@@ -181,7 +225,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await expectSaved(page, 'Batch thawed.');
 
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const correctForm = actionForm(page, manage, 'Correct quantity');
   await expect(correctForm).toHaveCount(1);
@@ -189,26 +233,31 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await correctForm.getByRole('button', { name: 'Correct quantity', exact: true }).click();
   await expectSaved(page, 'Quantity corrected.');
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const splitForm = actionForm(page, manage, 'Split batch');
   await expect(splitForm).toHaveCount(1);
   await splitForm.getByLabel(/Split amount/u).fill('2');
   await splitForm.getByRole('button', { name: 'Split batch', exact: true }).click();
   await expectSaved(page, 'Batch split.');
-  await cards.first().getByRole('button', { name: 'Undo' }).click();
+  await clickCardAction(cards.first(), 'Undo');
   await expectSaved(page, 'Last action undone.');
 
   card = cards.first();
-  await card.getByLabel(/Amount of Management beans consumed/u).fill('1');
-  await card.getByRole('button', { name: 'Use amount' }).click();
+  const cardMenu = await openCardMenu(card);
+  await cardMenu.getByLabel(/Amount of Management beans consumed/u).fill('1');
+  await cardMenu.getByRole('button', { name: 'Use amount' }).click();
   await expectSaved(page, 'Stock consumed.');
-  await cards.first().getByRole('button', { name: '−1' }).click();
+  await clickCardAction(cards.first(), '−1');
   await expectSaved(page, 'One item consumed.');
 
-  await page.getByRole('checkbox', { name: 'Show inactive and archived', exact: true }).check();
+  await page.getByRole('button', { name: 'Advanced search' }).click();
+  const filters = page.getByRole('dialog', { name: 'Filters' });
+  await filters.getByRole('checkbox', { name: 'Show inactive and archived', exact: true }).check();
+  await filters.getByRole('combobox', { name: 'Group items' }).selectOption('location');
+  await filters.getByRole('button', { name: 'Done' }).click();
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const discardForm = actionForm(page, manage, 'Discard batch');
   await expect(discardForm).toHaveCount(1);
@@ -216,7 +265,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await discardForm.getByRole('button', { name: 'Discard batch', exact: true }).click();
   await expectSaved(page, 'Batch discarded.');
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const restoreAfterDiscardForm = actionForm(page, manage, 'Restore batch');
   await expect(restoreAfterDiscardForm).toHaveCount(1);
@@ -224,7 +273,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await restoreAfterDiscardForm.getByRole('button', { name: 'Restore batch', exact: true }).click();
   await expectSaved(page, 'Batch restored.');
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const donateForm = actionForm(page, manage, 'Donate batch');
   await expect(donateForm).toHaveCount(1);
@@ -232,24 +281,26 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await donateForm.getByRole('button', { name: 'Donate batch', exact: true }).click();
   await expectSaved(page, 'Batch donated.');
   card = cards.first();
-  manage = card.locator('details', { hasText: 'Manage batch' });
+  manage = batchManagement(card);
   await openDetails(manage, 'Manage batch');
   const restoreAfterDonateForm = actionForm(page, manage, 'Restore batch');
   await expect(restoreAfterDonateForm).toHaveCount(1);
   await restoreAfterDonateForm.getByLabel(/Restored amount/u).fill('5');
   await restoreAfterDonateForm.getByRole('button', { name: 'Restore batch', exact: true }).click();
   await expectSaved(page, 'Batch restored.');
-  await cards.first().getByRole('button', { name: 'Empty' }).click();
+  await clickCardAction(cards.first(), 'Empty');
   await expectSaved(page, 'Item marked empty.');
-  await cards.first().getByRole('button', { name: 'Undo' }).click();
+  await clickCardAction(cards.first(), 'Undo');
   await expectSaved(page, 'Last action undone.');
 
   await page.getByPlaceholder('Search products, brands, or locations').fill('pantry beans');
   await expect(cards.first()).toBeVisible();
-  await page.getByRole('combobox', { name: 'Group Pantry', exact: true }).selectOption('location');
-  await expect(
-    page.getByText(/Best-before quality date · 2027-09-30 · estimated/u).first(),
-  ).toBeVisible();
+  const estimatedBestBefore = page.locator('time[datetime="2027-09-30"]').first();
+  await expect(estimatedBestBefore).toBeVisible();
+  await expect(estimatedBestBefore).toHaveAttribute(
+    'title',
+    'Best-before quality date · 2027-09-30 · estimated · recorded',
+  );
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await capture(page, testInfo, 'pantry-management-desktop');
 

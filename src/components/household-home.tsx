@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { AddRecipeDialog, AddRecipeTrigger } from '@/components/add-recipe-dialog';
+import { BordLockup } from '@/components/bord-brand';
 import { HomeRecipeFilters, type HomeFilters } from '@/components/home-recipe-filters';
 import { RecipeSummaryCard, type RecipeSummaryCardData } from '@/components/recipe-summary-card';
 import type { CollectionSummary } from '@/lib/services/collection-service';
@@ -50,10 +51,37 @@ export function HouseholdHome({
 }: HouseholdHomeProps) {
   return (
     <main className="home-page">
+      <section className="home-brand-intro" aria-labelledby="home-brand-title">
+        <BordLockup className="home-brand-lockup" />
+
+        <div className="home-brand-definition">
+          <h1 id="home-brand-title">bòrd</h1>
+          <p className="home-brand-meta">
+            <span>Scottish Gaelic</span>
+            <span aria-hidden="true">·</span>
+            <em>noun</em>
+          </p>
+          <hr aria-hidden="true" />
+          <dl className="home-brand-translation">
+            <div>
+              <dt>English translation</dt>
+              <dd>Table</dd>
+            </div>
+          </dl>
+          <p className="home-brand-meaning">
+            A communal area where kin unite to eat and end the day.
+          </p>
+          <p className="home-brand-goal">
+            <span>Our goal</span>
+            To make it easier to bring families around the table.
+          </p>
+        </div>
+      </section>
+
       <section className="home-hero" aria-labelledby="home-title">
         <div>
           <p className="eyebrow">{household.kitchenName.toUpperCase()} · THE SHARED COOKBOOK</p>
-          <h1 id="home-title">Welcome to the kitchen, {activeProfileName}.</h1>
+          <h2 id="home-title">Welcome to the kitchen, {activeProfileName}.</h2>
           <p>
             Keep the recipes you actually cook, plan the week around them, and share one calm
             kitchen notebook with your household.

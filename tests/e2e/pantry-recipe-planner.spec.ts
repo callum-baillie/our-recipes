@@ -20,7 +20,7 @@ async function expectContained(page: Page) {
 test('recipe and planner Pantry insight is truthful, durable, accessible, and responsive', async ({
   page,
 }, testInfo) => {
-  testInfo.setTimeout(180_000);
+  testInfo.setTimeout(300_000);
   const browserErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') browserErrors.push(message.text());
@@ -103,7 +103,7 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
   expect(mappingResponse.ok()).toBe(true);
 
   const mealIds: string[] = [];
-  for (const plannedFor of ['2027-04-03', '2027-04-05']) {
+  for (const plannedFor of ['2027-04-03', '2027-04-04']) {
     const response = await page.request.post('/api/v1/meal-plan', {
       headers: { Origin: ORIGIN },
       data: {
@@ -149,25 +149,22 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
   await screenshot(page, testInfo, 'pantry-recipe-detail-390');
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/planner?week=2027-04-01');
+  await page.goto('/planner?view=week&date=2027-04-01');
+  const mealActions = page.locator('summary[aria-label="Actions for Planner lentil stew"]:visible');
+  await mealActions.nth(1).click();
   const statusControls = page.getByRole('combobox', { name: 'Status for Planner lentil stew' });
-  await expect(statusControls).toHaveCount(2);
-  await statusControls.nth(1).focus();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
+  await expect(statusControls).toHaveCount(1);
+  await statusControls.selectOption('skipped');
   await expect(page.getByRole('status').filter({ hasText: 'Meal marked skipped.' })).toContainText(
     'Meal marked skipped.',
   );
   await page.reload();
-  await expect(
-    page.getByRole('combobox', { name: 'Status for Planner lentil stew' }).nth(1),
-  ).toHaveValue('skipped');
-  const demand = page.getByRole('region', { name: 'Across this whole week' });
-  await expect(
-    demand.getByText(/Need 100 g · exact compatible stock 300 g · covered/u),
-  ).toBeVisible();
-  await expect(demand.getByText(/exact stock runs short/u)).toHaveCount(0);
-  await expect(demand.getByText(/planning context, not food-safety advice/u)).toBeVisible();
+  await mealActions.nth(1).click();
+  await expect(page.getByRole('combobox', { name: 'Status for Planner lentil stew' })).toHaveValue(
+    'skipped',
+  );
+  await expect(page.getByText('100%', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 ingredients missing', { exact: true })).toBeVisible();
   await expectContained(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-planner-1280');

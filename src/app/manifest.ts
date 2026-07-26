@@ -26,9 +26,39 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description: `${kitchenName} is powered by ${PRODUCT_NAME}, your shared kitchen helper.`,
     start_url: '/',
     scope: '/',
+    lang: 'en',
+    dir: 'ltr',
     display: 'standalone',
+    orientation: 'any',
     background_color: colors.brandBackground,
     theme_color: colors.brandBackground,
+    categories: ['food', 'lifestyle', 'utilities'],
+    shortcuts: [
+      {
+        name: 'Recipebook',
+        short_name: 'Recipes',
+        description: 'Browse the household recipe library.',
+        url: '/recipes',
+      },
+      {
+        name: 'Meal planner',
+        short_name: 'Planner',
+        description: 'Plan meals for the household.',
+        url: '/planner',
+      },
+      {
+        name: 'Pantry',
+        short_name: 'Pantry',
+        description: 'Review food on hand.',
+        url: '/pantry',
+      },
+      {
+        name: 'Shopping lists',
+        short_name: 'Lists',
+        description: 'Shop from household grocery lists.',
+        url: '/lists',
+      },
+    ],
     icons: [
       {
         src: iconUrl(palette, kitchenIcon, 192),

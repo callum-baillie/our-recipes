@@ -948,6 +948,7 @@
 
 .card:has(.rowMenu[open]) {
   z-index: 10;
+  transform: none;
 }
 
 .rowMain {
@@ -1096,13 +1097,15 @@
   border: 1px solid var(--pantry-border);
   border-radius: 0.75rem;
   box-shadow: 0 20px 48px color-mix(in srgb, var(--ink) 16%, transparent);
-  max-height: min(42rem, calc(100vh - 9rem));
+  bottom: 1.25rem;
+  max-height: none;
   overflow: auto;
   padding: 1rem;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.4rem);
-  width: min(44rem, calc(100vw - 3rem));
+  position: fixed;
+  right: 1.25rem;
+  top: 5.5rem;
+  width: min(44rem, calc(100vw - 2.5rem));
+  z-index: 100;
 }
 
 .tags,
@@ -1538,14 +1541,15 @@
   }
 
   .views {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.55rem;
     margin: 0;
-    overflow-x: auto;
+    overflow: visible;
     padding: 0.1rem 0 0.2rem;
   }
 
   .views button {
+    flex: 0 0 auto;
     font-size: 0.67rem;
     padding: 0.48rem 0.7rem;
   }
@@ -1594,8 +1598,10 @@
   }
 
   .rowMenuPanel {
-    right: -0.25rem;
-    width: calc(100vw - 2.75rem);
+    bottom: 0.75rem;
+    right: 0.75rem;
+    top: 5rem;
+    width: calc(100vw - 1.5rem);
   }
 
   .formRow,

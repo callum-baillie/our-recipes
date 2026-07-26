@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
+import { useToast } from '@/components/toast-provider';
 import type { ShoppingListSummary } from '@/lib/services/planning-service';
 
 import styles from './shopping-lists-overview.module.css';
@@ -70,9 +71,9 @@ function updatedLabel(value: Date | string | number) {
 
 export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ListFilter>('all');
   const [sort, setSort] = useState<ListSort>('updated');
@@ -118,19 +119,24 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
   async function createList(event: React.FormEvent) {
     event.preventDefault();
     setBusy('create');
-    setError('');
-    const response = await fetch('/api/v1/shopping-lists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const body = (await response.json().catch(() => null)) as { list?: { id: string } } | null;
-    setBusy(null);
-    if (!response.ok || !body?.list) {
-      setError('The list could not be created.');
-      return;
+    try {
+      const response = await fetch('/api/v1/shopping-lists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const body = (await response.json().catch(() => null)) as { list?: { id: string } } | null;
+      if (!response.ok || !body?.list) {
+        showToast('The list could not be created.', 'error');
+        return;
+      }
+      showToast('Shopping list created.', 'success');
+      router.push(`/lists/${body.list.id}`);
+    } catch {
+      showToast('The list could not be created. Check the connection and try again.', 'error');
+    } finally {
+      setBusy(null);
     }
-    router.push(`/lists/${body.list.id}`);
   }
 
   async function manage(
@@ -139,34 +145,56 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
     nextName?: string,
   ) {
     setBusy(listId);
-    setError('');
-    const response = await fetch(`/api/v1/shopping-lists/${listId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(action === 'rename' ? { action, name: nextName } : { action }),
-    });
-    setBusy(null);
-    if (!response.ok) {
-      setError('The list change could not be saved.');
-      return;
+    try {
+      const response = await fetch(`/api/v1/shopping-lists/${listId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action === 'rename' ? { action, name: nextName } : { action }),
+      });
+      if (!response.ok) {
+        showToast('The list change could not be saved.', 'error');
+        return;
+      }
+      showToast(
+        action === 'duplicate'
+          ? 'Shopping list duplicated.'
+          : action === 'archive'
+            ? 'Shopping list archived.'
+            : action === 'restore'
+              ? 'Shopping list restored.'
+              : 'Shopping list renamed.',
+        'success',
+      );
+      setEditingId(null);
+      router.refresh();
+    } catch {
+      showToast('The list change could not be saved. Check the connection and try again.', 'error');
+    } finally {
+      setBusy(null);
     }
-    setEditingId(null);
-    router.refresh();
   }
 
   async function remove(listId: string) {
     setBusy(listId);
-    setError('');
-    const response = await fetch(`/api/v1/shopping-lists/${listId}`, { method: 'DELETE' });
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    setBusy(null);
-    if (!response.ok) {
-      setError(body?.error?.message ?? 'The list could not be deleted. Archive it instead.');
-      return;
+    try {
+      const response = await fetch(`/api/v1/shopping-lists/${listId}`, { method: 'DELETE' });
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      if (!response.ok) {
+        showToast(
+          body?.error?.message ?? 'The list could not be deleted. Archive it instead.',
+          'error',
+        );
+        return;
+      }
+      showToast('Shopping list deleted.', 'success');
+      router.refresh();
+    } catch {
+      showToast('The list could not be deleted. Check the connection and try again.', 'error');
+    } finally {
+      setBusy(null);
     }
-    router.refresh();
   }
 
   return (
@@ -207,7 +235,7 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                 />
                 <small>e.g. Weekend market</small>
               </label>
-              <button type="submit" disabled={busy === 'create'}>
+              <button type="submit" aria-busy={busy === 'create'} disabled={busy === 'create'}>
                 {busy === 'create' ? 'Creating…' : 'Create list'}
               </button>
             </form>
@@ -261,12 +289,6 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                 <ArrowDownUp size={18} aria-hidden="true" />
               </button>
             </div>
-
-            {error ? (
-              <p className={styles.error} role="alert">
-                {error}
-              </p>
-            ) : null}
 
             {visibleLists.length ? (
               <div className={styles.cardGrid}>
@@ -331,8 +353,12 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                             <span className="sr-only">Rename {list.name}</span>
                             <input name="name" defaultValue={list.name} maxLength={120} required />
                           </label>
-                          <button type="submit" disabled={busy === list.id}>
-                            Save
+                          <button
+                            type="submit"
+                            aria-busy={busy === list.id}
+                            disabled={busy === list.id}
+                          >
+                            {busy === list.id ? 'Saving…' : 'Save'}
                           </button>
                           <button type="button" onClick={() => setEditingId(null)}>
                             Cancel
@@ -345,6 +371,7 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                           </button>
                           <button
                             type="button"
+                            aria-busy={busy === list.id}
                             disabled={busy === list.id}
                             onClick={() => void manage(list.id, 'duplicate')}
                           >
@@ -357,6 +384,7 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                             <div>
                               <button
                                 type="button"
+                                aria-busy={busy === list.id}
                                 disabled={busy === list.id}
                                 onClick={() =>
                                   void manage(list.id, list.archivedAt ? 'restore' : 'archive')
@@ -367,8 +395,17 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                               </button>
                               <button
                                 type="button"
+                                aria-busy={busy === list.id}
                                 disabled={busy === list.id}
-                                onClick={() => void remove(list.id)}
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Delete “${list.name}”? This cannot be undone. Archive it instead if you may need it later.`,
+                                    )
+                                  ) {
+                                    void remove(list.id);
+                                  }
+                                }}
                               >
                                 <Trash2 size={15} aria-hidden="true" /> Delete
                               </button>

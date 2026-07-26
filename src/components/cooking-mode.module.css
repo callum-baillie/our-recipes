@@ -6,15 +6,15 @@
   max-width: 48rem;
   margin: auto;
   padding: 1.25rem;
-  border: 1px solid #d9d2c7;
+  border: 1px solid var(--line);
   border-radius: 1rem;
-  background: #fffdf9;
-  color: #242821;
-  box-shadow: 0 1rem 4rem rgb(0 0 0 / 20%);
+  background: var(--linen);
+  color: var(--ink);
+  box-shadow: 0 1rem 4rem color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
 .timerPanel :global(.muted) {
-  color: #d8ded4;
+  color: var(--immersive-muted);
 }
 
 .deduction,
@@ -29,7 +29,7 @@
 
 .deduction,
 .leftover {
-  border: 1px solid #e2dbcf;
+  border: 1px solid var(--line);
   border-radius: 0.75rem;
   padding: 0.85rem;
 }
@@ -57,7 +57,7 @@
 .batchReview {
   padding: 0.65rem;
   border-radius: 0.55rem;
-  background: #f3f0e8;
+  background: var(--paper-deep);
 }
 
 .batchReview p {
@@ -67,8 +67,8 @@
 
 .mealIdentity {
   padding: 0.55rem 0.7rem;
-  border-left: 3px solid #637a45;
-  background: #f3f0e8;
+  border-left: 3px solid var(--primary);
+  background: var(--paper-deep);
 }
 
 .leftoverHeading {
@@ -84,7 +84,7 @@
 
 .finishStatus {
   margin: 1rem;
-  color: #d8ded4;
+  color: var(--immersive-muted);
   text-align: center;
 }
 
