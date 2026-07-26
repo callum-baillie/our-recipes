@@ -16,8 +16,12 @@ const INTEGRITY_TAG = '0028_nutrition_household_actor_integrity';
 const INTEGRITY_HASH = '49bf505ff1c537db0c739500a52d3fa20a978ef26a2715de61cd6a94a4a1baa8';
 const LEGACY_PREFIX_FINGERPRINT =
   '0dcb7c0bfdf62e6e2da652679e4376d91da40603f8f8cdff84a49833e7f75ade';
-const SOURCE_PREFIX_FINGERPRINT =
-  '7db3fa8285a8bc5bf0f00346e91b648e57e5fa54205d70ae209f3c2327b6b9ab';
+const SOURCE_PREFIX_FINGERPRINTS = new Set([
+  // Canonical Git bytes used by Linux/container checkouts.
+  'd58ce0f383e80aef509b3e1f2da437e57d4bc4be8eee2ae2cc216c95706fcdfc',
+  // The exact Windows checkout lineage, where the historical 0014 migration is CRLF.
+  '7db3fa8285a8bc5bf0f00346e91b648e57e5fa54205d70ae209f3c2327b6b9ab',
+]);
 const UNAFFECTED_OBJECT_FINGERPRINT =
   'b7f0858abbb6b1b654bcef541468832a66262adcd6d723cdffb99286232446b1';
 
@@ -389,7 +393,7 @@ function verifySource(migrationsFolder) {
   const sourcePrefix = journal.entries
     .filter((entry) => entry.when < TARGET_TIMESTAMP)
     .map((entry) => [migrationHash(entry.tag), entry.when]);
-  if (sha256(JSON.stringify(sourcePrefix)) !== SOURCE_PREFIX_FINGERPRINT) {
+  if (!SOURCE_PREFIX_FINGERPRINTS.has(sha256(JSON.stringify(sourcePrefix)))) {
     fail('the current pre-0026 source lineage changed');
   }
 
@@ -499,7 +503,7 @@ function classify(sqlite, source) {
 
   const exactLegacyOrSourcePrefix =
     prefixFingerprint === LEGACY_PREFIX_FINGERPRINT ||
-    prefixFingerprint === SOURCE_PREFIX_FINGERPRINT;
+    SOURCE_PREFIX_FINGERPRINTS.has(prefixFingerprint);
   const exactCurrentPrefix = orderedPairPrefix(beforePairs, source.sourcePrefix);
   const exactLaterPrefix = orderedPairPrefix(laterPairs, source.later);
   const stateA =
@@ -554,7 +558,7 @@ function requireUnattestedPreparedState(sqlite) {
     }
     return 'legacy';
   }
-  if (lineage === SOURCE_PREFIX_FINGERPRINT) {
+  if (SOURCE_PREFIX_FINGERPRINTS.has(lineage)) {
     if (!preparedTableShape(sqlite, 'attested')) {
       fail('the fresh prepared-instance table is not the exact canonical logical shape');
     }

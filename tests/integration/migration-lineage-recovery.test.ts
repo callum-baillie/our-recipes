@@ -435,6 +435,19 @@ describe('duplicate-0026 migration lineage recovery', () => {
     }
   });
 
+  it('accepts the canonical LF source lineage used by Linux and container checkouts', () => {
+    const folder = join(temporaryRoot(), 'canonical-drizzle');
+    cpSync(migrationsFolder, folder, { recursive: true });
+    const migrationPath = join(folder, '0014_extended_recipe_nutrition.sql');
+    writeFileSync(migrationPath, readFileSync(migrationPath, 'utf8').replace(/\r\n/gu, '\n'));
+    const sqlite = new Database(join(temporaryRoot(), 'canonical-source.sqlite'));
+    try {
+      expect(recoverDuplicate0026Lineage(sqlite, folder)).toBe('C');
+    } finally {
+      sqlite.close();
+    }
+  });
+
   it('accepts zero history only for a pristine database or exact empty Drizzle table', () => {
     for (const exactEmptyTable of [false, true]) {
       const sqlite = new Database(join(temporaryRoot(), `pristine-${exactEmptyTable}.sqlite`));
