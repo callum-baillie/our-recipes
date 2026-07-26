@@ -1,5 +1,5 @@
-import { access, lstat, readdir } from 'node:fs/promises';
-import { resolve, relative, sep } from 'node:path';
+import { access, lstat, readlink, readdir } from 'node:fs/promises';
+import { dirname, isAbsolute, resolve, relative, sep } from 'node:path';
 
 const target = resolve(process.argv[2] ?? '.next/standalone');
 const projectName = process.cwd().split(/[\\/]/).at(-1)?.toLocaleLowerCase() ?? '';
@@ -19,6 +19,11 @@ const projectOnlyDirectories = new Set([
 
 function slash(path) {
   return path.split(sep).join('/');
+}
+
+function isWithin(parent, child) {
+  const path = relative(parent, child);
+  return path === '' || (!isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`));
 }
 
 function isProjectPath(path) {
@@ -45,9 +50,15 @@ async function walk(directory, files) {
     const absolutePath = resolve(directory, entry.name);
     const details = await lstat(absolutePath);
     if (details.isSymbolicLink()) {
-      throw new Error(
-        `Release artifact contains a non-portable symbolic link: ${slash(relative(target, absolutePath))}`,
-      );
+      const linkTarget = await readlink(absolutePath);
+      const resolvedTarget = resolve(dirname(absolutePath), linkTarget);
+      if (isAbsolute(linkTarget) || !isWithin(target, resolvedTarget)) {
+        throw new Error(
+          `Release artifact contains a non-portable symbolic link: ${slash(relative(target, absolutePath))}`,
+        );
+      }
+      await lstat(resolvedTarget);
+      continue;
     }
     if (details.isDirectory()) await walk(absolutePath, files);
     else if (details.isFile()) files.push(absolutePath);
