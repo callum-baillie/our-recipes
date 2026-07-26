@@ -27,11 +27,18 @@ function assertWithin(parent, child, label) {
   }
 }
 
+function assertRuntimeSource(source, label) {
+  const canonicalSource = realpathSync(source);
+  if (!isWithin(sourceModules, canonicalSource) && !isWithin(standaloneModules, canonicalSource)) {
+    throw new Error(`${label} is outside the expected dependency directories: ${source}`);
+  }
+}
+
 function copyRuntimePath(source, target, label) {
   if (!existsSync(source)) {
     throw new Error(`Required standalone dependency is missing: ${label} (${source})`);
   }
-  assertWithin(sourceModules, realpathSync(source), `${label} source`);
+  assertRuntimeSource(source, `${label} source`);
   assertWithin(standaloneRoot, target, `${label} target`);
 
   rmSync(target, { recursive: true, force: true });
