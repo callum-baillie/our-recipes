@@ -1,4 +1,4 @@
-import { lstat, readdir, readlink } from 'node:fs/promises';
+import { access, lstat, readdir } from 'node:fs/promises';
 import { resolve, relative, sep } from 'node:path';
 
 const target = resolve(process.argv[2] ?? '.next/standalone');
@@ -45,13 +45,9 @@ async function walk(directory, files) {
     const absolutePath = resolve(directory, entry.name);
     const details = await lstat(absolutePath);
     if (details.isSymbolicLink()) {
-      const linkTarget = slash(await readlink(absolutePath));
-      if (!/(?:^|\/)node_modules(?:\/|$)/i.test(linkTarget)) {
-        throw new Error(
-          `Release artifact contains an unexpected symbolic link: ${slash(relative(target, absolutePath))}`,
-        );
-      }
-      continue;
+      throw new Error(
+        `Release artifact contains a non-portable symbolic link: ${slash(relative(target, absolutePath))}`,
+      );
     }
     if (details.isDirectory()) await walk(absolutePath, files);
     else if (details.isFile()) files.push(absolutePath);
@@ -79,6 +75,40 @@ if (violations.length) {
       violations.length > 50 ? `\n...and ${violations.length - 50} more` : ''
     }`,
   );
+}
+
+const requiredRuntimeFiles = [
+  'node_modules/tesseract.js/src/index.js',
+  'node_modules/tesseract.js/src/worker-script/node/index.js',
+  'node_modules/tesseract.js-core/tesseract-core.wasm.js',
+  'node_modules/@tesseract.js-data/eng/index.js',
+  'node_modules/sharp/package.json',
+];
+
+for (const runtimeFile of requiredRuntimeFiles) {
+  try {
+    await access(resolve(target, runtimeFile));
+  } catch {
+    throw new Error(`Release artifact is missing required runtime file: ${runtimeFile}`);
+  }
+}
+
+const imageRuntimeDirectories = new Set(
+  await readdir(resolve(target, 'node_modules/@img'), { withFileTypes: true }).then((entries) =>
+    entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+  ),
+);
+const sharpPlatform = `sharp-${process.platform}-${process.arch}`;
+if (!imageRuntimeDirectories.has(sharpPlatform)) {
+  throw new Error(`Release artifact is missing the Sharp runtime package: @img/${sharpPlatform}`);
+}
+if (process.platform !== 'win32') {
+  const sharpLibvipsPlatform = `sharp-libvips-${process.platform}-${process.arch}`;
+  if (!imageRuntimeDirectories.has(sharpLibvipsPlatform)) {
+    throw new Error(
+      `Release artifact is missing the Sharp libvips package: @img/${sharpLibvipsPlatform}`,
+    );
+  }
 }
 
 console.log(`Release artifact is clean: ${files.length} files checked in ${target}`);

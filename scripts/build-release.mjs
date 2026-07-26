@@ -17,6 +17,15 @@ if (tracingWarning.test(`${build.stdout ?? ''}\n${build.stderr ?? ''}`)) {
   process.exit(1);
 }
 
+const hydrate = spawnSync('node', ['scripts/hydrate-standalone-dependencies.mjs'], {
+  cwd: process.cwd(),
+  encoding: 'utf8',
+  shell: process.platform === 'win32',
+});
+process.stdout.write(hydrate.stdout ?? '');
+process.stderr.write(hydrate.stderr ?? '');
+if (hydrate.status !== 0) process.exit(hydrate.status ?? 1);
+
 const artifact = spawnSync('pnpm', ['artifact:verify'], {
   cwd: process.cwd(),
   encoding: 'utf8',
