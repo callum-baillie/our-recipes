@@ -50,6 +50,20 @@ function copyRuntimePath(source, target, label) {
   });
 }
 
+function removePackageBinDirectories(directory) {
+  let removed = 0;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = resolve(directory, entry.name);
+    if (entry.name === '.bin') {
+      rmSync(path, { recursive: true, force: true });
+      removed += 1;
+    } else if (entry.isDirectory()) {
+      removed += removePackageBinDirectories(path);
+    }
+  }
+  return removed;
+}
+
 if (!existsSync(standaloneRoot)) {
   throw new Error('Standalone release artifact is missing. Run the Next.js build first.');
 }
@@ -86,6 +100,8 @@ if (existsSync(tracedExternalModules)) {
   }
 }
 
+const removedBinDirectories = removePackageBinDirectories(standaloneRoot);
+
 console.log(
-  `Standalone runtime dependencies hydrated: ${runtimePaths.length} runtime paths and ${hydratedExternals} traced externals`,
+  `Standalone runtime dependencies hydrated: ${runtimePaths.length} runtime paths, ${hydratedExternals} traced externals, and ${removedBinDirectories} build-only bin directories removed`,
 );
