@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { SettingsActionBar, SettingsPane } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 import {
   defaultProfileGoalContext,
@@ -12,6 +13,7 @@ import {
   type ProfileGoalContext,
   type ProfileGoalFocus,
 } from '@/lib/domain/profile-goals';
+import type { AppRole } from '@/lib/domain/permissions';
 
 type Profile = {
   id: string;
@@ -25,6 +27,8 @@ type Profile = {
   mainGoals: string;
   goalContext: ProfileGoalContext;
   archivedAt: Date | string | null;
+  role: AppRole;
+  isLastAdmin: boolean;
 };
 
 type ProfileValues = {
@@ -41,15 +45,18 @@ type ProfileValues = {
 
 export function ProfileSettings({
   initialProfiles,
+  initialGuardians,
   activeProfileId,
 }: {
   initialProfiles: Profile[];
+  initialGuardians: Array<{ parentProfileId: string; childProfileId: string }>;
   activeProfileId: string | null;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [profiles, setProfiles] = useState(initialProfiles);
   const [adding, setAdding] = useState(false);
+  const [guardians, setGuardians] = useState(initialGuardians);
   const [error, setError] = useState<string | null>(null);
 
   async function saveProfile(profile: Profile, data: ProfileValues) {
@@ -103,6 +110,55 @@ export function ProfileSettings({
     router.refresh();
   }
 
+  async function saveRole(profile: Profile, role: AppRole): Promise<boolean> {
+    setError(null);
+    const response = await fetch(`/api/v1/admin/profiles/${profile.id}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    });
+    const body = (await response.json().catch(() => null)) as {
+      account?: { profileId: string; role: AppRole; isLastAdmin: boolean };
+      error?: { message?: string };
+    } | null;
+    if (!response.ok || !body?.account) {
+      const message = body?.error?.message ?? 'We could not change this role.';
+      setError(message);
+      showToast(message, 'error');
+      return false;
+    }
+    router.refresh();
+    showToast(`${profile.displayName} is now ${body.account.role}.`, 'success');
+    return true;
+  }
+
+  async function setGuardian(parentProfileId: string, childProfileId: string, enabled: boolean) {
+    setError(null);
+    const response = await fetch('/api/v1/admin/guardians', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parentProfileId, childProfileId, enabled }),
+    });
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    if (!response.ok) {
+      const message = body?.error?.message ?? 'We could not change guardian access.';
+      setError(message);
+      showToast(message, 'error');
+      return;
+    }
+    setGuardians((current) =>
+      enabled
+        ? [...current, { parentProfileId, childProfileId }]
+        : current.filter(
+            (item) =>
+              item.parentProfileId !== parentProfileId || item.childProfileId !== childProfileId,
+          ),
+    );
+    showToast(enabled ? 'Guardian access granted.' : 'Guardian access revoked.', 'success');
+  }
+
   return (
     <div className="settings-page">
       {error && (
@@ -110,6 +166,49 @@ export function ProfileSettings({
           {error}
         </p>
       )}
+      {profiles.some((profile) => profile.role === 'child' && !profile.archivedAt) ? (
+        <SettingsPane
+          className="guardian-settings"
+          eyebrow="PERMISSIONS"
+          title="Guardian access"
+          description="Allow an Admin or Parent to manage a Child's Nutrition data. Guardians cannot delete the child's entries."
+          aria-labelledby="guardian-heading"
+        >
+          {profiles
+            .filter((profile) => profile.role === 'child' && !profile.archivedAt)
+            .map((child) => (
+              <fieldset key={child.id}>
+                <legend>{child.displayName}</legend>
+                {profiles
+                  .filter(
+                    (profile) =>
+                      profile.id !== child.id &&
+                      !profile.archivedAt &&
+                      (profile.role === 'admin' || profile.role === 'parent'),
+                  )
+                  .map((parent) => {
+                    const enabled = guardians.some(
+                      (item) =>
+                        item.parentProfileId === parent.id && item.childProfileId === child.id,
+                    );
+                    return (
+                      <label key={parent.id}>
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={(event) =>
+                            void setGuardian(parent.id, child.id, event.target.checked)
+                          }
+                        />
+                        <span>{parent.displayName}</span>
+                        <small>{parent.role}</small>
+                      </label>
+                    );
+                  })}
+              </fieldset>
+            ))}
+        </SettingsPane>
+      ) : null}
       <section className="profile-settings-list">
         {profiles.map((profile) => (
           <ProfileEditor
@@ -118,6 +217,7 @@ export function ProfileSettings({
             active={profile.id === activeProfileId}
             onSave={saveProfile}
             onArchive={archive}
+            onRoleChange={saveRole}
           />
         ))}
       </section>
@@ -188,7 +288,7 @@ function ProfileOnboardingDialog({
         mode="profile"
         onCancel={closeDialog}
         onProfileCreated={(profile) => {
-          onProfileCreated(profile);
+          onProfileCreated({ ...profile, role: 'parent', isLastAdmin: false });
           closeDialog();
         }}
       />
@@ -201,11 +301,13 @@ function ProfileEditor({
   active,
   onSave,
   onArchive,
+  onRoleChange,
 }: {
   profile: Profile;
   active: boolean;
   onSave: (profile: Profile, values: ProfileValues) => Promise<void>;
   onArchive: (profile: Profile, archived: boolean) => Promise<void>;
+  onRoleChange: (profile: Profile, role: AppRole) => Promise<boolean>;
 }) {
   const [values, setValues] = useState({
     displayName: profile.displayName,
@@ -219,6 +321,7 @@ function ProfileEditor({
     goalContext: profile.goalContext ?? defaultProfileGoalContext,
   });
   const archived = Boolean(profile.archivedAt);
+  const [role, setRole] = useState(profile.role);
 
   function toggleGoalFocus(focus: ProfileGoalFocus) {
     const selected = values.goalContext.focusAreas.includes(focus);
@@ -241,19 +344,36 @@ function ProfileEditor({
   }
 
   return (
-    <section className="settings-card profile-editor">
-      <div className="profile-editor-heading">
-        <div>
+    <SettingsPane
+      className="profile-editor"
+      eyebrow={archived ? 'ARCHIVED PROFILE' : active ? 'ACTIVE PROFILE' : 'HOUSEHOLD PROFILE'}
+      title={
+        <span className="profile-editor-title">
           <span
             className="profile-dot"
             style={{ backgroundColor: values.color }}
             aria-hidden="true"
           />
-          <h2>{profile.displayName}</h2>
-          {active && <small>Active profile</small>}
-          {archived && <small>Archived</small>}
-        </div>
-        <button className="text-button" type="button" onClick={() => onArchive(profile, !archived)}>
+          {profile.displayName}
+        </span>
+      }
+      description={
+        profile.isLastAdmin
+          ? 'This is the only active admin. Promote another admin before demoting or archiving it.'
+          : 'Identity, access role, regional preferences, and personal goals.'
+      }
+      actions={
+        <button
+          className="text-button"
+          type="button"
+          disabled={profile.isLastAdmin && !archived}
+          title={
+            profile.isLastAdmin && !archived
+              ? 'Promote another active profile to Admin before archiving this one.'
+              : undefined
+          }
+          onClick={() => onArchive(profile, !archived)}
+        >
           {archived ? (
             <>
               <RotateCcw size={15} /> Restore
@@ -264,8 +384,29 @@ function ProfileEditor({
             </>
           )}
         </button>
-      </div>
+      }
+    >
       <div className="field-grid two-columns">
+        <label>
+          <span>Access role</span>
+          <select
+            value={role}
+            onChange={async (event) => {
+              const nextRole = event.target.value as AppRole;
+              setRole(nextRole);
+              if (!(await onRoleChange(profile, nextRole))) setRole(profile.role);
+            }}
+          >
+            <option value="admin">Admin</option>
+            <option value="parent">Parent</option>
+            <option value="child">Child</option>
+          </select>
+          <small>
+            {profile.isLastAdmin
+              ? 'This is the only active admin. Promote another admin before demoting it.'
+              : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
+          </small>
+        </label>
         <label>
           <span>Display name</span>
           <input
@@ -396,14 +537,16 @@ function ProfileEditor({
           />
         </label>
       </div>
-      <button
-        className="primary-button compact"
-        type="button"
-        disabled={archived || !values.displayName.trim()}
-        onClick={() => onSave(profile, values)}
-      >
-        <Save size={16} /> Save profile
-      </button>
-    </section>
+      <SettingsActionBar>
+        <button
+          className="primary-button compact"
+          type="button"
+          disabled={archived || !values.displayName.trim()}
+          onClick={() => onSave(profile, values)}
+        >
+          <Save size={16} /> Save profile
+        </button>
+      </SettingsActionBar>
+    </SettingsPane>
   );
 }

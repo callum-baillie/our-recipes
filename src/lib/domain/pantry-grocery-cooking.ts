@@ -60,6 +60,13 @@ export const pantryShoppingControlSchema = z
     }
   });
 
+export const pantryShoppingMatchSchema = z
+  .object({
+    productId: z.string().uuid(),
+    matchType: z.enum(['exact', 'suggested', 'manual']),
+  })
+  .strict();
+
 export const pantryCookConsumptionSchema = z
   .object({
     productId: z.string().uuid(),
@@ -96,4 +103,5 @@ export const cookSessionPantryStartSchema = z
 export type PantryShortageGenerationInput = z.input<typeof pantryShortageGenerationSchema>;
 export type PantryPurchaseIntakeInput = z.input<typeof pantryPurchaseIntakeSchema>;
 export type PantryShoppingControlInput = z.input<typeof pantryShoppingControlSchema>;
+export type PantryShoppingMatchInput = z.output<typeof pantryShoppingMatchSchema>;
 export type PantryCookConfirmationInput = z.output<typeof pantryCookConfirmationSchema>;

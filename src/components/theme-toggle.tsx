@@ -16,6 +16,7 @@ import {
   type ColorMode,
   type PaletteId,
 } from '@/lib/appearance';
+import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 
 const APPEARANCE_EVENT = 'bord-theme-change';
 const SERVER_SNAPSHOT = 'green:system:light';
@@ -184,13 +185,19 @@ export function ThemeToggle() {
 
 export function AppearanceSettings() {
   return (
-    <section className="settings-card appearance-settings">
-      <div>
-        <p className="eyebrow">APPEARANCE</p>
-        <h2>Choose your kitchen colors.</h2>
-        <p>These choices apply only to this browser. The kitchen icon above is shared.</p>
-      </div>
-      <AppearanceChoices />
-    </section>
+    <SettingsPane
+      className="appearance-settings"
+      eyebrow="APPEARANCE"
+      title="Appearance"
+      description="Personal display choices saved only in this browser."
+    >
+      <SettingsRow
+        title="Color and brightness"
+        description="Choose a palette and whether the interface follows the system, light, or dark appearance."
+        align="start"
+      >
+        <AppearanceChoices />
+      </SettingsRow>
+    </SettingsPane>
   );
 }

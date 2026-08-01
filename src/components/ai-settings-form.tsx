@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { InlineSkeleton } from '@/components/skeleton';
+import { SettingsPane } from '@/components/settings-primitives';
 
 import styles from './ai-settings-form.module.css';
 
@@ -13,7 +14,7 @@ type Workload = {
   enabled: boolean;
   version: number;
 };
-type Policy = Record<string, boolean | number> & { version: number };
+type Policy = Record<string, boolean | number | string> & { version: number };
 type CatalogModel = {
   id: string;
   label: string;
@@ -46,21 +47,33 @@ const policyFields = [
   ['shareIdentity', 'Name and identity', 'Your household display name.'],
   ['sharePersonalMetrics', 'Personal metrics', 'Height, activity, sex category, and life stage.'],
   ['shareWeight', 'Weight', 'Current and target weight.'],
-  ['dailySummaryEnabled', 'Daily AI summary', 'Generate a daily nutrition recap.'],
+  ['shareShoppingLists', 'Shopping lists', 'List names, sources, completion, and store names.'],
+] as const;
+
+const summaryFields = [
   [
-    'weeklySummaryEnabled',
-    'Weekly AI summaries',
-    'Generate nutrition and planning recaps each week.',
+    'summaryNutritionEnabled',
+    'Nutrition',
+    'Patterns, goal progress, coverage, and useful metrics.',
   ],
+  ['summaryMealPlansEnabled', 'Meal plans', 'Upcoming coverage, repetition, and planning gaps.'],
+  [
+    'summaryShoppingListsEnabled',
+    'Shopping lists',
+    'Remaining items, completion, and list activity.',
+  ],
+  ['summaryRecipesEnabled', 'Recipes', 'Library variety, recent additions, and useful gaps.'],
 ] as const;
 
 function label(value: string) {
+  if (value === 'nutrition_summary') return 'household summaries';
   return value.replaceAll('_', ' ');
 }
 
 export function AiSettingsForm({ initialSettings }: { initialSettings: Settings }) {
   const [settings, setSettings] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState('');
   const imageGeneration = settings.workloads.find((item) => item.workload === 'image_generation');
 
@@ -73,18 +86,23 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
     }));
   }
 
+  async function persistSettings(): Promise<Settings> {
+    const response = await fetch('/api/v1/ai/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workloads: settings.workloads, dataPolicy: settings.dataPolicy }),
+    });
+    const body = (await response.json()) as Settings & { error?: { message?: string } };
+    if (!response.ok) throw new Error(body.error?.message ?? 'AI settings could not be saved.');
+    setSettings(body);
+    return body;
+  }
+
   async function save() {
     setSaving(true);
     setStatus('Saving…');
     try {
-      const response = await fetch('/api/v1/ai/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workloads: settings.workloads, dataPolicy: settings.dataPolicy }),
-      });
-      const body = (await response.json()) as Settings & { error?: { message?: string } };
-      if (!response.ok) throw new Error(body.error?.message ?? 'AI settings could not be saved.');
-      setSettings(body);
+      await persistSettings();
       setStatus('Saved. New privacy choices apply to future AI requests.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'AI settings could not be saved.');
@@ -93,16 +111,44 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
     }
   }
 
+  async function refreshSummaries() {
+    setRefreshing(true);
+    setStatus('Saving settings and preparing one summary request…');
+    try {
+      await persistSettings();
+      const response = await fetch('/api/v1/ai/summaries', { method: 'POST' });
+      const body = (await response.json().catch(() => null)) as {
+        summaries?: unknown[];
+        error?: { message?: string };
+      } | null;
+      if (!response.ok)
+        throw new Error(body?.error?.message ?? 'AI summaries could not be refreshed.');
+      const count = body?.summaries?.length ?? 0;
+      setStatus(
+        count
+          ? `Updated ${count} summary ${count === 1 ? 'section' : 'sections'} in one AI request.`
+          : 'Nothing was sent: enabled summary sections do not have shareable data yet.',
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'AI summaries could not be refreshed.');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <div className={styles.shell}>
-      <section className={styles.panel} aria-labelledby="ai-image-generation-title">
+      <SettingsPane
+        className={styles.panel}
+        eyebrow="AI FEATURES"
+        title="Recipe image generation"
+        description="Household-wide permission for paid AI-created recipe imagery."
+        aria-labelledby="ai-image-generation-title"
+      >
         <div className={styles.globalPreference}>
           <div>
-            <h2 id="ai-image-generation-title">Recipe image generation</h2>
-            <p>
-              Set the household-wide permission for AI-created recipe images. Individual creation
-              flows still keep image generation off until you choose it.
-            </p>
+            <strong id="ai-image-generation-title">Offer image generation</strong>
+            <p>Individual creation flows still keep image generation off until you choose it.</p>
           </div>
           <label className={styles.masterToggle}>
             <span>
@@ -126,15 +172,68 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
             <i aria-hidden="true" />
           </label>
         </div>
-      </section>
-      <section className={styles.panel}>
-        <header>
-          <h2>Models by task</h2>
+      </SettingsPane>
+      <SettingsPane
+        className={styles.panel}
+        eyebrow="SUMMARIES"
+        title="Household summaries"
+        description="One request creates enabled insight sections together; sections without data are omitted."
+      >
+        <div className={styles.summarySchedule}>
+          <label className={styles.field}>
+            Update frequency
+            <select
+              value={String(settings.dataPolicy.summaryFrequency)}
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  dataPolicy: {
+                    ...current.dataPolicy,
+                    summaryFrequency: event.target.value,
+                  },
+                }))
+              }
+            >
+              <option value="off">Off</option>
+              <option value="daily">Daily</option>
+              <option value="every_3_days">Every 3 days</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
           <p>
-            Model choices are shared by the household. Custom model IDs are supported when OpenAI
-            makes a compatible model available.
+            The schedule runs locally. A provider request is made only when an enabled section has
+            shareable data.
           </p>
-        </header>
+        </div>
+        <div className={styles.summaryDomains}>
+          {summaryFields.map(([key, title, description]) => (
+            <label className={styles.toggle} key={key}>
+              <input
+                type="checkbox"
+                checked={Boolean(settings.dataPolicy[key])}
+                disabled={settings.dataPolicy.summaryFrequency === 'off'}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    dataPolicy: { ...current.dataPolicy, [key]: event.target.checked },
+                  }))
+                }
+              />
+              <span>
+                <strong>{title}</strong>
+                <small>{description}</small>
+              </span>
+            </label>
+          ))}
+        </div>
+      </SettingsPane>
+      <SettingsPane
+        className={styles.panel}
+        eyebrow="MODEL ROUTING"
+        title="Models by task"
+        description="Model choices are shared by the household. Compatible custom model IDs are supported."
+      >
         <div className={styles.workloads}>
           {settings.workloads.map((item, index) => {
             const choices = settings.modelCatalog.filter((model) =>
@@ -196,15 +295,13 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
             );
           })}
         </div>
-      </section>
-      <section className={styles.panel}>
-        <header>
-          <h2>Data shared for this profile</h2>
-          <p>
-            Only enabled categories may be included in future requests. Turning a category off does
-            not recall data from requests already sent.
-          </p>
-        </header>
+      </SettingsPane>
+      <SettingsPane
+        className={styles.panel}
+        eyebrow="PRIVACY"
+        title="Data shared for this profile"
+        description="Only enabled categories may be included in future requests. Earlier requests cannot be recalled."
+      >
         <div className={styles.privacy}>
           {policyFields.map(([key, title, description]) => (
             <label className={styles.toggle} key={key}>
@@ -225,10 +322,22 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
             </label>
           ))}
         </div>
-      </section>
+      </SettingsPane>
       <div className={styles.actions}>
-        <button type="button" onClick={() => void save()} disabled={saving}>
+        <button type="button" onClick={() => void save()} disabled={saving || refreshing}>
           {saving ? <InlineSkeleton label="Saving AI settings" width="6rem" /> : 'Save AI settings'}
+        </button>
+        <button
+          className={styles.secondaryAction}
+          type="button"
+          onClick={() => void refreshSummaries()}
+          disabled={saving || refreshing}
+        >
+          {refreshing ? (
+            <InlineSkeleton label="Updating AI summaries" width="8rem" />
+          ) : (
+            'Update summaries now'
+          )}
         </button>
         <p className={styles.status} role="status">
           {status}

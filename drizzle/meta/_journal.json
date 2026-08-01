@@ -316,6 +316,69 @@
       "when": 1784790000000,
       "tag": "0043_ai_image_generation_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "1",
+      "when": 1785135600000,
+      "tag": "0044_ai_summary_bundles",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "1",
+      "when": 1785218400000,
+      "tag": "0045_ai_summary_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "1",
+      "when": 1785222000000,
+      "tag": "0046_auth_api_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "1",
+      "when": 1785308400000,
+      "tag": "0047_household_roles_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "1",
+      "when": 1785312000000,
+      "tag": "0048_guardian_nutrition_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "1",
+      "when": 1785398400000,
+      "tag": "0049_ai_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "1",
+      "when": 1785484800000,
+      "tag": "0050_shopping_ingredient_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "1",
+      "when": 1785571200000,
+      "tag": "0051_backfill_shopping_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "1",
+      "when": 1785657600000,
+      "tag": "0052_refine_shopping_categories",
+      "breakpoints": true
     }
   ]
 }

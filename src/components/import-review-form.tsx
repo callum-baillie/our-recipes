@@ -8,6 +8,7 @@ import { InlineSkeleton } from '@/components/skeleton';
 import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 
 import { useToast } from '@/components/toast-provider';
+import { SHOPPING_CATEGORIES, type ShoppingCategory } from '@/lib/domain/list-settings';
 import { RecipeTagSelector } from '@/components/recipe-tag-selector';
 import { RecipeTaxonomySelector } from '@/components/recipe-taxonomy-selector';
 import {
@@ -214,7 +215,14 @@ export function ImportReviewForm({
                     ...group,
                     ingredients: [
                       ...group.ingredients,
-                      { quantity: '', unit: '', item: '', note: '', pantryProductId: '' },
+                      {
+                        quantity: '',
+                        unit: '',
+                        item: '',
+                        note: '',
+                        shoppingCategory: 'Other',
+                        pantryProductId: '',
+                      },
                     ],
                   })
                 }
@@ -297,6 +305,30 @@ export function ImportReviewForm({
                         })
                       }
                     />
+                    <select
+                      aria-label={`${ingredientLabel} shopping category`}
+                      title="Shopping category"
+                      value={ingredient.shoppingCategory}
+                      onChange={(event) =>
+                        updateGroup(groupIndex, {
+                          ...group,
+                          ingredients: group.ingredients.map((current, currentIndex) =>
+                            currentIndex === index
+                              ? {
+                                  ...current,
+                                  shoppingCategory: event.target.value as ShoppingCategory,
+                                }
+                              : current,
+                          ),
+                        })
+                      }
+                    >
+                      {SHOPPING_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
                     <FoodCatalogPicker
                       context="recipe"
                       defaultQuery={ingredient.item}

@@ -11,14 +11,27 @@ services:
       DATA_DIR: /data
       DATABASE_URL: /data/bord.db
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       COOKIE_SECRET: ${COOKIE_SECRET:?Set a unique secret of at least 32 characters}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set a different unique secret of at least 32 characters}
+      AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM:?Set the verified authentication email sender}
+      AUTH_SMTP_HOST: ${AUTH_SMTP_HOST:?Set the SMTP host}
+      AUTH_SMTP_PORT: ${AUTH_SMTP_PORT:-587}
+      AUTH_SMTP_SECURE: ${AUTH_SMTP_SECURE:-false}
+      AUTH_SMTP_USER: ${AUTH_SMTP_USER:?Set the SMTP username}
+      AUTH_SMTP_PASSWORD: ${AUTH_SMTP_PASSWORD:?Set the SMTP password}
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
       HOMEPAGE_INTEGRATION_TOKEN: ${HOMEPAGE_INTEGRATION_TOKEN:-}
+      BACKUP_DIR: ${BACKUP_DIR:-/data/backups}
       BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_WORKER_ENABLED: ${AI_WORKER_ENABLED:-true}
+      AI_WORKER_POLL_SECONDS: ${AI_WORKER_POLL_SECONDS:-10}
+      AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-2}
+      AI_BATCH_MIN_ITEMS: ${AI_BATCH_MIN_ITEMS:-4}
       OPEN_FOOD_FACTS_ENABLED: ${OPEN_FOOD_FACTS_ENABLED:-true}
-      OPEN_FOOD_FACTS_USER_AGENT: ${OPEN_FOOD_FACTS_USER_AGENT:-Bord/1.0.0-rc.1 (https://github.com/callum-baillie/bord)}
+      OPEN_FOOD_FACTS_USER_AGENT: ${OPEN_FOOD_FACTS_USER_AGENT:-Bord/1.0.0-rc.2 (https://github.com/callum-baillie/bord)}
       USDA_FDC_ENABLED: ${USDA_FDC_ENABLED:-true}
       USDA_FDC_API_KEY: ${USDA_FDC_API_KEY:-}
     volumes:

@@ -1,13 +1,3 @@
-:global(html:has(.planner-workspace-shell)),
-:global(html:has(.planner-workspace-shell) body),
-:global(body:has(.planner-workspace-shell)) {
-  overflow: hidden;
-}
-
-:global(.planner-workspace-shell + .app-footer) {
-  display: none !important;
-}
-
 .workspaceShell {
   width: 100%;
   height: calc(100dvh - 5.5rem);
@@ -82,23 +72,6 @@
 }
 
 @media (max-width: 900px) {
-  :global(html:has(.planner-workspace-shell)),
-  :global(html:has(.planner-workspace-shell) body),
-  :global(body:has(.planner-workspace-shell)) {
-    overflow-x: hidden;
-    overflow-y: auto;
-    scrollbar-width: none;
-  }
-
-  :global(html:has(.planner-workspace-shell))::-webkit-scrollbar,
-  :global(body:has(.planner-workspace-shell))::-webkit-scrollbar {
-    display: none;
-  }
-
-  :global(.planner-workspace-shell + .app-footer) {
-    display: flex !important;
-  }
-
   .workspaceShell {
     height: auto;
     min-height: calc(100dvh - 5.5rem);

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { shoppingCategorySchema } from '@/lib/domain/list-settings';
 import { recipeInputSchema } from '@/lib/domain/recipe';
 
 export const aiOperationKindSchema = z.enum([
@@ -34,8 +35,15 @@ const aiStructuredIngredientSchema = z
   .object({
     quantity: z.union([z.literal(''), z.number().positive().max(10_000)]),
     unit: z.string().max(30),
-    item: z.string().min(1).max(160),
+    item: z
+      .string()
+      .min(1)
+      .max(160)
+      .describe(
+        'Specific purchasable ingredient identity, including meaningful type, form, variety, and size qualifiers.',
+      ),
     note: z.string().max(240),
+    shoppingCategory: shoppingCategorySchema,
   })
   .strict();
 

@@ -74,6 +74,7 @@ function RecipeChoiceCard({
             width={recipe.image.width}
             height={recipe.image.height}
             sizes="(max-width: 620px) 42vw, 240px"
+            unoptimized
           />
         ) : (
           <span aria-hidden="true">
@@ -84,8 +85,7 @@ function RecipeChoiceCard({
       <div className={styles.recipeChoiceBody}>
         <h3>{recipe.title}</h3>
         <div className={styles.recipeLabels}>
-          {[recipe.category, ...recipe.tags]
-            .filter(Boolean)
+          {[...new Set([recipe.category, ...recipe.tags].filter(Boolean))]
             .slice(0, 3)
             .map((label) => (
               <span key={label}>{label}</span>
@@ -169,7 +169,10 @@ export function MealPlanRecipeSelector({
       const taxonomy = [recipe.category, ...recipe.tags].join(' ').toLocaleLowerCase();
       return mealTerms.some((term) => taxonomy.includes(term));
     });
-    const mealPool = taggedForMeal.length ? taggedForMeal : recipes;
+    // Meal-aware suggestions are useful before someone searches. Once they
+    // type a query, search the whole recipebook so a valid result is never
+    // hidden only because its category is not associated with the active meal.
+    const mealPool = deferredSearch ? recipes : taggedForMeal.length ? taggedForMeal : recipes;
     return mealPool.filter((recipe) => {
       const recipeCollections = collectionNamesByRecipe.get(recipe.id) ?? [];
       const haystack = [

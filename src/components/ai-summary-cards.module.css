@@ -1,68 +1,206 @@
 .section {
-  width: min(var(--content-width), calc(100% - 2rem));
-  margin: 1rem auto;
-  padding: clamp(1rem, 3vw, 1.4rem);
-  border-radius: 20px;
+  display: grid;
+  min-width: 0;
+  gap: 0.8rem;
+  padding: clamp(1rem, 2vw, 1.25rem);
   color: var(--ink);
-  background: var(--leaf-pale);
-  border: 1px solid var(--notice-border);
+  background: color-mix(in srgb, var(--leaf-pale) 56%, var(--field));
+  border: 1px solid color-mix(in srgb, var(--leaf) 26%, var(--line));
+  border-radius: 18px;
 }
+
+.section[data-placement='content'] {
+  width: min(var(--content-width), calc(100% - 2rem));
+  margin: 1.25rem auto;
+}
+
+.section[data-placement='rail'] {
+  width: 100%;
+  padding: 1rem;
+  border-radius: 14px;
+}
+
+.section[data-placement='nutrition'] {
+  width: 100%;
+  margin: 0;
+}
+
 .header {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-bottom: 0.8rem;
+  align-items: flex-start;
+  gap: 0.7rem;
 }
+
+.header > div {
+  min-width: 0;
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  color: var(--leaf);
+  background: color-mix(in srgb, var(--leaf-pale) 80%, var(--field));
+  border-radius: 50%;
+}
+
+.header p {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.2rem;
+  color: var(--leaf);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .header h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-family: var(--font-heading, Georgia), serif;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-weight: 500;
+  line-height: 1.15;
 }
-.cards {
+
+.section[data-placement='rail'] .header h2 {
+  font-size: 1.08rem;
+}
+
+.summary {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.55rem;
+  margin: 0;
 }
-.card {
-  padding: 1rem;
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--linen) 88%, transparent);
+
+.metrics > div {
+  min-width: 0;
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--field) 82%, transparent);
   border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 12px;
 }
-.card p {
-  margin: 0.45rem 0;
+
+.metrics dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.metrics dd {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.metrics small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.highlights {
+  display: grid;
+  gap: 0.38rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.highlights li {
+  position: relative;
+  padding-left: 1rem;
   line-height: 1.45;
 }
-.card small {
+
+.highlights li::before {
+  position: absolute;
+  top: 0.62em;
+  left: 0;
+  width: 0.35rem;
+  height: 0.35rem;
+  background: var(--leaf);
+  border-radius: 50%;
+  content: '';
+}
+
+.caveats {
   color: var(--muted);
-  text-transform: capitalize;
+  font-size: 0.78rem;
 }
-.card ul {
+
+.caveats summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.caveats summary::-webkit-details-marker {
+  display: none;
+}
+
+.caveats ul {
+  margin: 0.2rem 0 0;
   padding-left: 1.1rem;
-  margin-bottom: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :global(html:not([data-theme='light'])) .card {
-    background: color-mix(in srgb, var(--linen) 92%, transparent);
-  }
+.openIcon {
+  display: none;
 }
 
-:global(html[data-theme='dark']) .card {
-  background: color-mix(in srgb, var(--linen) 92%, transparent);
+.caveats[open] .closedIcon {
+  display: none;
+}
+
+.caveats[open] .openIcon {
+  display: block;
+}
+
+.section footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  color: var(--muted);
+  border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  font-size: 0.74rem;
+}
+
+.section footer a {
+  color: var(--leaf);
 }
 
 @media (max-width: 520px) {
-  .section {
+  .section[data-placement='content'] {
     width: calc(100% - 1rem);
+    margin: 0.8rem auto;
+  }
+
+  .section {
     padding: 1rem;
     border-radius: 16px;
   }
 
-  .cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .card {
-    min-width: 0;
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -1,4 +1,6 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
+import 'server-only';
+
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
@@ -27,11 +29,23 @@ import type {
   MealPlanEntryUpdateInput,
   SwapMealPlanEntriesInput,
 } from '@/lib/domain/planning';
+import { shoppingListSourceKind, type ShoppingListSourceKind } from '@/lib/domain/planning';
 import {
   EMPTY_MEAL_PLAN_INGREDIENT_SNAPSHOT,
   parseMealPlanIngredientSnapshot,
   serializeMealPlanIngredientSnapshot,
 } from '@/lib/domain/meal-plan-snapshot';
+import { comparePlannedMeals, isPlannedMealActive } from '@/lib/domain/meal-plan-policy';
+import type { ShoppingCategory } from '@/lib/domain/list-settings';
+import {
+  mergeShoppingItemNotes,
+  preferredShoppingItemLabel,
+  shoppingItemIdentity,
+} from '@/lib/domain/shopping-item-identity';
+import {
+  areInventoryUnitsCompatible,
+  convertInventoryQuantity,
+} from '@/lib/domain/inventory-units';
 import {
   getShoppingItemPantryDetails,
   recordShoppingItemManualOverrides,
@@ -104,6 +118,7 @@ function recipePlanSnapshot(
       quantity: recipeIngredients.quantity,
       unit: recipeIngredients.unit,
       note: recipeIngredients.note,
+      shoppingCategory: recipeIngredients.shoppingCategory,
       productId: recipeIngredientProductMappings.productId,
       productName: pantryProducts.displayName,
       isOptional: recipeIngredientProductMappings.isOptional,
@@ -140,6 +155,13 @@ export type ShoppingListDetail = typeof shoppingLists.$inferSelect & {
 export type ShoppingListSummary = typeof shoppingLists.$inferSelect & {
   itemCount: number;
   checkedCount: number;
+  toBuyCount: number;
+  inCartCount: number;
+  cantFindCount: number;
+  sourcedCount: number;
+  openCount: number;
+  needsAttentionCount: number;
+  sourceKind: ShoppingListSourceKind;
   supermarketName: string | null;
   supermarketLocation: string;
 };
@@ -185,31 +207,46 @@ export function listPlannedMeals(weekStart: string, weekEnd: string): PlannedMea
       .all()
       .flatMap(({ mealPlanEntryId }) => (mealPlanEntryId ? [mealPlanEntryId] : [])),
   );
-  return entries.map((entry) => {
-    const currentRecipe = entry.recipeId
-      ? titles.find((recipe) => recipe.id === entry.recipeId)
-      : null;
-    const currentCalculation = currentRecipe
-      ? calculations.find(
-          (calculation) =>
-            calculation.recipeId === currentRecipe.id &&
-            calculation.recipeRevision === currentRecipe.currentRevision,
-        )
-      : null;
-    return {
-      ...entry,
-      recipeTitle: entry.recipeId
-        ? entry.recipeTitleSnapshot || currentRecipe?.title || 'Deleted recipe'
-        : entry.title,
-      recipeChangedSincePlanning: Boolean(
-        currentRecipe &&
-        entry.recipeRevision !== null &&
-        (currentRecipe.currentRevision !== entry.recipeRevision ||
-          (entry.recipeCalculationId ?? null) !== (currentCalculation?.id ?? null)),
-      ),
-      effectiveStatus: cookedEntryIds.has(entry.id) ? 'cooked' : entry.status,
-    };
-  });
+  return entries
+    .map((entry) => {
+      const currentRecipe = entry.recipeId
+        ? titles.find((recipe) => recipe.id === entry.recipeId)
+        : null;
+      const currentCalculation = currentRecipe
+        ? calculations.find(
+            (calculation) =>
+              calculation.recipeId === currentRecipe.id &&
+              calculation.recipeRevision === currentRecipe.currentRevision,
+          )
+        : null;
+      return {
+        ...entry,
+        recipeTitle: entry.recipeId
+          ? entry.recipeTitleSnapshot || currentRecipe?.title || 'Deleted recipe'
+          : entry.title,
+        recipeChangedSincePlanning: Boolean(
+          currentRecipe &&
+          entry.recipeRevision !== null &&
+          (currentRecipe.currentRevision !== entry.recipeRevision ||
+            (entry.recipeCalculationId ?? null) !== (currentCalculation?.id ?? null)),
+        ),
+        effectiveStatus: cookedEntryIds.has(entry.id) ? ('cooked' as const) : entry.status,
+      };
+    })
+    .sort(comparePlannedMeals);
+}
+
+export function getPlannedMeal(entryId: string): PlannedMeal | null {
+  ensureDatabase();
+  const entry = getDatabase()
+    .select({ plannedFor: mealPlanEntries.plannedFor })
+    .from(mealPlanEntries)
+    .where(eq(mealPlanEntries.id, entryId))
+    .get();
+  if (!entry) return null;
+  return (
+    listPlannedMeals(entry.plannedFor, entry.plannedFor).find((meal) => meal.id === entryId) ?? null
+  );
 }
 
 export function refreshMealPlanRecipeSnapshot(
@@ -518,7 +555,7 @@ export function duplicateWeek(
     title: entry.title,
     servings: entry.servings,
     note: entry.note,
-    status: entry.status,
+    status: 'planned' as const,
     createdByProfileId: actorProfileId,
     updatedByProfileId: actorProfileId,
     createdAt: now,
@@ -546,24 +583,26 @@ function icsDate(isoDate: string): string {
 }
 
 export function plannedMealsAsIcs(weekStart: string, weekEnd: string): string {
-  const events = listPlannedMeals(weekStart, weekEnd).flatMap((meal) => {
-    const description = [
-      `${meal.servings} servings`,
-      meal.note,
-      meal.recipeId ? 'Recipe planned in Bòrd.' : 'Free-form household meal.',
-    ]
-      .filter(Boolean)
-      .join('\n');
-    return [
-      'BEGIN:VEVENT',
-      `UID:${meal.id}@bord.local`,
-      `DTSTART;VALUE=DATE:${icsDate(meal.plannedFor)}`,
-      `DTEND;VALUE=DATE:${icsDate(addDays(meal.plannedFor, 1))}`,
-      `SUMMARY:${icsEscape(`${meal.meal}: ${meal.recipeTitle}`)}`,
-      `DESCRIPTION:${icsEscape(description)}`,
-      'END:VEVENT',
-    ];
-  });
+  const events = listPlannedMeals(weekStart, weekEnd)
+    .filter(isPlannedMealActive)
+    .flatMap((meal) => {
+      const description = [
+        `${meal.servings} servings`,
+        meal.note,
+        meal.recipeId ? 'Recipe planned in Bòrd.' : 'Free-form household meal.',
+      ]
+        .filter(Boolean)
+        .join('\n');
+      return [
+        'BEGIN:VEVENT',
+        `UID:${meal.id}@bord.local`,
+        `DTSTART;VALUE=DATE:${icsDate(meal.plannedFor)}`,
+        `DTEND;VALUE=DATE:${icsDate(addDays(meal.plannedFor, 1))}`,
+        `SUMMARY:${icsEscape(`${meal.meal}: ${meal.recipeTitle}`)}`,
+        `DESCRIPTION:${icsEscape(description)}`,
+        'END:VEVENT',
+      ];
+    });
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -614,10 +653,12 @@ function numericServings(value: string): number | null {
 }
 
 type GeneratedItem = {
+  identity: string;
   quantity: number | null;
   unit: string;
   item: string;
   note: string;
+  shoppingCategory: ShoppingCategory;
   sourceRecipeIds: Set<string>;
 };
 
@@ -627,12 +668,12 @@ export function generateShoppingList(
   actorProfileId: string,
 ): ShoppingListDetail {
   ensureDatabase();
-  const plannedMeals = listPlannedMeals(weekStart, weekEnd);
+  const plannedMeals = listPlannedMeals(weekStart, weekEnd).filter(isPlannedMealActive);
   if (!plannedMeals.length)
     throw new PlanningNotFoundError('Plan at least one meal before generating a shopping list.');
-  const combined = new Map<string, GeneratedItem>();
+  const combined: GeneratedItem[] = [];
 
-  plannedMeals.forEach((plannedMeal, sourceIndex) => {
+  plannedMeals.forEach((plannedMeal) => {
     if (!plannedMeal.recipeId) return;
     const snapshot = parseMealPlanIngredientSnapshot(plannedMeal.recipeIngredientsSnapshot);
     const recipe = snapshot ? null : getRecipe(plannedMeal.recipeId);
@@ -641,28 +682,39 @@ export function generateShoppingList(
     const multiplier = recipeServings ? plannedMeal.servings / recipeServings : 1;
     const ingredients =
       snapshot?.ingredients ?? recipe!.ingredientGroups.flatMap((group) => group.ingredients);
-    ingredients.forEach((ingredient, itemIndex) => {
+    ingredients.forEach((ingredient) => {
       const quantity =
         ingredient.quantity === null ? null : Number((ingredient.quantity * multiplier).toFixed(3));
-      const baseKey = [
-        ingredient.unit.toLocaleLowerCase(),
-        ingredient.item.toLocaleLowerCase(),
-        ingredient.note.toLocaleLowerCase(),
-      ].join('|');
-      const key = quantity === null ? `${baseKey}|${sourceIndex}|${itemIndex}` : baseKey;
-      const existing = combined.get(key);
+      const identity = shoppingItemIdentity(ingredient.item);
+      const existing = combined.find(
+        (candidate) =>
+          candidate.identity === identity &&
+          areInventoryUnitsCompatible(candidate.unit, ingredient.unit),
+      );
       if (existing) {
         existing.quantity =
           existing.quantity === null || quantity === null
             ? null
-            : Number((existing.quantity + quantity).toFixed(3));
+            : Number(
+                (
+                  existing.quantity +
+                  convertInventoryQuantity(quantity, ingredient.unit, existing.unit)
+                ).toFixed(3),
+              );
+        existing.item = preferredShoppingItemLabel(existing.item, ingredient.item);
+        existing.note = mergeShoppingItemNotes(existing.note, ingredient.note);
         existing.sourceRecipeIds.add(plannedMeal.recipeId!);
+        if (existing.shoppingCategory === 'Other' && ingredient.shoppingCategory !== 'Other') {
+          existing.shoppingCategory = ingredient.shoppingCategory;
+        }
       } else {
-        combined.set(key, {
+        combined.push({
+          identity,
           quantity,
           unit: ingredient.unit,
           item: ingredient.item,
           note: ingredient.note,
+          shoppingCategory: ingredient.shoppingCategory,
           sourceRecipeIds: new Set([plannedMeal.recipeId!]),
         });
       }
@@ -680,13 +732,16 @@ export function generateShoppingList(
         name: `Week of ${weekStart}`,
         weekStart,
         weekEnd,
+        sourceMode: 'planned_all',
+        sourceKey: null,
+        archivedAt: null,
         supermarketProfileId,
         createdByProfileId: actorProfileId,
         createdAt: now,
         updatedAt: now,
       })
       .run();
-    [...combined.values()]
+    combined
       .sort((a, b) => a.item.localeCompare(b.item))
       .forEach((item, position) => {
         db.insert(shoppingListItems)
@@ -698,7 +753,11 @@ export function generateShoppingList(
             unit: item.unit,
             item: item.item,
             note: item.note,
-            aisleId: resolveShoppingAisle(supermarketProfileId, { item: item.item }, db),
+            aisleId: resolveShoppingAisle(
+              supermarketProfileId,
+              { item: item.item, shoppingCategory: item.shoppingCategory },
+              db,
+            ),
             checked: false,
             shoppingState: 'to_buy',
             sourceRecipeIds: JSON.stringify([...item.sourceRecipeIds]),
@@ -715,6 +774,22 @@ export function listShoppingLists(includeArchived = false): ShoppingListSummary[
   ensureDatabase();
   const database = getDatabase();
   const profiles = new Map(listSupermarketProfiles(true).map((profile) => [profile.id, profile]));
+  const itemCounts = new Map(
+    database
+      .select({
+        listId: shoppingListItems.listId,
+        itemCount: sql<number>`count(*)`,
+        checkedCount: sql<number>`sum(case when ${shoppingListItems.checked} = 1 then 1 else 0 end)`,
+        toBuyCount: sql<number>`sum(case when ${shoppingListItems.shoppingState} = 'to_buy' then 1 else 0 end)`,
+        inCartCount: sql<number>`sum(case when ${shoppingListItems.shoppingState} = 'in_cart' then 1 else 0 end)`,
+        cantFindCount: sql<number>`sum(case when ${shoppingListItems.shoppingState} = 'cant_find' then 1 else 0 end)`,
+        sourcedCount: sql<number>`sum(case when ${shoppingListItems.shoppingState} = 'sourced' then 1 else 0 end)`,
+      })
+      .from(shoppingListItems)
+      .groupBy(shoppingListItems.listId)
+      .all()
+      .map((row) => [row.listId, row] as const),
+  );
   return database
     .select()
     .from(shoppingLists)
@@ -722,18 +797,25 @@ export function listShoppingLists(includeArchived = false): ShoppingListSummary[
     .all()
     .filter((list) => includeArchived || list.archivedAt === null)
     .map((list) => {
-      const items = database
-        .select({ checked: shoppingListItems.checked })
-        .from(shoppingListItems)
-        .where(eq(shoppingListItems.listId, list.id))
-        .all();
+      const counts = itemCounts.get(list.id);
+      const toBuyCount = Number(counts?.toBuyCount ?? 0);
+      const inCartCount = Number(counts?.inCartCount ?? 0);
+      const cantFindCount = Number(counts?.cantFindCount ?? 0);
+      const sourcedCount = Number(counts?.sourcedCount ?? 0);
       const profile = list.supermarketProfileId
         ? (profiles.get(list.supermarketProfileId) ?? null)
         : null;
       return {
         ...list,
-        itemCount: items.length,
-        checkedCount: items.filter((item) => item.checked).length,
+        itemCount: Number(counts?.itemCount ?? 0),
+        checkedCount: Number(counts?.checkedCount ?? 0),
+        toBuyCount,
+        inCartCount,
+        cantFindCount,
+        sourcedCount,
+        openCount: toBuyCount + inCartCount + cantFindCount,
+        needsAttentionCount: toBuyCount + cantFindCount,
+        sourceKind: shoppingListSourceKind(list.sourceMode),
         supermarketName: profile?.name ?? null,
         supermarketLocation: profile?.locationLabel ?? '',
       };

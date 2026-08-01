@@ -7,9 +7,10 @@ import { aiStructuredRecipeSchema } from '@/lib/domain/ai';
 import {
   aiMealPlanCandidateSchema,
   aiMealPlanStructuredOutputSchema,
-  aiSummaryOutputSchema,
+  aiSummaryBundleOutputSchema,
   type AiMealPlanCandidate,
   type AiReasoningEffort,
+  type AiSummaryBundleOutput,
 } from '@/lib/domain/ai-assistant';
 import { recipeInputSchema, type RecipeInput } from '@/lib/domain/recipe';
 import { getOpenAiApiKey } from '@/lib/providers/openai-key';
@@ -61,18 +62,13 @@ export interface AiAssistantProvider {
   generateRecipes?(
     inputs: Array<Parameters<AiAssistantProvider['generateRecipe']>[0]>,
   ): Promise<RecipeInput[]>;
-  generateSummary(input: {
+  generateSummaryBundle(input: {
     model: string;
     reasoningEffort: AiReasoningEffort | null;
     instructions: string;
     evidence: unknown;
     safetyIdentifier: string;
-  }): Promise<{
-    headline: string;
-    body: string;
-    highlights: string[];
-    caveats: string[];
-  }>;
+  }): Promise<AiSummaryBundleOutput>;
 }
 
 export class AiAssistantProviderUnavailableError extends Error {}
@@ -199,7 +195,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     return recipes;
   }
 
-  async generateSummary(input: Parameters<AiAssistantProvider['generateSummary']>[0]) {
+  async generateSummaryBundle(input: Parameters<AiAssistantProvider['generateSummaryBundle']>[0]) {
     try {
       const response = await this.responses.parse({
         model: input.model,
@@ -210,12 +206,12 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
             content: `Untrusted recorded evidence follows:\n${JSON.stringify(input.evidence)}`,
           },
         ],
-        text: { format: zodTextFormat(aiSummaryOutputSchema, 'periodic_summary') },
+        text: { format: zodTextFormat(aiSummaryBundleOutputSchema, 'household_summary_bundle') },
         store: false,
         safety_identifier: input.safetyIdentifier,
         ...reasoning(input.reasoningEffort),
       });
-      return aiSummaryOutputSchema.parse(response.output_parsed);
+      return aiSummaryBundleOutputSchema.parse(response.output_parsed);
     } catch {
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid summary.');
     }

@@ -1,9 +1,8 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
 import { collectionInputSchema } from '@/lib/domain/collection';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   CollectionConflictError,
   CollectionNotFoundError,
@@ -17,13 +16,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ collectionId: string }> },
 ) {
+  const authorization = await authorizeApi(request, 'collections', 'read');
+  if (authorization.response) return authorization.response;
   const { collectionId } = await context.params;
   const collection = getCollection(collectionId);
   return collection
-    ? NextResponse.json({ collection })
+    ? withApiRequestId(NextResponse.json({ collection }), authorization.requestId)
     : jsonError(404, 'collection_not_found', 'That collection no longer exists.');
 }
 
@@ -31,24 +32,24 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ collectionId: string }> },
 ) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before editing a collection.',
-    );
-  }
+  const authorization = await authorizeApi(request, 'collections', 'update');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   const parsed = collectionInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_collection', 'Check the collection details.');
   try {
     const { collectionId } = await context.params;
-    return NextResponse.json({
-      collection: updateCollection(collectionId, parsed.data, actor.profileId),
-    });
+    return withApiRequestId(
+      NextResponse.json({
+        collection: updateCollection(collectionId, parsed.data, authorization.principal.profileId),
+      }),
+      authorization.requestId,
+    );
   } catch (error) {
     if (error instanceof CollectionNotFoundError)
       return jsonError(404, 'collection_not_found', error.message);
@@ -64,21 +65,18 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ collectionId: string }> },
 ) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before removing a collection.',
-    );
-  }
+  const authorization = await authorizeApi(request, 'collections', 'delete');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   try {
     const { collectionId } = await context.params;
     deleteCollection(collectionId);
-    return new NextResponse(null, { status: 204 });
+    return withApiRequestId(new NextResponse(null, { status: 204 }), authorization.requestId);
   } catch (error) {
     if (error instanceof CollectionNotFoundError)
       return jsonError(404, 'collection_not_found', error.message);

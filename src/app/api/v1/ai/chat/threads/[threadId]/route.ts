@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import { listAiActionProposals } from '@/lib/services/ai-action-service';
+import { listAiJobs } from '@/lib/services/ai-job-service';
 import {
   AiChatForbiddenError,
   AiChatNotFoundError,
@@ -27,6 +28,7 @@ export async function GET(_request: Request, context: { params: Promise<{ thread
     return NextResponse.json({
       messages: getAiChatMessages(threadId, profileId),
       actions: listAiActionProposals(threadId, profileId),
+      jobs: listAiJobs({ profileId, threadId }),
     });
   } catch (error) {
     if (error instanceof AiChatNotFoundError)

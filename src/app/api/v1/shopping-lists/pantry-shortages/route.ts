@@ -8,6 +8,7 @@ import {
   generatePantryShortageList,
   PantryGroceryCookingConflictError,
   PantryGroceryCookingNotFoundError,
+  PantryGroceryCookingPrerequisiteError,
 } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
@@ -29,6 +30,8 @@ export async function POST(request: Request) {
       return jsonError(404, 'shopping_list_not_found', error.message);
     if (error instanceof PantryGroceryCookingConflictError)
       return jsonError(409, 'shopping_list_changed', error.message);
+    if (error instanceof PantryGroceryCookingPrerequisiteError)
+      return jsonError(409, 'plan_required', error.message);
     throw error;
   }
 }

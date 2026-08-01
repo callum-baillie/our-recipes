@@ -59,6 +59,45 @@ export const shoppingListGenerateSchema = z.object({
   weekEnd: isoDateSchema,
 });
 
+export const shoppingListRequestSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('manual'),
+      name: z.string().trim().min(1).max(120),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('planner'),
+      weekStart: isoDateSchema,
+      weekEnd: isoDateSchema,
+      sourceMode: z.enum(['pantry_missing', 'pantry_all']).default('pantry_all'),
+    })
+    .strict(),
+]);
+
+export const shoppingListSourceKindSchema = z.enum([
+  'manual',
+  'planner_all',
+  'pantry_missing',
+  'pantry_all',
+]);
+export type ShoppingListSourceKind = z.output<typeof shoppingListSourceKindSchema>;
+
+export function shoppingListSourceKind(sourceMode: string): ShoppingListSourceKind {
+  if (sourceMode === 'planned_all') return 'planner_all';
+  if (sourceMode === 'pantry_missing') return 'pantry_missing';
+  if (sourceMode === 'pantry_all') return 'pantry_all';
+  return 'manual';
+}
+
+export function shoppingListSourceLabel(source: ShoppingListSourceKind): string {
+  if (source === 'planner_all') return 'Planner all-items';
+  if (source === 'pantry_missing') return 'Pantry missing-items';
+  if (source === 'pantry_all') return 'Pantry all-items';
+  return 'Manual list';
+}
+
 export const shoppingListItemStateSchema = z.enum(['to_buy', 'in_cart', 'cant_find', 'sourced']);
 
 export const shoppingListItemSchema = z.object({

@@ -25,11 +25,20 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from 'react';
 
 import { useToast } from '@/components/toast-provider';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import type { FoodRecord } from '@/lib/domain/food-data';
+import { rankPantryMatches, type PantryMatchCandidate } from '@/lib/domain/pantry-shopping-match';
 import { rankShoppingScanMatches } from '@/lib/domain/shopping-scan-match';
 import type { ShoppingListDetail } from '@/lib/services/planning-service';
 
@@ -38,6 +47,8 @@ import styles from './shopping-list-editor.module.css';
 type Item = ShoppingListDetail['items'][number];
 type ShoppingState = Item['shoppingState'];
 type Filter = 'all' | 'to_buy' | 'in_cart' | 'cant_find' | 'sourced';
+type SortMode = 'position' | 'alpha' | 'recent';
+type GroupMode = 'aisle' | 'none';
 
 const BarcodeScanner = dynamic(
   () => import('@/components/barcode-scanner').then((module) => module.BarcodeScanner),
@@ -48,7 +59,12 @@ const BarcodeScanner = dynamic(
 );
 
 type PantryOptions = {
-  products: Array<{ id: string; displayName: string }>;
+  products: Array<{
+    id: string;
+    displayName: string;
+    aliases: string[];
+    stock: Array<{ quantity: number; unit: string }>;
+  }>;
   locations: Array<{ id: string; path: string }>;
 };
 
@@ -100,11 +116,65 @@ function emptyIntakeDraft(item: Item, locationId = ''): IntakeDraft {
 export function pantryOptionsFromSummary(body: unknown): PantryOptions {
   const dashboard =
     typeof body === 'object' && body !== null && 'dashboard' in body
-      ? (body as { dashboard?: Partial<PantryOptions> }).dashboard
+      ? (
+          body as {
+            dashboard?: {
+              products?: Array<{ id?: unknown; displayName?: unknown; aliases?: unknown }>;
+              locations?: Array<{ id?: unknown; path?: unknown }>;
+              batches?: Array<{
+                productId?: unknown;
+                quantityRemaining?: unknown;
+                unit?: unknown;
+                approximateState?: unknown;
+                status?: unknown;
+                excludeFromGrocery?: unknown;
+              }>;
+            };
+          }
+        ).dashboard
       : undefined;
+  const batches = Array.isArray(dashboard?.batches) ? dashboard.batches : [];
   return {
-    products: Array.isArray(dashboard?.products) ? dashboard.products : [],
-    locations: Array.isArray(dashboard?.locations) ? dashboard.locations : [],
+    products: Array.isArray(dashboard?.products)
+      ? dashboard.products.flatMap((product) => {
+          if (typeof product.id !== 'string' || typeof product.displayName !== 'string') return [];
+          const byUnit = new Map<string, number>();
+          batches
+            .filter(
+              (batch) =>
+                batch.productId === product.id &&
+                typeof batch.quantityRemaining === 'number' &&
+                batch.quantityRemaining > 0 &&
+                typeof batch.unit === 'string' &&
+                batch.approximateState === null &&
+                !batch.excludeFromGrocery &&
+                !['depleted', 'discarded', 'donated'].includes(String(batch.status)),
+            )
+            .forEach((batch) =>
+              byUnit.set(
+                batch.unit as string,
+                (byUnit.get(batch.unit as string) ?? 0) + (batch.quantityRemaining as number),
+              ),
+            );
+          return [
+            {
+              id: product.id,
+              displayName: product.displayName,
+              aliases: Array.isArray(product.aliases)
+                ? product.aliases.filter((alias): alias is string => typeof alias === 'string')
+                : [],
+              stock: [...byUnit].map(([unit, quantity]) => ({ quantity, unit })),
+            },
+          ];
+        })
+      : [],
+    locations: Array.isArray(dashboard?.locations)
+      ? dashboard.locations.flatMap((location) =>
+          typeof location.id === 'string' && typeof location.path === 'string'
+            ? [{ id: location.id, path: location.path }]
+            : [],
+        )
+      : [],
   };
 }
 
@@ -160,11 +230,11 @@ export function pantryStateLabel(item: { pantry: PantryLabelDetail | null }): st
   if (detail.coverageState === 'covered') return 'Covered · no purchase currently needed';
   if (detail.demandState === 'uncertain')
     return manuallyEdited
-      ? 'Manual value · automatic demand remains uncertain'
-      : 'Uncertain generated demand · no numeric shortage claimed';
+      ? 'Manual amount · Pantry match still needs review'
+      : 'Pantry match needed for an exact buy amount';
   if (manuallyEdited)
-    return `Manual override · generated shortage is ${detail.shortageQuantity} ${detail.generatedUnit}`;
-  return `Generated Pantry shortage · ${detail.shortageQuantity} ${detail.generatedUnit}`;
+    return `Manual amount · calculated buy amount is ${detail.shortageQuantity} ${detail.generatedUnit}`;
+  return 'Plan and Pantry calculation';
 }
 
 export function createIntakeOperationTracker(createKey: () => string) {
@@ -243,21 +313,154 @@ function normalizedState(item: Item): ShoppingState {
       : item.shoppingState;
 }
 
-function itemAmount(item: Item): string {
+export function shoppingItemAmount(
+  item: Pick<Item, 'quantity' | 'unit'> & {
+    pantry:
+      | (Pick<NonNullable<Item['pantry']>, 'demandState' | 'formulaInputs' | 'generatedUnit'> &
+          Record<string, unknown>)
+      | null;
+  },
+): string {
+  if (item.quantity === null && item.pantry?.demandState === 'uncertain') {
+    try {
+      const formula = JSON.parse(item.pantry.formulaInputs) as {
+        requiredQuantity?: unknown;
+        unit?: unknown;
+      };
+      if (
+        typeof formula.requiredQuantity === 'number' &&
+        Number.isFinite(formula.requiredQuantity) &&
+        formula.requiredQuantity > 0
+      ) {
+        const unit =
+          typeof formula.unit === 'string' && formula.unit.trim()
+            ? formula.unit
+            : item.pantry.generatedUnit || item.unit;
+        return `${formula.requiredQuantity} ${unit}`.trim() + ' recipe demand';
+      }
+    } catch {
+      // Fall through to the ordinary unknown-quantity label.
+    }
+  }
   return (
     [item.quantity ?? '', item.unit].filter((value) => value !== '').join(' ') || 'Quantity not set'
   );
 }
 
-export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
+export type ShoppingQuantitySummary = {
+  primary: string;
+  secondary: string;
+  calculation: string;
+  isEstimate: boolean;
+};
+
+function finiteQuantity(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function formatQuantity(quantity: number, unit: string): string {
+  return `${Number(quantity.toFixed(6))}${unit.trim() ? ` ${unit.trim()}` : ''}`;
+}
+
+export function shoppingQuantitySummary(
+  item: Pick<Item, 'quantity' | 'unit'> & {
+    pantry:
+      | (Pick<NonNullable<Item['pantry']>, 'demandState' | 'formulaInputs' | 'generatedUnit'> &
+          Partial<
+            Pick<
+              NonNullable<Item['pantry']>,
+              | 'manualQuantityOverride'
+              | 'manualUnitOverride'
+              | 'manualItemOverride'
+              | 'manualNoteOverride'
+            >
+          > &
+          Record<string, unknown>)
+      | null;
+  },
+): ShoppingQuantitySummary {
+  const ordinaryAmount =
+    item.quantity === null
+      ? 'Quantity not set'
+      : `${formatQuantity(item.quantity, item.unit)} to buy`;
+  if (!item.pantry) {
+    return {
+      primary: ordinaryAmount,
+      secondary: '',
+      calculation: '',
+      isEstimate: false,
+    };
+  }
+
+  let formula: Record<string, unknown> = {};
+  try {
+    formula = JSON.parse(item.pantry.formulaInputs) as Record<string, unknown>;
+  } catch {
+    return {
+      primary: ordinaryAmount,
+      secondary: '',
+      calculation: '',
+      isEstimate: false,
+    };
+  }
+
+  const unit =
+    typeof formula.unit === 'string' && formula.unit.trim()
+      ? formula.unit
+      : item.pantry.generatedUnit || item.unit;
+  const recipeRequirement = finiteQuantity(formula.recipeRequirement);
+  const stapleTarget = finiteQuantity(formula.stapleTarget) ?? 0;
+  const requiredQuantity = finiteQuantity(formula.requiredQuantity);
+  const manualExtra = finiteQuantity(formula.manualExtra) ?? 0;
+  const planQuantity =
+    recipeRequirement === null
+      ? requiredQuantity
+      : Math.max(recipeRequirement, stapleTarget) + manualExtra;
+
+  if (planQuantity !== null) {
+    return {
+      primary: `${formatQuantity(planQuantity, unit)} to buy`,
+      secondary: '',
+      calculation: '',
+      isEstimate: false,
+    };
+  }
+
+  return {
+    primary: ordinaryAmount,
+    secondary: '',
+    calculation: '',
+    isEstimate: false,
+  };
+}
+
+function pantryStockLabel(product: PantryOptions['products'][number] | undefined): string {
+  if (!product) return '';
+  if (!product.stock.length) return '0 already in Pantry';
+  return `${product.stock
+    .map(({ quantity, unit }) => formatQuantity(quantity, unit))
+    .join(' + ')} already in Pantry`;
+}
+
+export function ShoppingListEditor({
+  list,
+  initialPantryOptions,
+}: {
+  list: ShoppingListDetail;
+  initialPantryOptions?: PantryOptions;
+}) {
   const router = useRouter();
   const { showToast } = useToast();
   const [items, setItems] = useState(() =>
     list.items.map((item) => ({ ...item, shoppingState: normalizedState(item) })),
   );
   const [newItem, setNewItem] = useState('');
+  const [newQuantity, setNewQuantity] = useState('');
+  const [newUnit, setNewUnit] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('alpha');
+  const [groupMode, setGroupMode] = useState<GroupMode>('aisle');
   const [selectedSupermarketId, setSelectedSupermarketId] = useState(
     list.supermarketProfileId ?? '',
   );
@@ -279,18 +482,19 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
   const scanDialogRef = useRef<HTMLDialogElement>(null);
   const reviewDialogRef = useRef<HTMLDialogElement>(null);
   const substituteDialogRef = useRef<HTMLDialogElement>(null);
-  const [pantryOptions, setPantryOptions] = useState<PantryOptions>({
-    products: [],
-    locations: [],
-  });
+  const [pantryOptions, setPantryOptions] = useState<PantryOptions>(
+    initialPantryOptions ?? { products: [], locations: [] },
+  );
   const [intakeDrafts, setIntakeDrafts] = useState<Record<string, IntakeDraft>>({});
   const [operationTracker] = useState(() => createIntakeOperationTracker(createClientUuid));
+  const automaticMatches = useRef(new Set<string>());
 
   useEffect(() => {
+    if (initialPantryOptions) return;
     void fetch('/api/v1/pantry/summary')
       .then((response) => response.json())
       .then((body) => setPantryOptions(pantryOptionsFromSummary(body)));
-  }, []);
+  }, [initialPantryOptions]);
 
   useEffect(() => {
     if (!list.settings.keepScreenAwake || !('wakeLock' in navigator)) return;
@@ -331,9 +535,17 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
     () => new Map(list.aisles.map((aisle) => [aisle.id, aisle.name])),
     [list.aisles],
   );
-  const searched = items.filter((item) =>
-    item.item.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
-  );
+  const searched = items
+    .filter((item) => item.item.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    .sort((left, right) => {
+      if (sortMode === 'alpha') {
+        return left.item.localeCompare(right.item, undefined, { sensitivity: 'base' });
+      }
+      if (sortMode === 'recent') {
+        return right.createdAt.getTime() - left.createdAt.getTime();
+      }
+      return left.position - right.position;
+    });
   const itemsByState = (state: ShoppingState) =>
     searched.filter((item) => normalizedState(item) === state);
   const toBuy = itemsByState('to_buy');
@@ -371,6 +583,14 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
         : [],
     [items, scanRecord],
   );
+  const stockedPantryProducts = useMemo(
+    () => pantryOptions.products.filter((product) => product.stock.length > 0),
+    [pantryOptions.products],
+  );
+  const pantryCandidatesFor = (item: Item): PantryMatchCandidate[] =>
+    item.pantry && !item.pantry.productId
+      ? rankPantryMatches(item.item, stockedPantryProducts)
+      : [];
 
   const updateLocal = (id: string, patch: Partial<Item>) =>
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -528,14 +748,22 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
 
   const add = async () => {
     if (!newItem.trim()) return;
+    const quantity = newQuantity.trim() ? Number(newQuantity) : null;
+    if (
+      (quantity !== null && (!Number.isFinite(quantity) || quantity <= 0 || !newUnit.trim())) ||
+      (newUnit.trim() && quantity === null)
+    ) {
+      showToast('Enter a positive quantity and unit together.', 'error');
+      return;
+    }
     setBusy('add');
     try {
       const response = await fetch(`/api/v1/shopping-lists/${list.id}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          quantity: '',
-          unit: '',
+          quantity: quantity ?? '',
+          unit: newUnit.trim(),
           item: newItem,
           note: '',
           checked: false,
@@ -549,6 +777,8 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
       }
       setItems((current) => [...current, body.item!]);
       setNewItem('');
+      setNewQuantity('');
+      setNewUnit('');
       setMobileAddOpen(false);
       showToast(`${body.item.item} added.`, 'success');
     } catch {
@@ -557,6 +787,59 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
       setBusy('');
     }
   };
+
+  const matchPantryProduct = useCallback(
+    async (
+      item: Item,
+      productId: string,
+      matchType: 'exact' | 'suggested' | 'manual',
+      announce = true,
+    ) => {
+      try {
+        const response = await fetch(
+          `/api/v1/shopping-lists/${list.id}/items/${item.id}/pantry-match`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId, matchType }),
+          },
+        );
+        if (!response.ok) throw new Error('Could not save that Pantry match.');
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id && entry.pantry
+              ? { ...entry, pantry: { ...entry.pantry, productId } }
+              : entry,
+          ),
+        );
+        if (announce) {
+          const product = pantryOptions.products.find((candidate) => candidate.id === productId);
+          showToast(
+            `${item.item} matched to ${product?.displayName ?? 'the Pantry item'}.`,
+            'success',
+          );
+        }
+      } catch (error) {
+        automaticMatches.current.delete(item.id);
+        if (announce)
+          showToast(
+            error instanceof Error ? error.message : 'Could not save that Pantry match.',
+            'error',
+          );
+      }
+    },
+    [list.id, pantryOptions.products, showToast],
+  );
+
+  useEffect(() => {
+    for (const item of items) {
+      if (!item.pantry || item.pantry.productId || automaticMatches.current.has(item.id)) continue;
+      const best = rankPantryMatches(item.item, stockedPantryProducts)[0];
+      if (!best?.certain) continue;
+      automaticMatches.current.add(item.id);
+      void matchPantryProduct(item, best.productId, 'exact', false);
+    }
+  }, [items, matchPantryProduct, stockedPantryProducts]);
 
   const remove = async (item: Item) => {
     try {
@@ -742,6 +1025,14 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
 
   const renderItem = (item: Item) => {
     const state = normalizedState(item);
+    const quantitySummary = shoppingQuantitySummary(item);
+    const pantryCandidates = pantryCandidatesFor(item);
+    const automaticCandidate = pantryCandidates.find((candidate) => candidate.certain);
+    const matchedProductId = item.pantry?.productId ?? automaticCandidate?.productId;
+    const matchedProduct = pantryOptions.products.find(
+      (product) => product.id === matchedProductId,
+    );
+    const suggestedMatches = automaticCandidate ? [] : pantryCandidates;
     const intakeDraft =
       intakeDrafts[item.id] ?? emptyIntakeDraft(item, pantryOptions.locations[0]?.id);
     const aisleName = item.aisleId ? aisleById.get(item.aisleId) : undefined;
@@ -764,12 +1055,30 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
         <span className={styles.itemThumb}>
           <PackageOpen size={24} aria-hidden="true" />
         </span>
-        <div className={styles.itemIdentity}>
+        <div
+          className={`${styles.itemIdentity} ${
+            groupMode === 'aisle' ? styles.itemIdentityGrouped : ''
+          }`}
+        >
           <strong>{item.item}</strong>
-          <span>{itemAmount(item)}</span>
-          <span className={`${styles.aisleBadge} ${!aisleName ? styles.unassignedBadge : ''}`}>
-            {aisleName ?? 'Unassigned'}
+          <span
+            className={`${styles.quantitySummary} ${
+              quantitySummary.isEstimate ? styles.quantitySummaryEstimate : ''
+            }`}
+          >
+            <span className={styles.buyAmount}>{quantitySummary.primary}</span>
+            {matchedProduct ? (
+              <span className={styles.pantryAmount}>{pantryStockLabel(matchedProduct)}</span>
+            ) : null}
+            {quantitySummary.calculation ? (
+              <span className={styles.quantityCalculation}>{quantitySummary.calculation}</span>
+            ) : null}
           </span>
+          {groupMode === 'none' ? (
+            <span className={`${styles.aisleBadge} ${!aisleName ? styles.unassignedBadge : ''}`}>
+              {aisleName ?? 'Unassigned'}
+            </span>
+          ) : null}
         </div>
         {state === 'cant_find' ? (
           <>
@@ -791,14 +1100,16 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
         ) : (
           <>
             <button
-              className={`${styles.stateButton} ${state === 'in_cart' ? styles.stateButtonActive : ''}`}
+              className={`${styles.stateButton} ${styles.inCartButton} ${
+                state === 'in_cart' ? styles.stateButtonActive : ''
+              }`}
               type="button"
               onClick={() => void setItemState(item, state === 'in_cart' ? 'to_buy' : 'in_cart')}
             >
               <ShoppingCart size={19} /> <span>In Cart</span>
             </button>
             <button
-              className={styles.stateButton}
+              className={`${styles.stateButton} ${styles.cantFindButton}`}
               type="button"
               onClick={() => void setItemState(item, 'cant_find')}
             >
@@ -866,9 +1177,34 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
             </button>
           </div>
         </details>
-        {item.pantry ? (
+        {suggestedMatches.length ? (
+          <section
+            className={styles.pantryMatchPanel}
+            aria-label={`Pantry matches for ${item.item}`}
+          >
+            <strong>Match to item already in Pantry</strong>
+            <div>
+              {suggestedMatches.map((candidate) => {
+                const product = pantryOptions.products.find(
+                  (option) => option.id === candidate.productId,
+                );
+                return (
+                  <button
+                    key={candidate.productId}
+                    type="button"
+                    onClick={() => void matchPantryProduct(item, candidate.productId, 'suggested')}
+                  >
+                    <span>{candidate.displayName}</span>
+                    <small>{pantryStockLabel(product)}</small>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+        {item.pantry && matchedProduct ? (
           <details className={styles.provenance}>
-            <summary>{pantryStateLabel(item)}</summary>
+            <summary>Pantry details</summary>
             {pantryContributions(item).length ? (
               <ul>
                 {pantryContributions(item).map((entry) => (
@@ -1074,6 +1410,21 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
   const section = (state: ShoppingState, title: string, sectionItems: Item[], className = '') => {
     if (filter !== 'all' && filter !== state) return null;
     if (!sectionItems.length && state !== 'to_buy') return null;
+    const groupedItems =
+      groupMode === 'aisle'
+        ? [
+            ...list.aisles.map((aisle) => ({
+              id: aisle.id,
+              name: aisle.name,
+              items: sectionItems.filter((item) => item.aisleId === aisle.id),
+            })),
+            {
+              id: 'unassigned',
+              name: 'Unassigned',
+              items: sectionItems.filter((item) => !item.aisleId || !aisleById.has(item.aisleId)),
+            },
+          ].filter((group) => group.items.length)
+        : [];
     return (
       <details className={`${styles.listSection} ${className}`} open key={state}>
         <summary>
@@ -1092,7 +1443,19 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
         </summary>
         <div className={styles.items}>
           {sectionItems.length ? (
-            sectionItems.map(renderItem)
+            groupMode === 'aisle' ? (
+              groupedItems.map((group) => (
+                <section className={styles.aisleGroup} key={group.id}>
+                  <h3>
+                    <span>{group.name}</span>
+                    <small>{group.items.length}</small>
+                  </h3>
+                  <div>{group.items.map(renderItem)}</div>
+                </section>
+              ))
+            ) : (
+              sectionItems.map(renderItem)
+            )
           ) : (
             <p className={styles.emptyState}>Nothing here yet.</p>
           )}
@@ -1132,6 +1495,19 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
             placeholder="Add an item..."
             aria-label="New shopping item"
           />
+          <input
+            value={newQuantity}
+            onChange={(event) => setNewQuantity(event.target.value)}
+            placeholder="Qty"
+            aria-label="New shopping item quantity"
+            inputMode="decimal"
+          />
+          <input
+            value={newUnit}
+            onChange={(event) => setNewUnit(event.target.value)}
+            placeholder="Unit"
+            aria-label="New shopping item unit"
+          />
           <button
             type="submit"
             aria-busy={busy === 'add'}
@@ -1165,12 +1541,13 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
 
       <div className={styles.toolbar}>
         <div className={styles.mobileSearchRow}>
-          <label className={styles.search}>
-            <Search size={19} />
+          <label className={styles.search} aria-label="Search shopping items">
+            <Search size={19} aria-hidden="true" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search items..."
+              type="search"
             />
           </label>
           <button
@@ -1192,6 +1569,7 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
               key={value}
               className={filter === value ? styles.activeFilter : ''}
               type="button"
+              aria-pressed={filter === value}
               onClick={() => setFilter(value)}
             >
               <span>{label}</span>
@@ -1200,14 +1578,31 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
           ))}
         </div>
         <div className={styles.desktopSort}>
-          <button type="button">
-            Sort: <strong>A → Z</strong>
-            <ChevronDown size={16} />
-          </button>
-          <button type="button">
-            Group: <strong>Aisle</strong>
-            <ChevronDown size={16} />
-          </button>
+          <label>
+            <span>Sort</span>
+            <select
+              aria-label="Sort shopping items"
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as SortMode)}
+            >
+              <option value="position">List order</option>
+              <option value="alpha">A to Z</option>
+              <option value="recent">Recently added</option>
+            </select>
+            <ChevronDown size={16} aria-hidden="true" />
+          </label>
+          <label>
+            <span>Group</span>
+            <select
+              aria-label="Group shopping items"
+              value={groupMode}
+              onChange={(event) => setGroupMode(event.target.value as GroupMode)}
+            >
+              <option value="aisle">Aisle</option>
+              <option value="none">None</option>
+            </select>
+            <ChevronDown size={16} aria-hidden="true" />
+          </label>
         </div>
       </div>
       {mobileAddOpen ? (
@@ -1224,6 +1619,19 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
             onChange={(event) => setNewItem(event.target.value)}
             placeholder="Add an item..."
             aria-label="New shopping item mobile"
+          />
+          <input
+            value={newQuantity}
+            onChange={(event) => setNewQuantity(event.target.value)}
+            placeholder="Qty"
+            aria-label="New shopping item quantity mobile"
+            inputMode="decimal"
+          />
+          <input
+            value={newUnit}
+            onChange={(event) => setNewUnit(event.target.value)}
+            placeholder="Unit"
+            aria-label="New shopping item unit mobile"
           />
           <button type="submit" disabled={!newItem.trim()}>
             Add
@@ -1327,12 +1735,22 @@ export function ShoppingListEditor({ list }: { list: ShoppingListDetail }) {
       </div>
 
       <nav className={styles.mobileDock} aria-label="Shopping list totals">
-        <button className={styles.dockMetric} type="button" onClick={() => setFilter('in_cart')}>
+        <button
+          className={styles.dockMetric}
+          type="button"
+          aria-pressed={filter === 'in_cart'}
+          onClick={() => setFilter('in_cart')}
+        >
           <ShoppingCart />
           <strong>{inCart.length}</strong>
           <small>In cart</small>
         </button>
-        <button className={styles.dockMetric} type="button" onClick={() => setFilter('cant_find')}>
+        <button
+          className={styles.dockMetric}
+          type="button"
+          aria-pressed={filter === 'cant_find'}
+          onClick={() => setFilter('cant_find')}
+        >
           <CircleHelp />
           <strong>{cantFind.length}</strong>
           <small>Can’t Find</small>

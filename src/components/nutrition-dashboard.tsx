@@ -21,11 +21,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 
-import styles from '@/components/nutrition-dashboard.module.css';
+import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import {
   NutritionAdvancedChartPanels,
   NutritionWeightTrendPanel,
 } from '@/components/nutrition-advanced-chart-panels';
+import styles from '@/components/nutrition-dashboard.module.css';
 import { NutritionChartPanels } from '@/components/nutrition-chart-panels';
 import { NutritionDataWorkspace } from '@/components/nutrition-data-workspace';
 import { NutritionHouseholdWorkspace } from '@/components/nutrition-household-workspace';
@@ -47,7 +48,7 @@ import type { NutritionChartDatasets } from '@/lib/domain/nutrition-chart-datase
 import type { AdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
 import type { NutritionWeightTrend } from '@/lib/domain/nutrition-weight-trend';
 
-const VIEWS = ['overview', 'diary', 'nutrients', 'trends', 'household', 'goals'] as const;
+const VIEWS = ['overview', 'diary', 'nutrients', 'trends', 'household'] as const;
 const POUNDS_PER_KILOGRAM = 2.2046226218;
 export type NutritionView = (typeof VIEWS)[number];
 type LogMode = 'choose' | 'product' | 'recipe' | 'manual' | 'skipped' | 'copy' | 'weight';
@@ -58,7 +59,6 @@ const VIEW_LABELS: Record<NutritionView, string> = {
   nutrients: 'Nutrients',
   trends: 'Trends',
   household: 'Household',
-  goals: 'Goals',
 };
 
 const VIEW_EXPLAINERS: Record<NutritionView, string> = {
@@ -71,8 +71,6 @@ const VIEW_EXPLAINERS: Record<NutritionView, string> = {
     'Patterns across recorded days. Trends appear only when enough comparable diary data exists.',
   household:
     'Separate, privacy-aware views of each person’s recorded intake and assigned meal portions.',
-  goals:
-    'Versioned targets used for planning and progress. They are guidance, not a medical assessment.',
 };
 type ProfileSummary = {
   id: string;
@@ -138,6 +136,13 @@ type Goal = {
   unit: string;
   sourceType: string;
   state: string;
+};
+type NutritionGoalSetup = {
+  nutritionGoalType: 'none' | 'maintain' | 'gain' | 'loss' | 'custom';
+  currentWeightKilograms: number | null;
+  targetWeightKilograms: number | null;
+  targetDate: string | null;
+  profileVersion: number;
 };
 type Insight = {
   goals: Array<{
@@ -217,6 +222,7 @@ export type NutritionDashboardProps = {
   summary: DashboardSummary;
   definitions: NutrientDefinition[];
   goals: Goal[];
+  goalSetup?: NutritionGoalSetup | null;
   allocationCounts: Record<string, number>;
   mealProjection?: NutritionMealProjectionView;
   today?: string;
@@ -229,6 +235,7 @@ export type NutritionDashboardProps = {
   weightTrend?: NutritionWeightTrend | null;
   dataWorkspace?: Parameters<typeof NutritionDataWorkspace>[0]['workspace'];
   preparedWorkspace?: PreparedServingWorkspace;
+  initialAiSummary?: AiSummaryCardData | null;
 };
 
 function number(value: number | undefined, digits = 0) {
@@ -297,9 +304,15 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const [logMode, setLogMode] = useState<LogMode>('choose');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [goalSetupDialogOpen, setGoalSetupDialogOpen] = useState(false);
+  const [weightPlanPal, setWeightPlanPal] = useState('low_active');
+  const [weightPlanPace, setWeightPlanPace] = useState<'gradual' | 'steady'>('gradual');
+  const [maintenanceEstimate, setMaintenanceEstimate] = useState<number | null>(null);
+  const [estimatingPlan, setEstimatingPlan] = useState(false);
   const logDialogRef = useRef<HTMLDialogElement>(null);
   const viewDialogRef = useRef<HTMLDialogElement>(null);
   const profileDialogRef = useRef<HTMLDialogElement>(null);
+  const goalSetupDialogRef = useRef<HTMLDialogElement>(null);
   const retryKeys = useRef(new Map<string, string>());
   const { activeProfile, summary } = props;
   const definition = new Map(props.definitions.map((item) => [item.code, item]));
@@ -316,6 +329,26 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     props.goals.filter((goal) => goal.state === 'active').map((goal) => [goal.nutrientCode, goal]),
   );
   const hasConfiguredGoals = currentGoals.size > 0;
+  const savedWeightGoal = props.goalSetup;
+  const canPlanFromWeightGoal =
+    savedWeightGoal?.nutritionGoalType === 'loss' || savedWeightGoal?.nutritionGoalType === 'gain';
+  const paceAdjustment = weightPlanPace === 'steady' ? 500 : 250;
+  const guidedCalorieTarget =
+    maintenanceEstimate === null || !canPlanFromWeightGoal
+      ? null
+      : savedWeightGoal.nutritionGoalType === 'loss'
+        ? maintenanceEstimate - paceAdjustment
+        : maintenanceEstimate + paceAdjustment;
+  const guidedTargetIsTooLow = guidedCalorieTarget !== null && guidedCalorieTarget < 1200;
+  const savedGoalDescription =
+    savedWeightGoal?.nutritionGoalType === 'loss' || savedWeightGoal?.nutritionGoalType === 'gain'
+      ? savedWeightGoal.currentWeightKilograms !== null &&
+        savedWeightGoal.targetWeightKilograms !== null
+        ? `Saved ${savedWeightGoal.nutritionGoalType} target: ${savedWeightGoal.currentWeightKilograms.toFixed(1)} kg to ${savedWeightGoal.targetWeightKilograms.toFixed(1)} kg${savedWeightGoal.targetDate ? ` by ${savedWeightGoal.targetDate}` : ''}.`
+        : `Saved body-weight direction: ${savedWeightGoal.nutritionGoalType}.`
+      : savedWeightGoal?.nutritionGoalType === 'maintain'
+        ? 'Saved body-weight direction: maintain.'
+        : null;
   const calorieGoal = goalBoundary(currentGoals.get('energy_kcal'));
   const caloriesConsumed = summary.todayTotals.energy_kcal;
   const caloriesPlanned = plannedToday.energy_kcal;
@@ -378,6 +411,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     if (!profileDialogOpen && dialog?.open) dialog.close();
   }, [profileDialogOpen]);
 
+  useEffect(() => {
+    const dialog = goalSetupDialogRef.current;
+    if (goalSetupDialogOpen && dialog && !dialog.open) dialog.showModal();
+    if (!goalSetupDialogOpen && dialog?.open) dialog.close();
+  }, [goalSetupDialogOpen]);
+
   function closeLogDialog() {
     setLogDialogOpen(false);
     setLogMode('choose');
@@ -386,6 +425,10 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   function openLogDialog(mode: LogMode = 'choose') {
     setLogMode(mode);
     setLogDialogOpen(true);
+  }
+
+  function closeGoalSetupDialog() {
+    setGoalSetupDialogOpen(false);
   }
 
   async function mutate(url: string, body: unknown) {
@@ -469,16 +512,62 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     const nutrient = definition.get(nutrientCode);
     const kind = String(data.get('kind'));
     const numeric = Number(data.get('value'));
+    if (await saveEnergyOrNutrientGoal({ nutrientCode, unit: nutrient?.canonicalUnit ?? '', kind, value: numeric })) {
+      form.reset();
+    }
+  }
+
+  async function saveEnergyOrNutrientGoal(input: {
+    nutrientCode: string;
+    unit: string;
+    kind: string;
+    value: number;
+  }) {
     const goal = {
-      nutrientCode,
-      unit: nutrient?.canonicalUnit ?? '',
+      nutrientCode: input.nutrientCode,
+      unit: input.unit,
       sourceType: 'user_defined',
       startsOn: today,
-      kind,
-      ...(kind === 'limit' ? { maximum: numeric } : { value: numeric }),
+      kind: input.kind,
+      ...(input.kind === 'limit' ? { maximum: input.value } : { value: input.value }),
     };
-    if (await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/goals`, { goal })) {
-      form.reset();
+    const saved = await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/goals`, { goal });
+    if (saved) closeGoalSetupDialog();
+    return saved;
+  }
+
+  async function previewWeightPlan() {
+    const goalSetup = props.goalSetup;
+    if (!goalSetup) return;
+    setEstimatingPlan(true);
+    setStatus('Calculating a maintenance estimate…');
+    try {
+      const response = await fetch(`/api/v1/nutrition/profiles/${activeProfile.id}/goals/estimate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'preview',
+          expectedProfileVersion: goalSetup.profileVersion,
+          effectiveOn: today,
+          palCategory: weightPlanPal,
+        }),
+      });
+      if (!response.ok) {
+        setStatus(await errorMessage(response));
+        return;
+      }
+      const result = (await response.json()) as { estimate?: { roundedKcal?: number } };
+      const value = result.estimate?.roundedKcal;
+      if (!value) {
+        setStatus('A maintenance estimate was not available for this profile.');
+        return;
+      }
+      setMaintenanceEstimate(value);
+      setStatus('Maintenance estimate ready. Review the suggested daily target below.');
+    } catch {
+      setStatus('Bòrd could not reach the Nutrition service. Try again.');
+    } finally {
+      setEstimatingPlan(false);
     }
   }
 
@@ -943,7 +1032,11 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   </b>
                 </span>
               ))}
-              <Link href="/settings/nutrition">Edit goals</Link>
+              {activeProfile.canManageGoals ? (
+                <button type="button" onClick={() => setGoalSetupDialogOpen(true)}>
+                  Edit goals
+                </button>
+              ) : null}
             </footer>
             <details className={styles.exactData}>
               <summary>View exact nutrition data</summary>
@@ -1101,6 +1194,16 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           </section>
         </aside>
       </div>
+
+      {summary.currentEntries.length ||
+      props.goals.length ||
+      (props.weightTrend?.observations.length ?? 0) > 0 ? (
+        <AiSummaryCards
+          domain="nutrition"
+          placement="nutrition"
+          initialSummary={props.initialAiSummary}
+        />
+      ) : null}
 
       <div className={styles.contextGrid}>
         <section className={`${styles.panel} ${styles.contextPanel}`}>
@@ -1720,20 +1823,22 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
 
       {props.view === 'overview' ? (
         <>
-          {hasConfiguredGoals ? (
-            redesignedOverview
-          ) : (
+          {!hasConfiguredGoals || summary.currentEntries.length === 0 || mealProjection.meals.length === 0 ? (
             <NutritionSetupOverview
               profileName={activeProfile.displayName}
+              hasConfiguredGoals={hasConfiguredGoals}
               canManageGoals={activeProfile.canManageGoals}
               canManageProfile={activeProfile.canManageProfile}
               hasDiaryEntries={summary.currentEntries.length > 0}
               hasPlannedMeals={mealProjection.meals.length > 0}
+              savedGoalDescription={savedGoalDescription}
               weightTrend={props.weightTrend}
               onRecordNutrition={() => openLogDialog()}
               onRecordWeight={() => openLogDialog('weight')}
+              onConfigureGoals={() => setGoalSetupDialogOpen(true)}
             />
-          )}
+          ) : null}
+          {hasConfiguredGoals ? redesignedOverview : null}
           {false ? (
             <div className={styles.stack}>
               <section className={styles.metricGrid} aria-label="Today's nutrition summary">
@@ -2382,8 +2487,32 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
         />
       ) : null}
 
-      {props.view === 'goals' ? (
-        <div className={styles.twoColumn}>
+      <dialog
+        ref={goalSetupDialogRef}
+        className={`${styles.logDialog} ${styles.goalSetupDialog}`}
+        aria-labelledby="nutrition-goal-setup-title"
+        onClose={closeGoalSetupDialog}
+        onCancel={closeGoalSetupDialog}
+      >
+        <div className={styles.dialogHeader}>
+          <div>
+            <p className={styles.viewEyebrow}>Nutrition onboarding</p>
+            <h2 id="nutrition-goal-setup-title">Choose a daily nutrition goal</h2>
+          </div>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Close daily nutrition goal setup"
+            onClick={closeGoalSetupDialog}
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <p className={styles.dialogLead}>
+          Set a daily target when you are ready. This keeps setup separate from your recorded
+          nutrition views.
+        </p>
+        <div className={`${styles.twoColumn} ${styles.goalSetupBody}`}>
           <section className={styles.panel}>
             <h2>Current goal history</h2>
             {props.goals.length === 0 ? (
@@ -2396,7 +2525,6 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                     without one.
                   </p>
                 </div>
-                <Link href="/settings/nutrition">Set up Nutrition goals</Link>
               </div>
             ) : (
               <ul className={styles.goalList}>
@@ -2413,12 +2541,131 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               </ul>
             )}
           </section>
-          <details className={`${styles.panel} ${styles.actionDisclosure}`}>
-            <summary>Add a manual goal</summary>
+          <section id="daily-goal-setup" className={styles.panel}>
+            <h2>Choose a daily nutrition goal</h2>
             <p className={styles.muted}>
-              Manual goals are versioned and are never overwritten by general references.
+              Start with a calorie goal or add another nutrient. Goals are versioned, so saving a
+              new choice preserves earlier evidence.
             </p>
+            <section className={styles.goalGuide} aria-labelledby="daily-calorie-goal-title">
+              <div>
+                <h2 id="daily-calorie-goal-title">Daily calorie target</h2>
+                <p>
+                  Choose an editable starting point. These examples are general planning values,
+                  not a diagnosis or a prescription.
+                </p>
+              </div>
+              <div className={styles.goalExamples} aria-label="Daily calorie examples">
+                {[1800, 2000, 2200].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      void saveEnergyOrNutrientGoal({
+                        nutrientCode: 'energy_kcal',
+                        unit: 'kcal',
+                        kind: 'target',
+                        value,
+                      })
+                    }
+                  >
+                    Use {value.toLocaleString()} kcal
+                  </button>
+                ))}
+              </div>
+            </section>
+            {canPlanFromWeightGoal ? (
+              <section className={styles.goalGuide} aria-labelledby="weight-plan-title">
+                <div>
+                  <h2 id="weight-plan-title">Use your saved weight plan</h2>
+                  <p>
+                    {savedWeightGoal?.nutritionGoalType === 'loss' ? 'Loss' : 'Gain'} goal
+                    {savedWeightGoal?.currentWeightKilograms !== null &&
+                    savedWeightGoal?.targetWeightKilograms !== null
+                      ? `: ${savedWeightGoal.currentWeightKilograms.toFixed(1)} kg to ${savedWeightGoal.targetWeightKilograms.toFixed(1)} kg.`
+                      : '.'}{' '}
+                    {savedWeightGoal?.targetDate
+                      ? `Saved target date: ${savedWeightGoal.targetDate}.`
+                      : 'Add a target date any time in Nutrition settings.'}
+                  </p>
+                </div>
+                <div className={styles.goalGuideControls}>
+                  <label>
+                    Activity for this estimate
+                    <select
+                      value={weightPlanPal}
+                      onChange={(event) => setWeightPlanPal(event.target.value)}
+                    >
+                      <option value="inactive">Mostly sitting</option>
+                      <option value="low_active">Light daily movement</option>
+                      <option value="active">Active most days</option>
+                      <option value="very_active">Very active</option>
+                    </select>
+                  </label>
+                  <label>
+                    Weekly pace
+                    <select
+                      value={weightPlanPace}
+                      onChange={(event) =>
+                        setWeightPlanPace(event.target.value === 'steady' ? 'steady' : 'gradual')
+                      }
+                    >
+                      <option value="gradual">Gradual — about 0.25 kg (0.5 lb) per week</option>
+                      <option value="steady">Steady — about 0.5 kg (1 lb) per week</option>
+                    </select>
+                  </label>
+                </div>
+                <button
+                  className={styles.goalEstimateButton}
+                  type="button"
+                  disabled={estimatingPlan}
+                  onClick={() => void previewWeightPlan()}
+                >
+                  {estimatingPlan ? 'Calculating…' : 'Calculate a planning target'}
+                </button>
+                {maintenanceEstimate !== null && guidedCalorieTarget !== null ? (
+                  <div className={styles.goalEstimateResult} role="status">
+                    <strong>{maintenanceEstimate.toLocaleString()} kcal/day estimated maintenance</strong>
+                    {guidedTargetIsTooLow ? (
+                      <p>
+                        This pace would suggest less than 1,200 kcal/day. Bòrd will not create
+                        this target; choose a gentler plan or talk with a qualified clinician.
+                      </p>
+                    ) : (
+                      <>
+                        <p>
+                          A {paceAdjustment.toLocaleString()} kcal/day planning adjustment suggests{' '}
+                          <strong>{guidedCalorieTarget.toLocaleString()} kcal/day</strong>. Review
+                          it regularly: energy needs can change as weight changes.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() =>
+                            void saveEnergyOrNutrientGoal({
+                              nutrientCode: 'energy_kcal',
+                              unit: 'kcal',
+                              kind: 'target',
+                              value: guidedCalorieTarget,
+                            })
+                          }
+                        >
+                          Use {guidedCalorieTarget.toLocaleString()} kcal/day
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+                <p className={styles.goalDisclosure}>
+                  This calculation requires the optional body inputs, an explicit activity choice,
+                  and your consent to estimated targets. It is a planning estimate, not medical
+                  advice.
+                </p>
+              </section>
+            ) : null}
             <form className={styles.form} onSubmit={addGoal}>
+              <h2>Custom daily goal</h2>
               <label>
                 Nutrient
                 <select name="nutrientCode" defaultValue="energy_kcal">
@@ -2445,9 +2692,9 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 Save goal
               </button>
             </form>
-          </details>
+          </section>
         </div>
-      ) : null}
+      </dialog>
 
       <p className={styles.status} role="status" aria-live="polite">
         {status}

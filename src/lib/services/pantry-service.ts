@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { and, asc, desc, eq, inArray, isNull, max } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
@@ -431,6 +433,13 @@ export function listPantryProducts(includeArchived = false): PantryProductView[]
   }));
 }
 
+export function getPantryProduct(
+  productId: string,
+  includeArchived = true,
+): PantryProductView | null {
+  return listPantryProducts(includeArchived).find((product) => product.id === productId) ?? null;
+}
+
 export function createPantryProduct(
   input: PantryProductInput,
   actorProfileId: string,
@@ -558,6 +567,31 @@ export function updatePantryProduct(
   return listPantryProducts(true).find((product) => product.id === productId)!;
 }
 
+export function archivePantryProduct(productId: string, actorProfileId: string): PantryProductView {
+  ensureDatabase();
+  const db = getDatabase();
+  const existing = db.select().from(pantryProducts).where(eq(pantryProducts.id, productId)).get();
+  if (!existing) throw new PantryNotFoundError('That Pantry product no longer exists.');
+  const activeBatch = db
+    .select({ status: pantryBatches.status })
+    .from(pantryBatches)
+    .where(eq(pantryBatches.productId, productId))
+    .all()
+    .some((batch) => ACTIVE_BATCH_STATUSES.has(batch.status));
+  if (activeBatch) {
+    throw new PantryConflictError('Deplete, discard, or donate active stock before archiving.');
+  }
+  db.update(pantryProducts)
+    .set({
+      archivedAt: existing.archivedAt ?? new Date(),
+      updatedByProfileId: actorProfileId,
+      updatedAt: new Date(),
+    })
+    .where(eq(pantryProducts.id, productId))
+    .run();
+  return getPantryProduct(productId, true)!;
+}
+
 function locationPath(
   location: typeof pantryLocations.$inferSelect,
   locations: Array<typeof pantryLocations.$inferSelect>,
@@ -586,6 +620,65 @@ export function listPantryLocations(includeArchived = false): PantryLocationView
     .filter((location) => includeArchived || !location.archivedAt)
     .map((location) => ({ ...location, ...locationPath(location, all) }))
     .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+export function listPantryOptionSummaries(): {
+  products: Array<{
+    id: string;
+    displayName: string;
+    aliases: string[];
+    stock: Array<{ quantity: number; unit: string }>;
+  }>;
+  locations: Array<{ id: string; path: string }>;
+} {
+  ensureDatabase();
+  const db = getDatabase();
+  const products = db
+    .select({ id: pantryProducts.id, displayName: pantryProducts.displayName })
+    .from(pantryProducts)
+    .where(isNull(pantryProducts.archivedAt))
+    .orderBy(asc(pantryProducts.displayName))
+    .all()
+    .map((product) => {
+      const aliases = db
+        .select({ alias: pantryProductAliases.alias })
+        .from(pantryProductAliases)
+        .where(eq(pantryProductAliases.productId, product.id))
+        .all()
+        .map(({ alias }) => alias);
+      const byUnit = new Map<string, number>();
+      db.select({
+        quantity: pantryBatches.quantityRemaining,
+        unit: pantryBatches.unit,
+        approximateState: pantryBatches.approximateState,
+        status: pantryBatches.status,
+        excludeFromGrocery: pantryBatches.excludeFromGrocery,
+      })
+        .from(pantryBatches)
+        .where(eq(pantryBatches.productId, product.id))
+        .all()
+        .filter(
+          (batch) =>
+            !['depleted', 'discarded', 'donated'].includes(batch.status) &&
+            !batch.excludeFromGrocery &&
+            batch.approximateState === null &&
+            batch.quantity !== null &&
+            batch.quantity > 0,
+        )
+        .forEach((batch) =>
+          byUnit.set(batch.unit, (byUnit.get(batch.unit) ?? 0) + batch.quantity!),
+        );
+      return {
+        ...product,
+        aliases,
+        stock: [...byUnit].map(([unit, quantity]) => ({
+          quantity: Number(quantity.toFixed(6)),
+          unit,
+        })),
+      };
+    });
+  const locations = listPantryLocations().map(({ id, path }) => ({ id, path }));
+  return { products, locations };
 }
 
 function assertNoLocationCycle(locationId: string, parentId: string): void {
@@ -1774,4 +1867,15 @@ export function getPantryDashboard(
     recentEvents,
     lowStockProductIds,
   };
+}
+
+export function getPantryBatch(batchId: string): PantryBatchView | null {
+  return (
+    getPantryDashboard({
+      q: '',
+      view: 'all',
+      sort: 'updated',
+      includeInactive: true,
+    }).batches.find((batch) => batch.id === batchId) ?? null
+  );
 }

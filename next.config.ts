@@ -25,19 +25,20 @@ const nextConfig: NextConfig = {
   // artifact. Dynamic filesystem paths can otherwise make output tracing copy
   // the project tree, including a developer's populated DATA_DIR.
   outputFileTracingExcludes: {
-    '*': [
-      './.api_keys/**',
+    '/*': [
+      './.api_keys',
+      './.api_keys/**/*',
       './.env*',
-      './.git/**',
-      './.test-data/**',
-      './coverage/**',
-      './data/**',
-      './docs/**',
+      './.git/**/*',
+      './.test-data/**/*',
+      './coverage/**/*',
+      './data/**/*',
+      './docs/**/*',
       './next.config.ts',
-      './playwright-report/**',
-      './src/**',
-      './test-results/**',
-      './tests/**',
+      './playwright-report/**/*',
+      './src/**/*',
+      './test-results/**/*',
+      './tests/**/*',
       './v1-roadmap.md',
     ],
   },

@@ -25,6 +25,7 @@ import { useToast } from '@/components/toast-provider';
 import { RecipeTagSelector } from '@/components/recipe-tag-selector';
 import { RecipeTaxonomySelector } from '@/components/recipe-taxonomy-selector';
 import type { AiRecipeCandidate } from '@/lib/domain/ai';
+import { SHOPPING_CATEGORIES } from '@/lib/domain/list-settings';
 
 type FormValues = RecipePayload & { equipmentText: string };
 const recipeFormSchema = recipeInputSchema.extend({
@@ -144,6 +145,19 @@ function IngredientGroupEditor({
               `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.note` as const,
             )}
           />
+          <select
+            aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} shopping category`}
+            title="Shopping category"
+            {...form.register(
+              `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.shoppingCategory` as const,
+            )}
+          >
+            {SHOPPING_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
           <input
             type="hidden"
             {...form.register(
@@ -203,7 +217,14 @@ function IngredientGroupEditor({
         className="text-button"
         type="button"
         onClick={() =>
-          ingredients.append({ quantity: '', unit: '', item: '', note: '', pantryProductId: '' })
+          ingredients.append({
+            quantity: '',
+            unit: '',
+            item: '',
+            note: '',
+            shoppingCategory: 'Other',
+            pantryProductId: '',
+          })
         }
       >
         <Plus size={16} /> Add ingredient
@@ -645,7 +666,16 @@ export function RecipeForm({
           onClick={() =>
             ingredientGroups.append({
               name: '',
-              ingredients: [{ quantity: '', unit: '', item: '', note: '', pantryProductId: '' }],
+              ingredients: [
+                {
+                  quantity: '',
+                  unit: '',
+                  item: '',
+                  note: '',
+                  shoppingCategory: 'Other',
+                  pantryProductId: '',
+                },
+              ],
             })
           }
         >

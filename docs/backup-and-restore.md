@@ -2,7 +2,7 @@
 
 ## What a backup contains
 
-Every local bundle is a gzip-compressed tar archive below `DATA_DIR/backups`. It contains:
+Every local bundle is a gzip-compressed tar archive below `BACKUP_DIR`, which defaults to `DATA_DIR/backups`. It contains:
 
 - a consistent `database.sqlite` snapshot made through SQLite's backup API;
 - regular files from `uploads` and `generated` when those directories exist;
@@ -13,7 +13,20 @@ The export intentionally excludes `.env` files, OpenAI keys, cookie secrets, tru
 
 ## Create and retain
 
-Use **Backups → Create backup** for a manual recovery point. The application also schedules an in-process local backup every `BACKUP_INTERVAL_HOURS` (default `24`). On each successful creation it removes bundles older than `BACKUP_RETENTION_DAYS` (default `30`). Keep `DATA_DIR/backups` on the same durable volume as the application data, then copy verified downloaded bundles to an independently protected location as part of household operations.
+Use **System Settings → Local recovery → Create backup** for a manual recovery point. The application also schedules an in-process local backup every `BACKUP_INTERVAL_HOURS` (default `24`). On each successful creation it removes bundles older than `BACKUP_RETENTION_DAYS` (default `30`).
+
+For a host backup tool such as Kopia, mount a dedicated host directory into the Bòrd container and set `BACKUP_DIR` to that container path:
+
+```yaml
+services:
+  bord:
+    environment:
+      BACKUP_DIR: /backup
+    volumes:
+      - /mnt/user/backups/bord:/backup
+```
+
+Bòrd remains the only writer to this directory and manages its local retention. Configure Kopia to snapshot the host directory (`/mnt/user/backups/bord` in this example) into its independently protected repository. Do not point `BACKUP_DIR` at the Kopia repository itself, and do not let a second tool rewrite Bòrd's `.tar.gz` bundles in place. The effective container path, schedule, and retention are shown read-only in System Settings.
 
 ## Validate and restore
 
@@ -22,7 +35,7 @@ Use **Backups → Create backup** for a manual recovery point. The application a
 3. Review the displayed date/schema/file count. Type `RESTORE` exactly to enable replacement.
 4. The application makes a pre-restore safety backup, builds a restored data root, swaps it with rollback protection, reopens SQLite, runs migrations, and verifies integrity again.
 
-Only locally created, currently listed server bundles are restorable. Uploading an arbitrary archive is deliberately unsupported: it avoids zip-slip, corrupt-archive, and unreviewed compatibility risks. A restore replaces current household data; it is not a merge tool.
+Only locally created, currently listed server bundles are restorable. Uploading an arbitrary archive is deliberately unsupported: it avoids zip-slip, corrupt-archive, and unreviewed compatibility risks. A restore replaces current household data; it is not a merge tool. A dedicated `BACKUP_DIR` remains outside the data-root swap, so the selected bundle and the automatically created pre-restore safety bundle survive restoration.
 
 ## Operating policy and failure recovery
 
@@ -32,4 +45,6 @@ SQLite, `uploads`, and `generated` are one consistency set. Move or restore them
 
 If storage is full or read-only, stop writes, preserve the data directory, free or repair storage outside the app, and restart. Do not delete WAL/SHM files from a running instance. For corruption, stop the app, copy the entire data root for investigation, validate the newest independent bundle, then restore it into a fresh data directory. The health endpoint and System Settings report database integrity and migration status without exposing paths.
 
-Mounted-volume persistence must be proved on each release-candidate Docker/Unraid host. A source test or prior host run is not evidence for a new target.
+`BACKUP_DIR` must be writable by the container's UID/GID `1001`, must be distinct from `DATA_DIR`, and cannot be the filesystem root. The container entrypoint creates the exact configured directory when it can, but the operator remains responsible for host share permissions.
+
+Mounted-volume persistence and Kopia ingestion must be proved on each release-candidate Docker/Unraid host. A source test or prior host run is not evidence for a new target.

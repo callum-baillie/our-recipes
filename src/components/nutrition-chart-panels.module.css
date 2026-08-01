@@ -122,7 +122,7 @@
 }
 
 .filters button[aria-pressed='true'] {
-  color: var(--paper);
+  color: var(--on-primary);
   background: var(--leaf);
   border-color: var(--leaf);
 }

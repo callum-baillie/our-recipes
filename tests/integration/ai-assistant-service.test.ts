@@ -6,11 +6,13 @@ vi.mock('server-only', () => ({}));
 import { getDatabase, resetDatabaseForTests } from '@/lib/db/client';
 import {
   aiActionPreviewImages,
+  aiJobs,
   aiOperationAudits,
+  aiSummaryJobs,
   mealPlanLeftoverLinks,
   recipeImages,
 } from '@/lib/db/schema';
-import { aiMealPlanCandidateSchema } from '@/lib/domain/ai-assistant';
+import { aiMealPlanCandidateSchema, type AiSummaryBundleOutput } from '@/lib/domain/ai-assistant';
 import { recipeInputSchema } from '@/lib/domain/recipe';
 import type {
   AiAssistantProvider,
@@ -31,6 +33,17 @@ import {
 import { buildAiProfileContext } from '@/lib/services/ai-context-service';
 import { setAiProviderForTests } from '@/lib/services/ai-readiness-service';
 import { generateAiMealPlanProposal } from '@/lib/services/ai-meal-plan-service';
+import {
+  enqueueRecipeImageJob,
+  runDueAiJobs,
+  setAiBatchClientForTests,
+} from '@/lib/services/ai-job-service';
+import {
+  ensureAiSummaryJobs,
+  generateAiSummaryBundle,
+  refreshAiSummaryBundle,
+  runDueAiSummaryJobs,
+} from '@/lib/services/ai-summary-service';
 import {
   getAiDataPolicy,
   getAiSettings,
@@ -61,8 +74,23 @@ const recipe = recipeInputSchema.parse({
 
 class MockAssistantProvider implements AiAssistantProvider {
   responseQueue: AssistantProviderResult[] = [];
+  respondRequests: Array<Parameters<AiAssistantProvider['respond']>[0]> = [];
   mealPlanCandidate: unknown = null;
-  async respond() {
+  summaryRequests = 0;
+  summaryBundle: AiSummaryBundleOutput = {
+    summaries: [
+      {
+        domain: 'nutrition',
+        headline: 'A steady day',
+        summary: 'Recorded totals were consistent.',
+        highlights: [],
+        metrics: [],
+        caveats: ['Some values are estimates.'],
+      },
+    ],
+  };
+  async respond(input: Parameters<AiAssistantProvider['respond']>[0]) {
+    this.respondRequests.push(input);
     return (
       this.responseQueue.shift() ?? {
         text: 'Done.',
@@ -95,13 +123,9 @@ class MockAssistantProvider implements AiAssistantProvider {
   async generateRecipe() {
     return recipe;
   }
-  async generateSummary() {
-    return {
-      headline: 'A steady day',
-      body: 'Recorded totals were consistent.',
-      highlights: [],
-      caveats: ['Some values are estimates.'],
-    };
+  async generateSummaryBundle() {
+    this.summaryRequests += 1;
+    return this.summaryBundle;
   }
 }
 
@@ -139,8 +163,10 @@ describe('AI assistant services', () => {
     setAiAssistantProviderForTests(provider);
   });
   afterEach(() => {
+    vi.useRealTimers();
     setAiAssistantProviderForTests(null);
     setAiProviderForTests(null);
+    setAiBatchClientForTests(null);
     resetDatabaseForTests();
     vi.unstubAllEnvs();
   });
@@ -152,6 +178,50 @@ describe('AI assistant services', () => {
         'recipe_create',
       ),
     ).toBe('I made it high-protein and vegetarian like you requested.');
+  });
+
+  it('passes validated image and file attachments to the current assistant turn', async () => {
+    const profile = setupProfile();
+    const thread = createAiChatThread(profile.id);
+
+    await runAiChatTurn({
+      threadId: thread.id,
+      profileId: profile.id,
+      message: {
+        message: 'Use these notes to suggest dinner.',
+        attachments: [
+          {
+            kind: 'image',
+            name: 'pantry.jpg',
+            mimeType: 'image/jpeg',
+            dataBase64: Buffer.from('image').toString('base64'),
+          },
+          {
+            kind: 'file',
+            name: 'preferences.txt',
+            mimeType: 'text/plain',
+            dataBase64: Buffer.from('No shellfish').toString('base64'),
+          },
+        ],
+      },
+    });
+
+    expect(provider.respondRequests).toHaveLength(1);
+    expect(provider.respondRequests[0]!.messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'Use these notes to suggest dinner.' },
+        {
+          type: 'input_image',
+          image_url: expect.stringContaining('data:image/jpeg;base64,'),
+        },
+        {
+          type: 'input_file',
+          filename: 'preferences.txt',
+          file_data: expect.stringContaining('data:text/plain;base64,'),
+        },
+      ],
+    });
   });
 
   it('keeps reflective profile goals out of AI context until separately enabled', () => {
@@ -186,6 +256,190 @@ describe('AI assistant services', () => {
     expect(updated.workloads.find((item) => item.workload === 'image_generation')?.enabled).toBe(
       false,
     );
+  });
+
+  it('uses one summary request and skips enabled domains without data', async () => {
+    const profile = setupProfile();
+    const policy = getAiDataPolicy(profile.id);
+    updateAiSettings(profile.id, {
+      dataPolicy: {
+        ...policy,
+        summaryNutritionEnabled: false,
+        summaryMealPlansEnabled: false,
+        summaryShoppingListsEnabled: false,
+        summaryRecipesEnabled: true,
+        summaryFrequency: 'every_3_days',
+      },
+    });
+    expect(getAiDataPolicy(profile.id).summaryFrequency).toBe('every_3_days');
+
+    await expect(generateAiSummaryBundle(profile.id)).resolves.toEqual([]);
+    expect(provider.summaryRequests).toBe(0);
+
+    createRecipe(recipe, profile.id);
+    provider.summaryBundle = {
+      summaries: [
+        {
+          domain: 'recipes',
+          headline: 'A useful start',
+          summary: 'The recipebook now has a weeknight meal ready to plan.',
+          highlights: ['The first recipe is tagged for weeknights.'],
+          metrics: [
+            {
+              label: 'Saved recipes',
+              value: '1',
+              context: 'Current library',
+              trend: 'none',
+            },
+          ],
+          caveats: [],
+        },
+      ],
+    };
+
+    const summaries = await generateAiSummaryBundle(profile.id);
+    expect(provider.summaryRequests).toBe(1);
+    expect(summaries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ domain: 'recipes', headline: 'A useful start' }),
+      ]),
+    );
+  });
+
+  it('keeps automatic summaries off until a profile explicitly opts in', async () => {
+    const profile = setupProfile();
+    expect(getAiDataPolicy(profile.id).summaryFrequency).toBe('off');
+
+    const now = new Date('2026-07-27T12:00:00Z');
+    ensureAiSummaryJobs(now);
+    await runDueAiSummaryJobs(new Date('2026-08-03T12:00:00Z'));
+
+    expect(getDatabase().select().from(aiSummaryJobs).all()).toEqual([]);
+    expect(provider.summaryRequests).toBe(0);
+  });
+
+  it('schedules the first automatic summary one full interval after opt-in', async () => {
+    const profile = setupProfile();
+    createRecipe(recipe, profile.id);
+    const policy = getAiDataPolicy(profile.id);
+    const optedInAt = new Date('2026-07-27T12:00:00Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(optedInAt);
+    updateAiSettings(profile.id, {
+      dataPolicy: {
+        ...policy,
+        summaryFrequency: 'daily',
+        summaryNutritionEnabled: false,
+        summaryMealPlansEnabled: false,
+        summaryShoppingListsEnabled: false,
+        summaryRecipesEnabled: true,
+      },
+    });
+    provider.summaryBundle = {
+      summaries: [
+        {
+          domain: 'recipes',
+          headline: 'Recipebook update',
+          summary: 'One recipe is ready to plan.',
+          highlights: [],
+          metrics: [],
+          caveats: [],
+        },
+      ],
+    };
+
+    const job = getDatabase().select().from(aiSummaryJobs).get()!;
+    expect(job.dueAt.toISOString()).toBe('2026-07-28T12:00:00.000Z');
+    await runDueAiSummaryJobs(new Date('2026-07-28T11:59:59Z'));
+    expect(provider.summaryRequests).toBe(0);
+    await runDueAiSummaryJobs(new Date('2026-07-28T12:00:00Z'));
+    expect(provider.summaryRequests).toBe(1);
+    expect(getDatabase().select().from(aiSummaryJobs).get()).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+      leaseToken: null,
+    });
+  });
+
+  it('moves the next automatic run forward after an explicit manual refresh', async () => {
+    const profile = setupProfile();
+    createRecipe(recipe, profile.id);
+    const policy = getAiDataPolicy(profile.id);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-27T12:00:00Z'));
+    updateAiSettings(profile.id, {
+      dataPolicy: {
+        ...policy,
+        summaryFrequency: 'daily',
+        summaryNutritionEnabled: false,
+        summaryMealPlansEnabled: false,
+        summaryShoppingListsEnabled: false,
+        summaryRecipesEnabled: true,
+      },
+    });
+    provider.summaryBundle = {
+      summaries: [
+        {
+          domain: 'recipes',
+          headline: 'Recipebook update',
+          summary: 'One recipe is ready to plan.',
+          highlights: [],
+          metrics: [],
+          caveats: [],
+        },
+      ],
+    };
+
+    vi.setSystemTime(new Date('2026-07-27T18:00:00Z'));
+    await refreshAiSummaryBundle(profile.id, new Date('2026-07-27T18:00:00Z'));
+    await runDueAiSummaryJobs(new Date('2026-07-28T12:00:00Z'));
+    expect(provider.summaryRequests).toBe(1);
+    expect(getDatabase().select().from(aiSummaryJobs).get()?.dueAt.toISOString()).toBe(
+      '2026-07-28T18:00:00.000Z',
+    );
+  });
+
+  it('rejects an incomplete multi-domain summary bundle instead of returning stale cards', async () => {
+    const profile = setupProfile();
+    createRecipe(recipe, profile.id);
+    addMealPlanEntryWithNutrition(
+      {
+        plannedFor: '2026-07-27',
+        meal: 'dinner',
+        recipeId: '',
+        title: 'Existing supper',
+        servings: 1,
+        note: '',
+      },
+      profile.id,
+    );
+    const policy = getAiDataPolicy(profile.id);
+    updateAiSettings(profile.id, {
+      dataPolicy: {
+        ...policy,
+        summaryNutritionEnabled: false,
+        summaryMealPlansEnabled: true,
+        summaryShoppingListsEnabled: false,
+        summaryRecipesEnabled: true,
+      },
+    });
+    provider.summaryBundle = {
+      summaries: [
+        {
+          domain: 'recipes',
+          headline: 'Recipebook update',
+          summary: 'The recipebook has one saved dinner.',
+          highlights: [],
+          metrics: [],
+          caveats: [],
+        },
+      ],
+    };
+
+    await expect(
+      generateAiSummaryBundle(profile.id, new Date('2026-07-27T12:00:00Z')),
+    ).rejects.toThrow('incomplete household summary bundle');
+    expect(provider.summaryRequests).toBe(1);
   });
 
   it('keeps chat writes as proposals and audits without raw message content', async () => {
@@ -427,6 +681,25 @@ describe('AI assistant services', () => {
     ).toEqual(['Lemon chickpea bowls', 'Smoky bean bowls']);
   });
 
+  it('allows only one concurrent confirmation to execute a proposal', async () => {
+    const profile = setupProfile();
+    const action = createAiActionProposal({
+      profileId: profile.id,
+      kind: 'recipe_create',
+      payload: { recipe },
+      preview: { operation: 'create recipe', recipe },
+    });
+
+    const decisions = await Promise.allSettled([
+      decideAiAction(action.id, profile.id, 'confirm'),
+      decideAiAction(action.id, profile.id, 'confirm'),
+    ]);
+
+    expect(decisions.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(decisions.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(listRecipes().filter((item) => item.title === recipe.title)).toHaveLength(1);
+  });
+
   it('promotes a deterministic generated preview image when the recipe is confirmed', async () => {
     const profile = setupProfile();
     const thread = createAiChatThread(profile.id);
@@ -479,7 +752,7 @@ describe('AI assistant services', () => {
     ]);
   });
 
-  it('generates and attaches requested meal-plan recipe images only on confirmation', async () => {
+  it('saves a reviewed meal plan before its requested recipe images run', async () => {
     const profile = setupProfile();
     const imageBytes = await sharp({
       create: { width: 48, height: 48, channels: 3, background: '#8aa06b' },
@@ -526,9 +799,92 @@ describe('AI assistant services', () => {
     });
 
     expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
-    await decideAiAction(generated.proposal.id, profile.id, 'confirm');
+    const confirmed = await decideAiAction(generated.proposal.id, profile.id, 'confirm');
+    expect(confirmed).toMatchObject({
+      status: 'confirmed',
+      result: { imageJobId: expect.any(String) },
+    });
+    expect(getDatabase().select().from(aiJobs).all()).toMatchObject([
+      { kind: 'recipe_images', status: 'queued', executionMode: 'direct' },
+    ]);
+    expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
+    await runDueAiJobs();
     expect(getDatabase().select().from(recipeImages).all()).toMatchObject([
       { altText: 'A deterministic meal-plan image', createdByProfileId: profile.id },
     ]);
+  });
+
+  it('uses Batch output custom IDs to attach four recipe images out of order', async () => {
+    const profile = setupProfile();
+    const imageBytes = await sharp({
+      create: { width: 48, height: 48, channels: 3, background: '#758c58' },
+    })
+      .png()
+      .toBuffer();
+    let submittedLines = '';
+    let output = '';
+    setAiBatchClientForTests({
+      submit: async ({ lines }) => {
+        submittedLines = lines;
+        const requests = lines
+          .split('\n')
+          .map((line) => JSON.parse(line) as { custom_id: string })
+          .reverse();
+        output = requests
+          .map((request) =>
+            JSON.stringify({
+              custom_id: request.custom_id,
+              response: {
+                status_code: 200,
+                body: { data: [{ b64_json: imageBytes.toString('base64') }] },
+              },
+            }),
+          )
+          .join('\n');
+        return { batchId: 'batch-test', inputFileId: 'file-input' };
+      },
+      retrieve: async () => ({
+        id: 'batch-test',
+        status: 'completed',
+        inputFileId: 'file-input',
+        outputFileId: 'file-output',
+        errorFileId: null,
+      }),
+      read: async () => output,
+      cancel: async () => undefined,
+      deleteFile: async () => undefined,
+    });
+    const recipeIds = Array.from(
+      { length: 4 },
+      (_, index) => createRecipe({ ...recipe, title: `Queued recipe ${index + 1}` }, profile.id).id,
+    );
+    const job = enqueueRecipeImageJob({
+      profileId: profile.id,
+      images: recipeIds.map((recipeId, index) => ({
+        recipeId,
+        recipeTitle: `Queued recipe ${index + 1}`,
+        recipeSummary: 'A compact queued image fixture.',
+        ingredientNames: ['chickpeas'],
+      })),
+    });
+
+    expect(job).toMatchObject({ executionMode: 'batch', totalItems: 4 });
+    await runDueAiJobs();
+    expect(submittedLines.split('\n')).toHaveLength(4);
+    getDatabase()
+      .update(aiJobs)
+      .set({ nextAttemptAt: new Date(0) })
+      .run();
+    await runDueAiJobs();
+
+    expect(getDatabase().select().from(recipeImages).all()).toHaveLength(4);
+    expect(
+      getDatabase()
+        .select({ recipeId: recipeImages.recipeId })
+        .from(recipeImages)
+        .all()
+        .map((image) => image.recipeId)
+        .sort(),
+    ).toEqual([...recipeIds].sort());
   });
 });

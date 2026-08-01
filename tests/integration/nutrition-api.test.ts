@@ -96,7 +96,7 @@ describe('Nutrition ActorContext API boundary', () => {
     const session = await getSession();
     expect(session.status).toBe(200);
     const actor = (await session.json()).actor;
-    const profilesResponse = await listNutritionProfiles();
+    const profilesResponse = await listNutritionProfiles(request('/profiles'));
     const profiles = (await profilesResponse.json()).profiles;
     expect(profiles).toHaveLength(2);
     expect(
@@ -115,7 +115,7 @@ describe('Nutrition ActorContext API boundary', () => {
 
   it('shares linked profile reads while keeping cross-profile settings mutations forbidden', async () => {
     setupHousehold();
-    const profiles = (await (await listNutritionProfiles()).json()).profiles;
+    const profiles = (await (await listNutritionProfiles(request('/profiles'))).json()).profiles;
     expect(
       (await createNutritionProfile(request('/profiles', { displayName: 'Extra' }))).status,
     ).toBe(410);
@@ -157,7 +157,7 @@ describe('Nutrition ActorContext API boundary', () => {
 
   it('accepts only active-profile Nutrition settings and rejects identity or visibility fields', async () => {
     setupHousehold();
-    const profiles = (await (await listNutritionProfiles()).json()).profiles;
+    const profiles = (await (await listNutritionProfiles(request('/profiles'))).json()).profiles;
     const own = profiles.find(
       (profile: { relationship: string }) => profile.relationship === 'owner',
     );

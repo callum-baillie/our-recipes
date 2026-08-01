@@ -1,11 +1,13 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
-import { aiProfileSettings, aiWorkloadSettings } from '@/lib/db/schema';
+import { aiProfileSettings, aiSummaryJobs, aiWorkloadSettings } from '@/lib/db/schema';
 import {
   AI_MODEL_CATALOG,
+  AI_SUMMARY_FREQUENCY_MS,
   AI_WORKLOAD_DEFAULTS,
   DEFAULT_AI_DATA_POLICY,
   aiDataPolicySchema,
@@ -143,8 +145,14 @@ export function getAiDataPolicy(profileId: string): AiDataPolicy {
     shareIdentity: row.shareIdentity,
     sharePersonalMetrics: row.sharePersonalMetrics,
     shareWeight: row.shareWeight,
+    shareShoppingLists: row.shareShoppingLists,
     dailySummaryEnabled: row.dailySummaryEnabled,
     weeklySummaryEnabled: row.weeklySummaryEnabled,
+    summaryFrequency: row.summaryFrequency,
+    summaryNutritionEnabled: row.summaryNutritionEnabled,
+    summaryMealPlansEnabled: row.summaryMealPlansEnabled,
+    summaryShoppingListsEnabled: row.summaryShoppingListsEnabled,
+    summaryRecipesEnabled: row.summaryRecipesEnabled,
     version: row.version,
   });
 }
@@ -189,6 +197,11 @@ export function updateAiSettings(profileId: string, raw: unknown) {
     }
     if (input.dataPolicy) {
       const { version, ...values } = input.dataPolicy;
+      const previous = transaction
+        .select({ summaryFrequency: aiProfileSettings.summaryFrequency })
+        .from(aiProfileSettings)
+        .where(eq(aiProfileSettings.profileId, profileId))
+        .get();
       const result = transaction
         .update(aiProfileSettings)
         .set({ ...values, version: version + 1, updatedAt: now })
@@ -198,6 +211,48 @@ export function updateAiSettings(profileId: string, raw: unknown) {
         .run();
       if (result.changes !== 1) {
         throw new AiSettingsConflictError('AI data settings changed in another tab.');
+      }
+      if (values.summaryFrequency === 'off') {
+        transaction.delete(aiSummaryJobs).where(eq(aiSummaryJobs.profileId, profileId)).run();
+      } else if (previous?.summaryFrequency !== values.summaryFrequency) {
+        const dueAt = new Date(now.getTime() + AI_SUMMARY_FREQUENCY_MS[values.summaryFrequency]);
+        const existing = transaction
+          .select({ id: aiSummaryJobs.id })
+          .from(aiSummaryJobs)
+          .where(eq(aiSummaryJobs.profileId, profileId))
+          .get();
+        if (existing) {
+          transaction
+            .update(aiSummaryJobs)
+            .set({
+              kind: 'summary_bundle',
+              dueAt,
+              status: 'pending',
+              leaseUntil: null,
+              leaseToken: null,
+              attempts: 0,
+              errorCode: null,
+              updatedAt: now,
+            })
+            .where(eq(aiSummaryJobs.id, existing.id))
+            .run();
+        } else {
+          transaction
+            .insert(aiSummaryJobs)
+            .values({
+              id: randomUUID(),
+              profileId,
+              kind: 'summary_bundle',
+              dueAt,
+              status: 'pending',
+              leaseUntil: null,
+              leaseToken: null,
+              attempts: 0,
+              errorCode: null,
+              updatedAt: now,
+            })
+            .run();
+        }
       }
     }
   });

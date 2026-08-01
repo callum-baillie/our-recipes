@@ -6,9 +6,9 @@
 
 .panel {
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 1rem;
-  background: var(--surface);
+  background: var(--field);
   padding: 1rem;
 }
 
@@ -60,7 +60,7 @@
 }
 
 .controlLinks a {
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.35rem 0.65rem;
   color: inherit;
@@ -85,7 +85,7 @@
 
 .visualPanel {
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 0.75rem;
   padding: 0.85rem;
 }
@@ -152,7 +152,7 @@
 }
 
 .statGrid div {
-  border-inline-start: 0.25rem solid var(--border);
+  border-inline-start: 0.25rem solid var(--line);
   padding-inline-start: 0.5rem;
 }
 
@@ -240,7 +240,7 @@
 
 .tableWrap th,
 .tableWrap td {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
   padding: 0.65rem;
   text-align: left;
   vertical-align: top;

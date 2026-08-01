@@ -7,7 +7,7 @@ import { GET } from '@/app/api/integrations/homepage/v1/summary/route';
 import { getDatabase, resetDatabaseForTests } from '@/lib/db/client';
 import { recipeImages, shoppingAisles, shoppingListItems, shoppingLists } from '@/lib/db/schema';
 import { completeSetup } from '@/lib/services/household-service';
-import { addMealPlanEntry } from '@/lib/services/planning-service';
+import { addMealPlanEntry, updateMealPlanEntryStatus } from '@/lib/services/planning-service';
 import { createRecipe } from '@/lib/services/recipe-service';
 
 const endpoint = 'http://bord:3000/api/integrations/homepage/v1/summary';
@@ -243,6 +243,38 @@ describe('Homepage summary integration', () => {
     });
     expect(JSON.stringify(body)).not.toContain('private');
     expect(JSON.stringify(body)).not.toContain(profile.id);
+  });
+
+  it('skips cancelled outcomes when choosing the next household meal', async () => {
+    const profile = setupHousehold();
+    const recipe = createDinnerRecipe(profile.id);
+    const skipped = addMealPlanEntry(
+      {
+        plannedFor: '2026-07-18',
+        meal: 'dinner',
+        recipeId: recipe.id,
+        servings: 4,
+        note: '',
+      },
+      profile.id,
+    );
+    addMealPlanEntry(
+      {
+        plannedFor: '2026-07-19',
+        meal: 'breakfast',
+        recipeId: recipe.id,
+        servings: 2,
+        note: '',
+      },
+      profile.id,
+    );
+    updateMealPlanEntryStatus(skipped.id, 'cancelled', profile.id);
+
+    const response = GET(authorizedRequest());
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      nextMeal: { date: '2026-07-19', slot: 'breakfast' },
+    });
   });
 
   it('returns null meal and list values for an empty household plan', async () => {

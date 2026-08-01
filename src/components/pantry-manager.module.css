@@ -634,7 +634,7 @@
 .filterTrigger:focus-visible {
   background: var(--leaf);
   border-color: var(--leaf);
-  color: var(--page);
+  color: var(--on-primary);
 }
 
 .filterTriggerMobile {

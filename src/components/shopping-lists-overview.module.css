@@ -76,7 +76,7 @@
   border-radius: 0.55rem;
 }
 
-.createTabs button,
+.createTabs span,
 .createTabs a {
   display: inline-flex;
   gap: 0.65rem;
@@ -91,7 +91,7 @@
   border: 0;
 }
 
-.createTabs button {
+.createTabs span {
   color: var(--leaf);
   background: var(--leaf-pale);
 }
@@ -147,7 +147,7 @@
 .createForm > button {
   min-height: 3.15rem;
   padding: 0.7rem 1rem;
-  color: white;
+  color: var(--on-accent);
   font-weight: 850;
   background: var(--accent);
   border: 0;
@@ -231,7 +231,7 @@
 }
 
 .filters button[aria-pressed='true'] {
-  color: var(--page);
+  color: var(--on-primary);
   background: var(--leaf);
   border-color: var(--leaf);
 }
@@ -775,7 +775,7 @@
     width: 100%;
   }
 
-  .createTabs button,
+  .createTabs span,
   .createTabs a {
     padding-inline: 0.55rem;
     font-size: 0.76rem;

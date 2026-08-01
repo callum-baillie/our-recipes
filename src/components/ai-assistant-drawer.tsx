@@ -1,10 +1,11 @@
 'use client';
 
 import { Plus, Send, Sparkles, X } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
 import { createClientUuid } from '@/lib/client/client-uuid';
+import { useModalSurface } from '@/components/use-modal-surface';
 
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
 import styles from './ai-assistant-drawer.module.css';
@@ -15,6 +16,66 @@ type Message = {
   content: string;
   actionId?: string | null;
 };
+
+type AiJob = {
+  id: string;
+  kind: 'recipe_images' | 'recipe_batch_generation';
+  title: string;
+  status: 'queued' | 'running' | 'submitted' | 'completed' | 'failed' | 'cancelled';
+  executionMode: 'direct' | 'batch';
+  actionId: string | null;
+  totalItems: number;
+  completedItems: number;
+  failedItems: number;
+};
+
+function isActiveJob(job: AiJob) {
+  return job.status === 'queued' || job.status === 'running' || job.status === 'submitted';
+}
+
+function AiJobCard({
+  job,
+  busy,
+  onCommand,
+}: {
+  job: AiJob;
+  busy: boolean;
+  onCommand: (jobId: string, command: 'cancel' | 'retry') => void;
+}) {
+  const complete = job.status === 'completed';
+  const failed = job.status === 'failed' || job.status === 'cancelled';
+  const progress = `${job.completedItems} of ${job.totalItems}`;
+  return (
+    <section className={styles.job} aria-label={`${job.title} background task`}>
+      <div>
+        <strong>{job.title}</strong>
+        <p>
+          {complete
+            ? job.failedItems
+              ? `${progress} completed; ${job.failedItems} could not be completed.`
+              : `${progress} completed.`
+            : failed
+              ? `Could not complete ${job.title.toLocaleLowerCase()}.`
+              : `${job.status === 'submitted' ? 'OpenAI Batch is processing' : 'Working on'} ${progress}.`}
+        </p>
+        {job.executionMode === 'batch' && isActiveJob(job) ? (
+          <small>Batch work may take up to 24 hours. You can safely close this drawer.</small>
+        ) : null}
+      </div>
+      <div className={styles.jobActions}>
+        {isActiveJob(job) ? (
+          <button type="button" disabled={busy} onClick={() => onCommand(job.id, 'cancel')}>
+            Cancel
+          </button>
+        ) : failed ? (
+          <button type="button" disabled={busy} onClick={() => onCommand(job.id, 'retry')}>
+            Retry
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 function compactProposalMessage(message: Message, action?: AiDrawerAction): string {
   if (!message.actionId || !action) return message.content;
@@ -86,10 +147,19 @@ async function errorMessage(response: Response): Promise<string> {
   return body?.error?.message ?? 'The assistant request could not be completed.';
 }
 
-export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AiAssistantDrawer({
+  open,
+  onClose,
+  returnFocusRef,
+}: {
+  open: boolean;
+  onClose: () => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
+}) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [actions, setActions] = useState<AiDrawerAction[]>([]);
+  const [jobs, setJobs] = useState<AiJob[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -97,8 +167,11 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
     actionId: string;
     decision: 'confirm' | 'cancel';
   } | null>(null);
+  const [pendingJobCommand, setPendingJobCommand] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   async function newThread() {
     setBusy(true);
@@ -114,6 +187,7 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
       setThreadId(body.thread.id);
       setMessages([]);
       setActions([]);
+      setJobs([]);
       setStatus('');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not start a conversation.');
@@ -143,9 +217,11 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
         const historyBody = (await history.json()) as {
           messages: Message[];
           actions?: AiDrawerAction[];
+          jobs?: AiJob[];
         };
         setMessages(historyBody.messages);
         setActions(historyBody.actions ?? []);
+        setJobs(historyBody.jobs ?? []);
         setStatus('');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Could not load the assistant.');
@@ -159,20 +235,48 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
     bottomRef.current?.scrollIntoView({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
-  }, [messages, actions]);
+  }, [messages, actions, jobs]);
+
+  const activeJobIds = jobs
+    .filter(isActiveJob)
+    .map((job) => job.id)
+    .sort()
+    .join(',');
+
   useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+    if (!open || !threadId || !activeJobIds) return;
+    let disposed = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`/api/v1/ai/chat/threads/${threadId}`, { cache: 'no-store' });
+        if (!response.ok || disposed) return;
+        const body = (await response.json()) as {
+          messages: Message[];
+          actions: AiDrawerAction[];
+          jobs: AiJob[];
+        };
+        if (disposed) return;
+        setMessages(body.messages);
+        setActions(body.actions);
+        setJobs(body.jobs);
+      } catch {
+        // A background refresh should not interrupt the active conversation.
+      }
     };
-    window.addEventListener('keydown', close);
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5_000);
     return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', close);
+      disposed = true;
+      window.clearInterval(timer);
     };
-  }, [open, onClose]);
+  }, [activeJobIds, open, threadId]);
+  const modal = useModalSurface({
+    open,
+    onClose,
+    panelRef: drawerRef,
+    initialFocusRef: closeRef,
+    returnFocusRef,
+  });
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -224,6 +328,7 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
             actionId?: string;
             kind?: string;
             preview?: unknown;
+            job?: AiJob;
           };
           if (event.type === 'status') setStatus(event.message ?? 'Working…');
           if (event.type === 'text') assistantText += event.delta ?? '';
@@ -241,6 +346,13 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
                       status: 'pending',
                     },
                   ],
+            );
+          }
+          if (event.type === 'job' && event.job) {
+            setJobs((current) =>
+              current.some((job) => job.id === event.job!.id)
+                ? current.map((job) => (job.id === event.job!.id ? event.job! : job))
+                : [...current, event.job!],
             );
           }
           if (event.type === 'done')
@@ -300,6 +412,27 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
     }
   }
 
+  async function commandJob(jobId: string, command: 'cancel' | 'retry') {
+    setPendingJobCommand(jobId);
+    try {
+      const response = await fetch(`/api/v1/ai/jobs/${jobId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command }),
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      const body = (await response.json()) as { job: AiJob };
+      setJobs((current) => current.map((job) => (job.id === jobId ? body.job : job)));
+      setStatus(
+        command === 'cancel' ? 'Background task cancelled.' : 'Background task queued again.',
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not update that background task.');
+    } finally {
+      setPendingJobCommand(null);
+    }
+  }
+
   const actionsById = new Map(actions.map((action) => [action.id, action]));
   const linkedActionIds = new Set(
     messages.flatMap((message) => (message.actionId ? [message.actionId] : [])),
@@ -316,11 +449,14 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
         onClick={onClose}
       />
       <aside
+        ref={drawerRef}
         className={styles.drawer}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-assistant-title"
         aria-busy={busy}
+        tabIndex={-1}
+        onKeyDown={modal.onKeyDown}
       >
         <header className={styles.header}>
           <span className={styles.assistantMark} aria-hidden="true">
@@ -343,19 +479,25 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
               <Plus />
             )}
           </button>
-          <button type="button" title="Close" aria-label="Close AI assistant" onClick={onClose}>
+          <button
+            ref={closeRef}
+            type="button"
+            title="Close"
+            aria-label="Close AI assistant"
+            onClick={onClose}
+          >
             <X size={19} />
           </button>
         </header>
         <div className={styles.messages} aria-live="polite" aria-busy={busy}>
-          {busy && !messages.length && !actions.length ? (
+          {busy && !messages.length && !actions.length && !jobs.length ? (
             <AsyncSkeleton
               className={styles.loadingState}
               label={status || 'Opening your assistant'}
               variant="rows"
             />
           ) : null}
-          {!messages.length && !actions.length && !busy ? (
+          {!messages.length && !actions.length && !jobs.length && !busy ? (
             <div className={styles.empty}>
               <h3>What can I help with?</h3>
               <p>
@@ -405,6 +547,14 @@ export function AiAssistantDrawer({ open, onClose }: { open: boolean; onClose: (
                 onDecide={(actionId, decision) => void decide(actionId, decision)}
               />
             ))}
+          {jobs.map((job) => (
+            <AiJobCard
+              busy={busy || pendingJobCommand === job.id}
+              job={job}
+              key={job.id}
+              onCommand={(jobId, command) => void commandJob(jobId, command)}
+            />
+          ))}
           {isThinking ? (
             <AsyncSkeleton
               className={`${styles.message} ${styles.assistant} ${styles.typing}`}

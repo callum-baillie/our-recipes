@@ -10,6 +10,7 @@ import {
   setProfileArchived,
   updateProfile,
 } from '@/lib/services/household-service';
+import { countActiveAdmins, getProfileAccessRole } from '@/lib/services/auth-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,17 @@ export async function POST(request: Request, context: { params: Promise<{ profil
       409,
       'active_profile_archive',
       'Switch to another active profile before archiving this one.',
+    );
+  }
+  if (
+    body.archived &&
+    getProfileAccessRole(profileId) === 'admin' &&
+    countActiveAdmins() <= 1
+  ) {
+    return jsonError(
+      409,
+      'last_admin_required',
+      'Promote another active profile to Admin before archiving this one.',
     );
   }
   try {

@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { CookingMode } from '@/components/cooking-mode';
-import { RecipePantryPanel } from '@/components/recipe-pantry-panel';
 import { isFavorite } from '@/lib/services/cooking-service';
 import { getLatestRecipeNutritionCalculation } from '@/lib/services/nutrition-foundation-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
@@ -49,18 +48,12 @@ export default async function CookRecipePage({
         }
       : null;
   return (
-    <>
-      <RecipePantryPanel
-        initialAvailability={getRecipePantryAvailability(recipe.id)}
-        products={[]}
-        allowMapping={false}
-      />
-      <CookingMode
-        recipe={recipe}
-        initialFavorite={actor.profileId ? isFavorite(recipe.id, actor.profileId) : false}
-        mealPlanEntryId={(await searchParams).mealPlanEntryId}
-        nutritionPreparation={nutritionPreparation}
-      />
-    </>
+    <CookingMode
+      recipe={recipe}
+      initialFavorite={actor.profileId ? isFavorite(recipe.id, actor.profileId) : false}
+      mealPlanEntryId={(await searchParams).mealPlanEntryId}
+      nutritionPreparation={nutritionPreparation}
+      pantryAvailability={getRecipePantryAvailability(recipe.id)}
+    />
   );
 }

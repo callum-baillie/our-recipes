@@ -16,6 +16,7 @@ import { completeSetup } from '@/lib/services/household-service';
 import {
   getProjectedPantryDemand,
   getRecipePantryAvailability,
+  listRecipePantryAvailability,
   removeRecipeIngredientPantryMapping,
   setRecipeIngredientPantryMapping,
 } from '@/lib/services/pantry-availability-service';
@@ -341,6 +342,74 @@ describe('Pantry availability service', () => {
     expect(getProjectedPantryDemand('2026-07-20', '2026-07-26').lines[0]).toMatchObject({
       requiredQuantity: 500,
     });
+  });
+
+  it('uses the same pinned commitments for single and batched recipe availability', () => {
+    setRecipeIngredientPantryMapping(
+      ingredientId,
+      { productId, compatibleVariant: false, isOptional: false },
+      profileId,
+    );
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-07-21',
+        meal: 'dinner',
+        recipeId,
+        title: '',
+        servings: 4,
+        note: '',
+      },
+      profileId,
+    );
+    getDatabase()
+      .update(recipeIngredients)
+      .set({ quantity: 500 })
+      .where(eq(recipeIngredients.id, ingredientId))
+      .run();
+    getDatabase()
+      .update(recipes)
+      .set({ currentRevision: 2, updatedAt: new Date() })
+      .where(eq(recipes.id, recipeId))
+      .run();
+
+    const singleBeforeCook = getRecipePantryAvailability(recipeId, 4);
+    const batchBeforeCook = listRecipePantryAvailability([recipeId])[recipeId]!;
+    expect(singleBeforeCook.ingredients[0]?.plannedCommittedQuantity).toBe(
+      batchBeforeCook.ingredients[0]?.plannedCommittedQuantity,
+    );
+    expect(singleBeforeCook.ingredients[0]?.plannedCommittedQuantity).toBe(100);
+
+    const sessionId = crypto.randomUUID();
+    getDatabase()
+      .insert(cookSessions)
+      .values({
+        id: sessionId,
+        recipeId,
+        profileId,
+        targetServings: 4,
+        mealPlanEntryId: meal.id,
+        startedAt: new Date(),
+        completedAt: null,
+      })
+      .run();
+    expect(
+      listRecipePantryAvailability([recipeId])[recipeId]!.ingredients[0]?.plannedCommittedQuantity,
+    ).toBe(singleBeforeCook.ingredients[0]?.plannedCommittedQuantity);
+
+    getDatabase()
+      .update(cookSessions)
+      .set({ completedAt: new Date() })
+      .where(eq(cookSessions.id, sessionId))
+      .run();
+    const singleAfterCook = getRecipePantryAvailability(recipeId, 4);
+    const batchAfterCook = listRecipePantryAvailability([recipeId])[recipeId]!;
+    expect(singleAfterCook.ingredients[0]?.plannedCommittedQuantity).toBe(
+      batchAfterCook.ingredients[0]?.plannedCommittedQuantity,
+    );
+    expect(singleAfterCook.ingredients[0]?.plannedCommittedQuantity).toBe(0);
+    expect(singleAfterCook.ingredients[0]?.projectedRemainderQuantity).toBeGreaterThan(
+      singleBeforeCook.ingredients[0]?.projectedRemainderQuantity ?? 0,
+    );
   });
 
   it('persists skipped and cancelled status, derives cooked, and excludes all three from demand', () => {

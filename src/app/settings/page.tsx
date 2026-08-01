@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ClipboardList,
   ListChecks,
+  KeyRound,
   PackageOpen,
   Settings2,
   Sparkles,
@@ -12,12 +13,20 @@ import {
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { SettingsPageHeader } from '@/components/settings-page-header';
 import { getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { getHouseholdState } from '@/lib/services/household-service';
 
 export const dynamic = 'force-dynamic';
 
 const categories = [
+  {
+    href: '/settings/api',
+    eyebrow: 'API & SECURITY',
+    title: 'Integration keys and passkeys',
+    description: 'Create scoped admin-owned API keys or add a passkey to your account.',
+    icon: KeyRound,
+  },
   {
     href: '/settings/system',
     eyebrow: 'SYSTEM SETTINGS',
@@ -82,11 +91,11 @@ export default function SettingsPage() {
   const ai = getAiReadiness();
   return (
     <main className="recipe-page settings-hub">
-      <section className="settings-intro settings-hub-intro">
-        <p className="eyebrow">SETTINGS</p>
-        <h1>Your kitchen, your way.</h1>
-        <p>Choose a category to manage shared app behavior or profile-specific preferences.</p>
-      </section>
+      <SettingsPageHeader
+        eyebrow="SETTINGS"
+        title="Your kitchen, your way."
+        description="Choose a category to manage shared app behavior or profile-specific preferences."
+      />
       <section className="settings-overview" aria-label="Settings categories">
         {categories.map(({ href, eyebrow, title, description, icon: Icon }) => (
           <Link className="settings-overview-card linked" href={href} key={href}>

@@ -15,6 +15,7 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
   const [mounted, setMounted] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [listId, setListId] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
   const [mode, setMode] = useState<'missing' | 'all'>('missing');
   const [error, setError] = useState('');
   useEffect(() => {
@@ -36,10 +37,13 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
     });
     const body = (await response.json().catch(() => null)) as {
       listId?: string;
+      restored?: boolean;
       error?: { message?: string };
     } | null;
-    if (response.ok && body?.listId) setListId(body.listId);
-    else setError(body?.error?.message ?? 'The Pantry shortage list could not be generated.');
+    if (response.ok && body?.listId) {
+      setListId(body.listId);
+      setRestored(Boolean(body.restored));
+    } else setError(body?.error?.message ?? 'The Pantry shortage list could not be generated.');
     setGenerating(false);
   };
   return (
@@ -133,7 +137,12 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
             'Make all-items list'
           )}
         </button>
-        {listId && <a href={`/lists/${listId}`}>Open grocery list</a>}
+        {listId && (
+          <a href={`/lists/${listId}${restored ? '?restored=1' : ''}`}>Open grocery list</a>
+        )}
+        {restored ? (
+          <span role="status">Archived list restored with your edits intact.</span>
+        ) : null}
         {error && <span role="alert">{error}</span>}
       </div>
     </section>

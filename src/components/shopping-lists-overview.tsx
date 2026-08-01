@@ -19,7 +19,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
+import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import { useToast } from '@/components/toast-provider';
+import { shoppingListSourceLabel } from '@/lib/domain/planning';
 import type { ShoppingListSummary } from '@/lib/services/planning-service';
 
 import styles from './shopping-lists-overview.module.css';
@@ -36,20 +38,13 @@ const FILTERS: Array<{ key: ListFilter; label: string }> = [
 ];
 
 function remainingItems(list: ShoppingListSummary) {
-  return Math.max(0, list.itemCount - list.checkedCount);
+  return list.openCount;
 }
 
-function sourceKind(list: ShoppingListSummary) {
-  if (list.sourceMode === 'planned_all' || list.weekStart) return 'planned';
-  if (list.sourceMode === 'pantry_all' || list.sourceMode === 'pantry_missing') return 'pantry';
+function sourceFamily(list: ShoppingListSummary) {
+  if (list.sourceKind === 'planner_all') return 'planned';
+  if (list.sourceKind === 'pantry_all' || list.sourceKind === 'pantry_missing') return 'pantry';
   return 'manual';
-}
-
-function sourceLabel(list: ShoppingListSummary) {
-  const kind = sourceKind(list);
-  if (kind === 'planned') return 'FROM PLANNER';
-  if (kind === 'pantry') return 'PANTRY LIST';
-  return 'MANUAL LIST';
 }
 
 function updatedLabel(value: Date | string | number) {
@@ -69,7 +64,13 @@ function updatedLabel(value: Date | string | number) {
   );
 }
 
-export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] }) {
+export function ShoppingListsOverview({
+  lists,
+  initialAiSummary,
+}: {
+  lists: ShoppingListSummary[];
+  initialAiSummary?: AiSummaryCardData | null;
+}) {
   const router = useRouter();
   const { showToast } = useToast();
   const [name, setName] = useState('');
@@ -82,7 +83,7 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
 
   const activeLists = lists.filter((list) => !list.archivedAt);
   const archivedLists = lists.filter((list) => list.archivedAt);
-  const plannedLists = activeLists.filter((list) => sourceKind(list) === 'planned');
+  const plannedLists = activeLists.filter((list) => list.sourceKind !== 'manual');
   const completedLists = activeLists.filter(
     (list) => list.itemCount > 0 && remainingItems(list) === 0,
   );
@@ -98,7 +99,7 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
       if (filter === 'archived') return Boolean(list.archivedAt);
       if (list.archivedAt) return false;
       if (filter === 'active') return remaining > 0;
-      if (filter === 'planned') return sourceKind(list) === 'planned';
+      if (filter === 'planned') return list.sourceKind !== 'manual';
       if (filter === 'completed') return list.itemCount > 0 && remaining === 0;
       return true;
     });
@@ -207,7 +208,8 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
               <h1>From the plan to the pantry.</h1>
             </div>
             <p>
-              Every generated list stays separate, so changes you make are always yours to keep.
+              Planner-generated lists stay editable, and regenerating the same week preserves your
+              protected and manual changes.
             </p>
           </header>
 
@@ -216,9 +218,9 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
               Create a shopping list
             </h2>
             <div className={styles.createTabs} aria-label="Shopping list creation options">
-              <button type="button" aria-pressed="true">
+              <span>
                 <ClipboardList size={18} aria-hidden="true" /> Manual list
-              </button>
+              </span>
               <Link href="/planner">
                 <CalendarDays size={18} aria-hidden="true" /> From planner
               </Link>
@@ -239,10 +241,6 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                 {busy === 'create' ? 'Creating…' : 'Create list'}
               </button>
             </form>
-            <Link className={styles.plannerShortcut} href="/planner">
-              <Sparkles size={17} aria-hidden="true" /> Generate a list from your upcoming meals{' '}
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
           </section>
 
           <section className={styles.listWorkspace} aria-labelledby="shopping-lists-heading">
@@ -293,14 +291,13 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
             {visibleLists.length ? (
               <div className={styles.cardGrid}>
                 {visibleLists.map((list) => {
-                  const remaining = remainingItems(list);
-                  const remainingPercent = list.itemCount
-                    ? Math.round((remaining / list.itemCount) * 100)
+                  const sourcedPercent = list.itemCount
+                    ? Math.round((list.sourcedCount / list.itemCount) * 100)
                     : 0;
-                  const kind = sourceKind(list);
+                  const kind = sourceFamily(list);
                   return (
                     <article className={styles.listCard} data-source={kind} key={list.id}>
-                      <Link className={styles.cardBody} href={`/lists/${list.id}`}>
+                      <Link className={styles.cardBody} href={`/lists/${list.id}`} scroll>
                         <div className={styles.cardMeta}>
                           <span className={styles.cardIcon} aria-hidden="true">
                             {kind === 'planned' ? (
@@ -311,17 +308,20 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
                               <ClipboardList size={20} />
                             )}
                           </span>
-                          <span>{sourceLabel(list)}</span>
+                          <span>
+                            {shoppingListSourceLabel(list.sourceKind).toLocaleUpperCase()}
+                          </span>
                         </div>
                         <h3>{list.name}</h3>
                         <p>
-                          <strong>{remaining}</strong> of {list.itemCount} remaining
+                          <strong>{list.needsAttentionCount}</strong> to find
+                          {list.inCartCount ? ` · ${list.inCartCount} in cart` : ''}
                         </p>
                         <div className={styles.progressRow}>
-                          <span aria-label={`${remainingPercent}% of items remaining`}>
-                            <i style={{ width: `${remainingPercent}%` }} />
+                          <span aria-label={`${sourcedPercent}% of items sourced`}>
+                            <i style={{ width: `${sourcedPercent}%` }} />
                           </span>
-                          <b>{remainingPercent}%</b>
+                          <b>{sourcedPercent}%</b>
                         </div>
                         <dl>
                           <div>
@@ -477,6 +477,14 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
             </button>
           </section>
 
+          {lists.length ? (
+            <AiSummaryCards
+              domain="shopping_lists"
+              placement="rail"
+              initialSummary={initialAiSummary}
+            />
+          ) : null}
+
           <section className={styles.railPanel}>
             <h2>
               <Clock3 size={19} aria-hidden="true" /> Recent activity
@@ -485,19 +493,20 @@ export function ShoppingListsOverview({ lists }: { lists: ShoppingListSummary[] 
               <ul className={styles.activityList}>
                 {recentLists.map((list) => (
                   <li key={list.id}>
-                    <span data-source={sourceKind(list)} aria-hidden="true">
-                      {sourceKind(list) === 'planned' ? (
+                    <span data-source={sourceFamily(list)} aria-hidden="true">
+                      {sourceFamily(list) === 'planned' ? (
                         <CalendarDays size={15} />
                       ) : (
                         <ClipboardList size={15} />
                       )}
                     </span>
                     <p>
-                      <Link href={`/lists/${list.id}`}>{list.name}</Link>
+                      <Link href={`/lists/${list.id}`} scroll>
+                        {list.name}
+                      </Link>
                       <small>
-                        {sourceKind(list) === 'planned'
-                          ? 'Generated from planner'
-                          : `${remainingItems(list)} items remaining`}
+                        {shoppingListSourceLabel(list.sourceKind)}
+                        {` · ${list.needsAttentionCount} to find`}
                       </small>
                     </p>
                     <time dateTime={new Date(list.updatedAt).toISOString()}>

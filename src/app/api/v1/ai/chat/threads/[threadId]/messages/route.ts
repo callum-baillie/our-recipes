@@ -39,6 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ thread
         kind: action.kind,
         preview: action.preview,
       })),
+      ...result.jobs.map((job) => ({ type: 'job', job })),
       { type: 'done', messageId: result.message.id, actionId: result.message.actionId },
     ];
     return new Response(

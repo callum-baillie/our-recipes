@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 
 export function DiagnosticsExport() {
   const [status, setStatus] = useState('');
@@ -26,17 +27,24 @@ export function DiagnosticsExport() {
   }
 
   return (
-    <section className="settings-card" aria-labelledby="support-diagnostics-heading">
-      <p className="eyebrow">SUPPORT</p>
-      <h2 id="support-diagnostics-heading">Redacted diagnostics</h2>
-      <p>
-        Export build, migration, storage-health, configuration-presence, and redacted error
-        metadata. Household content, paths, origins, and secret values are excluded.
-      </p>
-      <button type="button" className="text-button" onClick={() => void download()}>
-        Download diagnostics
-      </button>
-      {status ? <p role="status">{status}</p> : null}
-    </section>
+    <SettingsPane
+      eyebrow="SUPPORT"
+      title="Redacted diagnostics"
+      description="Export safe installation details for troubleshooting."
+    >
+      <SettingsRow
+        title="Diagnostic report"
+        description="Includes build, migration, storage health, configuration presence, and redacted errors. Household content, paths, origins, and secrets are excluded."
+      >
+        <button type="button" className="secondary-button compact" onClick={() => void download()}>
+          Download diagnostics
+        </button>
+      </SettingsRow>
+      {status ? (
+        <p className="settings-inline-status" role="status">
+          {status}
+        </p>
+      ) : null}
+    </SettingsPane>
   );
 }

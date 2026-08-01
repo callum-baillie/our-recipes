@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { BrandIconPicker } from '@/components/brand-icon-picker';
 import { InlineSkeleton } from '@/components/skeleton';
+import { SettingsActionBar, SettingsPane, SettingsRow } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 import { parseBrandIcon, type BrandIconId } from '@/lib/appearance';
 
@@ -50,41 +51,50 @@ export function AppSettingsForm({
   }
 
   return (
-    <form className="settings-card app-settings-form" onSubmit={save}>
-      <div>
-        <p className="eyebrow">KITCHEN IDENTITY</p>
-        <h2>Make the kitchen feel like yours.</h2>
-        <p>
-          Your name and icon appear in the shared header and install icon. Bòrd remains visible in
-          page titles, footers, and product information.
-        </p>
-      </div>
-      <div className="field-grid">
-        <label className="full-width-field">
-          <span>Kitchen name</span>
-          <input
-            value={kitchenName}
-            minLength={1}
-            maxLength={80}
-            onChange={(event) => setKitchenName(event.target.value)}
-            required
-          />
-          <small>Use Bòrd, a household name, or any name that feels like home.</small>
-        </label>
-      </div>
-      <BrandIconPicker selected={kitchenIcon} onSelect={setKitchenIcon} />
-      <button
-        className="primary-button compact"
-        type="submit"
-        disabled={pending || !kitchenName.trim()}
+    <form className="settings-form" onSubmit={save}>
+      <SettingsPane
+        eyebrow="KITCHEN IDENTITY"
+        title="Kitchen identity"
+        description="Shared branding for everyone who uses this installation."
       >
-        {pending ? (
-          <InlineSkeleton label="Saving kitchen identity" width="1rem" />
-        ) : (
-          <Save size={16} />
-        )}
-        {pending ? 'Saving…' : 'Save kitchen identity'}
-      </button>
+        <SettingsRow
+          title="Kitchen name"
+          description="Appears in the app header. Bòrd remains visible in page titles and product information."
+        >
+          <label className="settings-control">
+            <span>Kitchen name</span>
+            <input
+              value={kitchenName}
+              minLength={1}
+              maxLength={80}
+              onChange={(event) => setKitchenName(event.target.value)}
+              required
+            />
+            <small>Use Bòrd, a household name, or any name that feels like home.</small>
+          </label>
+        </SettingsRow>
+        <SettingsRow
+          title="Kitchen icon"
+          description="Choose the mark used in the header and installed app icon."
+          align="start"
+        >
+          <BrandIconPicker selected={kitchenIcon} onSelect={setKitchenIcon} />
+        </SettingsRow>
+        <SettingsActionBar>
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={pending || !kitchenName.trim()}
+          >
+            {pending ? (
+              <InlineSkeleton label="Saving kitchen identity" width="1rem" />
+            ) : (
+              <Save size={16} />
+            )}
+            {pending ? 'Saving…' : 'Save kitchen identity'}
+          </button>
+        </SettingsActionBar>
+      </SettingsPane>
     </form>
   );
 }

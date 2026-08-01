@@ -45,7 +45,7 @@ export class LocalOcrError extends Error {
   }
 }
 
-const packageRequire = createRequire(resolve(process.cwd(), 'package.json'));
+const packageRequire = createRequire(import.meta.url);
 const waitQueue: Array<() => void> = [];
 let activeJobs = 0;
 

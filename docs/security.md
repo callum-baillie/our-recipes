@@ -2,14 +2,30 @@
 
 Food providers are read-only and server-mediated. USDA keys stay in the server environment; provider calls, cache writes, and imports require an active signed actor and exact trusted origin. Logs and diagnostics exclude keys, raw queries/barcodes, headers, and upstream payloads. Camera access is limited to `camera=(self)` and trusted HTTPS.
 
-This app is designed for a trusted private household network, not the public internet. Profiles are explicitly not accounts, passwords, or authorization. The UI shows this warning during setup and after setup.
+This app uses Better Auth accounts for access control. Each household profile has a unique email
+and passphrase, while its six-digit PIN only selects that profile as the active household actor
+inside an authenticated session. Profiles remain convenience identity and attribution context,
+not a separate authorization boundary.
 
 Current controls:
 
 - SQLite, migrations, filesystem paths, and OpenAI credentials are server-only.
-- POST/PATCH endpoints require an exact trusted `Origin`; CORS is not enabled by default.
-- The active-profile selection is a signed, HttpOnly, `SameSite=Lax` cookie; its secure flag is enabled in production.
-- Production refuses a missing or short `COOKIE_SECRET`.
+- Browser mutations require an exact trusted `Origin`; CORS is not enabled by default. Scoped
+  bearer API keys are the only server-to-server exception and are accepted only on documented
+  integration resource paths.
+- Better Auth email/passphrase sessions are HttpOnly. The active-profile cookie is additionally
+  signed and bound to the current session; switching profiles requires the target profile PIN.
+- PIN verification uses scrypt, five failed attempts trigger a 15-minute profile/session lock, and
+  recovery codes are HMAC-protected, displayed once, and consumed once.
+- Only the admin account can create API keys. Keys are hashed at rest, expire within 365 days,
+  default to 120 requests/minute, and carry per-resource CRUD scopes. Raw secrets are returned only
+  on creation/rotation. API-key create retries require a 24-hour idempotency key.
+- Passkeys are optional for account sign-in and admin step-up convenience; email/passphrase reset
+  remains available through SMTP, with one-time recovery codes as the offline fallback.
+- Database restore invalidates every session, verification, passkey, and recovery code and disables
+  all API keys in the restored database.
+- Production refuses missing/short independent `COOKIE_SECRET` and `BETTER_AUTH_SECRET` values,
+  and requires canonical Better Auth URL and SMTP configuration.
 - Baseline CSP, anti-framing, nosniff, referrer, permissions, COOP, and CORP headers are applied application-wide.
 - Input is Zod-validated at the HTTP boundary. OpenAI provider modules are marked server-only; `OPENAI_API_KEY` takes precedence, while ignored `.api_keys` may be read only in local development and is excluded from Docker.
 - AI readiness reports only configured/unconfigured state. OpenAI review and image requests require trusted origin, active profile, literal confirmation, bounded source input, a four-action-per-profile ten-minute process limit, strict Structured Outputs, and an audit row containing only source digest/label, operation/model/status/timestamps, and local IDs. Selecting a scan and creating its local import operation never contacts the provider; a paid vision request begins only after the user presses the expressly labeled OpenAI review action. Raw source, provider URLs, and credentials are neither audited nor returned. Tests use deterministic doubles; no live paid request is made here.
@@ -28,9 +44,14 @@ Current controls:
 - Rich recipe metadata and equipment are bounded shared inputs. Imported/manual legacy Nutrition values remain labelled source evidence; normalized, versioned ingredient calculations are authoritative across Recipes, Planner, and Nutrition. Optional AI estimation is an explicit configured provider action and remains unverified evidence until normalized sources exist. Per-profile ratings and notes use the validated active-profile ID and are excluded from shared revision snapshots and exports, but profiles are not a confidentiality boundary.
 - Recipe snapshots are internal bounded JSON produced by the ordinary recipe validator. A restore route requires trusted origin, a valid active profile, a positive source revision, and the caller’s expected current revision; it validates the saved snapshot again and writes a new revision rather than replacing historical data. The library projection exposes only the selected profile’s favorite/rating values, not another profile’s preference row.
 - Meal-plan writes accept only a valid local date, one of breakfast/lunch/dinner/snack, bounded servings/note, and either a current recipe ID or a bounded free-form title. Calendar export is a deterministic local `text/calendar` response with `nosniff`; it does not contact a calendar provider. Shopping rows and aisle names/order are bounded and require a trusted origin; deleting an aisle unassigns rows rather than deleting household food data.
-- The PWA cache is constrained to successful same-origin `GET` responses for already-viewed recipe reads, local images, the manifest, and static assets. It never caches or replays POST/PUT/PATCH/DELETE requests, does not queue background sync, and returns a static offline page for uncached navigation rather than simulating a write.
+- The service worker caches only versioned public/static shell assets. It does not cache
+  authenticated pages, recipe/Pantry/list API payloads, or requests carrying authorization
+  headers, never replays mutations, and clears app caches on sign-out.
 - Backup export uses a SQLite snapshot plus only regular local media files and safe display metadata; it excludes environment files and secrets. Restore accepts only a currently listed server-created bundle, validates archive entry paths/types/size limits in isolated staging, checks every manifest checksum and SQLite integrity, requires exact `RESTORE` confirmation, and creates a safety backup before any data-root replacement.
-- The Docker runner is non-root and keeps mutable state only below `/data`. `COOKIE_SECRET` and trusted origins are runtime environment variables, never image layers or backup exports. The checked-in container configuration remains LAN-oriented and must not be exposed publicly without a real authentication/reverse-proxy design.
+- The Docker runner is non-root and keeps mutable state only below `/data`. `COOKIE_SECRET`,
+  `BETTER_AUTH_SECRET`, SMTP credentials, and trusted origins are runtime environment variables,
+  never image layers or backup exports. Authentication reduces exposure risk but does not replace
+  TLS, reverse-proxy hardening, rate-limit monitoring, or target-host validation.
 
 Before adding arbitrary archive uploads, bundled handwriting OCR, remote-image imports, nutrition providers, or remote backup, add the corresponding size/type limits, audit/retention rules, mock-based tests, and any required human permission. A live OpenAI request additionally requires explicit paid-call approval.
 

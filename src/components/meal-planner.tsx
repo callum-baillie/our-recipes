@@ -33,6 +33,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react';
 
 import { AiMealPlanGenerator } from '@/components/ai-meal-plan-generator';
+import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import { MealPlanRecipeSelector } from '@/components/meal-plan-recipe-selector';
 import { InlineSkeleton } from '@/components/skeleton';
 import {
@@ -80,6 +81,7 @@ type MealPlannerProps = {
   weekStartsOn?: 0 | 1;
   aiMealPlanModel?: string;
   aiImageGenerationEnabled?: boolean;
+  initialAiSummary?: AiSummaryCardData | null;
 };
 
 type MealEntrySnapshot = {
@@ -192,6 +194,7 @@ function MealThumbnail({ meal, recipes }: { meal: PlannedMeal; recipes: RecipeLi
       width={recipe.image.width}
       height={recipe.image.height}
       sizes="96px"
+      unoptimized
     />
   );
 }
@@ -418,6 +421,7 @@ export function MealPlanner({
   weekStartsOn = 1,
   aiMealPlanModel = 'gpt-5.6-terra',
   aiImageGenerationEnabled = true,
+  initialAiSummary,
 }: MealPlannerProps) {
   const router = useRouter();
   const [startDate, setStartDate] = useState(weekStart);
@@ -1006,6 +1010,7 @@ export function MealPlanner({
     });
     const body = (await response.json().catch(() => null)) as {
       listId?: string;
+      restored?: boolean;
       error?: { message?: string };
     } | null;
     setBusyAction(null);
@@ -1013,7 +1018,7 @@ export function MealPlanner({
       setError(body?.error?.message ?? 'Plan at least one meal before generating a list.');
       return;
     }
-    router.push(`/lists/${body.listId}`);
+    router.push(`/lists/${body.listId}${body.restored ? '?restored=1' : ''}`);
   }
 
   function handleRecipesSaved(count: number, addedMeals: PlannedMeal[]) {
@@ -1906,6 +1911,13 @@ export function MealPlanner({
               </>
             )}
           </section>
+          {meals.length ? (
+            <AiSummaryCards
+              domain="meal_plans"
+              placement="rail"
+              initialSummary={initialAiSummary}
+            />
+          ) : null}
           <section
             className={`${styles.insightCard} ${styles.planOverviewCard}`}
             aria-label={`${mealLabel(viewMode)} plan at a glance`}

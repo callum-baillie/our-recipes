@@ -38,7 +38,7 @@ describe('setupSchema', () => {
     expect(source).not.toContain('onBrandIconPreviewChange');
     expect(setupSource).toContain('<BordLockup className="onboarding-brand-lockup" />');
     expect(setupSource).toContain('<dt>bòrd</dt>');
-    expect(setupSource).toContain('<dd>Scottish Gaelic</dd>');
+    expect(setupSource).toContain('<dd>Scottish Gaelic · noun</dd>');
     expect(setupSource).toContain('<dd>Table</dd>');
     expect(setupSource).toContain('A communal area where kin unite to eat and end the day.');
   });
@@ -54,10 +54,31 @@ describe('setupSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts each first-recipe onboarding path and defaults older payloads safely', () => {
+    for (const firstRecipeChoice of ['example', 'ai', 'import', 'manual'] as const) {
+      expect(
+        setupSchema.safeParse({
+          kitchenName: 'The Brooks kitchen',
+          kitchenIcon: 'table',
+          profile: validSetup.profile,
+          firstRecipeChoice,
+        }).success,
+      ).toBe(true);
+    }
+    const parsed = setupSchema.safeParse({
+      kitchenName: 'The Brooks kitchen',
+      kitchenIcon: 'table',
+      profile: validSetup.profile,
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.firstRecipeChoice).toBe('manual');
+  });
+
   it('accepts additional onboarded profiles and caps the setup roster', () => {
     const additionalProfile = {
       profile: { ...validSetup.profile, displayName: 'Avery' },
-      nutrition: { profileType: 'guest' as const },
+      nutrition: { profileType: 'dependent' as const },
+      role: 'child' as const,
     };
     expect(
       setupSchema.safeParse({ ...validSetup, additionalProfiles: [additionalProfile] }).success,
@@ -67,7 +88,7 @@ describe('setupSchema', () => {
         ...validSetup,
         additionalProfiles: Array.from({ length: 12 }, (_, index) => ({
           ...additionalProfile,
-          profile: { ...additionalProfile.profile, displayName: `Guest ${index + 1}` },
+          profile: { ...additionalProfile.profile, displayName: `Child ${index + 1}` },
         })),
       }).success,
     ).toBe(false);
@@ -166,7 +187,8 @@ describe('setupSchema', () => {
     expect(source).toContain("'Weight ounces'");
     expect(source.match(/<MultiValueCombobox/gu)).toHaveLength(3);
     expect(source).toContain('role="switch"');
-    expect(source).not.toContain('type="checkbox"');
+    expect(source.match(/type="checkbox"/gu)).toHaveLength(1);
+    expect(source).toContain('I saved these one-time codes somewhere private.');
     expect(source).not.toContain('<h2>Set up helpful Nutrition defaults.</h2>');
   });
 
@@ -202,6 +224,52 @@ describe('setupSchema', () => {
         ]),
       );
     }
+  });
+
+  it('keeps weight targets aligned with the selected direction', () => {
+    const lossTarget = profileOnboardingSchema.safeParse({
+      profile: validSetup.profile,
+      nutrition: {
+        profileType: 'adult',
+        dateOfBirth: '',
+        heightCentimeters: null,
+        currentWeightKilograms: 80,
+        referenceSexCategory: null,
+        activityLevel: null,
+        nutritionGoalType: 'loss',
+        targetWeightKilograms: 75,
+        targetDate: '2026-10-06',
+        dietaryPreferences: [],
+        foodAllergies: [],
+        dietaryExclusions: [],
+        weightTrackingEnabled: true,
+        estimatedTargetsEnabled: false,
+        estimatedTargetConsent: false,
+      },
+    });
+    expect(lossTarget.success).toBe(true);
+
+    const invalidGainTarget = profileOnboardingSchema.safeParse({
+      profile: validSetup.profile,
+      nutrition: {
+        profileType: 'adult',
+        dateOfBirth: '',
+        heightCentimeters: null,
+        currentWeightKilograms: 80,
+        referenceSexCategory: null,
+        activityLevel: null,
+        nutritionGoalType: 'gain',
+        targetWeightKilograms: 75,
+        targetDate: '2026-10-06',
+        dietaryPreferences: [],
+        foodAllergies: [],
+        dietaryExclusions: [],
+        weightTrackingEnabled: true,
+        estimatedTargetsEnabled: false,
+        estimatedTargetConsent: false,
+      },
+    });
+    expect(invalidGainTarget.success).toBe(false);
   });
 
   it('rejects an unsafe profile color', () => {

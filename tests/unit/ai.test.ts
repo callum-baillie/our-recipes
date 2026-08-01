@@ -153,6 +153,27 @@ describe('AI readiness boundary', () => {
         recipe: {
           properties: {
             sourceUrl: { type: 'string', maxLength: 2_048 },
+            ingredientGroups: {
+              items: {
+                properties: {
+                  ingredients: {
+                    items: {
+                      required: expect.arrayContaining(['shoppingCategory']),
+                      properties: {
+                        shoppingCategory: {
+                          enum: expect.arrayContaining([
+                            'Fresh produce',
+                            'Dairy & eggs',
+                            'Canned & jarred',
+                            'Other',
+                          ]),
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -284,10 +305,34 @@ describe('AI readiness boundary', () => {
           {
             name: 'Vegetables',
             ingredients: [
-              { quantity: '', unit: '', item: 'bell peppers', note: '3–4, cut in half' },
-              { quantity: '', unit: '', item: 'elephant garlic bulbs', note: '1, cut in half' },
-              { quantity: '', unit: '', item: 'cherry tomatoes', note: '1-2 c.' },
-              { quantity: '', unit: '', item: '0.5 c. pasta water', note: '' },
+              {
+                quantity: '',
+                unit: '',
+                item: 'bell peppers',
+                note: '3–4, cut in half',
+                shoppingCategory: 'Fresh produce',
+              },
+              {
+                quantity: '',
+                unit: '',
+                item: 'elephant garlic bulbs',
+                note: '1, cut in half',
+                shoppingCategory: 'Fresh produce',
+              },
+              {
+                quantity: '',
+                unit: '',
+                item: 'cherry tomatoes',
+                note: '1-2 c.',
+                shoppingCategory: 'Fresh produce',
+              },
+              {
+                quantity: '',
+                unit: '',
+                item: '0.5 c. pasta water',
+                note: '',
+                shoppingCategory: 'Dry goods & grains',
+              },
             ],
           },
         ],
@@ -295,10 +340,34 @@ describe('AI readiness boundary', () => {
     });
 
     expect(normalized.recipe.ingredientGroups[0]?.ingredients).toEqual([
-      { quantity: 3, unit: '', item: 'bell peppers', note: 'up to 4; cut in half' },
-      { quantity: 1, unit: '', item: 'elephant garlic bulbs', note: 'cut in half' },
-      { quantity: 1, unit: 'cup', item: 'cherry tomatoes', note: 'up to 2 cup' },
-      { quantity: 0.5, unit: 'cup', item: 'pasta water', note: '' },
+      {
+        quantity: 3,
+        unit: '',
+        item: 'bell peppers',
+        note: 'up to 4; cut in half',
+        shoppingCategory: 'Fresh produce',
+      },
+      {
+        quantity: 1,
+        unit: '',
+        item: 'elephant garlic bulbs',
+        note: 'cut in half',
+        shoppingCategory: 'Fresh produce',
+      },
+      {
+        quantity: 1,
+        unit: 'cup',
+        item: 'cherry tomatoes',
+        note: 'up to 2 cup',
+        shoppingCategory: 'Fresh produce',
+      },
+      {
+        quantity: 0.5,
+        unit: 'cup',
+        item: 'pasta water',
+        note: '',
+        shoppingCategory: 'Dry goods & grains',
+      },
     ]);
   });
 });

@@ -1,10 +1,11 @@
-export const AI_PRICING_AS_OF = '2026-07-22';
+export const AI_PRICING_AS_OF = '2026-07-28';
 
 const TEXT_PRICE_USD_PER_MILLION: Record<string, { input: number; output: number }> = {
   'gpt-5.6-sol': { input: 5, output: 30 },
   'gpt-5.6-terra': { input: 2.5, output: 15 },
   'gpt-5.6-luna': { input: 1, output: 6 },
   'gpt-5.4-mini': { input: 0.75, output: 4.5 },
+  'gpt-4o': { input: 2.5, output: 10 },
 };
 
 // The provider requests low-quality 1024x1024 GPT Image 2 output.
@@ -15,7 +16,11 @@ export type AiMealPlanCostEstimate = {
   outputTokens: number;
   inputUsd: number | null;
   outputUsd: number | null;
+  mealPlanRequestCount: 1;
+  recipeCount: number;
+  recipeCountIsEstimate: boolean;
   imageCount: number;
+  imageBatchApplied: boolean;
   imageUsd: number;
   totalUsd: number | null;
 };
@@ -44,26 +49,33 @@ export function estimateAiMealPlanCost(input: {
       ? Math.max(0, days - 1)
       : 0;
   const nonLeftoverMeals = Math.max(1, slotCount - leftoverMeals);
-  const distinctRecipes = input.allowRepeatingMeals
+  const recipeCount = input.allowRepeatingMeals
     ? Math.max(1, Math.ceil(nonLeftoverMeals * 0.7))
     : nonLeftoverMeals;
 
   // The estimate includes bounded household context plus structured recipe output for each meal.
   const inputTokens = 1_500 + slotCount * 85 + Math.max(1, input.profileCount) * 220;
-  const outputTokens = 450 + distinctRecipes * 1_000;
+  const outputTokens = 450 + recipeCount * 1_000;
   const price = TEXT_PRICE_USD_PER_MILLION[input.model];
   const inputUsd = price ? (inputTokens / 1_000_000) * price.input : null;
   const outputUsd = price ? (outputTokens / 1_000_000) * price.output : null;
-  const imageCount = input.generateRecipeImages ? distinctRecipes : 0;
-  const imageUsd = imageCount * LOW_SQUARE_RECIPE_IMAGE_ESTIMATE_USD;
+  const imageCount = input.generateRecipeImages ? recipeCount : 0;
+  const imageBatchApplied = imageCount >= 4;
+  const imageUsd =
+    imageCount * LOW_SQUARE_RECIPE_IMAGE_ESTIMATE_USD * (imageBatchApplied ? 0.5 : 1);
+  const totalUsd = inputUsd === null || outputUsd === null ? null : inputUsd + outputUsd + imageUsd;
 
   return {
     inputTokens,
     outputTokens,
     inputUsd,
     outputUsd,
+    mealPlanRequestCount: 1,
+    recipeCount,
+    recipeCountIsEstimate: input.allowRepeatingMeals,
     imageCount,
+    imageBatchApplied,
     imageUsd,
-    totalUsd: inputUsd === null || outputUsd === null ? null : inputUsd + outputUsd + imageUsd,
+    totalUsd: totalUsd === null ? null : Math.max(0, totalUsd),
   };
 }

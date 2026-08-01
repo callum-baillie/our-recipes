@@ -16,7 +16,14 @@ import {
 import { useMemo, useState, useTransition } from 'react';
 
 import { InlineSkeleton } from '@/components/skeleton';
+import {
+  SettingsActionBar,
+  SettingsControlGroup,
+  SettingsPane,
+  SettingsRow,
+} from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
+import { DEFAULT_SUPERMARKET_SECTIONS } from '@/lib/domain/list-settings';
 
 import styles from './list-settings-manager.module.css';
 
@@ -55,12 +62,11 @@ type ProfileDraft = {
   sections: Section[];
 };
 
-const starterSections: Section[] = [
-  { aisleId: '', name: 'Fresh', matchTerms: ['fruit', 'vegetables', 'herbs'] },
-  { aisleId: '', name: 'Canned goods', matchTerms: ['tinned', 'canned', 'beans'] },
-  { aisleId: '', name: 'Dairy', matchTerms: ['milk', 'cheese', 'yoghurt'] },
-  { aisleId: '', name: 'Frozen', matchTerms: ['frozen', 'ice cream'] },
-];
+const starterSections: Section[] = DEFAULT_SUPERMARKET_SECTIONS.map((section) => ({
+  aisleId: '',
+  name: section.name,
+  matchTerms: [...section.matchTerms],
+}));
 
 function draftFor(profile?: Profile): ProfileDraft {
   return profile
@@ -200,13 +206,104 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
 
   return (
     <div className={styles.manager}>
-      <section className={styles.preferences} aria-labelledby="list-preferences-title">
-        <div className={styles.sectionTitle}>
-          <p className="eyebrow" id="list-preferences-title">
-            GENERAL PREFERENCES
-          </p>
+      <SettingsPane
+        className={styles.preferences}
+        eyebrow="GENERAL PREFERENCES"
+        title="Shopping list behavior"
+        description="Shared defaults for list completion, supermarket routing, and shopping mode."
+      >
+        <SettingsRow
+          title="List organization"
+          description="Choose the default store and what happens after an item is completed."
+        >
+          <SettingsControlGroup>
+            <label className="settings-control">
+              <span>Default supermarket</span>
+              <select
+                value={workspace.settings.defaultSupermarketProfileId ?? ''}
+                onChange={(event) =>
+                  setWorkspace({
+                    ...workspace,
+                    settings: {
+                      ...workspace.settings,
+                      defaultSupermarketProfileId: event.target.value || null,
+                    },
+                  })
+                }
+              >
+                <option value="">No default</option>
+                {activeProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                    {profile.locationLabel ? ` · ${profile.locationLabel}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="settings-control">
+              <span>Completed items</span>
+              <select
+                value={workspace.settings.completedItemsBehavior}
+                onChange={(event) =>
+                  setWorkspace({
+                    ...workspace,
+                    settings: {
+                      ...workspace.settings,
+                      completedItemsBehavior: event.target
+                        .value as Settings['completedItemsBehavior'],
+                    },
+                  })
+                }
+              >
+                <option value="completed_section">Move to a Completed section</option>
+                <option value="hide">Hide completed items</option>
+                <option value="in_place">Keep items in place</option>
+              </select>
+            </label>
+          </SettingsControlGroup>
+        </SettingsRow>
+        <SettingsRow
+          title="Pantry intake"
+          description="Open purchase details as items are checked so quantities and dates can be recorded."
+        >
+          <label className={styles.toggleRow}>
+            <input
+              checked={workspace.settings.openPantryPurchaseOnCheck}
+              onChange={(event) =>
+                setWorkspace({
+                  ...workspace,
+                  settings: {
+                    ...workspace.settings,
+                    openPantryPurchaseOnCheck: event.target.checked,
+                  },
+                })
+              }
+              type="checkbox"
+            />
+            <span>Open Pantry purchase details when an item is checked</span>
+          </label>
+        </SettingsRow>
+        <SettingsRow
+          title="Shopping mode"
+          description="Prevent the display from sleeping while an active list is open."
+        >
+          <label className={styles.toggleRow}>
+            <input
+              checked={workspace.settings.keepScreenAwake}
+              onChange={(event) =>
+                setWorkspace({
+                  ...workspace,
+                  settings: { ...workspace.settings, keepScreenAwake: event.target.checked },
+                })
+              }
+              type="checkbox"
+            />
+            <span>Keep the screen awake while a list is open</span>
+          </label>
+        </SettingsRow>
+        <SettingsActionBar>
           <button
-            className="secondary-button compact"
+            className="primary-button compact"
             aria-busy={isPending}
             disabled={isPending}
             onClick={() =>
@@ -224,82 +321,8 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
           >
             <Save size={16} /> Save preferences
           </button>
-        </div>
-        <div className={styles.preferenceGrid}>
-          <label>
-            <span>Default supermarket</span>
-            <select
-              value={workspace.settings.defaultSupermarketProfileId ?? ''}
-              onChange={(event) =>
-                setWorkspace({
-                  ...workspace,
-                  settings: {
-                    ...workspace.settings,
-                    defaultSupermarketProfileId: event.target.value || null,
-                  },
-                })
-              }
-            >
-              <option value="">No default</option>
-              {activeProfiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                  {profile.locationLabel ? ` · ${profile.locationLabel}` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Completed items</span>
-            <select
-              value={workspace.settings.completedItemsBehavior}
-              onChange={(event) =>
-                setWorkspace({
-                  ...workspace,
-                  settings: {
-                    ...workspace.settings,
-                    completedItemsBehavior: event.target
-                      .value as Settings['completedItemsBehavior'],
-                  },
-                })
-              }
-            >
-              <option value="completed_section">Move to a Completed section</option>
-              <option value="hide">Hide completed items</option>
-              <option value="in_place">Keep items in place</option>
-            </select>
-          </label>
-          <label className={styles.toggleRow}>
-            <input
-              checked={workspace.settings.openPantryPurchaseOnCheck}
-              onChange={(event) =>
-                setWorkspace({
-                  ...workspace,
-                  settings: {
-                    ...workspace.settings,
-                    openPantryPurchaseOnCheck: event.target.checked,
-                  },
-                })
-              }
-              type="checkbox"
-            />
-            <span>Open Pantry purchase details when an item is checked</span>
-          </label>
-          <label className={styles.toggleRow}>
-            <input
-              checked={workspace.settings.keepScreenAwake}
-              onChange={(event) =>
-                setWorkspace({
-                  ...workspace,
-                  settings: { ...workspace.settings, keepScreenAwake: event.target.checked },
-                })
-              }
-              type="checkbox"
-            />
-            <span>Keep the screen awake while a list is open</span>
-          </label>
-        </div>
-      </section>
+        </SettingsActionBar>
+      </SettingsPane>
 
       <section className={styles.profiles} aria-labelledby="supermarket-profiles-title">
         <aside className={styles.profileRail}>

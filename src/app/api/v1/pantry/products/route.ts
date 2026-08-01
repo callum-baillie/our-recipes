@@ -1,25 +1,42 @@
 import { NextResponse } from 'next/server';
 
+import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
+import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { pantryProductInputSchema } from '@/lib/domain/pantry';
 import { jsonError } from '@/lib/http';
 import { createPantryProduct, listPantryProducts } from '@/lib/services/pantry-service';
 
-import { pantryServiceError, rejectUntrustedPantryMutation, requirePantryActor } from '../_shared';
+import { pantryServiceError } from '../_shared';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  const authorization = await authorizeApi(request, 'pantry', 'read');
+  if (authorization.response) return authorization.response;
   const includeArchived = new URL(request.url).searchParams.get('includeArchived') === 'true';
-  return NextResponse.json({ products: listPantryProducts(includeArchived) });
+  return withApiRequestId(
+    NextResponse.json({ products: listPantryProducts(includeArchived) }),
+    authorization.requestId,
+  );
 }
 
 export async function POST(request: Request) {
-  const rejected = rejectUntrustedPantryMutation(request);
-  if (rejected) return rejected;
-  const actor = await requirePantryActor();
-  if (actor.response) return actor.response;
-  const parsed = pantryProductInputSchema.safeParse(await request.json().catch(() => null));
+  const authorization = await authorizeApi(request, 'pantry', 'create');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
+  const idempotency = await prepareIdempotentMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (idempotency.response) return idempotency.response;
+  const parsed = pantryProductInputSchema.safeParse(idempotency.context.body);
   if (!parsed.success)
     return jsonError(
       400,
@@ -27,9 +44,13 @@ export async function POST(request: Request) {
       'Check the product name, units, and stock targets.',
     );
   try {
-    return NextResponse.json(
-      { product: createPantryProduct(parsed.data, actor.profileId) },
-      { status: 201 },
+    return idempotentJsonResponse(
+      idempotency.context,
+      {
+        product: createPantryProduct(parsed.data, authorization.principal.profileId),
+      },
+      authorization.requestId,
+      201,
     );
   } catch (error) {
     const response = pantryServiceError(error);

@@ -1,7 +1,9 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
+import { AiSummaryCards } from '@/components/ai-summary-cards';
 import { RecipeLibraryFilters } from '@/components/recipe-library-filters';
+import { RecipebookNav } from '@/components/recipebook-nav';
 import { RecipeSummaryCard } from '@/components/recipe-summary-card';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { DEFAULT_NUTRITION_CARD_NUTRIENTS } from '@/lib/domain/nutrition-profile';
@@ -12,6 +14,7 @@ import { listRecipePantryAvailability } from '@/lib/services/pantry-availability
 import { listRecipeNutritionPresentations } from '@/lib/services/nutrition-recipe-calculation-service';
 import { listAccessibleNutritionProfiles } from '@/lib/services/nutrition-profile-service';
 import { getAppPreferences } from '@/lib/services/app-preferences-service';
+import { listAiSummaries } from '@/lib/services/ai-summary-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
 import { listRecipeLibrary, listRecipeTags } from '@/lib/services/recipe-service';
 
@@ -108,11 +111,16 @@ export default async function RecipeLibraryPage({
         totalPages: filteredTotalPages,
       }
     : firstLibraryPage;
+  const aiSummary = actor.profileId
+    ? listAiSummaries(actor.profileId).find((item) => item.domain === 'recipes')
+    : null;
   const nutritionPresentations = showRecipeCardNutrition
     ? listRecipeNutritionPresentations(library.recipes.map((recipe) => recipe.id))
     : {};
+  const eagerRecipeId = library.recipes.find((recipe) => recipe.image)?.id;
   return (
     <main className="recipe-page">
+      <RecipebookNav current="library" />
       <section className="library-heading" aria-labelledby="library-title">
         <p className="eyebrow">THE SHARED COOKBOOK</p>
         <div className="library-title-row">
@@ -123,9 +131,6 @@ export default async function RecipeLibraryPage({
                 ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
                 : 'A place for every recipe your household returns to.'}
             </p>
-            <Link className="text-button" href="/collections">
-              Collections
-            </Link>
           </div>
         </div>
         <RecipeLibraryFilters
@@ -167,13 +172,21 @@ export default async function RecipeLibraryPage({
           </p>
         ) : null}
       </section>
+      {library.total ? (
+        <AiSummaryCards
+          domain="recipes"
+          initialSummary={
+            aiSummary ? { ...aiSummary, createdAt: aiSummary.createdAt.toISOString() } : null
+          }
+        />
+      ) : null}
       {library.recipes.length ? (
         <>
           <section
             className="home-recipe-grid all-recipes-grid library-recipe-grid"
             aria-label="Recipe results"
           >
-            {library.recipes.map((recipe, index) => (
+            {library.recipes.map((recipe) => (
               <RecipeSummaryCard
                 recipe={{
                   ...recipe,
@@ -200,7 +213,7 @@ export default async function RecipeLibraryPage({
                     };
                   })(),
                 }}
-                eager={index === 0}
+                eager={recipe.id === eagerRecipeId}
                 key={recipe.id}
               />
             ))}

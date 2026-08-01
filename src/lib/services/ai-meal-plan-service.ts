@@ -298,6 +298,8 @@ export async function generateAiMealPlanProposal(input: {
             ? 'When at least two open slots exist, include at least one existing and one new recipe.'
             : '',
           'Respect supplied dietary preferences, allergies, and exclusions, but never claim allergen or medical safety.',
+          'For every new recipe, make each ingredient a specific purchasable item. Choose practical type, form, variety, and size qualifiers when they affect what to buy; for example, use "large flour tortillas" rather than "tortillas". Keep preparation-only wording in the note.',
+          'For every ingredient in every new recipe, assign the most appropriate shoppingCategory from the recipe schema. Use Other only when no listed store category fits.',
           request.occupiedSlotMode === 'review'
             ? 'Propose the requested slots even when occupied; the app will ask the user to keep or replace each conflict.'
             : 'Do not overwrite occupied slots unless the occupied-slot mode is replace.',

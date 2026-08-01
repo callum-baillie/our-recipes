@@ -17,12 +17,15 @@ import {
   supermarketProfiles,
 } from '@/lib/db/schema';
 import {
+  DEFAULT_SUPERMARKET_SECTIONS,
+  inferShoppingCategory,
   listSettingsInputSchema,
   normalizeShoppingMatchText,
   shoppingTextMatchesTerm,
   supermarketProfileInputSchema,
   supermarketProfileUpdateSchema,
   type ListSettingsInput,
+  type ShoppingCategory,
   type SupermarketProfileInput,
   type SupermarketProfileUpdateInput,
 } from '@/lib/domain/list-settings';
@@ -390,6 +393,70 @@ export function createSupermarketProfile(
   return getListSettingsWorkspace();
 }
 
+export function ensureDefaultSupermarketProfile(
+  actorProfileId: string,
+  executor: DatabaseExecutor = getDatabase(),
+): string {
+  const actor = requireActor(actorProfileId, executor);
+  const household = requireHousehold(executor);
+  const activeProfile = executor
+    .select()
+    .from(supermarketProfiles)
+    .where(eq(supermarketProfiles.householdId, household.id))
+    .orderBy(asc(supermarketProfiles.createdAt))
+    .all()
+    .find((profile) => !profile.archivedAt);
+  const now = new Date();
+  let supermarketProfileId = activeProfile?.id;
+  if (!supermarketProfileId) {
+    supermarketProfileId = randomUUID();
+    executor
+      .insert(supermarketProfiles)
+      .values({
+        id: supermarketProfileId,
+        householdId: household.id,
+        name: 'General grocery store',
+        normalizedName: 'general grocery store',
+        locationLabel: '',
+        normalizedLocation: '',
+        notes: 'A ready-to-use store route. Rename, reorder, or customize any section.',
+        archivedAt: null,
+        createdByProfileId: actor.id,
+        updatedByProfileId: actor.id,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    replaceProfileSections(
+      supermarketProfileId,
+      {
+        name: 'General grocery store',
+        locationLabel: '',
+        notes: 'A ready-to-use store route. Rename, reorder, or customize any section.',
+        sections: DEFAULT_SUPERMARKET_SECTIONS.map((section) => ({
+          aisleId: '',
+          name: section.name,
+          matchTerms: [...section.matchTerms],
+        })),
+      },
+      executor,
+    );
+  }
+  const settings = ensureSettingsRow(actorProfileId, executor);
+  if (!settings.defaultSupermarketProfileId) {
+    executor
+      .update(householdListSettings)
+      .set({
+        defaultSupermarketProfileId: supermarketProfileId,
+        updatedByProfileId: actor.id,
+        updatedAt: now,
+      })
+      .where(eq(householdListSettings.householdId, household.id))
+      .run();
+  }
+  return supermarketProfileId;
+}
+
 function requireProfile(
   supermarketProfileId: string,
   executor: DatabaseExecutor,
@@ -549,6 +616,7 @@ export function duplicateSupermarketProfile(
 type ClassificationInput = {
   item: string;
   productId?: string | null;
+  shoppingCategory?: ShoppingCategory | null;
 };
 
 export function resolveShoppingAisle(
@@ -581,7 +649,13 @@ export function resolveShoppingAisle(
     if (learned === null || activeAisles.has(learned)) return learned;
   }
 
-  const candidateText = [input.item];
+  const inferredCategory = inferShoppingCategory(input.item);
+  const candidateText = [
+    input.item,
+    input.shoppingCategory && input.shoppingCategory !== 'Other'
+      ? input.shoppingCategory
+      : inferredCategory,
+  ];
   if (input.productId) {
     const product = executor
       .select()

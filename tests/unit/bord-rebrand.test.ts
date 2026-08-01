@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { createElement } from 'react';
@@ -15,7 +15,7 @@ import {
   legacyKitchenName,
 } from '@/lib/brand';
 import { BordIcon } from '@/components/bord-brand';
-import { getRuntimeConfig } from '@/lib/config';
+import { getBackupDirectory, getBackupStorageConfiguration, getRuntimeConfig } from '@/lib/config';
 import { backupManifestSchema } from '@/lib/domain/backup';
 
 const temporaryDirectories: string[] = [];
@@ -125,6 +125,29 @@ describe('Bòrd compatibility', () => {
     expect(existsSync(join(directory, 'our-recipes.db'))).toBe(true);
     expect(existsSync(join(directory, 'our-recipes.db-wal'))).toBe(true);
     expect(existsSync(join(directory, 'bord.db'))).toBe(false);
+  });
+
+  it('defaults backup storage below DATA_DIR and supports a dedicated directory', () => {
+    const dataDirectory = mkdtempSync(join(tmpdir(), 'bord-data-'));
+    const backupDirectory = mkdtempSync(join(tmpdir(), 'bord-backups-'));
+    temporaryDirectories.push(dataDirectory, backupDirectory);
+    vi.stubEnv('DATA_DIR', dataDirectory);
+    vi.stubEnv('BACKUP_DIR', undefined);
+
+    expect(getBackupDirectory()).toBe(join(dataDirectory, 'backups'));
+    expect(getBackupStorageConfiguration().location).toBe('app-data');
+
+    vi.stubEnv('BACKUP_DIR', backupDirectory);
+    expect(getBackupStorageConfiguration()).toMatchObject({
+      directory: backupDirectory,
+      location: 'dedicated',
+    });
+  });
+
+  it('rejects a filesystem root as BACKUP_DIR', () => {
+    vi.stubEnv('BACKUP_DIR', parse(process.cwd()).root);
+
+    expect(() => getBackupDirectory()).toThrow('BACKUP_DIR cannot be the filesystem root');
   });
 
   it('continues to validate version 1 backup manifests', () => {

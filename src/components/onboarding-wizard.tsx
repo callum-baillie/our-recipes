@@ -3,12 +3,14 @@
 import {
   ArrowLeft,
   BadgeDollarSign,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
   ChevronRight,
   ChefHat,
   HeartPulse,
+  Import,
   Leaf,
   Pencil,
   Plus,
@@ -19,7 +21,9 @@ import {
   Trash2,
   UserRound,
   UtensilsCrossed,
+  WandSparkles,
 } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -31,6 +35,8 @@ import { AppearanceSettings } from '@/components/theme-toggle';
 import { useToast } from '@/components/toast-provider';
 import { parseBrandIcon, type BrandIconId } from '@/lib/appearance';
 import { DEFAULT_KITCHEN_NAME } from '@/lib/brand';
+import { profileCredentialsSchema, type ProfileCredentialsInput } from '@/lib/domain/auth';
+import { type AppRole } from '@/lib/domain/permissions';
 import {
   defaultProfileGoalContext,
   hasProfileGoalContext,
@@ -43,13 +49,25 @@ import {
   defaultOnboardingNutrition,
   defaultProfileInput,
   onboardingHeightCentimeters,
+  onboardingNutritionSchema,
   onboardingWeightKilograms,
-  profileOnboardingSchema,
+  secureProfileOnboardingSchema,
   setupSchema,
+  type FirstRecipeChoice,
   type OnboardingMeasurementUnit,
   type OnboardingNutritionInput,
   type ProfileInput,
 } from '@/lib/domain/setup';
+import {
+  weightGoalPaces,
+  weightTargetTimeline,
+  type WeightGoalPace,
+} from '@/lib/domain/weight-target-guidance';
+import {
+  SCOTTISH_STOVIES_IMAGE_ALT,
+  SCOTTISH_STOVIES_IMAGE_PATH,
+  SCOTTISH_STOVIES_RECIPE,
+} from '@/lib/domain/example-recipes';
 
 const profileColors = ['#A85032', '#5B713E', '#D1863A', '#466F75', '#76558C', '#9B5C70'];
 const maximumSetupProfiles = 12;
@@ -270,15 +288,31 @@ const profileTypeOptions = [
     description: 'For a child or anyone whose meals and Nutrition are managed with support.',
     access: 'Intended for supervised use; it is not a security lock.',
   },
-  {
-    value: 'guest',
-    label: 'Guest',
-    description: 'A lighter home for occasional diners with their own preferences and history.',
-    access: 'Household features stay available while this profile is active.',
-  },
 ] as const;
 
 type ProfileTypeValue = (typeof profileTypeOptions)[number]['value'];
+
+const accessRoleOptions: Array<{
+  value: AppRole;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'admin',
+    label: 'Admin',
+    description: 'Full access, including profiles, settings, backups, and API keys.',
+  },
+  {
+    value: 'parent',
+    label: 'Parent',
+    description: 'Can manage shared recipes, plans, lists, collections, and pantry items.',
+  },
+  {
+    value: 'child',
+    label: 'Child',
+    description: 'Can view shared content and manage only their own personal entries.',
+  },
+];
 
 function RichProfileTypeSelect({
   id,
@@ -482,11 +516,45 @@ type ProfileRecord = {
   archivedAt: string | null;
 };
 
-type WizardStep = 'app' | 'appearance' | 'profile' | 'nutrition' | 'goals' | 'review';
+type WizardStep = 'app' | 'appearance' | 'profile' | 'nutrition' | 'goals' | 'recipe' | 'review';
+
+const firstRecipeOptions: Array<{
+  value: FirstRecipeChoice;
+  label: string;
+  description: string;
+  icon: typeof BookOpen;
+}> = [
+  {
+    value: 'example',
+    label: 'Use Example recipe',
+    description: 'Start with our complete Traditional Scottish Stovies recipe.',
+    icon: BookOpen,
+  },
+  {
+    value: 'ai',
+    label: 'AI generate',
+    description: 'Describe what you want and review an AI-generated recipe before saving.',
+    icon: WandSparkles,
+  },
+  {
+    value: 'import',
+    label: 'Import (From URL or Paste/JSON)',
+    description: 'Bring in a recipe you already trust from another source.',
+    icon: Import,
+  },
+  {
+    value: 'manual',
+    label: 'Manual',
+    description: 'Build your first recipe from a blank, structured recipe form.',
+    icon: Pencil,
+  },
+];
 
 type ProfileDraft = {
   localId: number;
+  role: AppRole;
   profile: ProfileInput;
+  credentials: ProfileCredentialsInput;
   nutrition: OnboardingNutritionInput;
   heightUnit: OnboardingMeasurementUnit;
   heightPrimary: string;
@@ -494,6 +562,8 @@ type ProfileDraft = {
   weightUnit: OnboardingMeasurementUnit;
   weightPrimary: string;
   weightSecondary: string;
+  targetWeight: string;
+  weightGoalPace: WeightGoalPace;
   dietaryPreferences: string[];
   foodAllergies: string[];
   dietaryExclusions: string[];
@@ -508,6 +578,7 @@ function createProfileDraft(
 ): ProfileDraft {
   return {
     localId,
+    role: 'parent',
     profile: {
       ...defaultProfileInput,
       ...regional,
@@ -517,6 +588,7 @@ function createProfileDraft(
         focusAreas: [...defaultProfileGoalContext.focusAreas],
       },
     },
+    credentials: { email: '', passphrase: '', pin: '' },
     nutrition: { ...defaultOnboardingNutrition },
     heightUnit: defaultProfileInput.units,
     heightPrimary: '',
@@ -524,6 +596,8 @@ function createProfileDraft(
     weightUnit: defaultProfileInput.units,
     weightPrimary: '',
     weightSecondary: '',
+    targetWeight: '',
+    weightGoalPace: 'steady',
     dietaryPreferences: [],
     foodAllergies: [],
     dietaryExclusions: [],
@@ -543,6 +617,7 @@ function canonicalNutritionForDraft(draft: ProfileDraft): OnboardingNutritionInp
       draft.weightPrimary,
       draft.weightSecondary,
     ),
+    targetWeightKilograms: onboardingWeightKilograms(draft.weightUnit, draft.targetWeight),
     dietaryPreferences: draft.dietaryPreferences,
     foodAllergies: draft.foodAllergies,
     dietaryExclusions: draft.dietaryExclusions,
@@ -566,7 +641,7 @@ export function OnboardingWizard({
   const { showToast } = useToast();
   const steps: WizardStep[] =
     mode === 'initial'
-      ? ['app', 'appearance', 'profile', 'nutrition', 'goals', 'review']
+      ? ['app', 'appearance', 'profile', 'nutrition', 'goals', 'recipe', 'review']
       : ['profile', 'nutrition', 'goals', 'review'];
   const [stepIndex, setStepIndex] = useState(0);
   const [kitchenName, setKitchenName] = useState(DEFAULT_KITCHEN_NAME);
@@ -586,10 +661,23 @@ export function OnboardingWizard({
   const nextProfileId = useRef(2);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [firstRecipeChoice, setFirstRecipeChoice] = useState<FirstRecipeChoice>('example');
+  const [firstRecipeImportMode, setFirstRecipeImportMode] = useState<'url' | 'text' | 'json'>(
+    'url',
+  );
+  const [securityCompletion, setSecurityCompletion] = useState<{
+    groups: Array<{ profileName: string; codes: string[] }>;
+    destination: string;
+    requiresEmailVerification: boolean;
+    createdProfile?: ProfileRecord;
+  } | null>(null);
+  const [recoveryCodesSaved, setRecoveryCodesSaved] = useState(false);
   const currentStep = steps[stepIndex]!;
   const activeDraft = profileDrafts[activeProfileIndex]!;
   const {
+    role,
     profile,
+    credentials,
     nutrition,
     heightUnit,
     heightPrimary,
@@ -597,6 +685,8 @@ export function OnboardingWizard({
     weightUnit,
     weightPrimary,
     weightSecondary,
+    targetWeight,
+    weightGoalPace,
     dietaryPreferences,
     foodAllergies,
     dietaryExclusions,
@@ -632,6 +722,19 @@ export function OnboardingWizard({
     updateActiveDraft((draft) => ({ ...draft, profile: value }));
   }
 
+  function setCredentials(value: ProfileCredentialsInput) {
+    updateActiveDraft((draft) => ({ ...draft, credentials: value }));
+  }
+
+  function setRole(value: AppRole) {
+    updateActiveDraft((draft) => ({
+      ...draft,
+      role: value,
+      nutrition:
+        value === 'child' ? { ...draft.nutrition, profileType: 'dependent' } : draft.nutrition,
+    }));
+  }
+
   function setNutrition(value: OnboardingNutritionInput) {
     updateActiveDraft((draft) => ({ ...draft, nutrition: value }));
   }
@@ -648,6 +751,14 @@ export function OnboardingWizard({
       ...draft,
       [segment === 'primary' ? 'weightPrimary' : 'weightSecondary']: value,
     }));
+  }
+
+  function setWeightGoalPace(value: WeightGoalPace) {
+    updateActiveDraft((draft) => ({ ...draft, weightGoalPace: value }));
+  }
+
+  function setTargetWeight(value: string) {
+    updateActiveDraft((draft) => ({ ...draft, targetWeight: value }));
   }
 
   function setHeightUnit(unit: OnboardingMeasurementUnit) {
@@ -687,8 +798,24 @@ export function OnboardingWizard({
         draft.weightPrimary,
         draft.weightSecondary,
       );
+      const targetWeightKilograms = onboardingWeightKilograms(draft.weightUnit, draft.targetWeight);
       if (kilograms === null) {
-        return { ...draft, weightUnit: unit, weightPrimary: '', weightSecondary: '' };
+        return {
+          ...draft,
+          weightUnit: unit,
+          weightPrimary: '',
+          weightSecondary: '',
+          targetWeight:
+            targetWeightKilograms === null
+              ? ''
+              : String(
+                  Math.round(
+                    (unit === 'metric'
+                      ? targetWeightKilograms
+                      : targetWeightKilograms * 2.2046226218) * 10,
+                  ) / 10,
+                ),
+        };
       }
       if (unit === 'metric') {
         const wholeKilograms = Math.floor(kilograms);
@@ -697,6 +824,10 @@ export function OnboardingWizard({
           weightUnit: unit,
           weightPrimary: String(wholeKilograms),
           weightSecondary: String(Math.round((kilograms - wholeKilograms) * 1_000)),
+          targetWeight:
+            targetWeightKilograms === null
+              ? ''
+              : String(Math.round(targetWeightKilograms * 10) / 10),
         };
       }
       const totalPounds = kilograms * 2.2046226218;
@@ -706,6 +837,10 @@ export function OnboardingWizard({
         weightUnit: unit,
         weightPrimary: String(pounds),
         weightSecondary: String(Math.round((totalPounds - pounds) * 160) / 10),
+        targetWeight:
+          targetWeightKilograms === null
+            ? ''
+            : String(Math.round(targetWeightKilograms * 2.2046226218 * 10) / 10),
       };
     });
   }
@@ -723,6 +858,29 @@ export function OnboardingWizard({
   }
 
   const canonicalNutrition = canonicalNutritionForDraft(activeDraft);
+  const weightGoalType = nutrition.nutritionGoalType;
+  const isWeightChangeGoal = weightGoalType === 'gain' || weightGoalType === 'loss';
+  const weightTargetTimelineEstimate =
+    weightGoalType === 'gain' || weightGoalType === 'loss'
+      ? weightTargetTimeline({
+          goalType: weightGoalType,
+          currentWeightKilograms: canonicalNutrition.currentWeightKilograms,
+          targetWeightKilograms: canonicalNutrition.targetWeightKilograms,
+          pace: weightGoalPace,
+          startsOn: new Date().toISOString().slice(0, 10),
+        })
+      : null;
+  const targetWeightDirectionMismatch =
+    canonicalNutrition.currentWeightKilograms !== null &&
+    canonicalNutrition.targetWeightKilograms !== null &&
+    ((nutrition.nutritionGoalType === 'loss' &&
+      canonicalNutrition.targetWeightKilograms >= canonicalNutrition.currentWeightKilograms) ||
+      (nutrition.nutritionGoalType === 'gain' &&
+      canonicalNutrition.targetWeightKilograms <= canonicalNutrition.currentWeightKilograms));
+  const targetDateIsEarlierThanSuggested =
+    Boolean(nutrition.targetDate) &&
+    Boolean(weightTargetTimelineEstimate?.targetDate) &&
+    nutrition.targetDate < weightTargetTimelineEstimate!.targetDate;
   const goalContext = profile.goalContext ?? defaultProfileGoalContext;
 
   function setGoalContext(changes: Partial<ProfileGoalContext>) {
@@ -745,22 +903,19 @@ export function OnboardingWizard({
     if (currentStep === 'app' && !kitchenName.trim()) {
       return 'Give your kitchen a name to continue.';
     }
-    if (currentStep === 'profile' && !profile.displayName.trim()) {
-      return 'Add a display name to continue.';
-    }
-    if (currentStep === 'nutrition' && nutrition.estimatedTargetsEnabled) {
-      const required = [
-        nutrition.dateOfBirth,
-        canonicalNutrition.heightCentimeters,
-        canonicalNutrition.currentWeightKilograms,
-        nutrition.referenceSexCategory,
-        nutrition.activityLevel,
-      ];
-      if (required.some((value) => value === '' || value === null)) {
-        return 'Birthday, height, weight, formula category, and activity are required for estimates.';
+    if (currentStep === 'profile') {
+      if (!profile.displayName.trim()) return 'Add a display name to continue.';
+      const parsedCredentials = profileCredentialsSchema.safeParse(credentials);
+      if (!parsedCredentials.success) {
+        return parsedCredentials.error.issues[0]?.message ?? 'Check the profile sign-in details.';
       }
-      if (!nutrition.estimatedTargetConsent) {
-        return 'Confirm the nutrition-estimate consent before continuing.';
+    }
+    if (currentStep === 'nutrition') {
+      const parsedNutrition = onboardingNutritionSchema.safeParse(canonicalNutrition);
+      if (!parsedNutrition.success) {
+        return (
+          parsedNutrition.error.issues[0]?.message ?? 'Check the Nutrition details to continue.'
+        );
       }
     }
     return null;
@@ -820,7 +975,9 @@ export function OnboardingWizard({
 
   async function submit() {
     const canonicalDrafts = profileDrafts.map((draft) => ({
+      role: draft.role,
       profile: draft.profile,
+      credentials: draft.credentials,
       nutrition: canonicalNutritionForDraft(draft),
     }));
     const firstDraft = canonicalDrafts[0]!;
@@ -830,14 +987,16 @@ export function OnboardingWizard({
             kitchenName,
             kitchenIcon: brandIcon,
             profile: firstDraft.profile,
+            credentials: firstDraft.credentials,
             nutrition: firstDraft.nutrition,
             additionalProfiles: canonicalDrafts.slice(1),
+            firstRecipeChoice,
           }
-        : { profile, nutrition: canonicalNutrition };
+        : { role, profile, credentials, nutrition: canonicalNutrition };
     const parsed =
       mode === 'initial'
         ? setupSchema.safeParse(payload)
-        : profileOnboardingSchema.safeParse(payload);
+        : secureProfileOnboardingSchema.safeParse(payload);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Check the onboarding answers.');
       return;
@@ -855,15 +1014,53 @@ export function OnboardingWizard({
       );
       const body = (await response.json().catch(() => null)) as {
         profile?: ProfileRecord;
+        firstRecipeId?: string | null;
+        recoveryCodes?: string[] | Array<{ profileId: string; codes: string[] }>;
+        requiresEmailVerification?: boolean;
         error?: { message?: string };
       } | null;
       if (!response.ok) throw new Error(body?.error?.message ?? 'Onboarding could not be saved.');
-      if (mode === 'profile' && body?.profile) onProfileCreated?.(body.profile);
       showToast(
         mode === 'initial' ? 'Your shared kitchen is ready.' : 'Profile onboarding complete.',
         'success',
       );
-      if (mode === 'initial') router.refresh();
+      if (mode === 'initial') {
+        const destination =
+          firstRecipeChoice === 'example' && body?.firstRecipeId
+            ? `/recipes/${body.firstRecipeId}`
+            : firstRecipeChoice === 'ai'
+              ? '/capture?mode=text&onboarding=1'
+              : firstRecipeChoice === 'import'
+                ? firstRecipeImportMode === 'json'
+                  ? '/import?mode=jsonld&onboarding=1'
+                  : `/capture?mode=${firstRecipeImportMode}&onboarding=1`
+                : '/recipes/new?onboarding=1';
+        const recoveryEntries = Array.isArray(body?.recoveryCodes) ? body.recoveryCodes : [];
+        setSecurityCompletion({
+          groups: profileDrafts.map((draft, index) => {
+            const entry = recoveryEntries[index];
+            return {
+              profileName: draft.profile.displayName,
+              codes: typeof entry === 'string' ? [entry] : (entry?.codes ?? []),
+            };
+          }),
+          destination,
+          requiresEmailVerification: Boolean(body?.requiresEmailVerification),
+        });
+      } else if (body?.profile) {
+        const recoveryEntries = Array.isArray(body.recoveryCodes) ? body.recoveryCodes : [];
+        setSecurityCompletion({
+          groups: [
+            {
+              profileName: body.profile.displayName,
+              codes: recoveryEntries.filter((entry): entry is string => typeof entry === 'string'),
+            },
+          ],
+          destination: '/settings/profiles',
+          requiresEmailVerification: Boolean(body.requiresEmailVerification),
+          createdProfile: body.profile,
+        });
+      }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Onboarding could not be saved.';
       setError(message);
@@ -871,6 +1068,93 @@ export function OnboardingWizard({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function copyRecoveryCodes() {
+    if (!securityCompletion) return;
+    const text = securityCompletion.groups
+      .map((group) => `${group.profileName}\n${group.codes.map((code) => `- ${code}`).join('\n')}`)
+      .join('\n\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Recovery codes copied. Store them somewhere private.', 'success');
+    } catch {
+      showToast('Copy was unavailable. Select and save the codes manually.', 'error');
+    }
+  }
+
+  function continueAfterSecuritySetup() {
+    if (!securityCompletion || !recoveryCodesSaved) return;
+    if (mode === 'profile' && securityCompletion.createdProfile) {
+      onProfileCreated?.(securityCompletion.createdProfile);
+      return;
+    }
+    const params = new URLSearchParams({
+      setup: '1',
+      callbackUrl: securityCompletion.destination,
+    });
+    router.push(`/sign-in?${params.toString()}`);
+    router.refresh();
+  }
+
+  if (securityCompletion) {
+    return (
+      <section className="onboarding-shell onboarding-security-complete" aria-live="polite">
+        <div className="onboarding-heading">
+          <ShieldCheck size={25} aria-hidden="true" />
+          <div>
+            <p className="eyebrow">SECURITY SETUP COMPLETE</p>
+            <h2>Save your recovery codes.</h2>
+            <p>
+              Each code works once if email recovery is unavailable. Bòrd will not show these codes
+              again.
+            </p>
+          </div>
+        </div>
+        {securityCompletion.requiresEmailVerification ? (
+          <div className="setup-note" role="note">
+            <span aria-hidden="true">✦</span>
+            <p>
+              <strong>Check each profile email.</strong> Email verification is required before that
+              profile can sign in.
+            </p>
+          </div>
+        ) : null}
+        <div className="recovery-code-groups">
+          {securityCompletion.groups.map((group, index) => (
+            <section key={`${group.profileName}-${index}`} aria-labelledby={`recovery-${index}`}>
+              <h3 id={`recovery-${index}`}>{group.profileName}</h3>
+              <ul>
+                {group.codes.map((code) => (
+                  <li key={code}>
+                    <code>{code}</code>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+        <button className="secondary-button" type="button" onClick={copyRecoveryCodes}>
+          Copy all recovery codes
+        </button>
+        <label className="recovery-code-confirmation">
+          <input
+            type="checkbox"
+            checked={recoveryCodesSaved}
+            onChange={(event) => setRecoveryCodesSaved(event.target.checked)}
+          />
+          <span>I saved these one-time codes somewhere private.</span>
+        </label>
+        <button
+          className="primary-button"
+          type="button"
+          disabled={!recoveryCodesSaved}
+          onClick={continueAfterSecuritySetup}
+        >
+          {mode === 'initial' ? 'Continue to sign in' : 'Finish profile setup'}
+        </button>
+      </section>
+    );
   }
 
   return (
@@ -940,8 +1224,8 @@ export function OnboardingWizard({
                       : 'Who is joining the kitchen?'}
                 </h2>
                 <p>
-                  Profiles personalize units, history, planning, and Nutrition. They are not
-                  passwords.
+                  Profiles personalize units, history, planning, and Nutrition. Each profile has its
+                  own sign-in and a quick-switch PIN.
                 </p>
               </div>
             </div>
@@ -997,6 +1281,71 @@ export function OnboardingWizard({
                   />
                   <small>This name appears in the profile switcher and household activity.</small>
                 </label>
+                <label>
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    value={credentials.email}
+                    onChange={(event) =>
+                      setCredentials({ ...credentials, email: event.target.value })
+                    }
+                  />
+                  <small>Used for this profile&apos;s full sign-in and account recovery.</small>
+                </label>
+                <label>
+                  <span>Passphrase</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={15}
+                    maxLength={128}
+                    value={credentials.passphrase}
+                    onChange={(event) =>
+                      setCredentials({ ...credentials, passphrase: event.target.value })
+                    }
+                  />
+                  <small>Use at least 15 characters. A passphrase protects remote sign-in.</small>
+                </label>
+                <label>
+                  <span>Profile PIN</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    minLength={6}
+                    maxLength={6}
+                    value={credentials.pin}
+                    onChange={(event) =>
+                      setCredentials({
+                        ...credentials,
+                        pin: event.target.value.replace(/\D/gu, '').slice(0, 6),
+                      })
+                    }
+                  />
+                  <small>Six digits used only when switching profiles on a signed-in device.</small>
+                </label>
+                <label>
+                  <span>Access role</span>
+                  <select
+                    value={mode === 'initial' && activeProfileIndex === 0 ? 'admin' : role}
+                    disabled={mode === 'initial' && activeProfileIndex === 0}
+                    onChange={(event) => setRole(event.target.value as AppRole)}
+                  >
+                    {accessRoleOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    {mode === 'initial' && activeProfileIndex === 0
+                      ? 'The first profile is always an admin.'
+                      : accessRoleOptions.find((option) => option.value === role)?.description}
+                  </small>
+                </label>
                 <div className="onboarding-profile-type-field">
                   <span
                     className="onboarding-field-label"
@@ -1022,8 +1371,9 @@ export function OnboardingWizard({
                   </small>
                 </div>
                 <p className="onboarding-profile-type-note">
-                  Profile type changes planning and Nutrition context, not access control. Anyone on
-                  this trusted installation can switch profiles.
+                  Access role controls permissions. Profile type only changes planning and Nutrition
+                  context. A PIN can switch to an equal or lower role; moving up requires a full
+                  sign-in.
                 </p>
               </div>
             </section>
@@ -1226,7 +1576,7 @@ export function OnboardingWizard({
               />
               <RichChoiceField
                 legend="Nutrition goal"
-                helper="This sets a starting direction, not a medical recommendation."
+                helper="This saves a body-weight direction. Daily calorie and nutrient goals are a separate, optional step."
                 name={`nutrition-goal-${activeDraft.localId}`}
                 value={nutrition.nutritionGoalType}
                 options={nutritionGoalOptions}
@@ -1237,6 +1587,103 @@ export function OnboardingWizard({
                   })
                 }
               />
+              {isWeightChangeGoal ? (
+                <section className="onboarding-weight-target" aria-labelledby="weight-target-title">
+                  <div>
+                    <h4 id="weight-target-title">
+                      Choose a workable {nutrition.nutritionGoalType === 'loss' ? 'loss' : 'gain'}{' '}
+                      target
+                    </h4>
+                    <p>
+                      Start with a target weight and a pace you can revisit. This is a planning
+                      estimate, not medical advice or a calorie prescription.
+                    </p>
+                  </div>
+                  <div className="onboarding-weight-target-grid">
+                    <label>
+                      <span>Target weight ({weightUnit === 'imperial' ? 'lb' : 'kg'})</span>
+                      <input
+                        aria-label="Target weight"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.1"
+                        max={weightUnit === 'imperial' ? 2_200 : 1_000}
+                        step="0.1"
+                        value={targetWeight}
+                        onChange={(event) => setTargetWeight(event.target.value)}
+                      />
+                    </label>
+                    <fieldset>
+                      <legend>Planning pace</legend>
+                      <div className="onboarding-weight-pace-options">
+                        {(
+                          Object.entries(weightGoalPaces) as Array<
+                            [WeightGoalPace, (typeof weightGoalPaces)[WeightGoalPace]]
+                          >
+                        ).map(([pace, option]) => (
+                          <label key={pace}>
+                            <input
+                              type="radio"
+                              name={`weight-goal-pace-${activeDraft.localId}`}
+                              checked={weightGoalPace === pace}
+                              onChange={() => setWeightGoalPace(pace)}
+                            />
+                            <span>
+                              <strong>{option.label}</strong>
+                              <small>{option.description}</small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <label>
+                      <span>Target date</span>
+                      <input
+                        type="date"
+                        value={nutrition.targetDate}
+                        onChange={(event) =>
+                          setNutrition({ ...nutrition, targetDate: event.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
+                  {targetWeightDirectionMismatch ? (
+                    <p className="onboarding-weight-target-warning" role="status">
+                      {nutrition.nutritionGoalType === 'loss'
+                        ? 'For a loss goal, choose a target below the current weight.'
+                        : 'For a gain goal, choose a target above the current weight.'}
+                    </p>
+                  ) : targetDateIsEarlierThanSuggested ? (
+                    <p className="onboarding-weight-target-warning" role="status">
+                      That date is faster than the selected pace. Choose the suggested date or a
+                      later one for a more gradual plan.
+                    </p>
+                  ) : weightTargetTimelineEstimate ? (
+                    <div className="onboarding-weight-target-estimate" role="status">
+                      <span>
+                        At this pace, the{' '}
+                        {Math.round(weightTargetTimelineEstimate.changeKilograms * 10) / 10} kg
+                        change is roughly {weightTargetTimelineEstimate.weeks} weeks.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setNutrition({
+                            ...nutrition,
+                            targetDate: weightTargetTimelineEstimate.targetDate,
+                          })
+                        }
+                      >
+                        Use suggested date
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="onboarding-weight-target-hint">
+                      Add a current and target weight to see a suggested timeframe.
+                    </p>
+                  )}
+                </section>
+              ) : null}
               <RichChoiceField
                 legend="Formula category"
                 helper="Reference formulas use one of two categories. Choose the category you want used for estimates; it does not define your identity."
@@ -1468,10 +1915,128 @@ export function OnboardingWizard({
 
               <p className="onboarding-goal-privacy-note">
                 <ShieldCheck size={16} aria-hidden="true" />
-                These answers stay with this profile. Sharing them with AI is a separate, optional
-                setting and is off by default.
+                These answers personalize this household profile; profiles are not separate private
+                accounts. Sharing them with AI is a separate, optional setting and is off by
+                default.
               </p>
             </div>
+          </>
+        ) : null}
+
+        {currentStep === 'recipe' ? (
+          <>
+            <div className="onboarding-heading">
+              <BookOpen size={25} aria-hidden="true" />
+              <div>
+                <h2>Add your first recipe.</h2>
+                <p>
+                  Begin with a polished example or continue into the recipe flow that suits you.
+                </p>
+              </div>
+            </div>
+            <div
+              className="onboarding-recipe-options"
+              role="radiogroup"
+              aria-label="Choose how to create your first recipe"
+            >
+              {firstRecipeOptions.map((option) => {
+                const Icon = option.icon;
+                const selected = firstRecipeChoice === option.value;
+                return (
+                  <button
+                    className={`onboarding-recipe-option${selected ? ' selected' : ''}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    key={option.value}
+                    onClick={() => setFirstRecipeChoice(option.value)}
+                  >
+                    <span className="onboarding-recipe-option-icon" aria-hidden="true">
+                      <Icon size={20} />
+                    </span>
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                    <span className="onboarding-recipe-radio" aria-hidden="true">
+                      {selected ? <Check size={14} /> : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {firstRecipeChoice === 'example' ? (
+              <article className="onboarding-example-recipe">
+                <div className="onboarding-example-image">
+                  <Image
+                    src={SCOTTISH_STOVIES_IMAGE_PATH}
+                    alt={SCOTTISH_STOVIES_IMAGE_ALT}
+                    fill
+                    sizes="(max-width: 700px) 100vw, 360px"
+                    priority
+                  />
+                </div>
+                <div className="onboarding-example-copy">
+                  <p className="eyebrow">BÒRD STARTER RECIPE</p>
+                  <h3>{SCOTTISH_STOVIES_RECIPE.title}</h3>
+                  <p>{SCOTTISH_STOVIES_RECIPE.summary}</p>
+                  <dl>
+                    <div>
+                      <dt>Serves</dt>
+                      <dd>6</dd>
+                    </div>
+                    <div>
+                      <dt>Time</dt>
+                      <dd>1 hr 25 min</dd>
+                    </div>
+                    <div>
+                      <dt>Estimate</dt>
+                      <dd>320 kcal</dd>
+                    </div>
+                  </dl>
+                  <p className="onboarding-example-note">
+                    Includes measured ingredients, equipment, eight detailed steps, source notes,
+                    and estimated nutrition. You can edit everything later.
+                  </p>
+                </div>
+              </article>
+            ) : (
+              <>
+                {firstRecipeChoice === 'import' ? (
+                  <fieldset className="onboarding-import-methods">
+                    <legend>What are you importing?</legend>
+                    <div role="radiogroup" aria-label="Recipe import method">
+                      {[
+                        { value: 'url', label: 'From URL' },
+                        { value: 'text', label: 'Paste recipe' },
+                        { value: 'json', label: 'Paste JSON-LD' },
+                      ].map((option) => (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={firstRecipeImportMode === option.value}
+                          className={firstRecipeImportMode === option.value ? 'selected' : ''}
+                          key={option.value}
+                          onClick={() =>
+                            setFirstRecipeImportMode(option.value as 'url' | 'text' | 'json')
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
+                <div className="setup-note onboarding-recipe-follow-up" role="note">
+                  <span aria-hidden="true">✦</span>
+                  <p>
+                    <strong>Your kitchen will be created first.</strong> Then Bòrd will open the
+                    selected recipe flow with your new profile active.
+                  </p>
+                </div>
+              </>
+            )}
           </>
         ) : null}
 
@@ -1599,6 +2164,14 @@ export function OnboardingWizard({
                   configured
                 </dd>
               </div>
+              {mode === 'initial' ? (
+                <div>
+                  <dt>First recipe</dt>
+                  <dd>
+                    {firstRecipeOptions.find((option) => option.value === firstRecipeChoice)?.label}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
             <div className="setup-note" role="note">
               <span aria-hidden="true">✦</span>
@@ -1653,7 +2226,13 @@ export function OnboardingWizard({
             ) : (
               <Check size={17} />
             )}
-            {submitting ? 'Saving…' : mode === 'initial' ? 'Open the cookbook' : 'Create profile'}
+            {submitting
+              ? 'Saving…'
+              : mode === 'initial'
+                ? firstRecipeChoice === 'example'
+                  ? 'Add Stovies & open recipe'
+                  : 'Create kitchen & continue'
+                : 'Create profile'}
           </button>
         ) : (
           <button className="primary-button" type="button" onClick={next}>

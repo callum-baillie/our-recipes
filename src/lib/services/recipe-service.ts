@@ -94,6 +94,7 @@ export type RecipeDetail = RecipeRecord & {
       unit: string;
       item: string;
       note: string;
+      shoppingCategory: RecipePayload['ingredientGroups'][number]['ingredients'][number]['shoppingCategory'];
     }>;
   }>;
   instructionSections: Array<{
@@ -246,7 +247,14 @@ function readDetail(recipe: RecipeRecord, activeProfileId: string | null = null)
       name: group.name,
       ingredients: ingredients
         .filter((ingredient) => ingredient.groupId === group.id)
-        .map(({ id, quantity, unit, item, note }) => ({ id, quantity, unit, item, note })),
+        .map(({ id, quantity, unit, item, note, shoppingCategory }) => ({
+          id,
+          quantity,
+          unit,
+          item,
+          note,
+          shoppingCategory,
+        })),
     })),
     instructionSections: sections.map((section) => ({
       id: section.id,
@@ -334,6 +342,7 @@ function createGraph(
           unit: ingredient.unit,
           item: ingredient.item,
           note: ingredient.note,
+          shoppingCategory: ingredient.shoppingCategory,
         })
         .run();
       if (ingredient.pantryProductId && actorProfileId) {
@@ -1147,6 +1156,7 @@ export function recipePayloadFromDetail(recipe: RecipeDetail): RecipePayload {
         unit: ingredient.unit,
         item: ingredient.item,
         note: ingredient.note,
+        shoppingCategory: ingredient.shoppingCategory,
       })),
     })),
     instructionSections: recipe.instructionSections.map((section) => ({

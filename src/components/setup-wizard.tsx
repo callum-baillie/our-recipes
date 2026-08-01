@@ -14,7 +14,7 @@ export function SetupWizard() {
         <dl className="brand-definition" aria-label="Bòrd definition">
           <div>
             <dt>bòrd</dt>
-            <dd>Scottish Gaelic</dd>
+            <dd>Scottish Gaelic · noun</dd>
           </div>
           <div>
             <dt>English translation</dt>
@@ -28,7 +28,7 @@ export function SetupWizard() {
           <p>
             Bòrd is a recipe keeper, a meal planner, a nutritional advisor, a grocery store helper.
           </p>
-          <p>Our goal is to make life easier and get everyone to the table.</p>
+          <p>Our goal is to make it easier to bring families around the table.</p>
         </div>
       </section>
       <OnboardingWizard mode="initial" />

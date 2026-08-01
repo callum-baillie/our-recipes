@@ -112,6 +112,7 @@
 .page {
   min-height: calc(100dvh - 5rem);
   padding: 0 clamp(1rem, 5vw, 6rem) clamp(4rem, 7vw, 7rem);
+  overflow-anchor: none;
 }
 
 .pageInner {

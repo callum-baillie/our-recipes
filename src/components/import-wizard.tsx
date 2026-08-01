@@ -167,7 +167,7 @@ function StoredImportPreview({
   );
 }
 
-export function ImportWizard() {
+export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' | 'jsonld' }) {
   const { showToast } = useToast();
   const [preparation, setPreparation] = useState<FilePreparation>(EMPTY_PREPARATION);
   const [transcription, setTranscription] = useState('');
@@ -640,35 +640,41 @@ export function ImportWizard() {
         </div>
       </aside>
       <div className="import-options">
-        <ImportUploadPanel
-          phase={preparation.phase}
-          items={items}
-          inputRef={fileInputRef}
-          error={error}
-          transcription={transcription}
-          autoOpenAiVision={autoOpenAiVision}
-          aiImprove={aiImprove}
-          canUseVision={hasOnlyImageScans}
-          willUseVision={shouldAutoOpenAiVision}
-          canRetryPreparation={preparation.canRetry}
-          previewsReady={previewsReady}
-          onInputClick={prepareForFilePicker}
-          onFileInput={handleFileInput}
-          onChooseFiles={openFilePicker}
-          onDropFiles={(selected) => {
-            lastSelectionSignatureRef.current = fileSelectionSignature(selected);
-            void prepareFiles(selected);
-          }}
-          onRemoveFile={removeFile}
-          onPreviewReady={markPreviewReady}
-          onPreviewError={handlePreviewError}
-          onRetry={() => void prepareFiles(preparation.sourceFiles)}
-          onPrimaryAction={() => void createDraft()}
-          onTranscriptionChange={setTranscription}
-          onVisionChange={setAutoOpenAiVision}
-          onImproveChange={setAiImprove}
-        />
-        <JsonLdImportWizard collapsedByDefault />
+        {initialMode === 'jsonld' ? (
+          <JsonLdImportWizard autoFocus />
+        ) : (
+          <>
+            <ImportUploadPanel
+              phase={preparation.phase}
+              items={items}
+              inputRef={fileInputRef}
+              error={error}
+              transcription={transcription}
+              autoOpenAiVision={autoOpenAiVision}
+              aiImprove={aiImprove}
+              canUseVision={hasOnlyImageScans}
+              willUseVision={shouldAutoOpenAiVision}
+              canRetryPreparation={preparation.canRetry}
+              previewsReady={previewsReady}
+              onInputClick={prepareForFilePicker}
+              onFileInput={handleFileInput}
+              onChooseFiles={openFilePicker}
+              onDropFiles={(selected) => {
+                lastSelectionSignatureRef.current = fileSelectionSignature(selected);
+                void prepareFiles(selected);
+              }}
+              onRemoveFile={removeFile}
+              onPreviewReady={markPreviewReady}
+              onPreviewError={handlePreviewError}
+              onRetry={() => void prepareFiles(preparation.sourceFiles)}
+              onPrimaryAction={() => void createDraft()}
+              onTranscriptionChange={setTranscription}
+              onVisionChange={setAutoOpenAiVision}
+              onImproveChange={setAiImprove}
+            />
+            <JsonLdImportWizard collapsedByDefault />
+          </>
+        )}
       </div>
     </section>
   );

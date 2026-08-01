@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { brandIconIdSchema, DEFAULT_BRAND_ICON } from '@/lib/appearance';
 import { DEFAULT_KITCHEN_NAME, legacyKitchenName } from '@/lib/brand';
+import { profileCredentialsSchema } from '@/lib/domain/auth';
+import { appRoleSchema } from '@/lib/domain/permissions';
 import { defaultProfileGoalContext, profileGoalContextSchema } from '@/lib/domain/profile-goals';
 
 const safeText = z.string().trim().min(1).max(80);
@@ -82,7 +84,7 @@ export function onboardingWeightKilograms(
 
 export const onboardingNutritionSchema = z
   .object({
-    profileType: z.enum(['adult', 'dependent', 'guest']).default('adult'),
+    profileType: z.enum(['adult', 'dependent']).default('adult'),
     dateOfBirth: optionalDate.default(''),
     heightCentimeters: optionalPositive(300).default(null),
     currentWeightKilograms: optionalPositive(1_000).default(null),
@@ -92,6 +94,8 @@ export const onboardingNutritionSchema = z
       .nullable()
       .default(null),
     nutritionGoalType: z.enum(['none', 'maintain', 'gain', 'loss', 'custom']).default('none'),
+    targetWeightKilograms: optionalPositive(1_000).default(null),
+    targetDate: optionalDate.default(''),
     dietaryPreferences: normalizedList.default([]),
     foodAllergies: normalizedList.default([]),
     dietaryExclusions: normalizedList.default([]),
@@ -101,6 +105,39 @@ export const onboardingNutritionSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (
+      (value.nutritionGoalType === 'gain' || value.nutritionGoalType === 'loss') &&
+      value.targetWeightKilograms !== null
+    ) {
+      if (value.currentWeightKilograms === null) {
+        context.addIssue({
+          code: 'custom',
+          path: ['currentWeightKilograms'],
+          message: 'Enter a current weight before setting a weight target.',
+        });
+      } else if (
+        (value.nutritionGoalType === 'loss' &&
+          value.targetWeightKilograms >= value.currentWeightKilograms) ||
+        (value.nutritionGoalType === 'gain' &&
+          value.targetWeightKilograms <= value.currentWeightKilograms)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['targetWeightKilograms'],
+          message:
+            value.nutritionGoalType === 'loss'
+              ? 'Choose a target below the current weight for a loss goal.'
+              : 'Choose a target above the current weight for a gain goal.',
+        });
+      }
+    }
+    if (value.targetDate && value.targetWeightKilograms === null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targetWeightKilograms'],
+        message: 'Choose a target weight before adding a target date.',
+      });
+    }
     if (!value.estimatedTargetsEnabled) return;
     if (!value.estimatedTargetConsent) {
       context.addIssue({
@@ -130,19 +167,26 @@ export const profileOnboardingSchema = z
   .object({
     profile: profileInputSchema,
     nutrition: onboardingNutritionSchema,
+    role: appRoleSchema.default('parent'),
   })
   .strict();
+
+export const secureProfileOnboardingSchema = profileOnboardingSchema.extend({
+  credentials: profileCredentialsSchema.optional(),
+});
 
 const canonicalSetupSchema = z
   .object({
     kitchenName: safeText.default(DEFAULT_KITCHEN_NAME),
     kitchenIcon: brandIconIdSchema.default(DEFAULT_BRAND_ICON),
     profile: profileInputSchema,
+    credentials: profileCredentialsSchema.optional(),
     nutrition: onboardingNutritionSchema.optional(),
-    additionalProfiles: profileOnboardingSchema
+    additionalProfiles: secureProfileOnboardingSchema
       .array()
       .max(11, 'You can create up to 12 profiles during setup.')
       .default([]),
+    firstRecipeChoice: z.enum(['example', 'ai', 'import', 'manual']).default('manual'),
   })
   .strict();
 
@@ -163,6 +207,7 @@ const legacySetupSchema = z
     ...rest,
     kitchenName: legacyKitchenName(appName, householdName),
     kitchenIcon: brandIcon ?? DEFAULT_BRAND_ICON,
+    firstRecipeChoice: 'manual' as const,
   }));
 
 export const setupSchema = z.union([canonicalSetupSchema, legacySetupSchema]);
@@ -190,7 +235,9 @@ export const householdSettingsSchema = z.union([
 
 export type ProfileInput = z.infer<typeof profileInputSchema>;
 export type ProfileOnboardingInput = z.infer<typeof profileOnboardingSchema>;
+export type SecureProfileOnboardingInput = z.infer<typeof secureProfileOnboardingSchema>;
 export type SetupInput = z.input<typeof setupSchema>;
+export type FirstRecipeChoice = 'example' | 'ai' | 'import' | 'manual';
 export type OnboardingNutritionInput = z.infer<typeof onboardingNutritionSchema>;
 export type HouseholdSettingsInput = z.input<typeof householdSettingsSchema>;
 
@@ -214,6 +261,8 @@ export const defaultOnboardingNutrition: OnboardingNutritionInput = {
   referenceSexCategory: null,
   activityLevel: null,
   nutritionGoalType: 'none',
+  targetWeightKilograms: null,
+  targetDate: '',
   dietaryPreferences: [],
   foodAllergies: [],
   dietaryExclusions: [],

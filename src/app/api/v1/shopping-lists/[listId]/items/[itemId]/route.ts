@@ -1,9 +1,8 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
 import { shoppingListItemSchema } from '@/lib/domain/planning';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   PlanningNotFoundError,
   removeShoppingListItem,
@@ -16,18 +15,21 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ listId: string; itemId: string }> },
 ) {
-  if (!hasTrustedMutationOrigin(request))
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  const authorization = await authorizeApi(request, 'shoppingLists', 'update');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   const parsed = shoppingListItemSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return jsonError(400, 'invalid_list_item', 'Check the shopping item details.');
   try {
     const { listId, itemId } = await context.params;
-    updateShoppingListItem(listId, itemId, parsed.data, actor.profileId);
-    return NextResponse.json({ ok: true });
+    updateShoppingListItem(listId, itemId, parsed.data, authorization.principal.profileId);
+    return withApiRequestId(NextResponse.json({ ok: true }), authorization.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
       return jsonError(404, 'shopping_item_not_found', error.message);
@@ -39,12 +41,18 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ listId: string; itemId: string }> },
 ) {
-  if (!hasTrustedMutationOrigin(request))
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
+  const authorization = await authorizeApi(request, 'shoppingLists', 'delete');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   try {
     const { listId, itemId } = await context.params;
     removeShoppingListItem(listId, itemId);
-    return new NextResponse(null, { status: 204 });
+    return withApiRequestId(new NextResponse(null, { status: 204 }), authorization.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
       return jsonError(404, 'shopping_item_not_found', error.message);

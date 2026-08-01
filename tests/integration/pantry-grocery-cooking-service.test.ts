@@ -24,9 +24,11 @@ import { pantryBatchInputSchema, pantryProductInputSchema } from '@/lib/domain/p
 import { completeSetup } from '@/lib/services/household-service';
 import {
   confirmCookSessionWithPantry,
+  formatMealPlanShoppingListName,
   generatePantryShortageList,
   getCookSessionPantryPreview,
   intakePurchasedShoppingItem,
+  matchShoppingItemToPantryProduct,
   updateShoppingItemPantryControl,
   undoCookSessionPantry,
 } from '@/lib/services/pantry-grocery-cooking-service';
@@ -40,10 +42,21 @@ import {
   applyPantryBatchAction,
   previewPantryProductConsumption,
 } from '@/lib/services/pantry-service';
-import { getShoppingList, updateShoppingListItem } from '@/lib/services/planning-service';
+import {
+  getShoppingList,
+  listShoppingLists,
+  manageShoppingList,
+  updateShoppingListItem,
+} from '@/lib/services/planning-service';
 import { startCookSession } from '@/lib/services/cooking-service';
 
 describe('Pantry grocery and cooking service', () => {
+  it('formats meal-plan shopping list names for shoppers', () => {
+    expect(formatMealPlanShoppingListName('2027-04-03', '2027-04-09')).toBe(
+      'Meal Plan 04/03 - 04/09',
+    );
+  });
+
   let profileId: string;
   let locationId: string;
   let productId: string;
@@ -225,6 +238,76 @@ describe('Pantry grocery and cooking service', () => {
     });
   });
 
+  it('restores an archived durable list when the same plan is regenerated', () => {
+    const generated = generatePantryShortageList(
+      { weekStart: '2027-04-01', weekEnd: '2027-04-07' },
+      profileId,
+    );
+    manageShoppingList(generated.listId, { action: 'archive' }, profileId);
+    expect(listShoppingLists().some((list) => list.id === generated.listId)).toBe(false);
+
+    const regenerated = generatePantryShortageList(
+      { weekStart: '2027-04-01', weekEnd: '2027-04-07' },
+      profileId,
+    );
+
+    expect(regenerated).toMatchObject({ listId: generated.listId, restored: true });
+    expect(getShoppingList(generated.listId)?.archivedAt).toBeNull();
+    expect(listShoppingLists().some((list) => list.id === generated.listId)).toBe(true);
+  });
+
+  it('combines singular and plural unmapped ingredients without inventing a Pantry shortage', () => {
+    const pluralIngredientId = '00000000-0000-4000-8000-000000000105';
+    getDatabase()
+      .delete(recipeIngredientProductMappings)
+      .where(sql`${recipeIngredientProductMappings.recipeIngredientId} = ${ingredientId}`)
+      .run();
+    getDatabase()
+      .update(recipeIngredients)
+      .set({ quantity: 1, unit: 'each', item: 'tomato', note: 'diced' })
+      .where(sql`${recipeIngredients.id} = ${ingredientId}`)
+      .run();
+    getDatabase()
+      .insert(recipeIngredients)
+      .values({
+        id: pluralIngredientId,
+        recipeId,
+        groupId,
+        position: 1,
+        quantity: 2,
+        unit: 'each',
+        item: 'tomatoes',
+        note: 'for garnish',
+      })
+      .run();
+
+    const generated = generatePantryShortageList(
+      { weekStart: '2027-04-01', weekEnd: '2027-04-07' },
+      profileId,
+    );
+    const items = getShoppingList(generated.listId)!.items;
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      item: 'tomato',
+      quantity: null,
+      unit: 'each',
+      pantry: {
+        demandState: 'uncertain',
+        generatedQuantity: null,
+        shortageQuantity: null,
+      },
+    });
+    expect(JSON.parse(items[0]!.pantry!.formulaInputs)).toMatchObject({
+      requiredQuantity: 3,
+      shortageQuantity: null,
+      contributions: [
+        expect.objectContaining({ ingredientName: 'tomato', contributionQuantity: 1 }),
+        expect.objectContaining({ ingredientName: 'tomatoes', contributionQuantity: 2 }),
+      ],
+    });
+  });
+
   it('persists null uncertain shortages with complete meal and formula provenance', () => {
     createPantryBatch(
       pantryBatchInputSchema.parse({
@@ -258,6 +341,37 @@ describe('Pantry grocery and cooking service', () => {
           contributionQuantity: 200,
         },
       ],
+    });
+  });
+
+  it('persists a shopping-row Pantry match back to contributing recipe ingredients', () => {
+    getDatabase().delete(recipeIngredientProductMappings).run();
+    const generated = generatePantryShortageList(
+      { weekStart: '2027-04-01', weekEnd: '2027-04-07' },
+      profileId,
+    );
+    const item = getShoppingList(generated.listId)!.items[0]!;
+    expect(item.pantry?.productId).toBeNull();
+
+    const detail = matchShoppingItemToPantryProduct(
+      generated.listId,
+      item.id,
+      { productId, matchType: 'exact' },
+      profileId,
+    );
+
+    expect(detail.productId).toBe(productId);
+    expect(
+      getDatabase()
+        .select()
+        .from(recipeIngredientProductMappings)
+        .where(sql`${recipeIngredientProductMappings.recipeIngredientId} = ${ingredientId}`)
+        .get(),
+    ).toMatchObject({
+      recipeIngredientId: ingredientId,
+      productId,
+      matchType: 'exact',
+      mappedByProfileId: profileId,
     });
   });
 

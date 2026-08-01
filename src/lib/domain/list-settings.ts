@@ -1,6 +1,213 @@
 import { z } from 'zod';
 
+import { shoppingItemIdentity } from '@/lib/domain/shopping-item-identity';
+
 const boundedText = (maximum: number) => z.string().trim().max(maximum);
+
+export const SHOPPING_CATEGORIES = [
+  'Fresh produce',
+  'Bakery',
+  'Meat & seafood',
+  'Deli & chilled',
+  'Dairy & eggs',
+  'Frozen',
+  'Canned & jarred',
+  'Dry goods & grains',
+  'Baking',
+  'Herbs & spices',
+  'Sauces & condiments',
+  'Snacks',
+  'Drinks',
+  'Household',
+  'Other',
+] as const;
+
+export const shoppingCategorySchema = z.enum(SHOPPING_CATEGORIES);
+export type ShoppingCategory = z.infer<typeof shoppingCategorySchema>;
+
+export const DEFAULT_SUPERMARKET_SECTIONS = [
+  {
+    name: 'Fresh produce',
+    matchTerms: [
+      'fresh produce',
+      'fruit',
+      'vegetable',
+      'vegetables',
+      'berries',
+      'potato',
+      'celery',
+      'onion',
+      'garlic',
+      'ginger',
+      'tomato',
+      'peach',
+      'pear',
+      'orange',
+      'lemon',
+      'lime',
+      'leafy greens',
+      'salad',
+      'fresh herbs',
+      'parsley',
+      'cilantro',
+      'coriander',
+    ],
+  },
+  {
+    name: 'Bakery',
+    matchTerms: ['bakery', 'bread', 'rolls', 'buns', 'bagels', 'pita', 'tortilla', 'croissant'],
+  },
+  {
+    name: 'Meat & seafood',
+    matchTerms: [
+      'meat',
+      'seafood',
+      'chicken',
+      'turkey',
+      'beef',
+      'pork',
+      'lamb',
+      'sausage',
+      'bacon',
+      'fish',
+      'salmon',
+      'tuna',
+      'shrimp',
+      'prawn',
+    ],
+  },
+  {
+    name: 'Deli & chilled',
+    matchTerms: ['deli', 'chilled', 'tofu', 'hummus', 'fresh pasta', 'prepared food'],
+  },
+  {
+    name: 'Dairy & eggs',
+    matchTerms: [
+      'dairy',
+      'eggs',
+      'milk',
+      'cheese',
+      'cheddar',
+      'mozzarella',
+      'yogurt',
+      'yoghurt',
+      'butter',
+      'cream',
+      'half and half',
+      'custard',
+    ],
+  },
+  {
+    name: 'Frozen',
+    matchTerms: ['frozen', 'ice cream', 'frozen fruit', 'frozen vegetables'],
+  },
+  {
+    name: 'Canned & jarred',
+    matchTerms: [
+      'canned',
+      'tinned',
+      'jarred',
+      'beans',
+      'chickpeas',
+      'canned tomatoes',
+      'crushed tomatoes',
+      'diced tomatoes',
+      'tomato paste',
+      'coconut milk',
+      'stock',
+      'broth',
+    ],
+  },
+  {
+    name: 'Dry goods & grains',
+    matchTerms: [
+      'dry goods',
+      'grains',
+      'rice',
+      'pasta',
+      'noodles',
+      'oats',
+      'cereal',
+      'granola',
+      'lentils',
+      'quinoa',
+      'couscous',
+      'seeds',
+      'nuts',
+      'pecans',
+      'peanut butter',
+    ],
+  },
+  {
+    name: 'Baking',
+    matchTerms: [
+      'baking',
+      'flour',
+      'sugar',
+      'baking powder',
+      'baking soda',
+      'yeast',
+      'vanilla',
+      'cocoa',
+      'chocolate chips',
+    ],
+  },
+  {
+    name: 'Herbs & spices',
+    matchTerms: [
+      'herbs',
+      'spices',
+      'salt',
+      'pepper',
+      'oregano',
+      'paprika',
+      'cumin',
+      'cinnamon',
+      'chili powder',
+      'seasoning',
+    ],
+  },
+  {
+    name: 'Sauces & condiments',
+    matchTerms: [
+      'sauces',
+      'condiments',
+      'olive oil',
+      'cooking oil',
+      'vinegar',
+      'salsa',
+      'mustard',
+      'ketchup',
+      'mayonnaise',
+      'soy sauce',
+      'hot sauce',
+      'pesto',
+      'honey',
+      'maple syrup',
+    ],
+  },
+  {
+    name: 'Snacks',
+    matchTerms: ['snacks', 'crisps', 'chips', 'crackers', 'popcorn', 'sweets', 'candy'],
+  },
+  {
+    name: 'Drinks',
+    matchTerms: ['drinks', 'beverages', 'coffee', 'tea', 'juice', 'soda', 'water', 'wine', 'beer'],
+  },
+  {
+    name: 'Household',
+    matchTerms: [
+      'household',
+      'cleaning',
+      'paper towels',
+      'toilet paper',
+      'dish soap',
+      'foil',
+      'baking paper',
+      'trash bags',
+    ],
+  },
+] as const;
 
 export const completedItemsBehaviorSchema = z.enum(['completed_section', 'hide', 'in_place']);
 
@@ -69,5 +276,24 @@ export function shoppingTextMatchesTerm(value: string, term: string): boolean {
   const normalizedValue = normalizeShoppingMatchText(value);
   const normalizedTerm = normalizeShoppingMatchText(term);
   if (!normalizedValue || !normalizedTerm) return false;
-  return ` ${normalizedValue} `.includes(` ${normalizedTerm} `);
+  if (` ${normalizedValue} `.includes(` ${normalizedTerm} `)) return true;
+  const identityValue = shoppingItemIdentity(normalizedValue);
+  const identityTerm = shoppingItemIdentity(normalizedTerm);
+  return Boolean(
+    identityValue && identityTerm && ` ${identityValue} `.includes(` ${identityTerm} `),
+  );
+}
+
+export function inferShoppingCategory(value: string): ShoppingCategory {
+  const matches = DEFAULT_SUPERMARKET_SECTIONS.flatMap((section, position) =>
+    [section.name, ...section.matchTerms].flatMap((term) =>
+      shoppingTextMatchesTerm(value, term)
+        ? [{ category: section.name as ShoppingCategory, specificity: term.length, position }]
+        : [],
+    ),
+  );
+  matches.sort(
+    (left, right) => right.specificity - left.specificity || left.position - right.position,
+  );
+  return matches[0]?.category ?? 'Other';
 }

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createBackup,
+  getBackupStorageStatus,
   listBackups,
   previewBackup,
   restoreBackup,
@@ -16,6 +17,7 @@ import { createRecipe, getRecipe } from '@/lib/services/recipe-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
 
 const backupDataDirectory = resolve(process.cwd(), '.test-data/backup-recovery');
+const dedicatedBackupDirectory = resolve(process.cwd(), '.test-data/backup-destination');
 
 describe('backup and recovery', () => {
   beforeEach(() => {
@@ -29,6 +31,7 @@ describe('backup and recovery', () => {
   afterEach(() => {
     resetDatabaseForTests();
     rmSync(backupDataDirectory, { recursive: true, force: true });
+    rmSync(dedicatedBackupDirectory, { recursive: true, force: true });
     vi.unstubAllEnvs();
   });
 
@@ -125,4 +128,55 @@ describe('backup and recovery', () => {
 
     await expect(previewBackup(backup.id)).rejects.toThrow('backup could not be validated safely');
   });
+
+  it('keeps dedicated backup storage outside a restored data-root swap', async () => {
+    vi.stubEnv('BACKUP_DIR', './.test-data/backup-destination');
+    const profile = completeSetup({
+      householdName: 'Sunday suppers',
+      appName: 'Our Recipes',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'imperial',
+        temperatureUnit: 'F',
+        locale: 'en-US',
+        timezone: 'America/Los_Angeles',
+      },
+    }).profiles[0]!;
+    const backup = await createBackup();
+
+    expect(getBackupStorageStatus()).toMatchObject({
+      directory: dedicatedBackupDirectory,
+      location: 'dedicated',
+      intervalHours: 24,
+      retentionDays: 30,
+    });
+    expect(existsSync(resolve(dedicatedBackupDirectory, `${backup.id}.tar.gz`))).toBe(true);
+    expect(existsSync(resolve(backupDataDirectory, 'backups'))).toBe(false);
+
+    createRecipe(
+      {
+        title: 'Removed by dedicated restore',
+        summary: '',
+        servings: '1 serving',
+        prepMinutes: 1,
+        cookMinutes: 1,
+        sourceName: '',
+        sourceUrl: '',
+        tags: [],
+        ingredientGroups: [
+          { name: '', ingredients: [{ quantity: 1, unit: '', item: 'bread', note: '' }] },
+        ],
+        instructionSections: [{ title: '', steps: ['Toast.'] }],
+      },
+      profile.id,
+    );
+
+    const restored = await restoreBackup(backup.id);
+    expect(restored.safetyBackup.manifest.reason).toBe('pre-restore');
+    expect((await listBackups()).length).toBeGreaterThanOrEqual(2);
+    expect(existsSync(resolve(dedicatedBackupDirectory, `${backup.id}.tar.gz`))).toBe(true);
+    expect(existsSync(resolve(backupDataDirectory, 'backups'))).toBe(false);
+  }, 20_000);
 });

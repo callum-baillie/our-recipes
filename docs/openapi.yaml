@@ -1,17 +1,24 @@
 openapi: 3.1.0
 info:
-  title: Our Recipes API
-  version: 1.0.0-rc.1
-  description: Trusted-household self-hosted API. Profiles are convenience identity, not authentication or access control.
+  title: Bord API
+  version: 1.0.0-rc.2
+  description: >-
+    Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
+    Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
+    Lists, Collections, and Pantry integration resources and are checked against per-resource
+    read/create/update/delete scopes. Household profiles remain convenience identity inside an
+    authenticated account and are not an authorization boundary.
   license:
     name: Private household use — see repository license decision before redistribution
     identifier: LicenseRef-Proprietary
 servers:
   - url: /api/v1
-security: []
+security:
+  - SessionCookie: []
 paths:
   /health:
     get:
+      security: []
       operationId: getHealth
       summary: Report application readiness
       responses:
@@ -24,7 +31,7 @@ paths:
                 required: [status, version, schemaVersion, migrationStatus, setupComplete]
                 properties:
                   status: { type: string, enum: [ok, error] }
-                  version: { type: string, example: 1.0.0-rc.1 }
+                  version: { type: string, example: 1.0.0-rc.2 }
                   schemaVersion: { type: string, example: 0038_meal_plan_ingredient_snapshots }
                   migrationStatus: { type: string, enum: [current, incomplete] }
                   setupComplete: { type: boolean }
@@ -180,6 +187,7 @@ paths:
         '503': { description: OpenAI is not configured on this server }
   /setup:
     post:
+      security: []
       operationId: completeSetup
       summary: Create the household and first profile
       requestBody:
@@ -192,6 +200,31 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Household already exists }
+  /auth/enroll:
+    post:
+      security: []
+      operationId: enrollExistingHouseholdAuthentication
+      summary: Complete the one-time credential upgrade for an existing household
+      description: >-
+        Available only while a household exists without authentication. Every active profile must
+        receive a unique email, a passphrase of at least 15 characters, and a six-digit PIN.
+        Recovery codes are returned once.
+      responses:
+        '201': { description: All active profiles enrolled and one-time recovery codes returned }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Authentication is already configured or profiles do not match }
+  /auth/recover:
+    post:
+      security: []
+      operationId: recoverAccountWithCode
+      summary: Replace a passphrase using one unused recovery code
+      description: Successful recovery consumes the code and invalidates existing sessions.
+      responses:
+        '200': { description: Passphrase replaced and active sessions invalidated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '429': { description: Recovery attempts are rate-limited }
   /settings:
     patch:
       operationId: updateHouseholdSettings
@@ -229,7 +262,7 @@ paths:
   /profiles/{profileId}/active:
     patch:
       operationId: setActiveProfile
-      summary: Select the active non-auth profile
+      summary: Switch the active household profile after verifying its six-digit PIN
       parameters:
         - name: profileId
           in: path
@@ -237,8 +270,11 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200': { description: Active profile cookie set }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: Authentication or profile PIN is invalid }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Profile not found }
+        '429': { description: PIN attempts are temporarily locked }
   /profiles/{profileId}:
     parameters:
       - name: profileId
@@ -341,6 +377,8 @@ paths:
         '404': { description: Source tag not found }
   /collections:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.read
       operationId: listCollections
       summary: List manually ordered household collections with optional local-photo covers
       responses:
@@ -348,8 +386,12 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Collection storage is unavailable }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.create
       operationId: createCollection
       summary: Create a curated household collection
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
@@ -381,12 +423,16 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.read
       operationId: getCollection
       summary: Read one collection with its ordered recipes and selectable saved-photo covers
       responses:
         '200': { description: Collection detail }
         '404': { description: Collection not found }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.update
       operationId: updateCollection
       summary: Update collection details or choose a cover from one of its saved recipe photos
       requestBody:
@@ -401,6 +447,8 @@ paths:
         '404': { description: Collection not found }
         '409': { description: Active profile is missing or collection name conflicts }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.delete
       operationId: deleteCollection
       summary: Remove a collection without deleting any recipe or photo
       responses:
@@ -409,6 +457,8 @@ paths:
         '404': { description: Collection not found }
   /collections/{collectionId}/recipes:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.create
       operationId: addRecipeToCollection
       summary: Add one recipe to the end of a collection if it is not already present
       parameters:
@@ -429,6 +479,8 @@ paths:
         '404': { description: Collection not found }
         '409': { description: Active profile is missing }
     put:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.update
       operationId: replaceCollectionRecipes
       summary: Replace a collection’s ordered recipe membership
       parameters:
@@ -447,8 +499,26 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Collection not found }
         '409': { description: Active profile is missing }
+  /collections/bulk:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: collections.read
+      operationId: exportCollectionsBulk
+      summary: Stream a bounded snapshot of all collections and their recipe memberships
+      parameters:
+        - { $ref: '#/components/parameters/UpdatedSince' }
+      responses:
+        '200':
+          description: Snapshot metadata followed by one collection per NDJSON line
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /recipes:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: recipes.read
       operationId: listRecipes
       summary: Search a paginated, lifecycle-aware shared recipe library
       parameters:
@@ -503,8 +573,12 @@ paths:
         '200': { description: Recipe cards }
         '400': { description: Invalid search query }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: recipes.create
       operationId: createRecipe
       summary: Create a structured recipe and first revision
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
@@ -522,12 +596,16 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: recipes.read
       operationId: getRecipe
       summary: Read a structured recipe card and revision metadata
       responses:
         '200': { description: Recipe card }
         '404': { description: Recipe not found }
     put:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: recipes.update
       operationId: updateRecipe
       summary: Replace the current recipe card and append a revision when its expected revision matches
       requestBody:
@@ -541,6 +619,38 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Recipe not found }
         '409': { description: Profile selection required or recipe revision conflict }
+    delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: recipes.delete
+      operationId: trashRecipe
+      summary: Move a recipe to trash while preserving its revision history
+      parameters:
+        - name: expectedRevision
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Recipe moved to trash as a new revision }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { description: Recipe not found }
+        '409': { description: Recipe revision conflict }
+  /recipes/bulk:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: recipes.read
+      operationId: exportRecipesBulk
+      summary: Stream a bounded snapshot of complete recipes
+      parameters:
+        - { $ref: '#/components/parameters/UpdatedSince' }
+        - { $ref: '#/components/parameters/IncludeInactive' }
+      responses:
+        '200':
+          description: Snapshot metadata followed by one complete recipe per NDJSON line
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /recipes/{recipeId}/tags:
     parameters:
       - name: recipeId
@@ -815,14 +925,20 @@ paths:
         '503': { description: OpenAI is not configured on this server }
   /meal-plan:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: mealPlans.read
       operationId: listMealPlan
       summary: Read planned meals for an inclusive date range
       responses:
         '200': { description: Planned meals }
         '400': { description: Invalid week range }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: mealPlans.create
       operationId: addMealPlanEntry
       summary: Add an existing recipe to a date and meal
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       responses:
         '201': { description: Planned meal created }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -833,7 +949,17 @@ paths:
         in: path
         required: true
         schema: { type: string, format: uuid }
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: mealPlans.read
+      operationId: getMealPlanEntry
+      summary: Read one planned meal
+      responses:
+        '200': { description: Planned meal }
+        '404': { description: Planned meal not found }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: mealPlans.delete
       operationId: deleteMealPlanEntry
       summary: Remove one planned recipe or free-form meal
       responses:
@@ -841,8 +967,10 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Planned meal not found }
     patch:
-      operationId: updateMealPlanEntryStatus
-      summary: Mark a meal planned, skipped, or cancelled; cooked remains derived
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: mealPlans.update
+      operationId: updateMealPlanEntry
+      summary: Update a planned meal or mark it planned, skipped, or cancelled
       requestBody:
         required: true
         content:
@@ -859,6 +987,22 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Planned meal not found }
         '409': { description: Active profile selection required }
+  /meal-plan/bulk:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: mealPlans.read
+      operationId: exportMealPlanBulk
+      summary: Stream a bounded snapshot of all planned meals
+      parameters:
+        - { $ref: '#/components/parameters/UpdatedSince' }
+      responses:
+        '200':
+          description: Snapshot metadata followed by one planned meal per NDJSON line
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /meal-plan/swap:
     post:
       operationId: swapMealPlanEntries
@@ -899,14 +1043,54 @@ paths:
         '400': { description: Invalid week range }
   /shopping-lists:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.read
       operationId: listShoppingLists
       summary: List previously generated editable shopping lists
       responses:
         '200': { description: Shopping lists }
         '400': { description: Invalid request }
     post:
-      operationId: generateShoppingList
-      summary: Generate a new editable list from a plan week
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.create
+      operationId: createOrGenerateShoppingList
+      summary: Create a manual list or generate a Pantry-aware list from a plan week
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [kind, name]
+                  properties:
+                    kind: { type: string, const: manual }
+                    name: { type: string, minLength: 1, maxLength: 120 }
+                - type: object
+                  additionalProperties: false
+                  required: [kind, weekStart, weekEnd]
+                  properties:
+                    kind: { type: string, const: planner }
+                    weekStart: { type: string, format: date }
+                    weekEnd: { type: string, format: date }
+                    sourceMode:
+                      { type: string, enum: [pantry_missing, pantry_all], default: pantry_all }
+                - type: object
+                  description: Backward-compatible untagged manual request
+                  additionalProperties: false
+                  required: [name]
+                  properties:
+                    name: { type: string, minLength: 1, maxLength: 120 }
+                - type: object
+                  description: Backward-compatible untagged planner request using pantry_all
+                  additionalProperties: false
+                  required: [weekStart, weekEnd]
+                  properties:
+                    weekStart: { type: string, format: date }
+                    weekEnd: { type: string, format: date }
       responses:
         '201': { description: Shopping list created }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
@@ -1022,12 +1206,16 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.read
       operationId: getShoppingList
       summary: Read an editable list with household aisle definitions in saved order
       responses:
         '200': { description: Shopping list and aisle catalog }
         '404': { description: Shopping list not found }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.update
       operationId: reorderShoppingListItems
       summary: Replace the complete explicit order for the current list items
       responses:
@@ -1035,6 +1223,14 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: List changed since it was read }
+    delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.delete
+      operationId: deleteShoppingList
+      summary: Delete a shopping list unless Pantry history requires retaining it
+      responses:
+        '204': { description: Shopping list removed }
+        '409': { description: Historical Pantry references require archiving instead }
   /shopping-lists/{listId}/items:
     parameters:
       - name: listId
@@ -1042,6 +1238,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.create
       operationId: addShoppingListItem
       summary: Add a bounded manual item with an optional household aisle assignment
       responses:
@@ -1089,6 +1287,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.update
       operationId: updateShoppingListItem
       summary: Edit, check, or reassign one shopping-list item
       responses:
@@ -1097,12 +1297,31 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Shopping item not found }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.delete
       operationId: deleteShoppingListItem
       summary: Remove one shopping-list item
       responses:
         '204': { description: Shopping item removed }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Shopping item not found }
+  /shopping-lists/bulk:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.read
+      operationId: exportShoppingListsBulk
+      summary: Stream a bounded snapshot of shopping lists with their items
+      parameters:
+        - { $ref: '#/components/parameters/UpdatedSince' }
+        - { $ref: '#/components/parameters/IncludeInactive' }
+      responses:
+        '200':
+          description: Snapshot metadata followed by one shopping list per NDJSON line
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /shopping-lists/{listId}/items/{itemId}/pantry-intake:
     parameters:
       - name: listId
@@ -1189,6 +1408,36 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Generated shopping item not found }
+  /shopping-lists/{listId}/items/{itemId}/pantry-match:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: matchShoppingItemToPantryProduct
+      summary: Persist a generated shopping item match to an existing Pantry product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [productId, matchType]
+              properties:
+                productId: { type: string, format: uuid }
+                matchType: { type: string, enum: [exact, suggested, manual] }
+      responses:
+        '200': { description: Pantry product match saved for the row and contributing ingredients }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Generated shopping item or Pantry product not found }
+        '409': { description: Profile selection required }
   /shopping-lists/aisles:
     get:
       operationId: listShoppingAisles
@@ -1555,14 +1804,20 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
   /pantry/products:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.read
       operationId: listPantryProducts
       summary: List canonical Pantry products
       responses:
         '200': { description: Canonical products with aliases and identifiers }
         '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.create
       operationId: createPantryProduct
       summary: Create a canonical Pantry product
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
@@ -1574,7 +1829,19 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Active profile required or duplicate product }
   /pantry/products/{productId}:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.read
+      operationId: getPantryProduct
+      summary: Read one canonical Pantry product
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Canonical Pantry product }
+        '404': { description: Product not found }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.update
       operationId: updatePantryProduct
       summary: Replace one canonical Pantry product definition
       parameters:
@@ -1590,6 +1857,17 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Product not found }
         '409': { description: Product conflict or active profile required }
+    delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.delete
+      operationId: archivePantryProduct
+      summary: Archive a Pantry product after all active stock is resolved
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Archived Pantry product }
+        '404': { description: Product not found }
+        '409': { description: Product still has active stock }
   /pantry/locations:
     get:
       operationId: listPantryLocations
@@ -1629,6 +1907,8 @@ paths:
         '409': { description: Location contains active stock/children or active profile required }
   /pantry/batches:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.read
       operationId: listPantryBatches
       summary: List filtered physical Pantry batches
       responses:
@@ -1636,8 +1916,12 @@ paths:
           { description: 'Physical batches with product, location, quantity, and expiry state' }
         '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.create
       operationId: createPantryBatch
       summary: Add a physical Pantry batch
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
@@ -1649,7 +1933,19 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Active profile required }
   /pantry/batches/{batchId}:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.read
+      operationId: getPantryBatch
+      summary: Read one physical Pantry batch with product, location, and expiry state
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Pantry batch }
+        '404': { description: Batch not found }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.update
       operationId: updatePantryBatch
       summary: Replace version-protected physical batch details
       parameters:
@@ -1671,6 +1967,39 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Batch not found }
         '409': { description: Stale version or active profile required }
+    delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.delete
+      operationId: discardPantryBatch
+      summary: Resolve a Pantry batch as discarded while preserving immutable inventory history
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: expectedVersion
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Discarded Pantry batch and appended inventory event }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { description: Batch not found }
+        '409': { description: Stale batch version }
+  /pantry/batches/bulk:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: pantry.read
+      operationId: exportPantryBatchesBulk
+      summary: Stream a bounded snapshot of physical Pantry batches
+      parameters:
+        - { $ref: '#/components/parameters/UpdatedSince' }
+        - { $ref: '#/components/parameters/IncludeInactive' }
+      responses:
+        '200':
+          description: Snapshot metadata followed by one Pantry batch per NDJSON line
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /pantry/batches/{batchId}/actions:
     post:
       operationId: applyPantryBatchAction
@@ -1817,6 +2146,70 @@ paths:
             Lines can include projected remainder, later exhaustion, earliest recorded expiry,
             and recorded expiry-before-meal conflicts without food-safety conclusions.
         '400': { $ref: '#/components/responses/InvalidRequest' }
+  /admin/api-keys:
+    get:
+      operationId: listApiKeys
+      summary: List API-key metadata without exposing key hashes or secrets
+      description: Requires the authenticated admin account.
+      responses:
+        '200': { description: API-key metadata and scoped permissions }
+        '401': { description: Authentication required }
+        '403': { description: Admin account required }
+    post:
+      operationId: createApiKey
+      summary: Create an expiring, scoped integration key
+      description: >-
+        Requires a fresh admin session. The raw bord_sk secret is returned only in this response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiKeyCreateInput' }
+      responses:
+        '201': { description: API-key metadata and one-time raw secret }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: Authentication required or session is no longer fresh }
+        '403': { description: Admin account required }
+  /admin/api-keys/{keyId}:
+    parameters:
+      - { name: keyId, in: path, required: true, schema: { type: string } }
+    patch:
+      operationId: updateApiKey
+      summary: Rename, enable, disable, re-scope, or shorten an API-key lifetime
+      description: Requires a fresh admin session and never returns a raw secret.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiKeyUpdateInput' }
+      responses:
+        '200': { description: Updated API-key metadata }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: Authentication required or session is no longer fresh }
+        '403': { description: Admin account required }
+        '404': { description: API key not found }
+    delete:
+      operationId: revokeApiKey
+      summary: Permanently revoke an API key
+      description: Requires a fresh admin session.
+      responses:
+        '204': { description: API key revoked }
+        '401': { description: Authentication required or session is no longer fresh }
+        '403': { description: Admin account required }
+        '404': { description: API key not found }
+  /admin/api-keys/{keyId}/rotate:
+    parameters:
+      - { name: keyId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: rotateApiKey
+      summary: Create a replacement secret and revoke the previous key
+      description: >-
+        Requires a fresh admin session. The replacement bord_sk secret is returned once.
+      responses:
+        '201': { description: Replacement metadata and one-time raw secret }
+        '401': { description: Authentication required or session is no longer fresh }
+        '403': { description: Admin account required }
+        '404': { description: API key not found }
   /integrations/homepage/v1/summary:
     servers:
       - url: /api
@@ -1842,11 +2235,74 @@ paths:
           description: Missing, invalid, or unconfigured integration credentials
 components:
   securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Better Auth browser session. Secure deployments may use the __Secure- prefix.
+    ApiKeyBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: bord_sk
+      description: >-
+        Admin-created integration key. The raw secret is displayed once, expires within 365 days,
+        and is accepted only on the scoped integration resource paths.
     HomepageBearer:
       type: http
       scheme: bearer
       bearerFormat: opaque integration token
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >-
+        Required for API-key create requests. Reusing a key with the same body replays the stored
+        response for 24 hours; reusing it with another body returns 409.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    UpdatedSince:
+      name: updatedSince
+      in: query
+      required: false
+      description: Return items updated after this timestamp.
+      schema: { type: string, format: date-time }
+    IncludeInactive:
+      name: includeInactive
+      in: query
+      required: false
+      schema: { type: boolean, default: false }
   schemas:
+    ApiPermissions:
+      type: object
+      additionalProperties: false
+      properties:
+        recipes: { $ref: '#/components/schemas/ApiActions' }
+        mealPlans: { $ref: '#/components/schemas/ApiActions' }
+        shoppingLists: { $ref: '#/components/schemas/ApiActions' }
+        collections: { $ref: '#/components/schemas/ApiActions' }
+        pantry: { $ref: '#/components/schemas/ApiActions' }
+    ApiActions:
+      type: array
+      uniqueItems: true
+      maxItems: 4
+      items: { type: string, enum: [read, create, update, delete] }
+    ApiKeyCreateInput:
+      type: object
+      additionalProperties: false
+      required: [name, permissions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        expiresInDays: { type: integer, minimum: 1, maximum: 365, default: 90 }
+        permissions: { $ref: '#/components/schemas/ApiPermissions' }
+    ApiKeyUpdateInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        enabled: { type: boolean }
+        expiresInDays: { type: integer, minimum: 1, maximum: 365 }
+        permissions: { $ref: '#/components/schemas/ApiPermissions' }
     PantryProductInput:
       type: object
       required: [displayName]

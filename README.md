@@ -8,7 +8,7 @@ Its optional OpenAI assistant can read permitted recipe, planning, and nutrition
 
 ## Release status
 
-**v1.0.0-rc.1** is a release candidate, not a public v1 tag. It is suitable for candidate testing by a trusted household that keeps regular backups, but it is not an authentication boundary and must not be exposed directly to the public internet. The canonical [capability matrix](docs/capabilities.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish implemented behavior from target-specific evidence still required. Please report issues through the [support and security guide](docs/support.md).
+**v1.0.0-rc.2** is a release candidate, not a public v1 tag. It is suitable for candidate testing by a trusted household that keeps regular backups, but it is not an authentication boundary and must not be exposed directly to the public internet. The canonical [capability matrix](docs/capabilities.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish implemented behavior from target-specific evidence still required. Please report issues through the [support and security guide](docs/support.md).
 
 ## Install with Docker
 
@@ -35,7 +35,7 @@ Open `http://localhost:3000`, complete the first-run household setup, then use t
 3. Add `COOKIE_SECRET` (a unique value of at least 32 characters), `APP_ORIGIN` (for example `http://tower.local:4123`, matching the chosen host port), and `TZ`. `OPENAI_API_KEY` is optional and should be added only when you intentionally enable an AI action.
 4. Apply the container, visit its WebUI, complete household setup, and confirm `http://tower.local:4123/api/v1/health` reports `{"status":"ok"}`.
 
-You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persistent: it contains the database, images, and backup bundles. The dedicated [Unraid guide](docs/deployment-unraid.md) covers upgrades and host-specific checks.
+You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persistent for the database and images, and use the template's dedicated `/backup` mapping when a host tool such as Kopia will protect recovery bundles. The dedicated [Unraid guide](docs/deployment-unraid.md) covers upgrades and host-specific checks.
 
 ## Run locally
 
@@ -63,7 +63,7 @@ The library marks only the selected profile’s rating/favorite state and offers
 
 ## AI readiness
 
-The kitchen navigation includes **AI status**. Set `OPENAI_API_KEY` only in the server runtime (or use the ignored root `.api_keys` convenience file during local development). The official SDK is server-only; `.api_keys` is never copied into Docker. Pasted text, normalized scan review, and generated serving images each require an explicit household action, have bounded inputs and a process-local rate limit, return an editable suggestion rather than saving a recipe, and write a content-free audit record. Tests use deterministic provider doubles; this workspace makes no paid live OpenAI request.
+The kitchen navigation includes **AI status**. Set `OPENAI_API_KEY` only in the server runtime (or use the ignored root `.api_keys` convenience file during local development). The official SDK is server-only; `.api_keys` is never copied into Docker. Pasted text, normalized scan review, and generated serving images each require an explicit household action, have bounded inputs and a process-local rate limit, return an editable suggestion rather than saving a recipe, and write a content-free audit record. Confirmed meal plans save before optional recipe images are generated; a SQLite-backed worker in the same container resumes queued work after restart. Four or more recipe or image generations use OpenAI Batch, which can take up to 24 hours. Tests use deterministic provider doubles; this workspace makes no paid live OpenAI request.
 
 Pantry, recipe ingredients, and Nutrition also share a review-first food picker. Open Food Facts supplies read-only exact barcode data; USDA FoodData Central search is enabled by the server-only `USDA_FDC_API_KEY`. Camera scanning is optional and requires trusted HTTPS—see [food data providers and barcode scanning](docs/food-data-integrations.md), including the Nginx Proxy Manager/local-CA setup. Manual barcode entry remains available over HTTP.
 
@@ -97,7 +97,7 @@ Bòrd installs a small read-only PWA after a secure local visit. It keeps succes
 
 ## Backup and recovery
 
-Open **Backups** from the household home to create, download, validate, and restore a local recovery bundle. Bundles are stored in `DATA_DIR/backups`, include a consistent SQLite snapshot plus local `uploads`/`generated` media and safe household metadata, and never include environment secrets. Automatic in-process backups run every `BACKUP_INTERVAL_HOURS` (24 by default); bundles older than `BACKUP_RETENTION_DAYS` (30 by default) are removed during the next successful backup.
+Open **System Settings → Local recovery** to create, download, validate, and restore a recovery bundle. Bundles are stored in `BACKUP_DIR` (default `DATA_DIR/backups`), include a consistent SQLite snapshot plus local `uploads`/`generated` media and safe household metadata, and never include environment secrets. Automatic in-process backups run every `BACKUP_INTERVAL_HOURS` (24 by default); bundles older than `BACKUP_RETENTION_DAYS` (30 by default) are removed during the next successful backup. A dedicated mounted `BACKUP_DIR`, such as `/backup`, lets Kopia or another host tool protect completed bundles independently.
 
 Before a restore, the app validates archive paths, manifest/schema information, every SHA-256 checksum, and SQLite integrity. It makes a pre-restore safety backup and requires typing `RESTORE` before atomically replacing the local data directory. See [backup and restore](docs/backup-and-restore.md) for recovery steps and limitations.
 

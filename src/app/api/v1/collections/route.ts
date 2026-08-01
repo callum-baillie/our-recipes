@@ -1,9 +1,9 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
+import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { collectionInputSchema } from '@/lib/domain/collection';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   CollectionConflictError,
   CollectionValidationError,
@@ -14,28 +14,40 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export function GET() {
-  return NextResponse.json({ collections: listCollections() });
+export async function GET(request: Request) {
+  const authorization = await authorizeApi(request, 'collections', 'read');
+  if (authorization.response) return authorization.response;
+  return withApiRequestId(
+    NextResponse.json({ collections: listCollections() }),
+    authorization.requestId,
+  );
 }
 
 export async function POST(request: Request) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before creating a collection.',
-    );
-  }
-  const parsed = collectionInputSchema.safeParse(await request.json().catch(() => null));
+  const authorization = await authorizeApi(request, 'collections', 'create');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
+  const idempotency = await prepareIdempotentMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (idempotency.response) return idempotency.response;
+  const parsed = collectionInputSchema.safeParse(idempotency.context.body);
   if (!parsed.success) return jsonError(400, 'invalid_collection', 'Check the collection details.');
   try {
-    return NextResponse.json(
-      { collection: createCollection(parsed.data, actor.profileId) },
-      { status: 201 },
+    return idempotentJsonResponse(
+      idempotency.context,
+      {
+        collection: createCollection(parsed.data, authorization.principal.profileId),
+      },
+      authorization.requestId,
+      201,
     );
   } catch (error) {
     if (error instanceof CollectionConflictError)

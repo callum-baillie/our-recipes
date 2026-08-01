@@ -8,6 +8,7 @@ import { optimize } from 'svgo';
 const workspace = resolve(import.meta.dirname, '..');
 const sourceDirectory = resolve(workspace, 'branding');
 const brandDirectory = resolve(workspace, 'public/brand');
+const mobileBrandDirectory = resolve(workspace, 'mobile/assets/brand');
 const iconDirectory = resolve(workspace, 'public/icons');
 
 const iconSourcePath = resolve(sourceDirectory, 'icon.svg');
@@ -119,6 +120,7 @@ async function main() {
   await Promise.all([
     mkdir(sourceDirectory, { recursive: true }),
     mkdir(brandDirectory, { recursive: true }),
+    mkdir(mobileBrandDirectory, { recursive: true }),
     mkdir(iconDirectory, { recursive: true }),
     mkdir(resolve(workspace, 'src/app'), { recursive: true }),
   ]);
@@ -137,8 +139,17 @@ async function main() {
     writeFile(resolve(brandDirectory, 'bord-mark.svg'), markSvg, 'utf8'),
     writeFile(resolve(brandDirectory, 'bord-lockup.svg'), lockupSvg, 'utf8'),
     writeFile(resolve(brandDirectory, 'bord-header-lockup.svg'), headerLockupSvg, 'utf8'),
+    writeFile(resolve(mobileBrandDirectory, 'bord-mark.svg'), markSvg, 'utf8'),
+    writeFile(resolve(mobileBrandDirectory, 'bord-lockup.svg'), lockupSvg, 'utf8'),
+    writeFile(resolve(mobileBrandDirectory, 'bord-header-lockup.svg'), headerLockupSvg, 'utf8'),
     rasterizeTransparent(markSvg, resolve(brandDirectory, 'bord-mark-1024.png'), 1024, 1024),
     rasterizeTransparent(lockupSvg, resolve(brandDirectory, 'bord-lockup.png'), 1600, 525),
+    rasterizeTransparent(
+      headerLockupSvg,
+      resolve(mobileBrandDirectory, 'bord-splash.png'),
+      1600,
+      312,
+    ),
   ]);
 
   const iconTargets = [

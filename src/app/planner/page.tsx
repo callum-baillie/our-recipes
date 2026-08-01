@@ -21,6 +21,7 @@ import { latestNutritionSeries } from '@/lib/domain/nutrition-view';
 import { getAppPreferences } from '@/lib/services/app-preferences-service';
 import { getAiDataPolicy, getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { AI_WORKLOAD_DEFAULTS } from '@/lib/domain/ai-assistant';
+import { listAiSummaries } from '@/lib/services/ai-summary-service';
 
 import styles from './layout.module.css';
 
@@ -174,6 +175,9 @@ export default async function PlannerPage({
   const imageAiSetting = actor.profileId
     ? getAiWorkloadSetting(actor.profileId, 'image_generation')
     : { ...AI_WORKLOAD_DEFAULTS.image_generation, enabled: true };
+  const aiSummary = actor.profileId
+    ? listAiSummaries(actor.profileId).find((item) => item.domain === 'meal_plans')
+    : null;
   return (
     <main className="recipe-page">
       <section className={styles.pageHeading} aria-labelledby="planner-page-title">
@@ -216,6 +220,9 @@ export default async function PlannerPage({
         mealPlanPreferences={plannerPreferences}
         aiMealPlanModel={mealPlanAiSetting.model}
         aiImageGenerationEnabled={imageAiSetting.enabled}
+        initialAiSummary={
+          aiSummary ? { ...aiSummary, createdAt: aiSummary.createdAt.toISOString() } : null
+        }
       />
     </main>
   );

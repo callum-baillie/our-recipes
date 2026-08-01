@@ -224,9 +224,10 @@ describe('Nutrition rendered boundary', () => {
     const markup = renderToStaticMarkup(createElement(NutritionDashboard, props));
     expect(markup).toContain('Calories consumed');
     expect(markup).toContain('not counted as consumed');
-    for (const label of ['Overview', 'Food Diary', 'Nutrients', 'Trends', 'Household', 'Goals']) {
+    for (const label of ['Overview', 'Food Diary', 'Nutrients', 'Trends', 'Household']) {
       expect(markup).toContain(label);
     }
+    expect(markup).not.toContain('>Goals<');
     expect(markup).toContain('Nothing is assumed');
     expect(markup).toContain('Daily calorie progress');
     expect(markup).toContain('Planned calories, not counted as consumed');
@@ -243,12 +244,36 @@ describe('Nutrition rendered boundary', () => {
       }),
     );
 
-    expect(markup).toContain('Build a useful nutrition baseline');
-    expect(markup).toContain('Set up nutrition goals');
+    expect(markup).toContain('Continue your nutrition setup');
+    expect(markup).toContain('Nutrition profile saved');
+    expect(markup).toContain('Set up daily nutrition goals');
+    expect(markup).toContain('Set daily nutrition goal');
     expect(markup).toContain('Weight tracking is off');
     expect(markup).toContain('What you will see after setup');
     expect(markup).not.toContain('Today at a glance');
     expect(markup).not.toContain('Calories consumed');
+  });
+
+  it('places daily calorie goals in the onboarding dialog and shows a saved weight plan', () => {
+    const markup = renderToStaticMarkup(
+      createElement(NutritionDashboard, {
+        ...props,
+        goals: [],
+        goalSetup: {
+          nutritionGoalType: 'loss',
+          currentWeightKilograms: 90,
+          targetWeightKilograms: 80,
+          targetDate: '2026-12-01',
+          profileVersion: 1,
+        },
+      }),
+    );
+
+    expect(markup).toContain('Choose a daily nutrition goal');
+    expect(markup).toContain('Use 1,800 kcal');
+    expect(markup).toContain('Use your saved weight plan');
+    expect(markup).toContain('Calculate a planning target');
+    expect(markup).toContain('Saved target date: 2026-12-01.');
   });
 
   it('offers a weight check-in only when measurement tracking is enabled', () => {

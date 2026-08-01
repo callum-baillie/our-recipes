@@ -65,12 +65,49 @@ describe('list settings and supermarket profiles', () => {
       },
       profileId,
     );
-    return listSupermarketProfiles()[0]!;
+    return listSupermarketProfiles().find((profile) => profile.name === 'Market Square')!;
   }
 
-  it('creates a default store and classifies by the longest matching route term', () => {
+  it('keeps the general store as default and classifies custom stores by the longest route term', () => {
     const store = createStore();
-    expect(getListSettings().defaultSupermarketProfileId).toBe(store.id);
+    const defaultStore = listSupermarketProfiles().find(
+      (profile) => profile.name === 'General grocery store',
+    )!;
+    expect(getListSettings().defaultSupermarketProfileId).toBe(defaultStore.id);
+    expect(defaultStore.sections.map((section) => section.name)).toEqual([
+      'Fresh produce',
+      'Bakery',
+      'Meat & seafood',
+      'Deli & chilled',
+      'Dairy & eggs',
+      'Frozen',
+      'Canned & jarred',
+      'Dry goods & grains',
+      'Baking',
+      'Herbs & spices',
+      'Sauces & condiments',
+      'Snacks',
+      'Drinks',
+      'Household',
+    ]);
+    expect(
+      resolveShoppingAisle(defaultStore.id, {
+        item: 'specialty carton',
+        shoppingCategory: 'Dairy & eggs',
+      }),
+    ).toBe(defaultStore.sections.find((section) => section.name === 'Dairy & eggs')?.aisleId);
+    expect(resolveShoppingAisle(defaultStore.id, { item: 'rolled oats' })).toBe(
+      defaultStore.sections.find((section) => section.name === 'Dry goods & grains')?.aisleId,
+    );
+    expect(resolveShoppingAisle(defaultStore.id, { item: 'shredded cheddar' })).toBe(
+      defaultStore.sections.find((section) => section.name === 'Dairy & eggs')?.aisleId,
+    );
+    expect(resolveShoppingAisle(defaultStore.id, { item: 'diced tomatoes' })).toBe(
+      defaultStore.sections.find((section) => section.name === 'Canned & jarred')?.aisleId,
+    );
+    expect(resolveShoppingAisle(defaultStore.id, { item: 'cherry tomatoes' })).toBe(
+      defaultStore.sections.find((section) => section.name === 'Fresh produce')?.aisleId,
+    );
     expect(store.sections.map((section) => section.name)).toEqual([
       'Fresh',
       'Canned goods',
@@ -160,7 +197,7 @@ describe('list settings and supermarket profiles', () => {
   it('duplicates, archives, restores, and updates household list preferences', () => {
     const store = createStore();
     duplicateSupermarketProfile(store.id, profileId);
-    expect(listSupermarketProfiles()).toHaveLength(2);
+    expect(listSupermarketProfiles()).toHaveLength(3);
 
     updateListSettings(
       {
@@ -193,7 +230,7 @@ describe('list settings and supermarket profiles', () => {
       profileId,
     );
     expect(getListSettings().defaultSupermarketProfileId).toBeNull();
-    expect(listSupermarketProfiles()).toHaveLength(1);
+    expect(listSupermarketProfiles()).toHaveLength(2);
     expect(
       listSupermarketProfiles(true).find((profile) => profile.id === store.id)?.archivedAt,
     ).toBeTruthy();

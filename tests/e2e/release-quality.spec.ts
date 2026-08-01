@@ -44,7 +44,7 @@ async function homeThemeContrast(page: import('@playwright/test').Page): Promise
     };
 
     const root = getComputedStyle(document.documentElement);
-    const heading = document.querySelector('.home-hero h2');
+    const heading = document.querySelector('.home-hero h1');
     const planner = document.querySelector('.home-plan-card');
     if (!heading || !planner) throw new Error('Home contrast targets are missing.');
 

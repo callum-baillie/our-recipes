@@ -1,26 +1,19 @@
-import Link from 'next/link';
-
 import { ImportWizard } from '@/components/import-wizard';
-import { BordIcon } from '@/components/bord-brand';
+import { RecipebookNav } from '@/components/recipebook-nav';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export default function ImportPage() {
+export default async function ImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
   return (
     <main className="recipe-page import-page">
-      <header className="recipe-header import-page-header">
-        <Link className="wordmark" href="/">
-          <span className="wordmark-mark custom" aria-hidden="true">
-            <BordIcon size={21} />
-          </span>
-          <span>Bòrd</span>
-        </Link>
-        <Link className="quiet-link" href="/recipes">
-          ← Back to library
-        </Link>
-      </header>
-      <ImportWizard />
+      <RecipebookNav current="import" />
+      <ImportWizard initialMode={mode === 'jsonld' ? 'jsonld' : 'files'} />
     </main>
   );
 }

@@ -6,7 +6,13 @@ set -eu
 # remain the dedicated, non-root `recipes` user.
 if [ "$(id -u)" = "0" ]; then
   data_dir="${DATA_DIR:-/data}"
+  backup_dir="${BACKUP_DIR:-$data_dir/backups}"
+  if [ "$backup_dir" = "/" ] || [ "$backup_dir" = "$data_dir" ]; then
+    echo "BACKUP_DIR must be a non-root directory distinct from DATA_DIR." >&2
+    exit 1
+  fi
   mkdir -p "$data_dir"
+  mkdir -p "$backup_dir"
   legacy_database="$data_dir/our-recipes.db"
   bord_database="$data_dir/bord.db"
   configured_database="${DATABASE_URL:-$bord_database}"
@@ -25,6 +31,9 @@ if [ "$(id -u)" = "0" ]; then
   fi
   export DATABASE_URL="$configured_database"
   chown -R recipes:recipes "$data_dir"
+  if [ "$backup_dir" != "$data_dir/backups" ]; then
+    chown recipes:recipes "$backup_dir"
+  fi
   exec gosu recipes "$@"
 fi
 

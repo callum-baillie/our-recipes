@@ -1,9 +1,8 @@
-import { CalendarDays, ChevronRight, FolderHeart, Plus } from 'lucide-react';
+import { CalendarDays, ChevronRight, FolderHeart } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
 import { AddRecipeDialog, AddRecipeTrigger } from '@/components/add-recipe-dialog';
-import { BordLockup } from '@/components/bord-brand';
 import { HomeRecipeFilters, type HomeFilters } from '@/components/home-recipe-filters';
 import { RecipeSummaryCard, type RecipeSummaryCardData } from '@/components/recipe-summary-card';
 import type { CollectionSummary } from '@/lib/services/collection-service';
@@ -49,39 +48,14 @@ export function HouseholdHome({
   filters,
   nextMeal,
 }: HouseholdHomeProps) {
+  const eagerRecentRecipeId = recentRecipes.find((recipe) => recipe.image)?.id;
+
   return (
     <main className="home-page">
-      <section className="home-brand-intro" aria-labelledby="home-brand-title">
-        <BordLockup className="home-brand-lockup" />
-
-        <div className="home-brand-definition">
-          <h1 id="home-brand-title">bòrd</h1>
-          <p className="home-brand-meta">
-            <span>Scottish Gaelic</span>
-            <span aria-hidden="true">·</span>
-            <em>noun</em>
-          </p>
-          <hr aria-hidden="true" />
-          <dl className="home-brand-translation">
-            <div>
-              <dt>English translation</dt>
-              <dd>Table</dd>
-            </div>
-          </dl>
-          <p className="home-brand-meaning">
-            A communal area where kin unite to eat and end the day.
-          </p>
-          <p className="home-brand-goal">
-            <span>Our goal</span>
-            To make it easier to bring families around the table.
-          </p>
-        </div>
-      </section>
-
       <section className="home-hero" aria-labelledby="home-title">
         <div>
           <p className="eyebrow">{household.kitchenName.toUpperCase()} · THE SHARED COOKBOOK</p>
-          <h2 id="home-title">Welcome to the kitchen, {activeProfileName}.</h2>
+          <h1 id="home-title">Welcome to the kitchen, {activeProfileName}.</h1>
           <p>
             Keep the recipes you actually cook, plan the week around them, and share one calm
             kitchen notebook with your household.
@@ -104,7 +78,7 @@ export function HouseholdHome({
                 </div>
               </div>
               {nextMeal.recipe ? (
-                <RecipeSummaryCard recipe={nextMeal.recipe} compact />
+                <RecipeSummaryCard recipe={nextMeal.recipe} compact eager />
               ) : (
                 <Link className="home-freeform-meal" href="/planner">
                   <span>{nextMeal.meal}</span>
@@ -122,11 +96,21 @@ export function HouseholdHome({
                 <CalendarDays size={20} />
               </span>
               <p className="eyebrow">MEAL PLANNING</p>
-              <h2>Make the week feel lighter.</h2>
-              <p>Choose a few trusted recipes now and make shopping and dinner easier later.</p>
-              <Link className="primary-button compact" href="/planner">
-                Set up your meal plan
-              </Link>
+              {recipeTotal ? (
+                <>
+                  <h2>Make the week feel lighter.</h2>
+                  <p>Choose a few trusted recipes now and make shopping and dinner easier later.</p>
+                  <Link className="primary-button compact" href="/planner">
+                    Set up your meal plan
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h2>Start with one recipe.</h2>
+                  <p>Add something you already cook, then plan it when you are ready.</p>
+                  <AddRecipeTrigger open={addRecipeOpen} />
+                </>
+              )}
             </div>
           )}
         </aside>
@@ -145,7 +129,11 @@ export function HouseholdHome({
         {recentRecipes.length ? (
           <div className="home-recipe-grid recent-grid">
             {recentRecipes.map((recipe) => (
-              <RecipeSummaryCard recipe={recipe} key={recipe.id} />
+              <RecipeSummaryCard
+                recipe={recipe}
+                eager={recipe.id === eagerRecentRecipeId}
+                key={recipe.id}
+              />
             ))}
           </div>
         ) : (
@@ -157,56 +145,58 @@ export function HouseholdHome({
         )}
       </section>
 
-      <section className="home-library-section all-recipes" aria-labelledby="all-recipes-title">
-        <div className="home-section-heading">
-          <div>
-            <p className="eyebrow">THE SHARED COOKBOOK</p>
-            <h2 id="all-recipes-title">All recipes</h2>
-            <span>
-              {recipeTotal} recipe{recipeTotal === 1 ? '' : 's'} found
-            </span>
-          </div>
-          <Link className="text-button" href="/recipes">
-            Advanced filters <ChevronRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-        <HomeRecipeFilters filters={filters} tags={tags} />
-        {recipes.length ? (
-          <div className="home-recipe-grid all-recipes-grid">
-            {recipes.map((recipe) => (
-              <RecipeSummaryCard recipe={recipe} key={recipe.id} />
-            ))}
-          </div>
-        ) : (
-          <div className="home-empty-state">
-            <h3>No recipes matched those filters.</h3>
-            <p>Try a broader search or clear the current filters.</p>
-            <Link className="text-button" href="/">
-              Clear filters
+      {recipeTotal > 0 ? (
+        <section className="home-library-section all-recipes" aria-labelledby="all-recipes-title">
+          <div className="home-section-heading">
+            <div>
+              <p className="eyebrow">THE SHARED COOKBOOK</p>
+              <h2 id="all-recipes-title">All recipes</h2>
+              <span>
+                {recipeTotal} recipe{recipeTotal === 1 ? '' : 's'} found
+              </span>
+            </div>
+            <Link className="text-button" href="/recipes">
+              Advanced filters <ChevronRight size={16} aria-hidden="true" />
             </Link>
           </div>
-        )}
-        {recipeTotal > recipes.length ? (
-          <Link className="home-view-all primary-button" href="/recipes">
-            View all {recipeTotal} recipes
-          </Link>
-        ) : null}
-      </section>
+          <HomeRecipeFilters filters={filters} tags={tags} />
+          {recipes.length ? (
+            <div className="home-recipe-grid all-recipes-grid">
+              {recipes.map((recipe) => (
+                <RecipeSummaryCard recipe={recipe} key={recipe.id} />
+              ))}
+            </div>
+          ) : (
+            <div className="home-empty-state">
+              <h3>No recipes matched those filters.</h3>
+              <p>Try a broader search or clear the current filters.</p>
+              <Link className="text-button" href="/">
+                Clear filters
+              </Link>
+            </div>
+          )}
+          {recipeTotal > recipes.length ? (
+            <Link className="home-view-all primary-button" href="/recipes">
+              View all {recipeTotal} recipes
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
-      <section
-        className="home-library-section home-collections"
-        aria-labelledby="collections-title"
-      >
-        <div className="home-section-heading">
-          <div>
-            <p className="eyebrow">YOUR RECIPE SHELVES</p>
-            <h2 id="collections-title">Collections</h2>
+      {collections.length ? (
+        <section
+          className="home-library-section home-collections"
+          aria-labelledby="collections-title"
+        >
+          <div className="home-section-heading">
+            <div>
+              <p className="eyebrow">YOUR RECIPE SHELVES</p>
+              <h2 id="collections-title">Collections</h2>
+            </div>
+            <Link className="text-button" href="/collections">
+              Manage collections <ChevronRight size={16} aria-hidden="true" />
+            </Link>
           </div>
-          <Link className="text-button" href="/collections">
-            Manage collections <ChevronRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-        {collections.length ? (
           <div className="home-collection-grid">
             {collections.map((collection) => (
               <Link href={`/collections/${collection.id}`} key={collection.id}>
@@ -218,6 +208,7 @@ export function HouseholdHome({
                       width={collection.coverImage.width}
                       height={collection.coverImage.height}
                       sizes="(max-width: 700px) 100vw, 33vw"
+                      unoptimized
                     />
                   ) : (
                     <span aria-hidden="true">
@@ -235,21 +226,8 @@ export function HouseholdHome({
               </Link>
             ))}
           </div>
-        ) : (
-          <div className="home-empty-state collection-empty">
-            <span aria-hidden="true">
-              <FolderHeart size={24} />
-            </span>
-            <div>
-              <h3>Build a shelf for the recipes you repeat.</h3>
-              <p>Group weeknight dinners, family favorites, baking projects, or anything else.</p>
-            </div>
-            <Link className="text-button" href="/collections">
-              <Plus size={16} aria-hidden="true" /> Create a collection
-            </Link>
-          </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <AddRecipeDialog open={addRecipeOpen} />
     </main>

@@ -20,11 +20,16 @@ describe('AI meal-plan cost estimates', () => {
 
     expect(estimate.inputUsd).toBeGreaterThan(0);
     expect(estimate.outputUsd).toBeGreaterThan(estimate.inputUsd ?? 0);
+    expect(estimate.mealPlanRequestCount).toBe(1);
+    expect(estimate.recipeCount).toBe(21);
+    expect(estimate.recipeCountIsEstimate).toBe(false);
     expect(estimate.imageCount).toBe(21);
-    expect(estimate.imageUsd).toBe(21 * LOW_SQUARE_RECIPE_IMAGE_ESTIMATE_USD);
+    expect(estimate.imageBatchApplied).toBe(true);
+    expect(estimate.imageUsd).toBe(21 * LOW_SQUARE_RECIPE_IMAGE_ESTIMATE_USD * 0.5);
     expect(estimate.totalUsd).toBeCloseTo(
       (estimate.inputUsd ?? 0) + (estimate.outputUsd ?? 0) + estimate.imageUsd,
     );
+    expect(estimate.totalUsd).toBeCloseTo(0.3940625);
   });
 
   it('reduces distinct recipe and image counts for linked leftovers', () => {
@@ -40,6 +45,8 @@ describe('AI meal-plan cost estimates', () => {
     });
 
     expect(estimate.imageCount).toBe(8);
+    expect(estimate.imageBatchApplied).toBe(true);
+    expect(estimate.recipeCount).toBe(8);
   });
 
   it('keeps token estimates visible for a custom model without inventing prices', () => {
@@ -57,5 +64,24 @@ describe('AI meal-plan cost estimates', () => {
     expect(estimate.inputTokens).toBeGreaterThan(0);
     expect(estimate.inputUsd).toBeNull();
     expect(estimate.totalUsd).toBeNull();
+  });
+
+  it('keeps an explicit, non-negative estimate when repeated meals reduce generated recipes', () => {
+    const estimate = estimateAiMealPlanCost({
+      model: 'gpt-4o',
+      startDate: '2026-07-20',
+      endDate: '2026-07-20',
+      mealSlots: ['lunch', 'dinner'],
+      profileCount: 1,
+      allowRepeatingMeals: true,
+      planLeftovers: false,
+      generateRecipeImages: true,
+    });
+
+    expect(estimate.recipeCount).toBe(2);
+    expect(estimate.recipeCountIsEstimate).toBe(true);
+    expect(estimate.imageCount).toBe(2);
+    expect(estimate.imageBatchApplied).toBe(false);
+    expect(estimate.totalUsd).toBeGreaterThanOrEqual(0);
   });
 });

@@ -68,6 +68,7 @@ export function RecipeSummaryCard({
               height={recipe.image.height}
               loading={eager ? 'eager' : 'lazy'}
               sizes={compact ? '(max-width: 850px) 100vw, 320px' : '(max-width: 700px) 100vw, 33vw'}
+              unoptimized
             />
           ) : (
             <span className="recipe-card-placeholder" aria-hidden="true">

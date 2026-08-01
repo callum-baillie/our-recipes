@@ -17,8 +17,10 @@ type Draft = {
 
 export function JsonLdImportWizard({
   collapsedByDefault = false,
+  autoFocus = false,
 }: {
   collapsedByDefault?: boolean;
+  autoFocus?: boolean;
 }) {
   const [source, setSource] = useState('');
   const [candidates, setCandidates] = useState<JsonLdCandidate[] | null>(null);
@@ -131,6 +133,7 @@ export function JsonLdImportWizard({
             </span>
             <textarea
               aria-label="Schema.org JSON-LD"
+              autoFocus={autoFocus}
               rows={11}
               value={source}
               onChange={(event) => setSource(event.target.value)}

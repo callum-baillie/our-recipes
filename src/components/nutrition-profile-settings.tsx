@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-profile-settings.module.css';
+import { SettingsActionBar, SettingsPane } from '@/components/settings-primitives';
 import { createClientUuid } from '@/lib/client/client-uuid';
 
 const CENTIMETERS_PER_INCH = 2.54;
@@ -169,6 +170,14 @@ export function NutritionProfileSettings({
   const [status, setStatus] = useState('');
   const [measurementSystem, setMeasurementSystem] = useState(profile.measurementSystem);
   const [energyEstimate, setEnergyEstimate] = useState<EnergyEstimateResponse | null>(null);
+  const [optionalInputsOpen, setOptionalInputsOpen] = useState(
+    Boolean(
+      profile.estimatedTargetsEnabled ||
+      profile.dateOfBirth ||
+      profile.heightCentimeters ||
+      profile.currentWeightKilograms,
+    ),
+  );
   const estimateOperationId = useRef<string | null>(null);
 
   async function requestEnergyEstimate(action: 'preview' | 'apply', form: HTMLFormElement) {
@@ -237,212 +246,223 @@ export function NutritionProfileSettings({
   const weightUnit = measurementSystem === 'imperial' ? 'lb' : 'kg';
 
   return (
-    <section className={styles.panel} aria-labelledby="nutrition-profile-settings-heading">
-      <header>
-        <p className={styles.eyebrow}>Active profile</p>
-        <h2 id="nutrition-profile-settings-heading">Nutrition settings</h2>
-        <p>
-          These choices apply to the household profile selected in the app header. Change the
-          profile name or avatar from household profile settings.
-        </p>
-      </header>
+    <SettingsPane
+      className={styles.panel}
+      eyebrow="ACTIVE PROFILE"
+      title="Nutrition preferences"
+      description="These choices apply to the household profile selected in the app header. Identity details stay in Profiles & roles."
+    >
       <form className={styles.form} onSubmit={save}>
-        <fieldset aria-describedby="sensitive-input-explanation">
-          <legend>Optional body and reference inputs</legend>
-          <p id="sensitive-input-explanation" className={styles.notice}>
-            Date of birth, body measurements, the source&apos;s sex category, activity and an
-            explicit pregnancy or breastfeeding life stage are requested only to support a
-            separately reviewed estimate you choose to enable. They are never inferred from recipes
-            or diary activity. Manual goals need none of these values.
-          </p>
-          <div className={styles.grid}>
-            <label>
-              Measurement system
-              <select
-                name="measurementSystem"
-                value={measurementSystem}
-                onChange={(event) =>
-                  setMeasurementSystem(event.target.value as 'metric' | 'imperial')
-                }
-              >
-                <option value="metric">Metric</option>
-                <option value="imperial">Imperial</option>
-              </select>
-            </label>
-            <label>
-              Date of birth <span>Optional</span>
-              <input name="dateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ''} />
-            </label>
-            <label>
-              Height ({heightUnit}) <span>Optional</span>
-              <input
-                key={`height-${measurementSystem}`}
-                name="height"
-                type="number"
-                min="0.0001"
-                step="any"
-                defaultValue={displayedHeight(profile.heightCentimeters, measurementSystem)}
-              />
-            </label>
-            <label>
-              Current weight ({weightUnit}) <span>Optional</span>
-              <input
-                key={`current-weight-${measurementSystem}`}
-                name="currentWeight"
-                type="number"
-                min="0.0001"
-                step="any"
-                defaultValue={displayedWeight(profile.currentWeightKilograms, measurementSystem)}
-              />
-            </label>
-            <label>
-              Reference source sex category <span>Optional</span>
-              <select name="referenceSexCategory" defaultValue={profile.referenceSexCategory ?? ''}>
-                <option value="">Not provided</option>
-                <option value="female">Female category used by the source</option>
-                <option value="male">Male category used by the source</option>
-              </select>
-            </label>
-            <label>
-              Activity level <span>Optional</span>
-              <select name="activityLevel" defaultValue={profile.activityLevel ?? ''}>
-                <option value="">Not provided</option>
-                <option value="sedentary">Sedentary</option>
-                <option value="light">Light</option>
-                <option value="moderate">Moderate</option>
-                <option value="active">Active</option>
-                <option value="very_active">Very active</option>
-              </select>
-            </label>
-            <label>
-              Explicit life stage <span>Optional</span>
-              <select
-                name="explicitlyEnteredLifeStage"
-                defaultValue={profile.explicitlyEnteredLifeStage ?? ''}
-              >
-                <option value="">Not provided</option>
-                <option value="pregnant">Pregnancy explicitly entered</option>
-                <option value="breastfeeding">Breastfeeding explicitly entered</option>
-              </select>
-            </label>
-          </div>
-          <div className={styles.checks}>
-            <label>
-              <input
-                name="estimatedTargetsEnabled"
-                type="checkbox"
-                defaultChecked={profile.estimatedTargetsEnabled}
-              />
-              Save these inputs for estimated-target use
-            </label>
-            <label>
-              <input
-                name="estimatedTargetConsent"
-                type="checkbox"
-                defaultChecked={profile.estimatedTargetConsent}
-              />
-              I explicitly consent to using the entered values for a documented estimate
-            </label>
-          </div>
-          <p className={styles.warning}>
-            Saving these inputs does not calculate, create, or replace a goal. Estimated targets
-            remain unavailable until a versioned reference method is separately selected and
-            applied. You can continue using manual goals.
-          </p>
-          <div className={styles.estimateBox}>
-            <h3>Preview an adult maintenance-energy estimate</h3>
-            <p>
-              Adults age 19+ who are not pregnant or breastfeeding can preview the NASEM 2023 Table
-              5-16 equation. Choose a fresh activity category below; the generic activity field
-              above is never translated automatically.
+        <details
+          className={styles.disclosure}
+          open={optionalInputsOpen}
+          onToggle={(event) => setOptionalInputsOpen(event.currentTarget.open)}
+        >
+          <summary>Optional body inputs and estimated targets</summary>
+          <fieldset aria-describedby="sensitive-input-explanation">
+            <legend>Optional body and reference inputs</legend>
+            <p id="sensitive-input-explanation" className={styles.notice}>
+              Date of birth, body measurements, the source&apos;s sex category, activity and an
+              explicit pregnancy or breastfeeding life stage are requested only to support a
+              separately reviewed estimate you choose to enable. They are never inferred from
+              recipes or diary activity. Manual goals need none of these values.
             </p>
-            <label>
-              Estimate effective date
-              <input name="estimateEffectiveOn" type="date" defaultValue={effectiveOn} />
-            </label>
-            <label>
-              NASEM physical-activity category
-              <select name="estimatePalCategory" defaultValue="">
-                <option value="">Choose after reviewing the descriptions</option>
-                <option value="inactive">Inactive</option>
-                <option value="low_active">Low active</option>
-                <option value="active">Active</option>
-                <option value="very_active">Very active</option>
-              </select>
-            </label>
-            <details>
-              <summary>How USDA describes these four categories</summary>
-              <ul>
-                <li>
-                  Inactive: activities of daily living only, with little activity beyond them.
-                </li>
-                <li>Low active: daily living plus 60–80 minutes of moderate activity per week.</li>
-                <li>
-                  Active: daily living plus 30–50 minutes of moderate and 85 minutes of vigorous
-                  activity per week.
-                </li>
-                <li>Very active: daily living plus 130 minutes of vigorous activity per week.</li>
-              </ul>
-              <p>
-                Classification is uncertain. Select the closest description yourself; the app does
-                not infer it from steps, recipes, Pantry, or diary entries.
-              </p>
-            </details>
-            <button
-              type="button"
-              onClick={(event) => void requestEnergyEstimate('preview', event.currentTarget.form!)}
-            >
-              Preview estimated maintenance calories
-            </button>
-            {energyEstimate?.estimate ? (
-              <section className={styles.estimateResult} aria-labelledby="energy-estimate-result">
-                <h4 id="energy-estimate-result">
-                  Estimated maintenance energy: {energyEstimate.estimate.roundedKcal} kcal/day
-                </h4>
-                <p>{energyEstimate.estimate.disclosure}</p>
-                <details>
-                  <summary>Formula and source</summary>
-                  <p>
-                    {energyEstimate.estimate.formula}. Unrounded result:{' '}
-                    {energyEstimate.estimate.exactKcal.toFixed(4)} kcal/day; displayed and applied
-                    at the nearest whole kcal.
-                  </p>
-                  <p>
-                    <a href={energyEstimate.estimate.sourceUrl} target="_blank" rel="noreferrer">
-                      {energyEstimate.estimate.sourceVersion}
-                    </a>{' '}
-                    · DOI {energyEstimate.estimate.doi}
-                  </p>
-                </details>
-                {energyEstimate.currentEnergyGoals.length ? (
-                  <label>
-                    Current calorie goal to supersede explicitly
-                    <select name="supersedesGoalVersionId" defaultValue="">
-                      <option value="">Choose the exact current version</option>
-                      {energyEstimate.currentEnergyGoals.map((goal) => (
-                        <option key={goal.id} value={goal.id}>
-                          {goal.value} {goal.unit} · {goal.sourceType} · revision {goal.revision}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <p>
-                    No current calorie goal will be replaced; applying starts a new goal series.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={(event) =>
-                    void requestEnergyEstimate('apply', event.currentTarget.form!)
+            <div className={styles.grid}>
+              <label>
+                Measurement system
+                <select
+                  name="measurementSystem"
+                  value={measurementSystem}
+                  onChange={(event) =>
+                    setMeasurementSystem(event.target.value as 'metric' | 'imperial')
                   }
                 >
-                  Apply this versioned estimate
-                </button>
-              </section>
-            ) : null}
-          </div>
-        </fieldset>
+                  <option value="metric">Metric</option>
+                  <option value="imperial">Imperial</option>
+                </select>
+              </label>
+              <label>
+                Date of birth <span>Optional</span>
+                <input name="dateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ''} />
+              </label>
+              <label>
+                Height ({heightUnit}) <span>Optional</span>
+                <input
+                  key={`height-${measurementSystem}`}
+                  name="height"
+                  type="number"
+                  min="0.0001"
+                  step="any"
+                  defaultValue={displayedHeight(profile.heightCentimeters, measurementSystem)}
+                />
+              </label>
+              <label>
+                Current weight ({weightUnit}) <span>Optional</span>
+                <input
+                  key={`current-weight-${measurementSystem}`}
+                  name="currentWeight"
+                  type="number"
+                  min="0.0001"
+                  step="any"
+                  defaultValue={displayedWeight(profile.currentWeightKilograms, measurementSystem)}
+                />
+              </label>
+              <label>
+                Reference source sex category <span>Optional</span>
+                <select
+                  name="referenceSexCategory"
+                  defaultValue={profile.referenceSexCategory ?? ''}
+                >
+                  <option value="">Not provided</option>
+                  <option value="female">Female category used by the source</option>
+                  <option value="male">Male category used by the source</option>
+                </select>
+              </label>
+              <label>
+                Activity level <span>Optional</span>
+                <select name="activityLevel" defaultValue={profile.activityLevel ?? ''}>
+                  <option value="">Not provided</option>
+                  <option value="sedentary">Sedentary</option>
+                  <option value="light">Light</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="active">Active</option>
+                  <option value="very_active">Very active</option>
+                </select>
+              </label>
+              <label>
+                Explicit life stage <span>Optional</span>
+                <select
+                  name="explicitlyEnteredLifeStage"
+                  defaultValue={profile.explicitlyEnteredLifeStage ?? ''}
+                >
+                  <option value="">Not provided</option>
+                  <option value="pregnant">Pregnancy explicitly entered</option>
+                  <option value="breastfeeding">Breastfeeding explicitly entered</option>
+                </select>
+              </label>
+            </div>
+            <div className={styles.checks}>
+              <label>
+                <input
+                  name="estimatedTargetsEnabled"
+                  type="checkbox"
+                  defaultChecked={profile.estimatedTargetsEnabled}
+                />
+                Save these inputs for estimated-target use
+              </label>
+              <label>
+                <input
+                  name="estimatedTargetConsent"
+                  type="checkbox"
+                  defaultChecked={profile.estimatedTargetConsent}
+                />
+                I explicitly consent to using the entered values for a documented estimate
+              </label>
+            </div>
+            <p className={styles.warning}>
+              Saving these inputs does not calculate, create, or replace a goal. Estimated targets
+              remain unavailable until a versioned reference method is separately selected and
+              applied. You can continue using manual goals.
+            </p>
+            <div className={styles.estimateBox}>
+              <h3>Preview an adult maintenance-energy estimate</h3>
+              <p>
+                Adults age 19+ who are not pregnant or breastfeeding can preview the NASEM 2023
+                Table 5-16 equation. Choose a fresh activity category below; the generic activity
+                field above is never translated automatically.
+              </p>
+              <label>
+                Estimate effective date
+                <input name="estimateEffectiveOn" type="date" defaultValue={effectiveOn} />
+              </label>
+              <label>
+                NASEM physical-activity category
+                <select name="estimatePalCategory" defaultValue="">
+                  <option value="">Choose after reviewing the descriptions</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="low_active">Low active</option>
+                  <option value="active">Active</option>
+                  <option value="very_active">Very active</option>
+                </select>
+              </label>
+              <details>
+                <summary>How USDA describes these four categories</summary>
+                <ul>
+                  <li>
+                    Inactive: activities of daily living only, with little activity beyond them.
+                  </li>
+                  <li>
+                    Low active: daily living plus 60–80 minutes of moderate activity per week.
+                  </li>
+                  <li>
+                    Active: daily living plus 30–50 minutes of moderate and 85 minutes of vigorous
+                    activity per week.
+                  </li>
+                  <li>Very active: daily living plus 130 minutes of vigorous activity per week.</li>
+                </ul>
+                <p>
+                  Classification is uncertain. Select the closest description yourself; the app does
+                  not infer it from steps, recipes, Pantry, or diary entries.
+                </p>
+              </details>
+              <button
+                type="button"
+                onClick={(event) =>
+                  void requestEnergyEstimate('preview', event.currentTarget.form!)
+                }
+              >
+                Preview estimated maintenance calories
+              </button>
+              {energyEstimate?.estimate ? (
+                <section className={styles.estimateResult} aria-labelledby="energy-estimate-result">
+                  <h4 id="energy-estimate-result">
+                    Estimated maintenance energy: {energyEstimate.estimate.roundedKcal} kcal/day
+                  </h4>
+                  <p>{energyEstimate.estimate.disclosure}</p>
+                  <details>
+                    <summary>Formula and source</summary>
+                    <p>
+                      {energyEstimate.estimate.formula}. Unrounded result:{' '}
+                      {energyEstimate.estimate.exactKcal.toFixed(4)} kcal/day; displayed and applied
+                      at the nearest whole kcal.
+                    </p>
+                    <p>
+                      <a href={energyEstimate.estimate.sourceUrl} target="_blank" rel="noreferrer">
+                        {energyEstimate.estimate.sourceVersion}
+                      </a>{' '}
+                      · DOI {energyEstimate.estimate.doi}
+                    </p>
+                  </details>
+                  {energyEstimate.currentEnergyGoals.length ? (
+                    <label>
+                      Current calorie goal to supersede explicitly
+                      <select name="supersedesGoalVersionId" defaultValue="">
+                        <option value="">Choose the exact current version</option>
+                        {energyEstimate.currentEnergyGoals.map((goal) => (
+                          <option key={goal.id} value={goal.id}>
+                            {goal.value} {goal.unit} · {goal.sourceType} · revision {goal.revision}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <p>
+                      No current calorie goal will be replaced; applying starts a new goal series.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(event) =>
+                      void requestEnergyEstimate('apply', event.currentTarget.form!)
+                    }
+                  >
+                    Apply this versioned estimate
+                  </button>
+                </section>
+              ) : null}
+            </div>
+          </fieldset>
+        </details>
 
         <fieldset id="nutrition-goals">
           <legend>Goals and tracking choices</legend>
@@ -489,8 +509,9 @@ export function NutritionProfileSettings({
             Enable weight tracking for this profile
           </label>
           <p className={styles.notice}>
-            Weight check-ins stay private to people who can view this profile&apos;s measurements.
-            Each observation is stored separately so history is never overwritten.
+            Weight check-ins are associated with the active profile for personalization. Household
+            profile selection is not access control, so use the app&apos;s account security for
+            privacy. Each observation is stored separately so history is never overwritten.
           </p>
         </fieldset>
 
@@ -608,50 +629,52 @@ export function NutritionProfileSettings({
           </label>
         </fieldset>
 
-        <fieldset>
-          <legend>Dates and references</legend>
-          <div className={styles.grid}>
-            <label>
-              Daily reset timezone
-              <input
-                name="dailyResetTimezone"
-                defaultValue={profile.dailyResetTimezone}
-                required
-                maxLength={100}
-              />
-            </label>
-            <label>
-              Week starts on
-              <select name="weekStartsOn" defaultValue={profile.weekStartsOn}>
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
-              </select>
-            </label>
-            <label>
-              Reference jurisdiction
-              <input
-                name="referenceJurisdiction"
-                defaultValue={profile.referenceJurisdiction}
-                required
-                minLength={2}
-                maxLength={20}
-              />
-            </label>
-          </div>
-        </fieldset>
+        <details className={styles.disclosure}>
+          <summary>Advanced dates and reference defaults</summary>
+          <fieldset>
+            <legend>Dates and references</legend>
+            <div className={styles.grid}>
+              <label>
+                Daily reset timezone
+                <input
+                  name="dailyResetTimezone"
+                  defaultValue={profile.dailyResetTimezone}
+                  required
+                  maxLength={100}
+                />
+              </label>
+              <label>
+                Week starts on
+                <select name="weekStartsOn" defaultValue={profile.weekStartsOn}>
+                  <option value="0">Sunday</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                </select>
+              </label>
+              <label>
+                Reference jurisdiction
+                <input
+                  name="referenceJurisdiction"
+                  defaultValue={profile.referenceJurisdiction}
+                  required
+                  minLength={2}
+                  maxLength={20}
+                />
+              </label>
+            </div>
+          </fieldset>
+        </details>
 
-        <button className="primary-button" type="submit">
-          Save Nutrition settings
-        </button>
-        <p className={styles.status} role="status" aria-live="polite">
-          {status}
-        </p>
+        <SettingsActionBar status={status}>
+          <button className="primary-button compact" type="submit">
+            Save Nutrition settings
+          </button>
+        </SettingsActionBar>
       </form>
-    </section>
+    </SettingsPane>
   );
 }

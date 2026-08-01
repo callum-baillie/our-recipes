@@ -9,7 +9,9 @@ describe('read-only food-data provider adapters', () => {
 
   it('normalizes a bounded Open Food Facts response without returning the raw payload', async () => {
     const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      expect(new Headers(init?.headers).get('user-agent')).toContain('Bord/1.0.0-rc.1');
+      expect(new Headers(init?.headers).get('user-agent')).toMatch(
+        /^Bord\/\d+\.\d+\.\d+(?:-[a-z0-9.]+)?\s+\(/u,
+      );
       return new Response(
         JSON.stringify({
           status: 1,

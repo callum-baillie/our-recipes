@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { shoppingCategorySchema } from '@/lib/domain/list-settings';
 import { RECIPE_REACTION_SCORES } from '@/lib/domain/recipe-reaction';
 import { NUTRIENT_CODES } from '@/lib/domain/nutrition';
 
@@ -98,8 +99,11 @@ const recipeTagsSchema = z
 export const recipeIngredientSchema = z.object({
   quantity: z.union([z.literal(''), z.coerce.number().positive().max(10_000)]),
   unit: boundedText(30),
-  item: requiredText(160),
+  item: requiredText(160).describe(
+    'Specific purchasable ingredient identity, including meaningful type, form, variety, and size qualifiers.',
+  ),
   note: boundedText(240),
+  shoppingCategory: shoppingCategorySchema.default('Other'),
   pantryProductId: z.union([z.literal(''), z.string().uuid()]).optional(),
 });
 

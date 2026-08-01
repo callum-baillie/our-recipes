@@ -95,6 +95,85 @@
   margin-top: 1.25rem;
 }
 
+.goalGuide {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.1rem;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--leaf) 5%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--leaf) 20%, var(--line));
+  border-radius: 0.75rem;
+}
+
+.goalGuide h2 {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.goalGuide p,
+.goalDisclosure {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  margin: 0.35rem 0 0;
+}
+
+.goalExamples,
+.goalGuideControls {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.goalGuideControls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.goalGuideControls label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--label);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.goalExamples button,
+.goalEstimateButton,
+.goalEstimateResult button {
+  min-height: 2.55rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.goalEstimateButton,
+.goalEstimateResult button {
+  justify-self: start;
+  color: var(--on-accent);
+  background: var(--tomato);
+  border-color: var(--tomato);
+}
+
+.goalEstimateResult {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+}
+
+.goalEstimateResult p {
+  margin: 0;
+}
+
 .form label,
 .headerActions label {
   display: grid;
@@ -156,7 +235,7 @@
 .dangerButton {
   min-height: 2.9rem;
   padding: 0.65rem 0.9rem;
-  color: white;
+  color: var(--on-accent);
   background: var(--tomato-dark);
   border: 1px solid var(--tomato-dark);
   border-radius: 0.4rem;
@@ -186,7 +265,7 @@
 }
 
 .tabs a[aria-current='page'] {
-  color: white;
+  color: var(--on-accent);
   background: var(--tomato);
 }
 
@@ -674,7 +753,7 @@
 .headerButtons .primaryAction {
   background: var(--leaf);
   border-color: var(--leaf);
-  color: var(--page);
+  color: var(--on-primary);
   min-width: 7.8rem;
 }
 
@@ -1062,6 +1141,7 @@
 }
 
 .goalSummary a,
+.goalSummary button,
 .panelHeadingRow a,
 .railHeading a,
 .railLink,
@@ -1073,6 +1153,14 @@
   font-size: 0.75rem;
   font-weight: 800;
   gap: 0.35rem;
+}
+
+.goalSummary button {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
 }
 
 .exactData,
@@ -1268,7 +1356,7 @@
 
 .avatarStack i:first-child {
   background: var(--leaf);
-  color: var(--page);
+  color: var(--on-primary);
   margin-left: 0;
 }
 
@@ -1605,7 +1693,7 @@
 .viewIntro button {
   background: var(--leaf);
   border-color: var(--leaf);
-  color: var(--page);
+  color: var(--on-primary);
 }
 
 .headerButtons button:disabled,
@@ -1690,6 +1778,14 @@
   width: min(46rem, calc(100vw - 2rem));
 }
 
+.goalSetupDialog {
+  width: min(62rem, calc(100vw - 2rem));
+}
+
+.goalSetupBody {
+  padding: 1rem 1.2rem 1.2rem;
+}
+
 .compactDialog::backdrop,
 .logDialog::backdrop {
   background: rgb(19 27 20 / 52%);
@@ -1755,7 +1851,7 @@
 .profileDialogActions a:first-child {
   background: var(--leaf);
   border-color: var(--leaf);
-  color: var(--page);
+  color: var(--on-primary);
 }
 
 .viewDialogLinks {
@@ -1889,7 +1985,7 @@
 .dialogPrimary {
   background: var(--tomato);
   border-color: var(--tomato);
-  color: white;
+  color: var(--on-accent);
   justify-self: stretch;
 }
 
@@ -1961,7 +2057,7 @@
   background: var(--leaf);
   border: 1px solid var(--leaf);
   border-radius: 0.55rem;
-  color: var(--page);
+  color: var(--on-primary);
   display: inline-flex;
   justify-content: center;
   min-height: 2.65rem;
@@ -2237,7 +2333,8 @@
   .logOptions,
   .dialogForm,
   .viewDialogLinks,
-  .profileDialogActions {
+  .profileDialogActions,
+  .goalSetupBody {
     padding-inline: 1rem;
   }
 
@@ -2276,6 +2373,17 @@
 
   .goalSummary {
     grid-template-columns: 1fr;
+  }
+
+  .goalExamples,
+  .goalGuideControls {
+    grid-template-columns: 1fr;
+  }
+
+  .goalExamples button,
+  .goalEstimateButton,
+  .goalEstimateResult button {
+    width: 100%;
   }
 
   .goalSummary > strong,

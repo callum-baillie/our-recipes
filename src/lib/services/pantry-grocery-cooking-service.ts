@@ -27,15 +27,21 @@ import {
 } from '@/lib/domain/inventory-units';
 import { parseServingCount } from '@/lib/domain/ingredient-scaling';
 import { localIsoDate } from '@/lib/domain/local-date';
+import {
+  preferredShoppingItemLabel,
+  shoppingItemIdentity,
+} from '@/lib/domain/shopping-item-identity';
 import { pantryBatchInputSchema } from '@/lib/domain/pantry';
 import {
   pantryPurchaseIntakeSchema,
   pantryShoppingControlSchema,
+  pantryShoppingMatchSchema,
   pantryShortageGenerationSchema,
   type PantryCookConfirmationInput,
   type PantryPurchaseIntakeInput,
   type PantryShortageGenerationInput,
   type PantryShoppingControlInput,
+  type PantryShoppingMatchInput,
 } from '@/lib/domain/pantry-grocery-cooking';
 import {
   getProjectedPantryDemand,
@@ -55,6 +61,7 @@ import { getListSettings, resolveShoppingAisle } from '@/lib/services/list-setti
 
 export class PantryGroceryCookingNotFoundError extends Error {}
 export class PantryGroceryCookingConflictError extends Error {}
+export class PantryGroceryCookingPrerequisiteError extends Error {}
 
 export type ShoppingDetail = typeof pantryShoppingItemDetails.$inferSelect;
 
@@ -159,6 +166,14 @@ function sourceRecipeIds(contributions: DemandContribution[]): string[] {
   return [...new Set(contributions.map((contribution) => contribution.recipeId))];
 }
 
+export function formatMealPlanShoppingListName(weekStart: string, weekEnd: string): string {
+  const shortDate = (value: string) => {
+    const [, month, day] = value.split('-');
+    return month && day ? `${month}/${day}` : value;
+  };
+  return `Meal Plan ${shortDate(weekStart)} - ${shortDate(weekEnd)}`;
+}
+
 export function generatePantryShortageList(
   input: PantryShortageGenerationInput,
   actorProfileId: string,
@@ -185,6 +200,12 @@ export function generatePantryShortageList(
     const existingList =
       durableList ??
       transaction.select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
+    const restored = Boolean(existingList?.archivedAt);
+    if (!existingList && !demand.lines.length && !demand.unknown.length) {
+      throw new PantryGroceryCookingPrerequisiteError(
+        'Plan at least one recipe meal before generating a shopping list.',
+      );
+    }
     if (parsedInput.listId && !existingList)
       throw new PantryGroceryCookingNotFoundError('That shopping list no longer exists.');
     if (
@@ -200,7 +221,7 @@ export function generatePantryShortageList(
         .insert(shoppingLists)
         .values({
           id: listId,
-          name: `Pantry shortages · ${parsedInput.weekStart}`,
+          name: formatMealPlanShoppingListName(parsedInput.weekStart, parsedInput.weekEnd),
           weekStart: parsedInput.weekStart,
           weekEnd: parsedInput.weekEnd,
           sourceMode: parsedInput.mode === 'missing' ? 'pantry_missing' : 'pantry_all',
@@ -317,6 +338,55 @@ export function generatePantryShortageList(
         });
       }
     }
+    const groupedUnknown: Array<{
+      identity: string;
+      productId: string | null;
+      item: string;
+      quantity: number | null;
+      unit: string;
+      reasons: Set<string>;
+      contributions: DemandContribution[];
+    }> = [];
+    for (const line of demand.unknown) {
+      const contribution = (contributionsByMeal.get(line.mealPlanEntryId) ?? []).find(
+        (candidate) => candidate.ingredientId === line.ingredientId,
+      );
+      if (!contribution)
+        throw new PantryGroceryCookingConflictError(
+          'Planned demand changed while grocery provenance was being generated. Try again.',
+        );
+      const identity = shoppingItemIdentity(line.ingredientName);
+      const existing = groupedUnknown.find(
+        (candidate) =>
+          candidate.identity === identity &&
+          candidate.productId === line.productId &&
+          areInventoryUnitsCompatible(candidate.unit, line.unit),
+      );
+      if (existing) {
+        existing.item = preferredShoppingItemLabel(existing.item, line.ingredientName);
+        existing.quantity =
+          existing.quantity === null || line.quantity === null
+            ? null
+            : Number(
+                (
+                  existing.quantity +
+                  convertInventoryQuantity(line.quantity, line.unit, existing.unit)
+                ).toFixed(6),
+              );
+        if (line.reason) existing.reasons.add(line.reason);
+        existing.contributions.push(contribution);
+      } else {
+        groupedUnknown.push({
+          identity,
+          productId: line.productId,
+          item: line.ingredientName.trim(),
+          quantity: line.quantity,
+          unit: normalizeInventoryUnit(line.unit),
+          reasons: new Set(line.reason ? [line.reason] : []),
+          contributions: [contribution],
+        });
+      }
+    }
     const desired = [
       ...candidateLines.flatMap((line) => {
         const previous = existingDetails.find(
@@ -417,36 +487,35 @@ export function generatePantryShortageList(
           })(),
         ];
       }),
-      ...demand.unknown.map((line) => {
-        const contribution = (contributionsByMeal.get(line.mealPlanEntryId) ?? []).find(
-          (candidate) => candidate.ingredientId === line.ingredientId,
-        );
-        if (!contribution)
-          throw new PantryGroceryCookingConflictError(
-            'Planned demand changed while grocery provenance was being generated. Try again.',
-          );
+      ...groupedUnknown.map((group) => {
+        const uncertaintyReason =
+          [...group.reasons].join(' ') || 'Demand cannot be calculated exactly.';
+        const demandSummary =
+          group.quantity === null
+            ? uncertaintyReason
+            : `${uncertaintyReason} Combined recipe demand is ${group.quantity} ${group.unit}; the Pantry-adjusted shortage still needs review.`;
         return {
-          key: `unknown:${line.mealPlanEntryId}:${line.ingredientId}`,
-          productId: line.productId,
-          item: line.ingredientName,
+          key: `unknown:${group.productId ?? 'unmapped'}:${group.identity}:${group.unit}`,
+          productId: group.productId,
+          item: group.item,
           quantity: null,
-          unit: line.unit,
-          note: line.reason ?? 'Demand cannot be calculated exactly.',
+          unit: group.unit,
+          note: demandSummary.slice(0, 240),
           state: 'uncertain' as const,
           formulaInputs: {
             version: 'pantry-shortage-v1',
-            productId: line.productId,
-            requiredQuantity: null,
+            productId: group.productId,
+            requiredQuantity: group.quantity,
             availableQuantity: null,
             shortageQuantity: null,
-            unit: line.unit,
+            unit: group.unit,
             formula: 'not calculated because demand or stock is uncertain',
-            uncertaintyReason: line.reason,
-            contributions: [contribution],
+            uncertaintyReason,
+            contributions: group.contributions,
           },
           provenance: {
             ...provenanceForDemand(demand),
-            contributions: [contribution],
+            contributions: group.contributions,
           },
         };
       }),
@@ -576,10 +645,10 @@ export function generatePantryShortageList(
     }
     transaction
       .update(shoppingLists)
-      .set({ updatedAt: now })
+      .set({ archivedAt: null, updatedAt: now })
       .where(eq(shoppingLists.id, listId))
       .run();
-    return { listId, demand };
+    return { listId, demand, restored };
   });
 }
 
@@ -673,6 +742,107 @@ export function updateShoppingItemPantryControl(
     .from(pantryShoppingItemDetails)
     .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
     .get()!;
+}
+
+export function matchShoppingItemToPantryProduct(
+  listId: string,
+  itemId: string,
+  input: PantryShoppingMatchInput,
+  actorProfileId: string,
+) {
+  ensureDatabase();
+  const parsedInput = pantryShoppingMatchSchema.parse(input);
+  const db = getDatabase();
+  return db.transaction((transaction) => {
+    const row = transaction
+      .select({ item: shoppingListItems, detail: pantryShoppingItemDetails })
+      .from(shoppingListItems)
+      .innerJoin(
+        pantryShoppingItemDetails,
+        eq(pantryShoppingItemDetails.shoppingListItemId, shoppingListItems.id),
+      )
+      .where(and(eq(shoppingListItems.id, itemId), eq(shoppingListItems.listId, listId)))
+      .get();
+    if (!row)
+      throw new PantryGroceryCookingNotFoundError('That generated shopping item no longer exists.');
+    const product = transaction
+      .select({ id: pantryProducts.id, archivedAt: pantryProducts.archivedAt })
+      .from(pantryProducts)
+      .where(eq(pantryProducts.id, parsedInput.productId))
+      .get();
+    if (!product || product.archivedAt)
+      throw new PantryGroceryCookingNotFoundError('That Pantry item is no longer available.');
+
+    let formulaInputs: Record<string, unknown> = {};
+    let provenance: { contributions?: Array<{ ingredientId?: unknown }> } = {};
+    try {
+      formulaInputs = JSON.parse(row.detail.formulaInputs) as Record<string, unknown>;
+    } catch {
+      formulaInputs = {};
+    }
+    try {
+      provenance = JSON.parse(row.detail.provenance) as typeof provenance;
+    } catch {
+      provenance = {};
+    }
+    const ingredientIds = [
+      ...new Set(
+        (provenance.contributions ?? [])
+          .map(({ ingredientId }) => ingredientId)
+          .filter((ingredientId): ingredientId is string => typeof ingredientId === 'string'),
+      ),
+    ];
+    const validIngredientIds = new Set(
+      ingredientIds.length
+        ? transaction
+            .select({ id: recipeIngredients.id })
+            .from(recipeIngredients)
+            .where(inArray(recipeIngredients.id, ingredientIds))
+            .all()
+            .map(({ id }) => id)
+        : [],
+    );
+    const now = new Date();
+    for (const ingredientId of validIngredientIds) {
+      transaction
+        .insert(recipeIngredientProductMappings)
+        .values({
+          recipeIngredientId: ingredientId,
+          productId: product.id,
+          matchType: parsedInput.matchType,
+          compatibleVariant: false,
+          isOptional: false,
+          mappedByProfileId: actorProfileId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: recipeIngredientProductMappings.recipeIngredientId,
+          set: {
+            productId: product.id,
+            matchType: parsedInput.matchType,
+            mappedByProfileId: actorProfileId,
+            updatedAt: now,
+          },
+        })
+        .run();
+    }
+    transaction
+      .update(pantryShoppingItemDetails)
+      .set({
+        productId: product.id,
+        formulaInputs: JSON.stringify({ ...formulaInputs, productId: product.id }),
+        uncertaintyReason: null,
+        updatedAt: now,
+      })
+      .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
+      .run();
+    return transaction
+      .select()
+      .from(pantryShoppingItemDetails)
+      .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
+      .get()!;
+  });
 }
 
 export function intakePurchasedShoppingItem(

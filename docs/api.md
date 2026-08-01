@@ -2,11 +2,50 @@
 
 Food discovery uses profile-scoped, exact-origin POST actions because requests consume shared upstream quota and populate a transient server cache. The stable routes and errors are documented in `openapi.yaml`; provider behavior is described in [food-data-integrations.md](food-data-integrations.md). Raw upstream responses and credentials are never response fields.
 
-Application routes are under `/api/v1`; the private Homepage integration is under `/api/integrations/homepage/v1`. Responses use JSON, all write endpoints require an exact same/trusted `Origin`, and failures use:
+Application routes are under `/api/v1`; the private Homepage integration is under `/api/integrations/homepage/v1`. Responses use JSON. Browser writes require an exact same/trusted `Origin`; server-to-server bearer requests use scoped API-key authentication instead. Failures use:
 
 ```json
 { "error": { "code": "machine_readable_code", "message": "Safe human explanation" } }
 ```
+
+## Authentication and integration keys
+
+The app uses Better Auth email/passphrase sessions. Every profile has a unique account email and a
+six-digit profile-switch PIN; the PIN changes the active household actor inside an authenticated
+session and is not an independent access-control boundary. Existing installs complete a one-time
+security upgrade before other routes become available.
+
+Only the first/admin account can manage keys at **Settings → API access**. Keys:
+
+- start with `bord_sk_`, are shown once, and are stored hashed;
+- expire after 1–365 days (90 by default);
+- have explicit `read`, `create`, `update`, and `delete` grants for Recipes, Meal Plans, Grocery
+  Lists, Collections, and Pantry;
+- are accepted only on those documented resource paths, at a default 120 requests/minute;
+- can be disabled, revoked, or rotated; rotation revokes the previous key immediately.
+
+Send a key as `Authorization: Bearer bord_sk_…`. API-key create requests also require an
+`Idempotency-Key` header (1–128 visible ASCII characters). Identical retries replay the stored JSON
+response for 24 hours; changing the body while reusing the same key returns `409`.
+
+Every integration response includes `X-Request-Id`. The five `/bulk` endpoints return
+`application/x-ndjson`: the first line is snapshot metadata and later lines contain records. A
+snapshot is limited to 50,000 records and 100 MB; `updatedSince` reduces the slice and
+`includeInactive=true` includes archived/trash/inactive records where the resource supports them.
+Bulk exports never include credentials, recovery codes, session tokens, API-key hashes, or raw
+secrets.
+
+| Integration resource | CRUD endpoints                                                   | Bulk snapshot          |
+| -------------------- | ---------------------------------------------------------------- | ---------------------- |
+| Recipes              | `/recipes`, `/recipes/{recipeId}`                                | `/recipes/bulk`        |
+| Meal Plans           | `/meal-plan`, `/meal-plan/{entryId}`                             | `/meal-plan/bulk`      |
+| Grocery Lists        | `/shopping-lists`, `/shopping-lists/{listId}`, nested `/items`   | `/shopping-lists/bulk` |
+| Collections          | `/collections`, `/collections/{collectionId}`, nested `/recipes` | `/collections/bulk`    |
+| Pantry               | `/pantry/products`, `/pantry/batches`, and their item routes     | `/pantry/batches/bulk` |
+
+Recipe deletion creates a trash revision. Shopping lists refuse destructive deletion when Pantry
+history depends on them. Pantry products are archived, and Pantry-batch deletion records a
+version-protected discard event. These semantics preserve audit/history integrity.
 
 | Endpoint                                                               | Purpose                                                                                                                                                                                                       |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -80,6 +119,7 @@ Application routes are under `/api/v1`; the private Homepage integration is unde
 | `DELETE /api/v1/shopping-lists/aisles/{aisleId}`                       | Removes an aisle and leaves affected list rows explicitly unassigned.                                                                                                                                         |
 | `POST /api/v1/shopping-lists/pantry-shortages`                         | Creates or regenerates missing-only or all-item demand using the normalized recipe/staple/extra/Pantry/purchased formula while preserving edits and uncertainty.                                              |
 | `PATCH /api/v1/shopping-lists/{listId}/items/{itemId}/pantry-controls` | Saves covered, ignore-Pantry, inaccurate-inventory, manual-extra, or reset controls behind trusted-origin and signed ActorContext checks.                                                                     |
+| `PATCH /api/v1/shopping-lists/{listId}/items/{itemId}/pantry-match`    | Persists an exact, suggested, or manually chosen Pantry product match for a generated row and its contributing recipe ingredients.                                                                            |
 | `POST /api/v1/shopping-lists/{listId}/items/{itemId}/pantry-intake`    | Explicitly records rich partial/complete purchased batch details using a retry-stable operation key; confirmed success rotates it for a later purchase.                                                       |
 
 | `PUT /api/v1/recipes/{recipeId}/favorite` | Sets the current profile’s personal favorite state. |
@@ -111,7 +151,7 @@ The Homepage summary is the exception: it is a server-to-server read endpoint re
 
 The AI status endpoint has no enable/configure action and never returns a key. Production reads `OPENAI_API_KEY` only from the server environment; local development may use the ignored root `.api_keys` convenience file. `POST /ai/reviews` requires `confirm: true` plus either 20–30,000 characters of text or an existing image-import ID, and accepts an optional `improve` flag that asks the model to repair and enrich instructions and metadata while keeping the source ingredients. `POST /recipes/{recipeId}/improve` requires `confirm: true`, the current revision, and the current bounded editor recipe; it returns a review-only candidate and server-enforces the submitted ingredient groups even if the provider suggests changes. Image generation and nutrition estimation remain explicit actions. Every AI mutation requires a trusted origin and selected-or-default household profile, enforces a per-profile process rate limit, and writes a no-raw-content audit. No review or improvement endpoint auto-saves a candidate or returns provider URLs/secrets.
 
-Recipe reads and writes include ordered ingredient groups, instruction sections, equipment, original-author/source/cooking-method metadata, optional user-entered nutrition values, current creator/editor attribution, and revision metadata. The editor sends `expectedRevision` on every shared replacement, lifecycle change, or restore; a stale value returns `409 recipe_revision_conflict` rather than overwriting a newer household edit. Restoring a saved revision validates its stored bounded recipe shape and appends a new revision—it never mutates the old snapshot. Profile ratings/notes are separate and do not increment that revision. Image-card reactions use the existing private rating field: dislike is 1, like is 3, and staple is 5, leaving 2 and 4 available for future reactions. Scores 3 and 5 also retain compatibility with the personal-favorites filter. Recipe-list reads default to active cards and 24 cards per page. Their bounded query parameters are `q`, `creator`, `tag`, `collection`, `category`, `cuisine`, `maxTotalMinutes`, `favorite=true`, `cooked=true`, `status`, `sort`, and `page`; `sort=highest-rated` uses only the selected profile’s rating and falls back to recency without one.
+Recipe reads and writes include ordered ingredient groups, each ingredient's bounded `shoppingCategory`, instruction sections, equipment, original-author/source/cooking-method metadata, optional user-entered nutrition values, current creator/editor attribution, and revision metadata. AI recipe extraction and generation must return that category for every ingredient; meal-plan snapshots preserve it so generated shopping lists can route explicitly before using the deterministic legacy/manual-item fallback. The editor sends `expectedRevision` on every shared replacement, lifecycle change, or restore; a stale value returns `409 recipe_revision_conflict` rather than overwriting a newer household edit. Restoring a saved revision validates its stored bounded recipe shape and appends a new revision—it never mutates the old snapshot. Profile ratings/notes are separate and do not increment that revision. Image-card reactions use the existing private rating field: dislike is 1, like is 3, and staple is 5, leaving 2 and 4 available for future reactions. Scores 3 and 5 also retain compatibility with the personal-favorites filter. Recipe-list reads default to active cards and 24 cards per page. Their bounded query parameters are `q`, `creator`, `tag`, `collection`, `category`, `cuisine`, `maxTotalMinutes`, `favorite=true`, `cooked=true`, `status`, `sort`, and `page`; `sort=highest-rated` uses only the selected profile’s rating and falls back to recency without one.
 
 Tags are household-managed, lower-cased labels. Rename, merge, and deletion update recipe associations in a database transaction and refresh full-text search; deletion removes the tag association rather than a recipe. Profiles remain attribution/preferences only and are never an authorization boundary.
 

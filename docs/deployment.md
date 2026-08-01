@@ -4,7 +4,10 @@
 
 - Docker Engine with a current BuildKit-capable builder.
 - A host directory dedicated to the container's `/data` volume. The image initializes ownership of this app-specific directory at startup, then runs the application as UID/GID `1001`.
-- A unique `COOKIE_SECRET` of at least 32 characters and an exact `APP_ORIGIN` matching the household browser URL.
+- Independent high-entropy `COOKIE_SECRET` and `BETTER_AUTH_SECRET` values, plus exact
+  `APP_ORIGIN`/`BETTER_AUTH_URL` values matching the household browser URL.
+- SMTP host, sender, and credentials for verification and passphrase-reset email. Test delivery
+  before accepting a production deployment.
 - Optional `OPENAI_API_KEY` only when the household intentionally enables review suggestions or generated serving images. Never put `.api_keys` in a bind mount, image, or backup.
 - Optional server-only `USDA_FDC_API_KEY` enables FoodData Central search. Open Food Facts exact barcode reads need no credential. Camera scanning requires the trusted Nginx Proxy Manager HTTPS route described in [food-data-integrations.md](food-data-integrations.md).
 
@@ -14,13 +17,14 @@ Profiles are not authentication. Do not expose an `AUTH_MODE=none` household dep
 
 ```sh
 cp .env.example .env
-# Set COOKIE_SECRET and APP_ORIGIN in .env. Set OPENAI_API_KEY only if intentionally enabling OpenAI actions.
+# Set both secrets, APP_ORIGIN/BETTER_AUTH_URL, and SMTP in .env.
+# Set OPENAI_API_KEY only if intentionally enabling OpenAI actions.
 docker compose up --build -d
 docker compose ps
 curl http://127.0.0.1:3000/api/v1/health
 ```
 
-The image briefly starts its entrypoint as root to initialize ownership of the dedicated `/data` mount, then drops to UID/GID `1001`, binds the app to port `3000` inside the container, and stores SQLite, images, backups, migration locks, and safe backup configuration below `/data`. The runner executes `scripts/container-migrate.mjs` before `server.js`; the script holds a migration lock and takes a pre-migration SQLite safety copy when a database already exists.
+The image briefly starts its entrypoint as root to initialize ownership of the dedicated `/data` mount and the exact configured `BACKUP_DIR`, then drops to UID/GID `1001` and binds the app to port `3000` inside the container. SQLite, images, migration locks, and safe backup configuration remain below `/data`; completed bundles and pre-migration safety copies go to `BACKUP_DIR` (default `/data/backups`). The runner executes `scripts/container-migrate.mjs` before `server.js`; the script holds a migration lock and takes a pre-migration SQLite safety copy when a database already exists.
 
 ## Health and persistence proof
 

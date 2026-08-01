@@ -8,13 +8,16 @@ import type { NutritionWeightTrend } from '@/lib/domain/nutrition-weight-trend';
 
 type NutritionSetupOverviewProps = {
   profileName: string;
+  hasConfiguredGoals: boolean;
   canManageGoals: boolean;
   canManageProfile: boolean;
   hasDiaryEntries: boolean;
   hasPlannedMeals: boolean;
+  savedGoalDescription?: string | null;
   weightTrend?: NutritionWeightTrend | null;
   onRecordNutrition: () => void;
   onRecordWeight: () => void;
+  onConfigureGoals: () => void;
 };
 
 type NutritionWeightTrackerCardProps = {
@@ -114,15 +117,41 @@ export function NutritionWeightTrackerCard({
 
 export function NutritionSetupOverview({
   profileName,
+  hasConfiguredGoals,
   canManageGoals,
   canManageProfile,
   hasDiaryEntries,
   hasPlannedMeals,
+  savedGoalDescription,
   weightTrend,
   onRecordNutrition,
   onRecordWeight,
+  onConfigureGoals,
 }: NutritionSetupOverviewProps) {
-  const completedSteps = Number(hasDiaryEntries) + Number(hasPlannedMeals);
+  const completedSteps =
+    1 + Number(hasConfiguredGoals) + Number(hasDiaryEntries) + Number(hasPlannedMeals);
+  const nextStep = !hasConfiguredGoals
+    ? {
+        title: 'Choose a daily nutrition goal',
+        detail: 'Set a calorie or nutrient goal before Bòrd can compare recorded nutrition.',
+        href: null,
+        label: 'Set daily nutrition goal',
+      }
+    : !hasDiaryEntries
+      ? {
+          title: 'Record what you eat',
+          detail: 'Confirm a food or meal to start your diary.',
+          href: null,
+          label: 'Record nutrition',
+        }
+      : !hasPlannedMeals
+        ? {
+            title: 'Connect your meal plan',
+            detail: 'Assign a planned meal when you want a separate weekly preview.',
+            href: '/planner',
+            label: 'Open meal planner',
+          }
+        : null;
 
   return (
     <div className={styles.setup}>
@@ -131,14 +160,31 @@ export function NutritionSetupOverview({
           <Target size={26} aria-hidden="true" />
         </div>
         <div>
-          <p className={styles.eyebrow}>Nutrition setup</p>
-          <h2 id="nutrition-setup-title">Build a useful nutrition baseline</h2>
+          <p className={styles.eyebrow}>{nextStep ? `Next: ${nextStep.title}` : 'Nutrition baseline ready'}</p>
+          <h2 id="nutrition-setup-title">
+            {nextStep ? 'Continue your nutrition setup' : 'Your nutrition baseline is ready'}
+          </h2>
           <p>
-            Set goals for {profileName}, then record food or connect planned meals. Bòrd only shows
-            progress when it has goals and confirmed data to compare.
+            {profileName}&apos;s Nutrition profile is saved. Each item below is optional and has its
+            own completion action, so you can return exactly where you left off.
           </p>
+          {nextStep ? (
+            nextStep.href ? (
+              <Link className={styles.heroAction} href={nextStep.href}>
+                {nextStep.label} <ArrowRight size={15} aria-hidden="true" />
+              </Link>
+            ) : nextStep.title === 'Choose a daily nutrition goal' && canManageGoals ? (
+              <button className={styles.heroAction} type="button" onClick={onConfigureGoals}>
+                {nextStep.label} <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            ) : canManageProfile ? (
+              <button className={styles.heroAction} type="button" onClick={onRecordNutrition}>
+                {nextStep.label} <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            ) : null
+          ) : null}
         </div>
-        <span className={styles.progressLabel}>{completedSteps} of 3 steps complete</span>
+        <span className={styles.progressLabel}>{completedSteps} of 4 steps complete</span>
       </section>
 
       <section className={styles.steps} aria-label="Nutrition setup steps">
@@ -148,27 +194,46 @@ export function NutritionSetupOverview({
             <Target size={20} aria-hidden="true" />
           </span>
           <div>
-            <span className={styles.stepEyebrow}>Start here</span>
-            <h3>Choose goals and preferences</h3>
+            <span className={styles.stepEyebrow}>Complete</span>
+            <h3>Nutrition profile saved</h3>
             <p>
-              Add calorie or nutrient targets, units, dietary context, and optional estimated-target
-              settings.
+              Body, preference, and body-weight direction settings from onboarding are saved for{' '}
+              {profileName}.
+            </p>
+            {savedGoalDescription ? <p className={styles.savedValue}>{savedGoalDescription}</p> : null}
+            <Link href="/settings/nutrition">
+              Review Nutrition profile <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          </div>
+          <SetupStatus complete />
+        </article>
+
+        <article>
+          <span className={styles.stepNumber}>2</span>
+          <span className={styles.stepIcon}>
+            <Utensils size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <h3>Choose a daily nutrition goal</h3>
+            <p>
+              Add a manual calorie or nutrient goal, or review and apply an estimated maintenance
+              target. This is separate from your saved weight direction.
             </p>
             {canManageGoals ? (
-              <Link href="/settings/nutrition#nutrition-goals">
-                Set up nutrition goals <ArrowRight size={15} aria-hidden="true" />
-              </Link>
+              <button type="button" onClick={onConfigureGoals}>
+                Set up daily nutrition goals <ArrowRight size={15} aria-hidden="true" />
+              </button>
             ) : (
               <span className={styles.unavailable}>
                 Goal settings are not available for this profile.
               </span>
             )}
           </div>
-          <SetupStatus complete={false} />
+          <SetupStatus complete={hasConfiguredGoals} />
         </article>
 
         <article>
-          <span className={styles.stepNumber}>2</span>
+          <span className={styles.stepNumber}>3</span>
           <span className={styles.stepIcon}>
             <Utensils size={20} aria-hidden="true" />
           </span>
@@ -185,7 +250,7 @@ export function NutritionSetupOverview({
         </article>
 
         <article>
-          <span className={styles.stepNumber}>3</span>
+          <span className={styles.stepNumber}>4</span>
           <span className={styles.stepIcon}>
             <ClipboardCheck size={20} aria-hidden="true" />
           </span>

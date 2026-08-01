@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
 import { shoppingListManageSchema, shoppingListReorderSchema } from '@/lib/domain/planning';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   getShoppingList,
   deleteShoppingList,
@@ -14,26 +13,38 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function GET(_request: Request, context: { params: Promise<{ listId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ listId: string }> }) {
+  const authorization = await authorizeApi(request, 'shoppingLists', 'read');
+  if (authorization.response) return authorization.response;
   const list = getShoppingList((await context.params).listId);
   return list
-    ? NextResponse.json({ list })
+    ? withApiRequestId(NextResponse.json({ list }), authorization.requestId)
     : jsonError(404, 'shopping_list_not_found', 'That shopping list no longer exists.');
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ listId: string }> }) {
-  if (!hasTrustedMutationOrigin(request))
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  const authorization = await authorizeApi(request, 'shoppingLists', 'update');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   const raw = await request.json().catch(() => null);
   const managed = shoppingListManageSchema.safeParse(raw);
   if (managed.success) {
     try {
-      return NextResponse.json({
-        list: manageShoppingList((await context.params).listId, managed.data, actor.profileId),
-      });
+      return withApiRequestId(
+        NextResponse.json({
+          list: manageShoppingList(
+            (await context.params).listId,
+            managed.data,
+            authorization.principal.profileId,
+          ),
+        }),
+        authorization.requestId,
+      );
     } catch (error) {
       if (error instanceof PlanningNotFoundError)
         return jsonError(409, 'list_changed', error.message);
@@ -44,7 +55,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ listI
   if (!parsed.success) return jsonError(400, 'invalid_list_change', 'Use a supported list change.');
   try {
     reorderShoppingListItems((await context.params).listId, parsed.data.itemIds);
-    return NextResponse.json({ ok: true });
+    return withApiRequestId(NextResponse.json({ ok: true }), authorization.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
       return jsonError(409, 'list_changed', error.message);
@@ -53,14 +64,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ listI
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ listId: string }> }) {
-  if (!hasTrustedMutationOrigin(request))
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  const authorization = await authorizeApi(request, 'shoppingLists', 'delete');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   try {
     deleteShoppingList((await context.params).listId);
-    return new NextResponse(null, { status: 204 });
+    return withApiRequestId(new NextResponse(null, { status: 204 }), authorization.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
       return jsonError(409, 'list_delete_refused', error.message);

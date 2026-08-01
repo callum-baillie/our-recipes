@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
-import { BordIcon } from '@/components/bord-brand';
+import { RecipebookNav } from '@/components/recipebook-nav';
 import type { CollectionDetail } from '@/lib/services/collection-service';
 
 type RecipeOption = { id: string; title: string };
@@ -106,15 +106,10 @@ export function CollectionDetailManager({
 
   return (
     <main className="settings-page collection-page">
+      <RecipebookNav current="collections" />
       <header className="collection-detail-header">
         <Link className="quiet-link" href="/collections">
           ← All collections
-        </Link>
-        <Link className="wordmark" href="/">
-          <span className="wordmark-mark custom" aria-hidden="true">
-            <BordIcon size={21} />
-          </span>
-          <span>Bòrd</span>
         </Link>
       </header>
       <section className="settings-intro">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
+import { RecipebookNav } from '@/components/recipebook-nav';
 
 type Tag = { name: string; color: string | null; usageCount: number };
 
@@ -96,6 +97,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
 
   return (
     <main className="settings-page">
+      <RecipebookNav current="tags" />
       <section className="settings-intro">
         <p className="eyebrow">HOUSEHOLD ORGANIZATION</p>
         <h1>Tags with a little order.</h1>

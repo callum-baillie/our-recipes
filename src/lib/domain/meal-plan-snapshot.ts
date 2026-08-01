@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
+import { shoppingCategorySchema } from '@/lib/domain/list-settings';
+
 const ingredientSchema = z.object({
   ingredientId: z.string().min(1),
   item: z.string(),
   quantity: z.number().nullable(),
   unit: z.string(),
   note: z.string(),
+  shoppingCategory: shoppingCategorySchema.default('Other'),
   productId: z.string().nullable(),
   productName: z.string().nullable(),
   isOptional: z.boolean(),

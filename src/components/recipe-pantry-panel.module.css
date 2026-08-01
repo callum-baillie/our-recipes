@@ -1,9 +1,10 @@
 .panel {
   margin: 1.5rem 0;
-  border: 1px solid #d9d2c7;
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 1rem;
   padding: 1.1rem;
-  background: #fffdf9;
+  background: var(--linen);
 }
 
 .header,
@@ -27,14 +28,14 @@
 }
 
 .eyebrow {
-  color: #746a5f;
+  color: var(--muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.09em;
 }
 
 .explainer {
-  color: #655f59;
+  color: var(--muted);
 }
 
 .servings {
@@ -47,7 +48,8 @@
 }
 
 .servings button {
-  border: 1px solid #8b7b68;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
   padding: 0.4rem 0.75rem;
   background: transparent;
@@ -62,13 +64,13 @@
 }
 
 .item {
-  border-top: 1px solid #e6dfd5;
+  border-top: 1px solid var(--line);
   padding-top: 0.75rem;
 }
 
 .item small {
   display: block;
-  color: #655f59;
+  color: var(--muted);
 }
 
 .mapping {

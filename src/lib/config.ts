@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, parse, relative, resolve } from 'node:path';
 
 const configSchema = z.object({
   dataDir: z.string().min(1),
@@ -8,6 +8,20 @@ const configSchema = z.object({
   cookieSecret: z.string().min(24),
   appOrigin: z.string().url().optional(),
   trustedOrigins: z.array(z.string().url()),
+  auth: z.object({
+    secret: z.string().min(32),
+    baseUrl: z.string().url(),
+    emailFrom: z.string().min(3),
+    smtp: z.object({
+      configured: z.boolean(),
+      host: z.string().min(1).nullable(),
+      port: z.number().int().min(1).max(65_535),
+      secure: z.boolean(),
+      user: z.string().min(1).nullable(),
+      password: z.string().min(1).nullable(),
+    }),
+  }),
+  backupDir: z.string().min(1),
   backupRetentionDays: z.number().int().min(1).max(3_650),
   backupIntervalHours: z.number().int().min(1).max(168),
   foodData: z.object({
@@ -61,15 +75,39 @@ export function getRuntimeConfig(): RuntimeConfig {
   const isProduction = process.env.NODE_ENV === 'production';
   const dataDir = process.env.DATA_DIR ?? './data';
   const cookieSecret = process.env.COOKIE_SECRET ?? 'development-only-change-me-before-production';
+  const authSecret =
+    process.env.BETTER_AUTH_SECRET ?? 'development-only-better-auth-secret-change-me';
+  const authBaseUrl =
+    process.env.BETTER_AUTH_URL ??
+    process.env.APP_ORIGIN ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    'http://localhost:3000';
   const trustedOrigins = (process.env.TRUSTED_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
   const usdaApiKey = process.env.USDA_FDC_API_KEY?.trim() || null;
   const usdaExplicitlyDisabled = process.env.USDA_FDC_ENABLED === 'false';
+  const backupDir = process.env.BACKUP_DIR?.trim() || join(dataDir, 'backups');
 
   if (isProduction && (!process.env.COOKIE_SECRET || cookieSecret.length < 32)) {
     throw new Error('COOKIE_SECRET must be set to at least 32 characters in production.');
+  }
+  if (isProduction && (!process.env.BETTER_AUTH_SECRET || authSecret.length < 32)) {
+    throw new Error('BETTER_AUTH_SECRET must be set to at least 32 characters in production.');
+  }
+  if (isProduction && !process.env.BETTER_AUTH_URL && !process.env.APP_ORIGIN) {
+    throw new Error('BETTER_AUTH_URL or APP_ORIGIN must be set in production.');
+  }
+
+  const smtpHost = process.env.AUTH_SMTP_HOST?.trim() || null;
+  const smtpUser = process.env.AUTH_SMTP_USER?.trim() || null;
+  const smtpPassword = process.env.AUTH_SMTP_PASSWORD?.trim() || null;
+  const smtpConfigured = Boolean(smtpHost && smtpUser && smtpPassword);
+  if (isProduction && !smtpConfigured) {
+    throw new Error(
+      'AUTH_SMTP_HOST, AUTH_SMTP_USER, and AUTH_SMTP_PASSWORD are required in production.',
+    );
   }
 
   return configSchema.parse({
@@ -78,6 +116,20 @@ export function getRuntimeConfig(): RuntimeConfig {
     cookieSecret,
     appOrigin: process.env.APP_ORIGIN,
     trustedOrigins,
+    auth: {
+      secret: authSecret,
+      baseUrl: authBaseUrl,
+      emailFrom: process.env.AUTH_EMAIL_FROM ?? 'Bòrd <bord@localhost>',
+      smtp: {
+        configured: smtpConfigured,
+        host: smtpHost,
+        port: Number(process.env.AUTH_SMTP_PORT ?? '587'),
+        secure: process.env.AUTH_SMTP_SECURE === 'true',
+        user: smtpUser,
+        password: smtpPassword,
+      },
+    },
+    backupDir,
     backupRetentionDays: Number(process.env.BACKUP_RETENTION_DAYS ?? '30'),
     backupIntervalHours: Number(process.env.BACKUP_INTERVAL_HOURS ?? '24'),
     foodData: {
@@ -87,7 +139,7 @@ export function getRuntimeConfig(): RuntimeConfig {
         apiVersion: process.env.OPEN_FOOD_FACTS_API_VERSION ?? 'v3.6',
         userAgent:
           process.env.OPEN_FOOD_FACTS_USER_AGENT ??
-          'Bord/1.0.0-rc.1 (https://github.com/callum-baillie/bord)',
+          'Bord/1.0.0-rc.2 (https://github.com/callum-baillie/bord)',
         timeoutMs: Number(process.env.OPEN_FOOD_FACTS_TIMEOUT_MS ?? '5000'),
         requestsPerMinute: Number(process.env.OPEN_FOOD_FACTS_PRODUCT_RPM ?? '12'),
       },
@@ -115,4 +167,39 @@ export function getRuntimeConfig(): RuntimeConfig {
 
 export function getDataDirectory(): string {
   return resolve(/* turbopackIgnore: true */ process.cwd(), getRuntimeConfig().dataDir);
+}
+
+export function getBackupDirectory(): string {
+  const dataDirectory = getDataDirectory();
+  const backupDirectory = resolve(
+    /* turbopackIgnore: true */ process.cwd(),
+    getRuntimeConfig().backupDir,
+  );
+  if (parse(backupDirectory).root === backupDirectory) {
+    throw new Error('BACKUP_DIR cannot be the filesystem root.');
+  }
+  if (backupDirectory === dataDirectory) {
+    throw new Error('BACKUP_DIR must not be the same directory as DATA_DIR.');
+  }
+  return backupDirectory;
+}
+
+export function getBackupStorageConfiguration(): {
+  directory: string;
+  location: 'app-data' | 'dedicated';
+  intervalHours: number;
+  retentionDays: number;
+} {
+  const config = getRuntimeConfig();
+  const dataDirectory = getDataDirectory();
+  const directory = getBackupDirectory();
+  const relativePath = relative(dataDirectory, directory);
+  const isInsideDataDirectory =
+    relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath);
+  return {
+    directory,
+    location: isInsideDataDirectory ? 'app-data' : 'dedicated',
+    intervalHours: config.backupIntervalHours,
+    retentionDays: config.backupRetentionDays,
+  };
 }

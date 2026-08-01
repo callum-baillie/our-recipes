@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { access, mkdir, open, rm } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { isAbsolute, join, parse, relative, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import lineageRecovery from './migration-lineage-recovery.cjs';
@@ -17,7 +17,15 @@ const databasePath = configuredDatabase.startsWith('file:')
 const resolvedDatabasePath = isAbsolute(databasePath)
   ? databasePath
   : resolve(process.cwd(), databasePath);
+const configuredBackupDirectory = process.env.BACKUP_DIR?.trim() || join(dataDirectory, 'backups');
+const backupDirectory = isAbsolute(configuredBackupDirectory)
+  ? configuredBackupDirectory
+  : resolve(process.cwd(), configuredBackupDirectory);
 const pathWithinData = relative(dataDirectory, resolvedDatabasePath);
+
+if (parse(backupDirectory).root === backupDirectory || backupDirectory === dataDirectory) {
+  throw new Error('Container BACKUP_DIR must be a non-root directory distinct from DATA_DIR.');
+}
 
 if (
   resolvedDatabasePath === ':memory:' ||
@@ -28,7 +36,7 @@ if (
 }
 
 await mkdir(dataDirectory, { recursive: true });
-await mkdir(join(dataDirectory, 'backups'), { recursive: true });
+await mkdir(backupDirectory, { recursive: true });
 const lockPath = join(dataDirectory, '.migration.lock');
 let lock;
 try {
@@ -47,8 +55,7 @@ try {
     sqlite.pragma('foreign_keys = ON');
     if (databaseExists) {
       const safetyPath = join(
-        dataDirectory,
-        'backups',
+        backupDirectory,
         `pre-migration-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}.sqlite`,
       );
       await sqlite.backup(safetyPath);

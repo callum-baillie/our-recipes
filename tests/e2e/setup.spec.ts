@@ -3,32 +3,51 @@ import sharp from 'sharp';
 
 import packageJson from '../../package.json';
 import { HEIC_FIXTURES } from './fixtures/heic-fixtures';
+import { onboardingEmail, TEST_PASSPHRASE, TEST_PROFILE_PIN } from './helpers/onboarding';
 
-test('portable recipe export requires an active local profile and a trusted explicit origin', async ({
+test('a fresh install exposes only setup and operational APIs', async ({ page }) => {
+  await page.goto('/');
+  const response = await page.request.get('/api/v1/exports/recipes');
+  expect(response.status()).toBe(503);
+  expect(await response.json()).toMatchObject({
+    error: { code: 'setup_required' },
+  });
+});
+
+test('AI status stays behind the setup boundary without leaking configuration', async ({
+  page,
+}) => {
+  const response = await page.request.get('/api/v1/ai/status');
+  expect(response.status()).toBe(503);
+  const body = await response.json();
+  expect(body).toMatchObject({
+    error: { code: 'setup_required' },
+  });
+  expect(JSON.stringify(body)).not.toMatch(/sk-(?:proj-)?/u);
+});
+
+test('onboarding turns a weight direction into an editable, gradual target timeline', async ({
   page,
 }) => {
   await page.goto('/');
-  expect((await page.request.get('/api/v1/exports/recipes')).status()).toBe(409);
-  expect(
-    (
-      await page.request.get('/api/v1/exports/recipes', {
-        headers: { Origin: 'https://untrusted.example.test' },
-      })
-    ).status(),
-  ).toBe(403);
-});
+  await page.getByLabel('Kitchen name').fill('The Timeline Table');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Display name').fill('Maya');
+  await page.getByLabel('Email').fill(onboardingEmail('The Timeline Table', 'Maya'));
+  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
+  await page.getByRole('button', { name: 'Continue' }).click();
 
-test('AI settings expose only a safe configuration state', async ({ page }) => {
-  const response = await page.request.get('/api/v1/ai/status');
-  expect(response.ok()).toBe(true);
-  const body = (await response.json()) as {
-    status: { provider: string; state: string; enabled: boolean; message: string };
-  };
-  expect(body).toMatchObject({
-    status: { provider: 'OpenAI', state: expect.any(String), enabled: expect.any(Boolean) },
-  });
-  expect(body.status.state === 'configured').toBe(body.status.enabled);
-  expect(JSON.stringify(body)).not.toMatch(/sk-(?:proj-)?/u);
+  await page.getByLabel('Weight pounds').fill('200');
+  await page.getByRole('radio', { name: /Lose weight/u }).check();
+  await page.getByLabel('Target weight').fill('180');
+  await expect(page.getByText(/roughly 19 weeks/u)).toBeVisible();
+  await page.getByRole('button', { name: 'Use suggested date' }).click();
+  await expect(page.getByLabel('Target date')).not.toHaveValue('');
+  await expect(
+    page.getByText(/planning estimate, not medical advice or a calorie prescription/u),
+  ).toBeVisible();
 });
 
 test('a fresh household can complete the supported local release acceptance workflow', async ({
@@ -36,13 +55,16 @@ test('a fresh household can complete the supported local release acceptance work
 }, testInfo) => {
   // This intentionally covers the full supported household workflow. It takes
   // longer than Playwright's default in a fresh Linux CI environment.
-  testInfo.setTimeout(360_000);
+  testInfo.setTimeout(720_000);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Name your kitchen.' })).toBeVisible();
   await page.getByLabel('Kitchen name').fill('The Garden Table');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
+  await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
+  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('checkbox', { name: /Feel organized at mealtime/u }).click();
@@ -56,11 +78,36 @@ test('a fresh household can complete the supported local release acceptance work
     .getByLabel(/Imagine this is working well/u)
     .fill('Weeknight meals feel calm and planned.');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Open the cookbook' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
+  await page.getByLabel('I saved these one-time codes somewhere private.').check();
+  await page.getByRole('button', { name: 'Continue to sign in' }).click();
+  await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
+  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.waitForURL(/\/recipes\//u);
+  await page.goto('/');
   await expect(
     page.getByRole('heading', { name: 'Welcome to the kitchen, Callum.' }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make the week feel lighter.' })).toBeVisible();
+  const aiStatusResponse = await page.request.get('/api/v1/ai/status');
+  expect(aiStatusResponse.ok()).toBe(true);
+  const aiStatusBody = (await aiStatusResponse.json()) as {
+    status: { provider: string; state: string; enabled: boolean; message: string };
+  };
+  expect(aiStatusBody).toMatchObject({
+    status: { provider: 'OpenAI', state: expect.any(String), enabled: expect.any(Boolean) },
+  });
+  expect(aiStatusBody.status.state === 'configured').toBe(aiStatusBody.status.enabled);
+  expect(JSON.stringify(aiStatusBody)).not.toMatch(/sk-(?:proj-)?/u);
+  expect(
+    (
+      await page.request.get('/api/v1/exports/recipes', {
+        headers: { Origin: 'https://untrusted.example.test' },
+      })
+    ).status(),
+  ).toBe(403);
   await page.goto('/settings/ai');
   await expect(page).toHaveURL('/settings/ai');
   await expect(
@@ -86,6 +133,9 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Add another profile' }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await profileOnboarding.getByLabel('Display name').fill('Jon');
+  await profileOnboarding.getByLabel('Email').fill('jon-setup@example.test');
+  await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await profileOnboarding.getByLabel('Profile PIN').fill('593817');
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('checkbox', { name: /Cook at home more/u }).click();
@@ -94,6 +144,8 @@ test('a fresh household can complete the supported local release acceptance work
     .fill('Bake more often.');
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
+  await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();
+  await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
   await expect(page.getByRole('heading', { name: 'Jon' })).toBeVisible();
   const jonProfile = page.locator('.profile-editor', {
     has: page.getByRole('heading', { name: 'Jon', exact: true }),
@@ -116,11 +168,19 @@ test('a fresh household can complete the supported local release acceptance work
   const renamedFreezerTag = page.locator('.tag-row', { hasText: 'freezer' });
   await renamedFreezerTag.getByLabel('Merge freezer into').fill('weeknight');
   await renamedFreezerTag.getByRole('button', { name: 'Merge' }).click();
-  await expect(page.getByText('freezer', { exact: true })).not.toBeVisible();
+  await expect(
+    page.locator('.toast').filter({ hasText: 'freezer merged into weeknight.' }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('freezer', { exact: true })).not.toBeVisible({ timeout: 30_000 });
   const weeknightTag = page.locator('.tag-row', { hasText: 'weeknight' });
   page.once('dialog', (dialog) => dialog.accept());
   await weeknightTag.getByRole('button', { name: 'Remove' }).click();
-  await expect(page.getByText('weeknight', { exact: true })).not.toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: 'weeknight removed.' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByText('weeknight', { exact: true })).not.toBeVisible({
+    timeout: 30_000,
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/import');
   await expect(page.getByRole('heading', { name: 'Add from an image.' })).toBeVisible();
@@ -653,7 +713,7 @@ test('a fresh household can complete the supported local release acceptance work
   await page.goto(`/planner?view=week&date=${weekStart}`);
   await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
   await expect(
-    page.getByRole('heading', { name: /^Pantry shortages · \d{4}-\d{2}-\d{2}$/u }),
+    page.getByRole('heading', { name: /^Meal Plan \d{2}\/\d{2} - \d{2}\/\d{2}$/u }),
   ).toBeVisible();
   await page.getByLabel('New shopping item').fill('lemons');
   await page.getByRole('button', { name: 'Add item' }).click();
@@ -695,7 +755,14 @@ test('a fresh household can complete the supported local release acceptance work
   }
   await page.goto('/settings/backups');
   await page.getByRole('button', { name: 'Create backup' }).click();
-  await expect(page.getByRole('button', { name: 'Validate & restore' })).toBeVisible();
+  await expect(
+    page.locator('.toast').filter({ hasText: 'Backup created and verified.' }),
+  ).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole('button', { name: 'Validate & restore' })).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByRole('button', { name: 'Validate & restore' }).click();
   await expect(
     page.getByRole('heading', { name: 'Ready to restore, if you mean it.' }),

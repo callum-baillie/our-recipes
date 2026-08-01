@@ -139,7 +139,7 @@
   border: 0;
   border-radius: 0.65rem;
   background: var(--leaf);
-  color: white;
+  color: var(--on-primary);
   padding: 0.72rem 0.9rem;
   font: inherit;
   font-weight: 800;
@@ -176,7 +176,7 @@
   background: var(--leaf);
   border: 0;
   border-radius: 0.65rem;
-  color: white;
+  color: var(--on-primary);
   cursor: pointer;
   display: inline-flex;
   font: inherit;

@@ -40,15 +40,16 @@ import {
   createRecipeInTransaction,
   updateRecipeWithIntegrations,
 } from '@/lib/services/recipe-service';
-import { getAiProvider, getAiReadiness } from '@/lib/services/ai-readiness-service';
-import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
-import { removeRecipeImage, storeRecipeImage } from '@/lib/storage/recipe-image-storage';
+import { removeRecipeImage } from '@/lib/storage/recipe-image-storage';
 
 const ACTION_LIFETIME_MS = 24 * 60 * 60 * 1_000;
 
 const recipeCreatePayloadSchema = z.object({ recipe: recipeInputSchema }).strict();
 const recipeBatchCreatePayloadSchema = z
-  .object({ recipes: z.array(recipeInputSchema).min(1).max(12) })
+  .object({
+    recipes: z.array(recipeInputSchema).min(1).max(12),
+    generateRecipeImages: z.boolean().default(false),
+  })
   .strict();
 const recipeUpdatePayloadSchema = z
   .object({
@@ -95,17 +96,6 @@ const nutritionEntryPayloadSchema = z.object({ entry: manualConsumptionRequestSc
 export class AiActionNotFoundError extends Error {}
 export class AiActionConflictError extends Error {}
 export class AiActionForbiddenError extends Error {}
-
-type StagedPlanImage = {
-  recipeKey: string;
-  imageId: string;
-  storageKey: string;
-  altText: string;
-  width: number;
-  height: number;
-  model: string;
-  auditId: string;
-};
 
 function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -187,13 +177,18 @@ function commitGeneratedPlan(
   previewConflicts: Array<{ entryId: string; expectedUpdatedAt: string }>,
   conflictResolutions: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
   profileId: string,
-  stagedImages: StagedPlanImage[] = [],
 ) {
   const database = getDatabase();
   const result = {
     recipeIds: [] as string[],
     mealIds: [] as string[],
     leftoverLinkIds: [] as string[],
+    imageInputs: [] as Array<{
+      recipeId: string;
+      recipeTitle: string;
+      recipeSummary: string;
+      ingredientNames: string[];
+    }>,
   };
   database.transaction((transaction) => {
     const targetSlots = new Set(
@@ -278,27 +273,14 @@ function commitGeneratedPlan(
       const recipeId = createRecipeInTransaction(transaction, generated.recipe, profileId);
       recipeIdsByKey.set(generated.key, recipeId);
       result.recipeIds.push(recipeId);
-      const image = stagedImages.find((candidate) => candidate.recipeKey === generated.key);
-      if (image) {
-        transaction
-          .insert(recipeImages)
-          .values({
-            id: image.imageId,
-            recipeId,
-            storageKey: image.storageKey,
-            altText: image.altText,
-            width: image.width,
-            height: image.height,
-            createdByProfileId: profileId,
-            createdAt: new Date(),
-          })
-          .run();
-        transaction
-          .update(aiOperationAudits)
-          .set({ recipeId, generatedImageId: image.imageId })
-          .where(eq(aiOperationAudits.id, image.auditId))
-          .run();
-      }
+      result.imageInputs.push({
+        recipeId,
+        recipeTitle: generated.recipe.title,
+        recipeSummary: generated.recipe.summary,
+        ingredientNames: generated.recipe.ingredientGroups.flatMap((group) =>
+          group.ingredients.map((ingredient) => ingredient.item),
+        ),
+      });
     }
     if (occupiedSlotMode === 'replace' || occupiedSlotMode === 'review') {
       for (const entry of occupied) {
@@ -401,125 +383,9 @@ function commitGeneratedPlan(
   return result;
 }
 
-async function prepareGeneratedPlanImages(
-  row: typeof aiActionProposals.$inferSelect,
-  conflictResolutions: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
-): Promise<StagedPlanImage[]> {
-  if (row.kind !== 'meal_plan_generate') return [];
-  const payload = generatedPlanPayloadSchema.parse(JSON.parse(row.payload));
-  if (!payload.generateRecipeImages || payload.candidate.newRecipes.length === 0) return [];
-  const resolutionById = new Map(
-    conflictResolutions.map((resolution) => [resolution.entryId, resolution.resolution]),
-  );
-  const keptSlots = new Set(
-    payload.conflicts.flatMap((conflict) =>
-      resolutionById.get(conflict.entryId) === 'keep'
-        ? [`${conflict.plannedFor}:${conflict.meal}`]
-        : [],
-    ),
-  );
-  const referencedKeys = new Set(
-    payload.candidate.entries.flatMap((entry) =>
-      !keptSlots.has(`${entry.plannedFor}:${entry.meal}`) && entry.newRecipeKey
-        ? [entry.newRecipeKey]
-        : [],
-    ),
-  );
-
-  const setting = getAiWorkloadSetting(row.profileId, 'image_generation');
-  if (!setting.enabled) {
-    throw new AiActionConflictError(
-      'Recipe image generation was disabled after this preview was created. Review a fresh plan.',
-    );
-  }
-  if (!getAiReadiness().enabled) {
-    throw new AiActionConflictError(
-      'OpenAI must be configured before recipe images can be generated.',
-    );
-  }
-
-  const staged: StagedPlanImage[] = [];
-  try {
-    for (const generated of payload.candidate.newRecipes.filter((recipe) =>
-      referencedKeys.has(recipe.key),
-    )) {
-      const now = new Date();
-      const auditId = randomUUID();
-      getDatabase()
-        .insert(aiOperationAudits)
-        .values({
-          id: auditId,
-          kind: 'image-generation',
-          status: 'requested',
-          sourceDigest: digest(generated.recipe),
-          sourceLabel: generated.recipe.title.slice(0, 160),
-          provider: 'OpenAI',
-          model: setting.model,
-          reasoningEffort: null,
-          inputTokens: null,
-          outputTokens: null,
-          threadId: row.threadId,
-          actionId: row.id,
-          summaryId: null,
-          errorCode: null,
-          profileId: row.profileId,
-          recipeId: null,
-          importId: null,
-          generatedImageId: null,
-          createdAt: now,
-          completedAt: null,
-        })
-        .run();
-      try {
-        const image = await getAiProvider().generateRecipeImage(
-          {
-            recipeTitle: generated.recipe.title,
-            recipeSummary: generated.recipe.summary,
-            ingredientNames: generated.recipe.ingredientGroups.flatMap((group) =>
-              group.ingredients.map((ingredient) => ingredient.item),
-            ),
-          },
-          setting,
-        );
-        const imageId = randomUUID();
-        const stored = await storeRecipeImage(imageId, image.bytes);
-        staged.push({
-          recipeKey: generated.key,
-          imageId,
-          storageKey: stored.storageKey,
-          altText: image.altText,
-          width: stored.width,
-          height: stored.height,
-          model: setting.model,
-          auditId,
-        });
-        getDatabase()
-          .update(aiOperationAudits)
-          .set({ status: 'succeeded', completedAt: new Date() })
-          .where(eq(aiOperationAudits.id, auditId))
-          .run();
-      } catch (error) {
-        getDatabase()
-          .update(aiOperationAudits)
-          .set({ status: 'failed', errorCode: 'meal_plan_image_failed', completedAt: new Date() })
-          .where(eq(aiOperationAudits.id, auditId))
-          .run();
-        throw error;
-      }
-    }
-    return staged;
-  } catch (error) {
-    await Promise.all(
-      staged.map((image) => removeRecipeImage(image.storageKey).catch(() => undefined)),
-    );
-    throw error;
-  }
-}
-
 function execute(
   row: typeof aiActionProposals.$inferSelect,
   conflictResolutions: Array<{ entryId: string; resolution: 'keep' | 'replace' }> = [],
-  stagedPlanImages: StagedPlanImage[] = [],
 ): unknown {
   const payload = JSON.parse(row.payload) as unknown;
   switch (aiActionKindSchema.parse(row.kind)) {
@@ -570,7 +436,19 @@ function execute(
           recipeIds.push(createRecipeInTransaction(transaction, recipe, row.profileId));
         }
       });
-      return { recipeIds };
+      return {
+        recipeIds,
+        imageInputs: parsed.generateRecipeImages
+          ? parsed.recipes.map((recipe, index) => ({
+              recipeId: recipeIds[index]!,
+              recipeTitle: recipe.title,
+              recipeSummary: recipe.summary,
+              ingredientNames: recipe.ingredientGroups.flatMap((group) =>
+                group.ingredients.map((ingredient) => ingredient.item),
+              ),
+            }))
+          : [],
+      };
     }
     case 'recipe_update': {
       const parsed = recipeUpdatePayloadSchema.parse(payload);
@@ -605,7 +483,6 @@ function execute(
         parsed.conflicts,
         conflictResolutions,
         row.profileId,
-        stagedPlanImages,
       );
     }
     case 'nutrition_entry': {
@@ -655,53 +532,123 @@ export async function decideAiAction(
   const { row, action } = getAiActionProposal(actionId, profileId);
   if (row.status !== 'pending') return action;
   if (row.expiresAt.getTime() <= Date.now()) {
-    const storageKey = detachPreviewImage(row.id);
-    getDatabase()
+    const expired = getDatabase()
       .update(aiActionProposals)
       .set({ status: 'expired', decidedAt: new Date() })
-      .where(eq(aiActionProposals.id, row.id))
+      .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'pending')))
       .run();
-    await removeDetachedPreview(storageKey);
+    if (expired.changes === 1) {
+      await removeDetachedPreview(detachPreviewImage(row.id));
+    }
     throw new AiActionConflictError('That AI preview expired. Generate it again.');
   }
   if (digest(JSON.parse(row.payload)) !== row.sourceDigest) {
     throw new AiActionConflictError('That AI preview failed its integrity check.');
   }
   if (decision === 'cancel') {
-    const storageKey = detachPreviewImage(row.id);
-    getDatabase()
+    const cancelled = getDatabase()
       .update(aiActionProposals)
       .set({ status: 'cancelled', decidedAt: new Date() })
       .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'pending')))
       .run();
-    await removeDetachedPreview(storageKey);
+    if (cancelled.changes === 1) {
+      await removeDetachedPreview(detachPreviewImage(row.id));
+    }
     return getAiActionProposal(actionId, profileId).action;
   }
-  const stagedPlanImages: StagedPlanImage[] = [];
+  let claimed = false;
   try {
-    stagedPlanImages.push(...(await prepareGeneratedPlanImages(row, conflictResolutions)));
-    const result = execute(row, conflictResolutions, stagedPlanImages);
+    // Keep the compare-and-set claim observable to concurrent confirmations.
+    await Promise.resolve();
+    const claim = getDatabase()
+      .update(aiActionProposals)
+      .set({ status: 'executing' })
+      .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'pending')))
+      .run();
+    if (claim.changes !== 1) {
+      throw new AiActionConflictError('That AI action was already decided.');
+    }
+    claimed = true;
+    const result = execute(row, conflictResolutions);
+    let storedResult = result;
+    if (row.kind === 'meal_plan_generate') {
+      const payload = generatedPlanPayloadSchema.parse(JSON.parse(row.payload));
+      const planResult = result as {
+        recipeIds: string[];
+        mealIds: string[];
+        leftoverLinkIds: string[];
+        imageInputs: Array<{
+          recipeId: string;
+          recipeTitle: string;
+          recipeSummary: string;
+          ingredientNames: string[];
+        }>;
+      };
+      const { imageInputs, ...persistedPlanResult } = planResult;
+      let imageJobId: string | null = null;
+      if (payload.generateRecipeImages && imageInputs.length) {
+        try {
+          const { enqueueRecipeImageJob } = await import('@/lib/services/ai-job-service');
+          imageJobId =
+            enqueueRecipeImageJob({
+              profileId: row.profileId,
+              threadId: row.threadId,
+              actionId: row.id,
+              images: imageInputs,
+            })?.id ?? null;
+        } catch {
+          // The reviewed plan is already committed. A later retry can regenerate images.
+        }
+      }
+      storedResult = { ...persistedPlanResult, imageJobId };
+    }
+    if (row.kind === 'recipe_batch_create') {
+      const batchResult = result as {
+        recipeIds: string[];
+        imageInputs: Array<{
+          recipeId: string;
+          recipeTitle: string;
+          recipeSummary: string;
+          ingredientNames: string[];
+        }>;
+      };
+      const { imageInputs, ...persistedBatchResult } = batchResult;
+      let imageJobId: string | null = null;
+      if (imageInputs.length) {
+        try {
+          const { enqueueRecipeImageJob } = await import('@/lib/services/ai-job-service');
+          imageJobId =
+            enqueueRecipeImageJob({
+              profileId: row.profileId,
+              threadId: row.threadId,
+              actionId: row.id,
+              images: imageInputs,
+            })?.id ?? null;
+        } catch {
+          // Recipes remain saved even if creating the optional image task fails.
+        }
+      }
+      storedResult = { ...persistedBatchResult, imageJobId };
+    }
     const updated = getDatabase()
       .update(aiActionProposals)
-      .set({ status: 'confirmed', result: JSON.stringify(result), decidedAt: new Date() })
-      .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'pending')))
+      .set({ status: 'confirmed', result: JSON.stringify(storedResult), decidedAt: new Date() })
+      .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'executing')))
       .run();
     if (updated.changes !== 1) {
       throw new AiActionConflictError('That AI action was already decided.');
     }
     return getAiActionProposal(actionId, profileId).action;
   } catch (error) {
-    await Promise.all(
-      stagedPlanImages.map((image) => removeRecipeImage(image.storageKey).catch(() => undefined)),
-    );
+    if (claimed) {
+      getDatabase()
+        .update(aiActionProposals)
+        .set({ status: 'failed', decidedAt: new Date() })
+        .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'executing')))
+        .run();
+      await removeDetachedPreview(detachPreviewImage(row.id));
+    }
     if (error instanceof AiActionConflictError) throw error;
-    const storageKey = detachPreviewImage(row.id);
-    getDatabase()
-      .update(aiActionProposals)
-      .set({ status: 'failed', decidedAt: new Date() })
-      .where(and(eq(aiActionProposals.id, row.id), eq(aiActionProposals.status, 'pending')))
-      .run();
-    await removeDetachedPreview(storageKey);
     throw error;
   }
 }

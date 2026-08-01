@@ -1,13 +1,12 @@
 import { cookies } from 'next/headers';
 
 import { HouseholdHome } from '@/components/household-home';
-import { AiSummaryCards } from '@/components/ai-summary-cards';
 import type { RecipeSummaryCardData } from '@/components/recipe-summary-card';
 import { SetupWizard } from '@/components/setup-wizard';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { nextActionableMeal } from '@/lib/domain/meal-plan-policy';
 import { recipeLibraryQuerySchema } from '@/lib/domain/recipe';
 import { addLocalDateDays, localIsoDate } from '@/lib/domain/local-date';
-import { ensureBackupScheduler } from '@/lib/services/backup-service';
 import { listCollections } from '@/lib/services/collection-service';
 import { getHouseholdState } from '@/lib/services/household-service';
 import { listPlannedMeals } from '@/lib/services/planning-service';
@@ -49,7 +48,6 @@ function toCardRecipe(recipe: NonNullable<ReturnType<typeof getRecipe>>): Recipe
 }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  ensureBackupScheduler();
   const state = getHouseholdState();
   if (!state.household) return <SetupWizard />;
 
@@ -75,15 +73,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     4,
   ).recipes;
   const library = listRecipeLibrary(query, actor.profileId, 48);
-  const today = localIsoDate(new Date(), activeProfile?.timezone ?? 'UTC');
-  const upcomingMeal = listPlannedMeals(today, addLocalDateDays(today, 365))[0] ?? null;
+  const now = new Date();
+  const timeZone = activeProfile?.timezone ?? 'UTC';
+  const today = localIsoDate(now, timeZone);
+  const upcomingMeal = nextActionableMeal(
+    listPlannedMeals(today, addLocalDateDays(today, 365)),
+    now,
+    timeZone,
+  );
   const upcomingRecipe = upcomingMeal?.recipeId
     ? getRecipe(upcomingMeal.recipeId, actor.profileId)
     : null;
 
   return (
     <>
-      <AiSummaryCards kinds={['daily_nutrition', 'weekly_nutrition', 'weekly_planning']} />
       <HouseholdHome
         household={state.household}
         activeProfileName={activeProfile?.displayName ?? 'there'}

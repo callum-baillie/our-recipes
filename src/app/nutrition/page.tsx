@@ -2,7 +2,6 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { NutritionDashboard, type NutritionView } from '@/components/nutrition-dashboard';
-import { AiSummaryCards } from '@/components/ai-summary-cards';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { evaluateNutritionInsights } from '@/lib/domain/nutrition-insights';
 import { buildAdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
@@ -26,11 +25,13 @@ import {
   listNutritionMealAllocationVersions,
 } from '@/lib/services/nutrition-intake-service';
 import {
+  getPrivateNutritionProfile,
   listAccessibleNutritionProfiles,
   listNutritionGoalVersions,
 } from '@/lib/services/nutrition-profile-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
 import { getNutritionDataWorkspace } from '@/lib/services/nutrition-recipe-calculation-service';
+import { listAiSummaries } from '@/lib/services/ai-summary-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,6 @@ const VIEWS = new Set<NutritionView>([
   'nutrients',
   'trends',
   'household',
-  'goals',
 ]);
 
 export default async function NutritionPage({
@@ -62,6 +62,7 @@ export default async function NutritionPage({
   const profiles = listAccessibleNutritionProfiles(principalId);
   const requested = await searchParams;
   if (requested.view === 'settings') redirect('/settings/nutrition');
+  if (requested.view === 'goals') redirect('/nutrition');
   const activeProfile = profiles.find(
     (profile) => profile.id === household.activeNutritionProfile.id,
   )!;
@@ -95,6 +96,9 @@ export default async function NutritionPage({
     activeProfile.canManageGoals && view !== 'trends'
       ? latestNutritionSeries(listNutritionGoalVersions(activeProfile.id, principalId))
       : [];
+  const goalSetup = activeProfile.canManageProfile
+    ? getPrivateNutritionProfile(activeProfile.id, principalId)
+    : null;
   const observedDays = summary.trend.filter((day) => day.entryCount > 0).length;
   const trendDates = new Set(summary.trend.map((day) => day.date));
   const recentValues = summary.consumedEntries
@@ -210,63 +214,77 @@ export default async function NutritionPage({
           }),
         )
       : null;
+  const aiSummary = actor.profileId
+    ? listAiSummaries(actor.profileId).find((item) => item.domain === 'nutrition')
+    : null;
 
   return (
-    <>
-      <NutritionDashboard
-        principalId={principalId}
-        profiles={profiles}
-        activeProfile={activeProfile}
-        view={view}
-        summary={{
-          currentEntries: summary.currentEntries.map((entry) => {
-            const full = revisions.find((revision) => revision.id === entry.id)!;
-            return {
-              id: full.id,
-              revision: full.revision,
-              occurredAt: full.occurredAt.toISOString(),
-              state: full.state,
-              sourceNameSnapshot: full.sourceNameSnapshot,
-              mealSlot: full.mealSlot,
-              sourceType: full.sourceType,
-              recipeId: full.recipeId,
-              productId: full.productId,
-              recipeCalculationId: full.recipeCalculationId,
-              quantity: full.quantity,
-              unit: full.unit,
-              servingCount: full.servingCount,
-              values: full.values.map((value) => ({
-                nutrientCode: value.nutrientCode,
-                amount: value.amount,
-                confidence: value.confidence,
-                completeness: value.completeness,
-                estimated: value.estimated,
-              })),
-            };
-          }),
-          todayTotals: summary.todayTotals,
-          sevenDayTotals: summary.sevenDayTotals,
-          trend: summary.trend,
-          averageCompleteness: summary.averageCompleteness,
-          averageConfidence: summary.averageConfidence,
-          hasEstimatedValues: summary.hasEstimatedValues,
-        }}
-        definitions={definitions}
-        goals={goals}
-        allocationCounts={allocationCounts}
-        mealProjection={mealProjection}
-        today={today}
-        insights={insights}
-        recommendations={recommendations}
-        shoppingLists={shoppingLists}
-        householdComparison={householdComparison}
-        chartDatasets={chartDatasets}
-        advancedCharts={advancedCharts}
-        weightTrend={weightTrend}
-        dataWorkspace={dataWorkspace}
-        preparedWorkspace={preparedWorkspace}
-      />
-      <AiSummaryCards kinds={['daily_nutrition', 'weekly_nutrition']} />
-    </>
+    <NutritionDashboard
+      principalId={principalId}
+      profiles={profiles}
+      activeProfile={activeProfile}
+      view={view}
+      summary={{
+        currentEntries: summary.currentEntries.map((entry) => {
+          const full = revisions.find((revision) => revision.id === entry.id)!;
+          return {
+            id: full.id,
+            revision: full.revision,
+            occurredAt: full.occurredAt.toISOString(),
+            state: full.state,
+            sourceNameSnapshot: full.sourceNameSnapshot,
+            mealSlot: full.mealSlot,
+            sourceType: full.sourceType,
+            recipeId: full.recipeId,
+            productId: full.productId,
+            recipeCalculationId: full.recipeCalculationId,
+            quantity: full.quantity,
+            unit: full.unit,
+            servingCount: full.servingCount,
+            values: full.values.map((value) => ({
+              nutrientCode: value.nutrientCode,
+              amount: value.amount,
+              confidence: value.confidence,
+              completeness: value.completeness,
+              estimated: value.estimated,
+            })),
+          };
+        }),
+        todayTotals: summary.todayTotals,
+        sevenDayTotals: summary.sevenDayTotals,
+        trend: summary.trend,
+        averageCompleteness: summary.averageCompleteness,
+        averageConfidence: summary.averageConfidence,
+        hasEstimatedValues: summary.hasEstimatedValues,
+      }}
+      definitions={definitions}
+      goals={goals}
+      goalSetup={
+        goalSetup
+          ? {
+              nutritionGoalType: goalSetup.nutritionGoalType,
+              currentWeightKilograms: goalSetup.currentWeightKilograms,
+              targetWeightKilograms: goalSetup.targetWeightKilograms,
+              targetDate: goalSetup.targetDate,
+              profileVersion: goalSetup.version,
+            }
+          : null
+      }
+      allocationCounts={allocationCounts}
+      mealProjection={mealProjection}
+      today={today}
+      insights={insights}
+      recommendations={recommendations}
+      shoppingLists={shoppingLists}
+      householdComparison={householdComparison}
+      chartDatasets={chartDatasets}
+      advancedCharts={advancedCharts}
+      weightTrend={weightTrend}
+      dataWorkspace={dataWorkspace}
+      preparedWorkspace={preparedWorkspace}
+      initialAiSummary={
+        aiSummary ? { ...aiSummary, createdAt: aiSummary.createdAt.toISOString() } : null
+      }
+    />
   );
 }

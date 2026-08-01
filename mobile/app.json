@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Bòrd",
+    "slug": "bord-mobile",
+    "scheme": "bord",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bord.mobile",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Bòrd connects to your household web app on the local network.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.bord.mobile",
+      "predictiveBackGestureEnabled": true,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F3EB",
+          "image": "./assets/brand/bord-splash.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Bòrd to scan grocery barcodes for your pantry and shopping lists."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Bòrd to choose recipe photos and scanned recipe pages.",
+          "cameraPermission": "Allow Bòrd to photograph recipe pages and recipe covers."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "assetBundlePatterns": ["**/*"]
+  }
+}

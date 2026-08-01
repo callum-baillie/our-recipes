@@ -78,8 +78,10 @@ const DEFAULT_OPTIONS: GenerationOptions = {
 
 function estimatedUsd(value: number | null): string {
   if (value === null) return 'Unavailable';
-  if (value < 0.01) return `<$0.01`;
-  return `~$${value.toFixed(2)}`;
+  const safeValue = Math.max(0, value);
+  if (safeValue === 0) return '$0.00';
+  if (safeValue < 0.01) return 'Less than $0.01';
+  return `About $${safeValue.toFixed(2)}`;
 }
 
 async function responseError(response: Response) {
@@ -169,6 +171,12 @@ function ModeOptions({
               </div>
               <dl>
                 <div>
+                  <dt>{costEstimate.mealPlanRequestCount} plan request</dt>
+                  <dd>
+                    {costEstimate.recipeCount} recipe{costEstimate.recipeCount === 1 ? '' : 's'}
+                  </dd>
+                </div>
+                <div>
                   <dt>Input</dt>
                   <dd>{estimatedUsd(costEstimate.inputUsd)}</dd>
                 </div>
@@ -176,15 +184,22 @@ function ModeOptions({
                   <dt>Output</dt>
                   <dd>{estimatedUsd(costEstimate.outputUsd)}</dd>
                 </div>
-                {costEstimate.imageCount ? (
-                  <div>
-                    <dt>{costEstimate.imageCount} images</dt>
-                    <dd>{estimatedUsd(costEstimate.imageUsd)}</dd>
-                  </div>
-                ) : null}
+                <div>
+                  <dt>
+                    {costEstimate.imageCount} image{costEstimate.imageCount === 1 ? '' : 's'}
+                  </dt>
+                  <dd>{estimatedUsd(costEstimate.imageUsd)}</dd>
+                </div>
               </dl>
               <small>
-                Estimate only · actual token use may vary · pricing checked {AI_PRICING_AS_OF}
+                {costEstimate.recipeCountIsEstimate
+                  ? 'Recipe and image counts are estimates because repeating meals are allowed. '
+                  : 'Recipe and image counts match the selected meal slots and leftovers. '}
+                Low-quality 1024×1024 recipe images are estimated at $0.006 each · pricing checked{' '}
+                {AI_PRICING_AS_OF}
+                {costEstimate.imageBatchApplied
+                  ? ' · Batch pricing is applied to four or more recipe images.'
+                  : ''}
               </small>
             </div>
           ) : null}
@@ -383,9 +398,18 @@ export function AiMealPlanGenerator({
         }),
       });
       if (!response.ok) throw new Error(await responseError(response));
+      const body = (await response.json()) as {
+        action: { result?: { imageJobId?: string | null } | null };
+      };
       if (decision === 'confirm') {
-        setStatus('Meal plan saved. Refreshing…');
-        window.location.reload();
+        setProposal(null);
+        setActiveMode(null);
+        setStatus(
+          body.action.result?.imageJobId
+            ? 'Meal plan saved. Recipe images are generating in the background.'
+            : 'Meal plan saved. Refreshing…',
+        );
+        window.setTimeout(() => window.location.reload(), 900);
       } else {
         setProposal(null);
         setActiveMode(null);

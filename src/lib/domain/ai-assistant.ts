@@ -96,12 +96,25 @@ export const aiDataPolicySchema = z
     shareIdentity: z.boolean(),
     sharePersonalMetrics: z.boolean(),
     shareWeight: z.boolean(),
+    shareShoppingLists: z.boolean(),
     dailySummaryEnabled: z.boolean(),
     weeklySummaryEnabled: z.boolean(),
+    summaryFrequency: z.enum(['off', 'daily', 'every_3_days', 'weekly', 'monthly']),
+    summaryNutritionEnabled: z.boolean(),
+    summaryMealPlansEnabled: z.boolean(),
+    summaryShoppingListsEnabled: z.boolean(),
+    summaryRecipesEnabled: z.boolean(),
     version: z.number().int().positive(),
   })
   .strict();
 export type AiDataPolicy = z.infer<typeof aiDataPolicySchema>;
+
+export const AI_SUMMARY_FREQUENCY_MS = {
+  daily: 24 * 60 * 60 * 1_000,
+  every_3_days: 3 * 24 * 60 * 60 * 1_000,
+  weekly: 7 * 24 * 60 * 60 * 1_000,
+  monthly: 30 * 24 * 60 * 60 * 1_000,
+} as const;
 
 export const DEFAULT_AI_DATA_POLICY: Omit<AiDataPolicy, 'version'> = {
   shareSharedRecipes: true,
@@ -115,8 +128,14 @@ export const DEFAULT_AI_DATA_POLICY: Omit<AiDataPolicy, 'version'> = {
   shareIdentity: false,
   sharePersonalMetrics: false,
   shareWeight: false,
-  dailySummaryEnabled: true,
-  weeklySummaryEnabled: true,
+  shareShoppingLists: true,
+  dailySummaryEnabled: false,
+  weeklySummaryEnabled: false,
+  summaryFrequency: 'off',
+  summaryNutritionEnabled: true,
+  summaryMealPlansEnabled: true,
+  summaryShoppingListsEnabled: true,
+  summaryRecipesEnabled: true,
 };
 
 export const aiSettingsUpdateSchema = z
@@ -126,9 +145,71 @@ export const aiSettingsUpdateSchema = z
   })
   .strict();
 
+const aiChatAttachmentSchema = z
+  .object({
+    kind: z.enum(['image', 'file']),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[^<>:"/\\|?*\u0000-\u001f]+$/u),
+    mimeType: z.enum([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'application/pdf',
+      'text/plain',
+      'text/csv',
+      'application/json',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ]),
+    dataBase64: z
+      .string()
+      .min(1)
+      .max(8_000_000)
+      .regex(/^[a-z0-9+/]+={0,2}$/iu),
+  })
+  .strict()
+  .superRefine((attachment, context) => {
+    const isImage = attachment.mimeType.startsWith('image/');
+    if ((attachment.kind === 'image') !== isImage) {
+      context.addIssue({
+        code: 'custom',
+        path: ['mimeType'],
+        message: 'Attachment kind does not match its media type.',
+      });
+    }
+  });
+
 export const aiChatMessageInputSchema = z
-  .object({ message: z.string().trim().min(1).max(8_000) })
-  .strict();
+  .object({
+    message: z.string().trim().max(8_000).default(''),
+    attachments: z.array(aiChatAttachmentSchema).max(4).default([]),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (!input.message && input.attachments.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['message'],
+        message: 'Enter a message or attach a file.',
+      });
+    }
+    if (
+      input.attachments.reduce((total, attachment) => total + attachment.dataBase64.length, 0) >
+      12_000_000
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['attachments'],
+        message: 'Attachments are too large.',
+      });
+    }
+  });
 
 export const aiActionKindSchema = z.enum([
   'recipe_create',
@@ -286,21 +367,53 @@ export const aiMealPlanStructuredOutputSchema = z
   })
   .strict();
 
-export const aiSummaryKindSchema = z.enum([
-  'daily_nutrition',
-  'weekly_nutrition',
-  'weekly_planning',
+export const aiSummaryDomainSchema = z.enum([
+  'nutrition',
+  'meal_plans',
+  'shopping_lists',
+  'recipes',
 ]);
-export type AiSummaryKind = z.infer<typeof aiSummaryKindSchema>;
+export type AiSummaryDomain = z.infer<typeof aiSummaryDomainSchema>;
 
-export const aiSummaryOutputSchema = z
+export const aiSummaryMetricSchema = z
   .object({
-    headline: z.string().trim().min(1).max(160),
-    body: z.string().trim().min(1).max(1_500),
-    highlights: z.array(z.string().trim().min(1).max(240)).max(5),
-    caveats: z.array(z.string().trim().min(1).max(240)).max(5),
+    label: z.string().trim().min(1).max(80),
+    value: z.string().trim().min(1).max(80),
+    context: z.string().trim().max(160).default(''),
+    trend: z.enum(['up', 'down', 'steady', 'none']).default('none'),
   })
   .strict();
+
+export const aiSummaryItemSchema = z
+  .object({
+    domain: aiSummaryDomainSchema,
+    headline: z.string().trim().min(1).max(160),
+    summary: z.string().trim().min(1).max(600),
+    highlights: z.array(z.string().trim().min(1).max(180)).max(3),
+    metrics: z.array(aiSummaryMetricSchema).max(6).default([]),
+    caveats: z.array(z.string().trim().min(1).max(180)).max(3),
+  })
+  .strict();
+
+export const aiSummaryBundleOutputSchema = z
+  .object({
+    summaries: z.array(aiSummaryItemSchema).max(aiSummaryDomainSchema.options.length),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<AiSummaryDomain>();
+    value.summaries.forEach((summary, index) => {
+      if (seen.has(summary.domain)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['summaries', index, 'domain'],
+          message: 'Each summary domain may appear only once.',
+        });
+      }
+      seen.add(summary.domain);
+    });
+  });
+export type AiSummaryBundleOutput = z.infer<typeof aiSummaryBundleOutputSchema>;
 
 export type AiAssistantStreamEvent =
   | { type: 'status'; message: string }

@@ -16,6 +16,7 @@ import {
 import {
   addProfile,
   completeSetup,
+  completeSetupWithResult,
   getHouseholdState,
   listProfiles,
   setProfileArchived,
@@ -38,10 +39,13 @@ import {
   duplicateWeek,
   generateShoppingList,
   getShoppingList,
+  listShoppingAisles,
+  listShoppingLists,
   plannedMealsAsIcs,
   removeShoppingAisle,
   reorderShoppingAisles,
   swapMealPlanEntries,
+  updateMealPlanEntryStatus,
   updateShoppingListItem,
 } from '@/lib/services/planning-service';
 import {
@@ -118,6 +122,8 @@ describe('household persistence', () => {
         referenceSexCategory: 'female',
         activityLevel: 'moderate',
         nutritionGoalType: 'maintain',
+        targetWeightKilograms: 62,
+        targetDate: '2026-12-01',
         dietaryPreferences: ['Vegetarian'],
         foodAllergies: ['Peanuts'],
         dietaryExclusions: ['Alcohol'],
@@ -145,6 +151,8 @@ describe('household persistence', () => {
       currentWeightKilograms: 64,
       activityLevel: 'moderate',
       nutritionGoalType: 'maintain',
+      targetWeightKilograms: 62,
+      targetDate: '2026-12-01',
       dietaryPreferences: '["Vegetarian"]',
       foodAllergies: '["Peanuts"]',
       dietaryExclusions: '["Alcohol"]',
@@ -216,6 +224,33 @@ describe('household persistence', () => {
     expect(getPrivateNutritionProfile(state.profiles[1]!.id, state.profiles[1]!.id)).toMatchObject({
       profileType: 'dependent',
       foodAllergies: '["Peanuts"]',
+    });
+  });
+
+  it('creates the researched Stovies starter recipe for the example onboarding path', () => {
+    const result = completeSetupWithResult({
+      kitchenName: 'The Stovies table',
+      kitchenIcon: 'table',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'metric',
+        temperatureUnit: 'C',
+        locale: 'en-GB',
+        timezone: 'Europe/London',
+      },
+      firstRecipeChoice: 'example',
+    });
+
+    expect(result.firstRecipeId).toBeTruthy();
+    expect(getRecipe(result.firstRecipeId!)).toMatchObject({
+      title: 'Traditional Scottish Stovies',
+      servings: '6 servings',
+      nutritionCalories: 320,
+      nutritionProteinGrams: 21,
+      cuisine: 'Scottish, British',
+      category: 'Dinner, Main dish',
     });
   });
 
@@ -733,7 +768,32 @@ describe('household persistence', () => {
         sourceUrl: '',
         tags: [],
         ingredientGroups: [
-          { name: '', ingredients: [{ quantity: 200, unit: 'g', item: 'pasta', note: '' }] },
+          {
+            name: '',
+            ingredients: [
+              {
+                quantity: 200,
+                unit: 'g',
+                item: 'pasta',
+                note: '',
+                shoppingCategory: 'Dry goods & grains',
+              },
+              {
+                quantity: 1,
+                unit: 'each',
+                item: 'tomato',
+                note: 'diced',
+                shoppingCategory: 'Fresh produce',
+              },
+              {
+                quantity: 2,
+                unit: 'each',
+                item: 'tomatoes',
+                note: 'for garnish',
+                shoppingCategory: 'Fresh produce',
+              },
+            ],
+          },
         ],
         instructionSections: [{ title: '', steps: ['Boil the pasta.'] }],
       },
@@ -745,13 +805,29 @@ describe('household persistence', () => {
     );
     const list = generateShoppingList('2026-07-13', '2026-07-19', profile.id);
     expect(list.items[0]?.quantity).toBe(400);
+    expect(list.items.find((item) => item.item === 'tomato')).toMatchObject({
+      quantity: 6,
+      unit: 'each',
+      note: 'diced; for garnish',
+    });
+    expect(list.items.filter((item) => ['tomato', 'tomatoes'].includes(item.item))).toHaveLength(1);
     const firstItem = list.items[0]!;
+    expect(list.aisles.find((aisle) => aisle.id === firstItem.aisleId)?.name).toBe(
+      'Dry goods & grains',
+    );
     updateShoppingListItem(list.id, firstItem.id, {
       quantity: 400,
       unit: 'g',
       item: 'pasta',
       note: 'whole wheat',
       checked: true,
+    });
+    expect(listShoppingLists(true).find((summary) => summary.id === list.id)).toMatchObject({
+      itemCount: 2,
+      sourcedCount: 1,
+      openCount: 1,
+      needsAttentionCount: 1,
+      sourceKind: 'planner_all',
     });
     expect(generateShoppingList('2026-07-13', '2026-07-19', profile.id).id).not.toBe(list.id);
     const freeform = addMealPlanEntry(
@@ -791,20 +867,31 @@ describe('household persistence', () => {
         profile.id,
       ).map((meal) => meal.recipeTitle),
     ).toContain('Leftovers board');
+    const skippedFreeform = updateMealPlanEntryStatus(freeform.id, 'skipped', profile.id);
+    expect(plannedMealsAsIcs('2026-07-13', '2026-07-19')).not.toContain(
+      'SUMMARY:snack: Leftovers board',
+    );
+    expect(
+      duplicateWeek(
+        { weekStart: '2026-07-13', destinationWeekStart: '2026-07-27' },
+        profile.id,
+      ).find((meal) => meal.recipeTitle === 'Leftovers board'),
+    ).toMatchObject({ status: 'planned', effectiveStatus: 'planned' });
     const [swappedFreeform, swappedDessert] = swapMealPlanEntries(
       {
         sourceId: freeform.id,
         targetId: dessert.id,
-        sourceExpectedUpdatedAt: freeform.updatedAt.toISOString(),
+        sourceExpectedUpdatedAt: skippedFreeform.updatedAt.toISOString(),
         targetExpectedUpdatedAt: dessert.updatedAt.toISOString(),
       },
       profile.id,
     );
     expect(swappedFreeform).toMatchObject({ plannedFor: '2026-07-15', meal: 'dessert' });
     expect(swappedDessert).toMatchObject({ plannedFor: '2026-07-14', meal: 'snack' });
+    const existingAisles = listShoppingAisles();
     const produce = createShoppingAisle({ name: 'Produce' });
     const pantry = createShoppingAisle({ name: 'Pantry' });
-    reorderShoppingAisles([pantry.id, produce.id]);
+    reorderShoppingAisles([pantry.id, produce.id, ...existingAisles.map((aisle) => aisle.id)]);
     updateShoppingListItem(list.id, firstItem.id, {
       quantity: 400,
       unit: 'g',

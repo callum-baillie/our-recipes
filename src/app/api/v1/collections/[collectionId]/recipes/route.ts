@@ -1,9 +1,8 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
 import { collectionRecipeSchema, collectionRecipesSchema } from '@/lib/domain/collection';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   addRecipeToCollection,
   CollectionNotFoundError,
@@ -18,24 +17,28 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ collectionId: string }> },
 ) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before organizing recipes.',
-    );
-  }
+  const authorization = await authorizeApi(request, 'collections', 'create');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   const parsed = collectionRecipeSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return jsonError(400, 'invalid_collection_recipe', 'Choose a valid recipe to add.');
   try {
     const { collectionId } = await context.params;
-    const result = addRecipeToCollection(collectionId, parsed.data.recipeId, actor.profileId);
-    return NextResponse.json(result, { status: result.added ? 201 : 200 });
+    const result = addRecipeToCollection(
+      collectionId,
+      parsed.data.recipeId,
+      authorization.principal.profileId,
+    );
+    return withApiRequestId(
+      NextResponse.json(result, { status: result.added ? 201 : 200 }),
+      authorization.requestId,
+    );
   } catch (error) {
     if (error instanceof CollectionNotFoundError)
       return jsonError(404, 'collection_not_found', error.message);
@@ -49,25 +52,29 @@ export async function PUT(
   request: Request,
   context: { params: Promise<{ collectionId: string }> },
 ) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before organizing recipes.',
-    );
-  }
+  const authorization = await authorizeApi(request, 'collections', 'update');
+  if (authorization.response) return authorization.response;
+  const originError = requireTrustedSessionMutation(
+    request,
+    authorization.principal,
+    authorization.requestId,
+  );
+  if (originError) return originError;
   const parsed = collectionRecipesSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return jsonError(400, 'invalid_collection_recipes', 'Check the collection recipes.');
   try {
     const { collectionId } = await context.params;
-    return NextResponse.json({
-      collection: replaceCollectionRecipes(collectionId, parsed.data.recipeIds, actor.profileId),
-    });
+    return withApiRequestId(
+      NextResponse.json({
+        collection: replaceCollectionRecipes(
+          collectionId,
+          parsed.data.recipeIds,
+          authorization.principal.profileId,
+        ),
+      }),
+      authorization.requestId,
+    );
   } catch (error) {
     if (error instanceof CollectionNotFoundError)
       return jsonError(404, 'collection_not_found', error.message);

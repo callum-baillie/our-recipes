@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import Script from 'next/script';
 
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { auth } from '@/lib/auth/server';
 import { AppFooter } from '@/components/app-footer';
 import { AppHeader } from '@/components/app-header';
 import { PwaRegistration } from '@/components/pwa-registration';
@@ -15,7 +16,13 @@ import {
   parsePalette,
 } from '@/lib/appearance';
 import { getHouseholdState } from '@/lib/services/household-service';
-import { startAiSummaryScheduler } from '@/lib/services/ai-summary-service';
+import {
+  effectiveAppRole,
+  normalizeAppRole,
+  type AppRole,
+} from '@/lib/domain/permissions';
+import { getProfileAccessRole } from '@/lib/services/auth-service';
+import { isAuthenticationConfigured } from '@/lib/services/auth-service';
 import { brandedKitchenTitle, DEFAULT_KITCHEN_NAME, PRODUCT_NAME } from '@/lib/brand';
 
 import './globals.css';
@@ -106,10 +113,28 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  startAiSummaryScheduler();
   const state = getHouseholdState();
   const cookieStore = await cookies();
+  const requestHeaders = await headers();
+  const pathname = requestHeaders.get('x-bord-pathname') ?? '';
+  const isSecuritySurface = [
+    '/sign-in',
+    '/forgot-password',
+    '/reset-password',
+    '/security-upgrade',
+  ].includes(pathname);
+  const authConfigured = isAuthenticationConfigured();
+  const authSession = authConfigured
+    ? await auth.api.getSession({ headers: requestHeaders })
+    : null;
   const actor = getActorContext(cookieStore.get(ACTIVE_PROFILE_COOKIE)?.value);
+  const accountRole = normalizeAppRole(
+    (authSession?.user as { role?: string } | undefined)?.role,
+  );
+  const activeProfileRole = actor.profileId
+    ? (getProfileAccessRole(actor.profileId) ?? accountRole)
+    : accountRole;
+  const effectiveRole: AppRole = effectiveAppRole(accountRole, activeProfileRole);
   const palette = parsePalette(cookieStore.get(APPEARANCE_COOKIE_KEYS.palette)?.value);
   const mode = parseColorMode(cookieStore.get(APPEARANCE_COOKIE_KEYS.mode)?.value);
   const kitchenIcon = parseBrandIcon(state.household?.kitchenIcon);
@@ -130,17 +155,22 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       </head>
       <body>
         <ToastProvider>
-          {state.household ? (
+          {state.household && !isSecuritySurface && (!authConfigured || authSession) ? (
             <AppHeader
               kitchenName={state.household.kitchenName}
+              role={effectiveRole}
               activeProfileId={actor.profileId}
-              profiles={state.profiles}
+              profiles={state.profiles.map(({ id, displayName, color }) => ({
+                id,
+                displayName,
+                color,
+              }))}
               kitchenIcon={kitchenIcon}
             />
           ) : null}
           {children}
-          <AppFooter kitchenName={kitchenName} />
-          <PwaRegistration />
+          {!isSecuritySurface ? <AppFooter kitchenName={kitchenName} /> : null}
+          {!isSecuritySurface && (!authConfigured || authSession) ? <PwaRegistration /> : null}
         </ToastProvider>
       </body>
     </html>

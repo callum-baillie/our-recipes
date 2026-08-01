@@ -1,4 +1,5 @@
 import { Settings2 } from 'lucide-react';
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
@@ -19,6 +20,20 @@ import { getRecipeNutritionPresentation } from '@/lib/services/nutrition-recipe-
 import { getRecipe, listTags } from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ recipeId: string }>;
+}): Promise<Metadata> {
+  const { recipeId } = await params;
+  const recipe = getRecipe(recipeId);
+  if (!recipe) return {};
+  return {
+    title: recipe.title,
+    description: recipe.summary || `Cook ${recipe.title} from the shared recipe library.`,
+  };
+}
 
 export default async function RecipeDetailPage({
   params,

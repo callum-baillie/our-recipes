@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
+import { RecipebookNav } from '@/components/recipebook-nav';
 import type { CollectionSummary } from '@/lib/services/collection-service';
 
 export function CollectionManager({
@@ -110,6 +111,7 @@ export function CollectionManager({
   return (
     <main className="recipe-page collection-page">
       <div className="collection-page-shell">
+        <RecipebookNav current="collections" />
         <header className="collection-page-intro">
           <p className="eyebrow">CURATED COOKBOOKS</p>
           <div className="collection-intro-layout">

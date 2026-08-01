@@ -762,7 +762,7 @@ export function deletePrivateNutritionProfileData(
         linkedHouseholdProfileId: profile.linkedHouseholdProfileId,
         displayName: 'Deleted Nutrition profile',
         avatarUrl: '',
-        profileType: 'guest',
+        profileType: 'adult',
         dateOfBirth: null,
         heightCentimeters: null,
         currentWeightKilograms: null,

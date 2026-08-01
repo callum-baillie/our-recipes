@@ -2,7 +2,9 @@
 
 import { FileImage, FileText, Link2, Plus, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useRef, type RefObject } from 'react';
+
+import { useModalSurface } from '@/components/use-modal-surface';
 
 const options = [
   { href: '/recipes/new', label: 'From scratch', icon: FileText },
@@ -29,47 +31,20 @@ export function AddRecipeTrigger({ open }: { open: boolean }) {
 type AddRecipeDialogProps = {
   open: boolean;
   onClose?: () => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
-export function AddRecipeDialog({ open, onClose }: AddRecipeDialogProps) {
+export function AddRecipeDialog({ open, onClose, returnFocusRef }: AddRecipeDialogProps) {
   const panelRef = useRef<HTMLElement>(null);
   const closeControlRef = useRef<HTMLElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    previousFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    document.body.style.overflow = 'hidden';
-    closeControlRef.current?.focus();
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previousFocusRef.current?.focus();
-    };
-  }, [open]);
-
-  function containFocus(event: KeyboardEvent<HTMLElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeControlRef.current?.click();
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    const controls = Array.from(
-      panelRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? [],
-    );
-    if (controls.length === 0) return;
-    const first = controls[0];
-    const last = controls[controls.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first?.focus();
-    }
-  }
+  const close = onClose ?? (() => closeControlRef.current?.click());
+  const modal = useModalSurface({
+    open,
+    onClose: close,
+    panelRef,
+    initialFocusRef: closeControlRef,
+    returnFocusRef,
+  });
 
   if (!open) return null;
 
@@ -101,7 +76,8 @@ export function AddRecipeDialog({ open, onClose }: AddRecipeDialogProps) {
         aria-modal="true"
         aria-labelledby="add-recipe-title"
         aria-describedby="add-recipe-description"
-        onKeyDown={containFocus}
+        tabIndex={-1}
+        onKeyDown={modal.onKeyDown}
       >
         {onClose ? (
           <button

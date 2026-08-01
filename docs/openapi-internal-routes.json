@@ -26,6 +26,21 @@
   },
   {
     "method": "GET",
+    "path": "/ai/jobs",
+    "reason": "First-party background AI task query."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/jobs/{jobId}",
+    "reason": "First-party background AI task status query."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/jobs/{jobId}",
+    "reason": "First-party background AI task cancel and retry command."
+  },
+  {
+    "method": "GET",
     "path": "/ai/actions/{actionId}/image",
     "reason": "Ephemeral first-party assistant preview asset."
   },

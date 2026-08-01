@@ -1,10 +1,11 @@
 import 'server-only';
 
-import { asc, eq, gte } from 'drizzle-orm';
+import { and, asc, eq, gte } from 'drizzle-orm';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import { mealPlanEntries, recipeImages, recipes } from '@/lib/db/schema';
 import { formatScaledQuantity } from '@/lib/domain/ingredient-scaling';
+import { scheduledMealInstant } from '@/lib/domain/meal-plan-policy';
 import { getHouseholdState } from '@/lib/services/household-service';
 import { getShoppingList, listShoppingLists } from '@/lib/services/planning-service';
 
@@ -114,18 +115,6 @@ function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
   return Math.round((representedAsUtc - wholeSecondInstant) / 60_000);
 }
 
-function scheduledInstant(date: string, slot: MealSlot, timeZone: string): Date {
-  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
-  const localAsUtc = Date.UTC(year, month - 1, day, mealSlotHour(slot), 0, 0);
-  let candidate = new Date(localAsUtc);
-  // Re-evaluate after applying the offset so dates close to a DST boundary use
-  // the offset at the actual scheduled instant.
-  for (let pass = 0; pass < 2; pass += 1) {
-    candidate = new Date(localAsUtc - timeZoneOffsetMinutes(candidate, timeZone) * 60_000);
-  }
-  return candidate;
-}
-
 function localIsoDate(date: Date, timeZone: string): string {
   const parts = zonedParts(date, timeZone);
   return [
@@ -162,11 +151,16 @@ function nextMeal(now: Date, timeZone: string): HomepageSummary['nextMeal'] {
     })
     .from(mealPlanEntries)
     .innerJoin(recipes, eq(mealPlanEntries.recipeId, recipes.id))
-    .where(gte(mealPlanEntries.plannedFor, localIsoDate(now, timeZone)))
+    .where(
+      and(
+        gte(mealPlanEntries.plannedFor, localIsoDate(now, timeZone)),
+        eq(mealPlanEntries.status, 'planned'),
+      ),
+    )
     .all()
     .map((candidate) => ({
       ...candidate,
-      instant: scheduledInstant(candidate.date, candidate.slot, timeZone),
+      instant: scheduledMealInstant(candidate.date, candidate.slot, timeZone),
     }))
     .filter((candidate) => candidate.instant.getTime() > now.getTime())
     .sort(

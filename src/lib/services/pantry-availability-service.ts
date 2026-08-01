@@ -83,18 +83,36 @@ function plannedCommitments(recipeId: string) {
       .filter((session) => session.mealPlanEntryId && session.completedAt)
       .map((session) => session.mealPlanEntryId!),
   );
+  const leftoverDestinationIds = new Set(
+    db
+      .select({ id: mealPlanLeftoverLinks.destinationEntryId })
+      .from(mealPlanLeftoverLinks)
+      .all()
+      .map(({ id }) => id),
+  );
   const recipe = getRecipe(recipeId);
-  const baseServings = recipe ? parseServingCount(recipe.servings) : null;
-  if (!recipe || !baseServings) return [];
-  const ingredients = recipeIngredientsWithMappings(recipeId);
+  if (!recipe) return [];
+  const currentBaseServings = parseServingCount(recipe.servings);
+  const currentIngredients = recipeIngredientsWithMappings(recipeId);
   return db
     .select()
     .from(mealPlanEntries)
     .where(eq(mealPlanEntries.recipeId, recipeId))
     .all()
-    .filter((meal) => meal.status === 'planned' && !cookedIds.has(meal.id))
-    .flatMap((meal) =>
-      ingredients.flatMap((ingredient) =>
+    .filter(
+      (meal) =>
+        meal.status === 'planned' &&
+        !leftoverDestinationIds.has(meal.id) &&
+        !cookedIds.has(meal.id),
+    )
+    .flatMap((meal) => {
+      const snapshot = parseMealPlanIngredientSnapshot(meal.recipeIngredientsSnapshot);
+      const baseServings = snapshot
+        ? parseServingCount(snapshot.baseServings)
+        : currentBaseServings;
+      if (!baseServings) return [];
+      const ingredients = snapshot?.ingredients ?? currentIngredients;
+      return ingredients.flatMap((ingredient) =>
         ingredient.productId && ingredient.quantity !== null && ingredient.unit.trim()
           ? [
               {
@@ -104,8 +122,8 @@ function plannedCommitments(recipeId: string) {
               },
             ]
           : [],
-      ),
-    );
+      );
+    });
 }
 
 function recipeIngredientsWithMappings(recipeId: string): AvailabilityIngredient[] {
@@ -274,7 +292,10 @@ export function listRecipePantryAvailability(
   const cookedIds = new Set(
     meals.length
       ? db
-          .select({ mealPlanEntryId: cookSessions.mealPlanEntryId })
+          .select({
+            mealPlanEntryId: cookSessions.mealPlanEntryId,
+            completedAt: cookSessions.completedAt,
+          })
           .from(cookSessions)
           .where(
             inArray(
@@ -283,7 +304,9 @@ export function listRecipePantryAvailability(
             ),
           )
           .all()
-          .flatMap(({ mealPlanEntryId }) => (mealPlanEntryId ? [mealPlanEntryId] : []))
+          .flatMap(({ mealPlanEntryId, completedAt }) =>
+            mealPlanEntryId && completedAt ? [mealPlanEntryId] : [],
+          )
       : [],
   );
   const stock = availableStock();
@@ -430,12 +453,14 @@ export function getProjectedPantryDemand(
       .map((ingredient) => {
         let reason: string | null = null;
         let quantity: number | null = null;
+        if (ingredient.quantity !== null && ingredient.unit.trim() && baseServings) {
+          quantity = Number(((ingredient.quantity * meal.servings) / baseServings).toFixed(6));
+        }
         if (!ingredient.productId) reason = 'Not mapped to a Pantry product.';
         else if (ingredient.quantity === null)
           reason = 'The recipe does not specify an exact quantity.';
         else if (!ingredient.unit.trim()) reason = 'The recipe does not specify a unit.';
         else if (!baseServings) reason = 'The recipe serving yield cannot be scaled exactly.';
-        else quantity = Number(((ingredient.quantity * meal.servings) / baseServings).toFixed(6));
         return {
           mealPlanEntryId: meal.id,
           plannedFor: meal.plannedFor,

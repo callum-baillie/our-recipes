@@ -1,6 +1,6 @@
 'use client';
 
-import { ArchiveRestore, Download, ShieldCheck } from 'lucide-react';
+import { ArchiveRestore, Clock3, Download, FolderArchive, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
@@ -17,7 +17,14 @@ type BackupManifest = {
 
 type BackupPreview = BackupSummary & { manifest: BackupManifest };
 
-type BackupManagerProps = { initialBackups: BackupSummary[] };
+type BackupStorage = {
+  directory: string;
+  location: 'app-data' | 'dedicated';
+  intervalHours: number;
+  retentionDays: number;
+};
+
+type BackupManagerProps = { initialBackups: BackupSummary[]; storage: BackupStorage };
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -30,7 +37,7 @@ function displayDate(value: string): string {
   );
 }
 
-export function BackupManager({ initialBackups }: BackupManagerProps) {
+export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
   const { showToast } = useToast();
   const [backups, setBackups] = useState(initialBackups);
   const [preview, setPreview] = useState<BackupPreview | null>(null);
@@ -136,6 +143,33 @@ export function BackupManager({ initialBackups }: BackupManagerProps) {
           Restore only validates server-created bundles. It makes a fresh safety backup first and
           requires you to type <strong>RESTORE</strong> before current household data changes.
         </p>
+      </div>
+      <div className="backup-destination" aria-label="Backup destination">
+        <div className="backup-destination-copy">
+          <FolderArchive size={20} aria-hidden="true" />
+          <div>
+            <p className="backup-destination-title">
+              {storage.location === 'dedicated'
+                ? 'Dedicated backup directory'
+                : 'Application data directory'}
+            </p>
+            <p>
+              {storage.location === 'dedicated'
+                ? 'Ready for Kopia or another host backup tool to snapshot independently.'
+                : 'Set BACKUP_DIR to a mounted directory such as /backup to separate recovery bundles from app data.'}
+            </p>
+          </div>
+        </div>
+        <code>{storage.directory}</code>
+        <div className="backup-policy" aria-label="Automatic backup policy">
+          <span>
+            <Clock3 size={15} aria-hidden="true" />
+            Every {storage.intervalHours} {storage.intervalHours === 1 ? 'hour' : 'hours'}
+          </span>
+          <span>
+            Keep {storage.retentionDays} {storage.retentionDays === 1 ? 'day' : 'days'}
+          </span>
+        </div>
       </div>
       {error && (
         <p className="form-error" role="alert">

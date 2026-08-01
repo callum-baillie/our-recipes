@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers';
-import Link from 'next/link';
 
 import {
   NutritionProfileSettings,
   type NutritionProfileSettingsValue,
 } from '@/components/nutrition-profile-settings';
+import { SettingsPageHeader } from '@/components/settings-page-header';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { nutritionLocalDateKey } from '@/lib/domain/nutrition-view';
 import { listNutrientDefinitions } from '@/lib/services/nutrition-foundation-service';
@@ -74,17 +74,16 @@ export default async function NutritionSettingsPage() {
 
   return (
     <main className="recipe-page settings-hub">
-      <section className="settings-intro settings-hub-intro">
-        <Link className="quiet-link" href="/settings">
-          ← Settings
-        </Link>
-        <p className="eyebrow">NUTRITION SETTINGS</p>
-        <h1>{household.activeNutritionProfile.displayName}&apos;s Nutrition</h1>
-        <p>
-          These preferences follow the active household profile in the app header. Everyone in the
-          household can still view shared Nutrition summaries.
-        </p>
-      </section>
+      <SettingsPageHeader
+        eyebrow="NUTRITION SETTINGS"
+        title={`${household.activeNutritionProfile.displayName}'s Nutrition`}
+        description={
+          <>
+            These preferences follow the active household profile in the app header. Everyone in the
+            household can still view shared Nutrition summaries.
+          </>
+        }
+      />
       <NutritionProfileSettings
         profile={settingsValue(profile)}
         effectiveOn={nutritionLocalDateKey(new Date(), profile.dailyResetTimezone)}

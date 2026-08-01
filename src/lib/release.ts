@@ -5,9 +5,9 @@ import { accessSync, constants } from 'node:fs';
 import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
 import { ensureDatabase, getSqliteDatabase } from '@/lib/db/client';
 
-export const APPLICATION_VERSION = '1.0.0-rc.1';
-export const SCHEMA_VERSION = '0040_food_data_providers';
-export const EXPECTED_MIGRATION_COUNT = 42;
+export const APPLICATION_VERSION = '1.0.0-rc.2';
+export const SCHEMA_VERSION = '0048_guardian_nutrition_permissions';
+export const EXPECTED_MIGRATION_COUNT = 50;
 
 export type ReleaseStatus = {
   applicationVersion: string;
@@ -54,6 +54,9 @@ export function getRedactedRuntimeDiagnostics() {
     dataDirectoryWritable,
     configuration: {
       cookieSecretPresent: Boolean(process.env.COOKIE_SECRET),
+      betterAuthSecretPresent: Boolean(process.env.BETTER_AUTH_SECRET),
+      betterAuthUrlPresent: Boolean(process.env.BETTER_AUTH_URL || process.env.APP_ORIGIN),
+      smtpConfigured: config.auth.smtp.configured,
       appOriginPresent: Boolean(process.env.APP_ORIGIN),
       trustedOriginsConfigured: config.trustedOrigins.length > 0,
       openAiConfigured: Boolean(process.env.OPENAI_API_KEY),

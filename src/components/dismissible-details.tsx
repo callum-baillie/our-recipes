@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 
 type DismissibleDetailsProps = {
   className: string;
   summary: ReactNode;
   summaryAriaLabel?: string;
+  summaryRef?: Ref<HTMLElement>;
   children: ReactNode;
 };
 
@@ -13,6 +14,7 @@ export function DismissibleDetails({
   className,
   summary,
   summaryAriaLabel,
+  summaryRef,
   children,
 }: DismissibleDetailsProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -57,7 +59,9 @@ export function DismissibleDetails({
         if (details) details.open = false;
       }}
     >
-      <summary aria-label={summaryAriaLabel}>{summary}</summary>
+      <summary aria-label={summaryAriaLabel} ref={summaryRef}>
+        {summary}
+      </summary>
       {children}
     </details>
   );

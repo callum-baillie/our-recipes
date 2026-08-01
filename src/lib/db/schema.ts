@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 import { defaultProfileGoalContext, type ProfileGoalContext } from '@/lib/domain/profile-goals';
+import type { ShoppingCategory } from '@/lib/domain/list-settings';
 
 export const households = sqliteTable('households', {
   id: text('id').primaryKey(),
@@ -37,6 +38,277 @@ export const profiles = sqliteTable('profiles', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+// Better Auth owns authentication credentials and sessions. Household profiles
+// remain preference and attribution records and are linked separately below.
+// The exported object names intentionally match Better Auth's model names so
+// the Drizzle adapter can resolve the schema without pluralization guesses.
+export const user = sqliteTable(
+  'user',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+    image: text('image'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    role: text('role', { enum: ['admin', 'parent', 'child'] })
+      .notNull()
+      .default('parent'),
+    banned: integer('banned', { mode: 'boolean' }).notNull().default(false),
+    banReason: text('ban_reason'),
+    banExpires: integer('ban_expires', { mode: 'timestamp' }),
+  },
+  (table) => [uniqueIndex('auth_user_email_unique').on(table.email)],
+);
+
+export const session = sqliteTable(
+  'session',
+  {
+    id: text('id').primaryKey(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    token: text('token').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    impersonatedBy: text('impersonated_by'),
+  },
+  (table) => [
+    uniqueIndex('auth_session_token_unique').on(table.token),
+    index('auth_session_user_idx').on(table.userId),
+  ],
+);
+
+export const account = sqliteTable(
+  'account',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    providerId: text('provider_id').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp' }),
+    refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp' }),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('auth_account_user_idx').on(table.userId),
+    uniqueIndex('auth_account_provider_unique').on(table.providerId, table.accountId),
+  ],
+);
+
+export const verification = sqliteTable(
+  'verification',
+  {
+    id: text('id').primaryKey(),
+    identifier: text('identifier').notNull(),
+    value: text('value').notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [index('auth_verification_identifier_idx').on(table.identifier)],
+);
+
+export const rateLimit = sqliteTable(
+  'rate_limit',
+  {
+    id: text('id').primaryKey(),
+    key: text('key').notNull(),
+    count: integer('count').notNull(),
+    lastRequest: integer('last_request').notNull(),
+  },
+  (table) => [uniqueIndex('auth_rate_limit_key_unique').on(table.key)],
+);
+
+export const apikey = sqliteTable(
+  'apikey',
+  {
+    id: text('id').primaryKey(),
+    configId: text('config_id').notNull().default('default'),
+    name: text('name'),
+    start: text('start'),
+    referenceId: text('reference_id').notNull(),
+    prefix: text('prefix'),
+    key: text('key').notNull(),
+    refillInterval: integer('refill_interval'),
+    refillAmount: integer('refill_amount'),
+    lastRefillAt: integer('last_refill_at', { mode: 'timestamp' }),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    rateLimitEnabled: integer('rate_limit_enabled', { mode: 'boolean' }).notNull().default(true),
+    rateLimitTimeWindow: integer('rate_limit_time_window').notNull().default(60_000),
+    rateLimitMax: integer('rate_limit_max').notNull().default(120),
+    requestCount: integer('request_count').notNull().default(0),
+    remaining: integer('remaining'),
+    lastRequest: integer('last_request', { mode: 'timestamp' }),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    permissions: text('permissions'),
+    metadata: text('metadata'),
+  },
+  (table) => [
+    index('auth_apikey_config_idx').on(table.configId),
+    index('auth_apikey_reference_idx').on(table.referenceId),
+    index('auth_apikey_key_idx').on(table.key),
+  ],
+);
+
+export const passkey = sqliteTable(
+  'passkey',
+  {
+    id: text('id').primaryKey(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull(),
+    counter: integer('counter').notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: integer('backed_up', { mode: 'boolean' }).notNull(),
+    transports: text('transports'),
+    createdAt: integer('created_at', { mode: 'timestamp' }),
+    aaguid: text('aaguid'),
+  },
+  (table) => [
+    index('auth_passkey_user_idx').on(table.userId),
+    uniqueIndex('auth_passkey_credential_unique').on(table.credentialID),
+  ],
+);
+
+export const profileAuthLinks = sqliteTable(
+  'profile_auth_links',
+  {
+    profileId: text('profile_id')
+      .primaryKey()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [uniqueIndex('profile_auth_links_user_unique').on(table.userId)],
+);
+
+export const profileSecurity = sqliteTable('profile_security', {
+  profileId: text('profile_id')
+    .primaryKey()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  pinSalt: text('pin_salt').notNull(),
+  pinHash: text('pin_hash').notNull(),
+  pinVersion: integer('pin_version').notNull().default(1),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const profilePinAttempts = sqliteTable(
+  'profile_pin_attempts',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    windowStartedAt: integer('window_started_at', { mode: 'timestamp' }).notNull(),
+    failedAttempts: integer('failed_attempts').notNull().default(0),
+    lockedUntil: integer('locked_until', { mode: 'timestamp' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('profile_pin_attempt_session_profile_unique').on(table.sessionId, table.profileId),
+    index('profile_pin_attempt_profile_idx').on(table.profileId),
+  ],
+);
+
+export const authRecoveryCodes = sqliteTable(
+  'auth_recovery_codes',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    codePrefix: text('code_prefix').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    usedAt: integer('used_at', { mode: 'timestamp' }),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    index('auth_recovery_code_user_idx').on(table.userId),
+    uniqueIndex('auth_recovery_code_hash_unique').on(table.codeHash),
+  ],
+);
+
+export const authSecurityEvents = sqliteTable(
+  'auth_security_events',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+    profileId: text('profile_id').references(() => profiles.id, { onDelete: 'set null' }),
+    apiKeyId: text('api_key_id'),
+    event: text('event', {
+      enum: [
+        'bootstrap',
+        'sign_in',
+        'sign_out',
+        'profile_switch',
+        'profile_pin_failed',
+        'recovery_code_used',
+        'api_key_created',
+        'api_key_updated',
+        'api_key_rotated',
+        'api_key_revoked',
+        'api_key_used',
+        'credentials_invalidated',
+        'role_changed',
+        'guardian_updated',
+        'password_changed',
+      ],
+    }).notNull(),
+    requestId: text('request_id'),
+    details: text('details').notNull().default('{}'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('auth_security_event_user_idx').on(table.userId),
+    index('auth_security_event_created_idx').on(table.createdAt),
+  ],
+);
+
+export const apiIdempotencyRecords = sqliteTable(
+  'api_idempotency_records',
+  {
+    id: text('id').primaryKey(),
+    keyHash: text('key_hash').notNull(),
+    method: text('method').notNull(),
+    path: text('path').notNull(),
+    requestHash: text('request_hash').notNull(),
+    status: integer('status').notNull(),
+    responseBody: text('response_body').notNull(),
+    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+    apiKeyId: text('api_key_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('api_idempotency_key_unique').on(table.keyHash, table.method, table.path),
+    index('api_idempotency_expires_idx').on(table.expiresAt),
+  ],
+);
 
 export const householdExperienceSettings = sqliteTable('household_experience_settings', {
   householdId: text('household_id')
@@ -171,6 +443,7 @@ export const recipeIngredients = sqliteTable('recipe_ingredients', {
   unit: text('unit').notNull(),
   item: text('item').notNull(),
   note: text('note').notNull(),
+  shoppingCategory: text('shopping_category').$type<ShoppingCategory>().notNull().default('Other'),
 });
 
 export const recipeInstructionSections = sqliteTable('recipe_instruction_sections', {
@@ -320,6 +593,7 @@ export const aiOperationAudits = sqliteTable('ai_operation_audits', {
       'meal-plan-generation',
       'nutrition-summary',
       'planning-summary',
+      'household-summary',
     ],
   }).notNull(),
   status: text('status', { enum: ['requested', 'succeeded', 'failed'] }).notNull(),
@@ -384,10 +658,28 @@ export const aiProfileSettings = sqliteTable('ai_profile_settings', {
     .notNull()
     .default(false),
   shareWeight: integer('share_weight', { mode: 'boolean' }).notNull().default(false),
+  shareShoppingLists: integer('share_shopping_lists', { mode: 'boolean' }).notNull().default(true),
   dailySummaryEnabled: integer('daily_summary_enabled', { mode: 'boolean' })
     .notNull()
-    .default(true),
+    .default(false),
   weeklySummaryEnabled: integer('weekly_summary_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  summaryFrequency: text('summary_frequency', {
+    enum: ['off', 'daily', 'every_3_days', 'weekly', 'monthly'],
+  })
+    .notNull()
+    .default('off'),
+  summaryNutritionEnabled: integer('summary_nutrition_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(true),
+  summaryMealPlansEnabled: integer('summary_meal_plans_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(true),
+  summaryShoppingListsEnabled: integer('summary_shopping_lists_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(true),
+  summaryRecipesEnabled: integer('summary_recipes_enabled', { mode: 'boolean' })
     .notNull()
     .default(true),
   version: integer('version').notNull().default(1),
@@ -435,7 +727,7 @@ export const aiActionProposals = sqliteTable(
       .references(() => profiles.id, { onDelete: 'restrict' }),
     kind: text('kind').notNull(),
     status: text('status', {
-      enum: ['pending', 'confirmed', 'cancelled', 'expired', 'failed'],
+      enum: ['pending', 'executing', 'confirmed', 'cancelled', 'expired', 'failed'],
     }).notNull(),
     payload: text('payload').notNull(),
     preview: text('preview').notNull(),
@@ -461,6 +753,66 @@ export const aiActionPreviewImages = sqliteTable('ai_action_preview_images', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const aiJobs = sqliteTable(
+  'ai_jobs',
+  {
+    id: text('id').primaryKey(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    threadId: text('thread_id').references(() => aiChatThreads.id, { onDelete: 'set null' }),
+    actionId: text('action_id').references(() => aiActionProposals.id, { onDelete: 'set null' }),
+    kind: text('kind', { enum: ['recipe_images', 'recipe_batch_generation'] }).notNull(),
+    status: text('status', {
+      enum: ['queued', 'running', 'submitted', 'completed', 'failed', 'cancelled'],
+    }).notNull(),
+    executionMode: text('execution_mode', { enum: ['direct', 'batch'] }).notNull(),
+    model: text('model').notNull(),
+    payload: text('payload').notNull(),
+    result: text('result'),
+    sourceDigest: text('source_digest').notNull(),
+    providerBatchId: text('provider_batch_id'),
+    providerInputFileId: text('provider_input_file_id'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: integer('next_attempt_at', { mode: 'timestamp' }).notNull(),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: integer('lease_expires_at', { mode: 'timestamp' }),
+    errorCode: text('error_code'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    index('ai_jobs_profile_status_next_idx').on(table.profileId, table.status, table.nextAttemptAt),
+    index('ai_jobs_thread_created_idx').on(table.threadId, table.createdAt),
+  ],
+);
+
+export const aiJobItems = sqliteTable(
+  'ai_job_items',
+  {
+    id: text('id').primaryKey(),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => aiJobs.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    customId: text('custom_id').notNull().unique(),
+    status: text('status', { enum: ['pending', 'succeeded', 'failed', 'cancelled'] }).notNull(),
+    payload: text('payload').notNull(),
+    result: text('result'),
+    errorCode: text('error_code'),
+    recipeId: text('recipe_id').references(() => recipes.id, { onDelete: 'set null' }),
+    auditId: text('audit_id').references(() => aiOperationAudits.id, { onDelete: 'set null' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    uniqueIndex('ai_job_items_job_position_idx').on(table.jobId, table.position),
+    index('ai_job_items_job_status_idx').on(table.jobId, table.status),
+  ],
+);
+
 export const aiPeriodicSummaries = sqliteTable(
   'ai_periodic_summaries',
   {
@@ -469,13 +821,14 @@ export const aiPeriodicSummaries = sqliteTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     kind: text('kind', {
-      enum: ['daily_nutrition', 'weekly_nutrition', 'weekly_planning'],
+      enum: ['nutrition', 'meal_plans', 'shopping_lists', 'recipes'],
     }).notNull(),
     periodStart: text('period_start').notNull(),
     periodEnd: text('period_end').notNull(),
     headline: text('headline').notNull(),
     body: text('body').notNull(),
     highlights: text('highlights').notNull(),
+    metrics: text('metrics').notNull().default('[]'),
     caveats: text('caveats').notNull(),
     evidence: text('evidence').notNull(),
     sourceDigest: text('source_digest').notNull(),
@@ -499,12 +852,11 @@ export const aiSummaryJobs = sqliteTable(
     profileId: text('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
-    kind: text('kind', {
-      enum: ['daily_nutrition', 'weekly_nutrition', 'weekly_planning'],
-    }).notNull(),
+    kind: text('kind', { enum: ['summary_bundle'] }).notNull(),
     dueAt: integer('due_at', { mode: 'timestamp' }).notNull(),
     status: text('status', { enum: ['pending', 'running', 'complete', 'failed'] }).notNull(),
     leaseUntil: integer('lease_until', { mode: 'timestamp' }),
+    leaseToken: text('lease_token'),
     attempts: integer('attempts').notNull().default(0),
     errorCode: text('error_code'),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
@@ -1570,7 +1922,7 @@ export const nutritionProfiles = sqliteTable(
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url').notNull().default(''),
     profileType: text('profile_type', {
-      enum: ['adult', 'dependent', 'guest', 'unassigned'],
+      enum: ['adult', 'dependent', 'unassigned'],
     }).notNull(),
     dateOfBirth: text('date_of_birth'),
     heightCentimeters: real('height_centimeters'),

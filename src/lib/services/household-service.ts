@@ -1,8 +1,21 @@
+import 'server-only';
+
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
-import { households, nutritionPrincipals, nutritionProfiles, profiles } from '@/lib/db/schema';
+import {
+  account,
+  authRecoveryCodes,
+  authSecurityEvents,
+  households,
+  nutritionPrincipals,
+  nutritionProfiles,
+  profileAuthLinks,
+  profiles,
+  profileSecurity,
+  user,
+} from '@/lib/db/schema';
 import {
   defaultOnboardingNutrition,
   householdSettingsSchema,
@@ -15,6 +28,10 @@ import {
   type SetupInput,
 } from '@/lib/domain/setup';
 import { defaultProfileGoalContext } from '@/lib/domain/profile-goals';
+import { SCOTTISH_STOVIES_RECIPE } from '@/lib/domain/example-recipes';
+import type { PreparedProfileEnrollment } from '@/lib/services/auth-service';
+import { createRecipeInTransaction } from '@/lib/services/recipe-service';
+import { ensureDefaultSupermarketProfile } from '@/lib/services/list-settings-service';
 
 export type HouseholdRecord = typeof households.$inferSelect;
 export type ProfileRecord = typeof profiles.$inferSelect;
@@ -26,6 +43,12 @@ export type HouseholdState = {
 
 export class ConflictError extends Error {}
 export class NotFoundError extends Error {}
+
+export type SetupCompletionResult = {
+  state: HouseholdState;
+  firstRecipeId: string | null;
+  recoveryCodes: Array<{ profileId: string; codes: string[] }>;
+};
 
 type Db = ReturnType<typeof getDatabase>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -120,6 +143,8 @@ function applyNutritionOnboarding(
       referenceSexCategory: input.referenceSexCategory,
       activityLevel: input.activityLevel,
       nutritionGoalType: input.nutritionGoalType,
+      targetWeightKilograms: input.targetWeightKilograms,
+      targetDate: input.targetDate || null,
       dietaryPreferences: JSON.stringify(input.dietaryPreferences),
       foodAllergies: JSON.stringify(input.foodAllergies),
       dietaryExclusions: JSON.stringify(input.dietaryExclusions),
@@ -148,7 +173,10 @@ export function getHouseholdState(includeArchived = false): HouseholdState {
   };
 }
 
-export function completeSetup(input: SetupInput): HouseholdState {
+export function completeSetupWithResult(
+  input: SetupInput,
+  enrollments: PreparedProfileEnrollment[] = [],
+): SetupCompletionResult {
   ensureDatabase();
   const db = getDatabase();
   const existing = db.select({ id: households.id }).from(households).limit(1).get();
@@ -160,9 +188,16 @@ export function completeSetup(input: SetupInput): HouseholdState {
     {
       profile: canonicalInput.profile,
       nutrition: canonicalInput.nutrition ?? defaultOnboardingNutrition,
+      role: 'admin',
     },
     ...canonicalInput.additionalProfiles,
   ];
+  if (enrollments.length !== 0 && enrollments.length !== profileInputs.length) {
+    throw new ConflictError('Every profile needs one authentication enrollment.');
+  }
+  let firstRecipeId: string | null = null;
+  let primaryProfileId: string | null = null;
+  const recoveryCodes: Array<{ profileId: string; codes: string[] }> = [];
   db.transaction((transaction) => {
     transaction
       .insert(households)
@@ -176,6 +211,7 @@ export function completeSetup(input: SetupInput): HouseholdState {
       .run();
     profileInputs.forEach((entry, index) => {
       const profileId = randomUUID();
+      if (index === 0) primaryProfileId = profileId;
       const profileCreatedAt = new Date(now.getTime() + index);
       transaction
         .insert(profiles)
@@ -198,9 +234,60 @@ export function completeSetup(input: SetupInput): HouseholdState {
       const profile = transaction.select().from(profiles).where(eq(profiles.id, profileId)).get()!;
       synchronizeHouseholdNutritionProfile(transaction, profile);
       applyNutritionOnboarding(transaction, profile.id, entry.nutrition);
+      const enrollment = enrollments[index];
+      if (enrollment) {
+        transaction.insert(user).values(enrollment.user).run();
+        transaction.insert(account).values(enrollment.account).run();
+        transaction
+          .insert(profileAuthLinks)
+          .values({
+            profileId,
+            userId: enrollment.user.id,
+            createdAt: profileCreatedAt,
+            updatedAt: profileCreatedAt,
+          })
+          .run();
+        transaction
+          .insert(profileSecurity)
+          .values({ profileId, ...enrollment.security })
+          .run();
+        transaction
+          .insert(authRecoveryCodes)
+          .values(
+            enrollment.recoveryRows.map((row) => ({
+              ...row,
+              userId: enrollment.user.id as string,
+            })),
+          )
+          .run();
+        recoveryCodes.push({ profileId, codes: enrollment.recoveryCodes });
+      }
+      if (index === 0 && canonicalInput.firstRecipeChoice === 'example') {
+        firstRecipeId = createRecipeInTransaction(transaction, SCOTTISH_STOVIES_RECIPE, profile.id);
+      }
     });
+    if (primaryProfileId) {
+      ensureDefaultSupermarketProfile(primaryProfileId, transaction);
+    }
+    if (enrollments[0]) {
+      transaction
+        .insert(authSecurityEvents)
+        .values({
+          id: randomUUID(),
+          userId: enrollments[0].user.id,
+          profileId: recoveryCodes[0]!.profileId,
+          event: 'bootstrap',
+          details: JSON.stringify({ profileCount: enrollments.length, upgraded: false }),
+          createdAt: now,
+        })
+        .run();
+    }
   });
-  return getHouseholdState();
+  return { state: getHouseholdState(), firstRecipeId, recoveryCodes };
+}
+
+export function completeSetup(input: SetupInput): HouseholdState {
+  return completeSetupWithResult(input).state;
 }
 
 export function updateHouseholdSettings(input: HouseholdSettingsInput): HouseholdRecord {
@@ -223,6 +310,7 @@ export function updateHouseholdSettings(input: HouseholdSettingsInput): Househol
 function addProfileInternal(
   rawInput: ProfileInput,
   nutrition?: OnboardingNutritionInput,
+  enrollment?: PreparedProfileEnrollment,
 ): ProfileRecord {
   ensureDatabase();
   const household = getDatabase().select({ id: households.id }).from(households).limit(1).get();
@@ -249,6 +337,32 @@ function addProfileInternal(
     transaction.insert(profiles).values(profile).run();
     synchronizeHouseholdNutritionProfile(transaction, profile);
     applyNutritionOnboarding(transaction, profile.id, nutrition);
+    if (enrollment) {
+      transaction.insert(user).values(enrollment.user).run();
+      transaction.insert(account).values(enrollment.account).run();
+      transaction
+        .insert(profileAuthLinks)
+        .values({
+          profileId: profile.id,
+          userId: enrollment.user.id,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      transaction
+        .insert(profileSecurity)
+        .values({ profileId: profile.id, ...enrollment.security })
+        .run();
+      transaction
+        .insert(authRecoveryCodes)
+        .values(
+          enrollment.recoveryRows.map((row) => ({
+            ...row,
+            userId: enrollment.user.id as string,
+          })),
+        )
+        .run();
+    }
   });
   return profile;
 }
@@ -259,6 +373,16 @@ export function addProfile(input: ProfileInput): ProfileRecord {
 
 export function onboardProfile(input: ProfileOnboardingInput): ProfileRecord {
   return addProfileInternal(input.profile, input.nutrition);
+}
+
+export function onboardProfileWithEnrollment(
+  input: ProfileOnboardingInput,
+  enrollment: PreparedProfileEnrollment,
+): { profile: ProfileRecord; recoveryCodes: string[] } {
+  return {
+    profile: addProfileInternal(input.profile, input.nutrition, enrollment),
+    recoveryCodes: enrollment.recoveryCodes,
+  };
 }
 
 export function getProfile(profileId: string): ProfileRecord | null {

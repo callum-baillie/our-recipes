@@ -178,6 +178,44 @@
   display: none;
 }
 
+.mobileCreateGroup {
+  display: grid;
+  gap: 0.15rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.mobileCreateGroup > span {
+  padding: 0.35rem 0.8rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mobileCreateGroup > button,
+.mobileCreateGroup > a {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0.42rem;
+}
+
+.mobileCreateGroup > button:hover,
+.mobileCreateGroup > button:focus-visible,
+.mobileCreateGroup > a:hover,
+.mobileCreateGroup > a:focus-visible {
+  background: var(--surface-hover);
+}
+
 .header.header :global(.profile-switcher) > summary {
   gap: 0.65rem;
   min-height: 3rem;
@@ -219,6 +257,37 @@
 
   .mobileNavigation.mobileNavigation > nav {
     width: min(19rem, calc(100vw - 2rem));
+  }
+}
+
+@media (min-width: 651px) and (max-width: 1120px) {
+  .createMenu > summary {
+    width: 3rem;
+    min-width: 3rem;
+    padding: 0;
+  }
+
+  .createMenuLabel,
+  .createMenuChevron,
+  .settingsUtility.settingsUtility,
+  .controlDivider.controlDivider {
+    display: none;
+  }
+
+  .mobileSettingsLink.mobileSettingsLink {
+    display: flex;
+  }
+
+  .header.header :global(.profile-switcher) > summary {
+    justify-content: center;
+    width: 3rem;
+    min-width: 3rem;
+    gap: 0;
+  }
+
+  .header.header :global(.profile-switcher) > summary :global(.profile-name),
+  .header.header :global(.profile-switcher) > summary > svg {
+    display: none;
   }
 }
 

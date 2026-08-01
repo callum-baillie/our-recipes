@@ -4,6 +4,7 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { InlineSkeleton } from '@/components/skeleton';
+import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 
 const CONFIRMATION = 'FRESH INSTALL';
@@ -40,26 +41,27 @@ export function FreshInstallPanel() {
   }
 
   return (
-    <section className="settings-card danger-zone" aria-labelledby="danger-zone-title">
-      <div>
-        <p className="eyebrow">DANGER ZONE</p>
-        <h2 id="danger-zone-title">Need a fresh start?</h2>
-        <p>
-          Fresh install creates one final local safety backup, then removes all recipes, profiles,
-          meal plans, lists, Pantry stock, and Nutrition data from the active app. Existing backup
-          archives and uploaded media files stay on this device.
-        </p>
-      </div>
-      <button
-        className="danger-button"
-        type="button"
-        onClick={() => {
-          setConfirmation('');
-          dialogRef.current?.showModal();
-        }}
+    <SettingsPane
+      tone="danger"
+      eyebrow="DANGER ZONE"
+      title="Fresh installation"
+      description="Irreversible installation-level actions are kept separate from everyday preferences."
+    >
+      <SettingsRow
+        title="Erase app data and start over"
+        description="Creates one final local safety backup, then removes recipes, profiles, plans, lists, Pantry stock, and Nutrition data. Existing backup archives and uploaded media remain."
       >
-        <RotateCcw size={17} /> Fresh install
-      </button>
+        <button
+          className="danger-button"
+          type="button"
+          onClick={() => {
+            setConfirmation('');
+            dialogRef.current?.showModal();
+          }}
+        >
+          <RotateCcw size={17} /> Fresh install
+        </button>
+      </SettingsRow>
       <dialog className="confirmation-dialog" ref={dialogRef} aria-labelledby="fresh-install-title">
         <form
           method="dialog"
@@ -112,6 +114,6 @@ export function FreshInstallPanel() {
           </div>
         </form>
       </dialog>
-    </section>
+    </SettingsPane>
   );
 }

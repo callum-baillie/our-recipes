@@ -13,7 +13,9 @@ import {
   pantryContributions,
   pantryOptionsFromSummary,
   pantryStateLabel,
+  shoppingQuantitySummary,
   runTrackedIntakeOperation,
+  shoppingItemAmount,
 } from '@/components/shopping-list-editor';
 import { MealPlanPantryDemand } from '@/components/meal-plan-pantry-demand';
 
@@ -22,13 +24,29 @@ describe('Pantry grocery and cooking contracts', () => {
     expect(
       pantryOptionsFromSummary({
         dashboard: {
-          products: [{ id: 'product-1', displayName: 'Red lentils' }],
+          products: [{ id: 'product-1', displayName: 'Red lentils', aliases: ['Lentils'] }],
           locations: [{ id: 'location-1', path: 'Basement shelf' }],
-          batches: [],
+          batches: [
+            {
+              productId: 'product-1',
+              quantityRemaining: 2,
+              unit: 'kg',
+              approximateState: null,
+              status: 'unopened',
+              excludeFromGrocery: false,
+            },
+          ],
         },
       }),
     ).toEqual({
-      products: [{ id: 'product-1', displayName: 'Red lentils' }],
+      products: [
+        {
+          id: 'product-1',
+          displayName: 'Red lentils',
+          aliases: ['Lentils'],
+          stock: [{ quantity: 2, unit: 'kg' }],
+        },
+      ],
       locations: [{ id: 'location-1', path: 'Basement shelf' }],
     });
   });
@@ -134,7 +152,7 @@ describe('Pantry grocery and cooking contracts', () => {
       generatedAt: new Date(),
       updatedAt: new Date(),
     };
-    expect(pantryStateLabel({ pantry: detail })).toBe('Generated Pantry shortage · 2 each');
+    expect(pantryStateLabel({ pantry: detail })).toBe('Plan and Pantry calculation');
     expect(
       pantryStateLabel({
         pantry: {
@@ -144,9 +162,9 @@ describe('Pantry grocery and cooking contracts', () => {
           shortageQuantity: null,
         },
       }),
-    ).toBe('Uncertain generated demand · no numeric shortage claimed');
+    ).toBe('Pantry match needed for an exact buy amount');
     expect(pantryStateLabel({ pantry: { ...detail, manualQuantityOverride: true } })).toBe(
-      'Manual override · generated shortage is 2 each',
+      'Manual amount · calculated buy amount is 2 each',
     );
     expect(pantryStateLabel({ pantry: { ...detail, demandState: 'manual' } })).toBe(
       'Obsolete generated demand · kept as a manual item',
@@ -160,6 +178,63 @@ describe('Pantry grocery and cooking contracts', () => {
         },
       }),
     ).toEqual([]);
+  });
+
+  it('shows the exact combined meal-plan demand without an uncertainty qualifier', () => {
+    expect(
+      shoppingItemAmount({
+        quantity: null,
+        unit: 'medium',
+        pantry: {
+          demandState: 'uncertain',
+          generatedUnit: 'medium',
+          formulaInputs: JSON.stringify({ requiredQuantity: 4, unit: 'medium' }),
+        },
+      }),
+    ).toBe('4 medium recipe demand');
+    expect(
+      shoppingQuantitySummary({
+        quantity: null,
+        unit: 'medium',
+        pantry: {
+          demandState: 'uncertain',
+          generatedUnit: 'medium',
+          formulaInputs: JSON.stringify({ requiredQuantity: 4, unit: 'medium' }),
+        },
+      }),
+    ).toEqual({
+      primary: '4 medium to buy',
+      secondary: '',
+      calculation: '',
+      isEstimate: false,
+    });
+  });
+
+  it('keeps the full meal-plan demand visible when Pantry stock reduced the stored shortage', () => {
+    expect(
+      shoppingQuantitySummary({
+        quantity: 3,
+        unit: 'each',
+        pantry: {
+          demandState: 'shortage',
+          generatedUnit: 'each',
+          formulaInputs: JSON.stringify({
+            recipeRequirement: 5,
+            stapleTarget: 0,
+            manualExtra: 0,
+            usablePantry: 2,
+            purchased: 0,
+            covered: 0,
+            unit: 'each',
+          }),
+        },
+      }),
+    ).toEqual({
+      primary: '5 each to buy',
+      secondary: '',
+      calculation: '',
+      isEstimate: false,
+    });
   });
 
   it('reuses a persisted intake key across rejected, unknown-outcome, and concurrent fetches', async () => {

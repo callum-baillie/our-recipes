@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createClientUuid } from '@/lib/client/client-uuid';
+import { RecipePantryPanel } from '@/components/recipe-pantry-panel';
 import { convertTemperature, recipeYieldNumber, scaledQuantity } from '@/lib/domain/cooking';
+import type { PantryRecipeAvailability } from '@/lib/domain/pantry-availability';
 import type { RecipeDetail } from '@/lib/services/recipe-service';
 
 import styles from './cooking-mode.module.css';
@@ -54,6 +56,7 @@ export function CookingMode({
   initialFavorite,
   mealPlanEntryId,
   nutritionPreparation,
+  pantryAvailability,
 }: {
   recipe: RecipeDetail;
   initialFavorite: boolean;
@@ -63,6 +66,7 @@ export function CookingMode({
     calculationId: string;
     finalWeightGrams: number | null;
   } | null;
+  pantryAvailability: PantryRecipeAvailability;
 }) {
   const router = useRouter();
   const steps = useMemo(
@@ -428,6 +432,17 @@ export function CookingMode({
           )}
         </aside>
       </section>
+      <details className="cooking-pantry">
+        <summary>
+          Pantry check
+          <span>{pantryAvailability.state.replaceAll('_', ' ')}</span>
+        </summary>
+        <RecipePantryPanel
+          initialAvailability={pantryAvailability}
+          products={[]}
+          allowMapping={false}
+        />
+      </details>
       <section className="cooking-layout">
         <aside className="scaled-ingredients">
           <h2>Ingredients</h2>

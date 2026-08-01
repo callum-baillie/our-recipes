@@ -4,7 +4,23 @@ const build = spawnSync('pnpm', ['build'], {
   cwd: process.cwd(),
   encoding: 'utf8',
   shell: process.platform === 'win32',
-  env: { ...process.env, CI: process.env.CI ?? '1' },
+  // Builds may evaluate server modules, but they must never open a populated
+  // household database or require deploy-time credentials. The standalone
+  // server reads the real values when it starts.
+  env: {
+    ...process.env,
+    CI: process.env.CI ?? '1',
+    DATA_DIR: '.test-data/build-release',
+    DATABASE_URL: ':memory:',
+    COOKIE_SECRET: 'build-only-cookie-secret-000000000000',
+    BETTER_AUTH_SECRET: 'build-only-auth-secret-00000000000000',
+    BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+    APP_ORIGIN: 'http://127.0.0.1:3000',
+    TRUSTED_ORIGINS: '',
+    AUTH_SMTP_HOST: 'build.invalid',
+    AUTH_SMTP_USER: 'build',
+    AUTH_SMTP_PASSWORD: 'build',
+  },
 });
 
 process.stdout.write(build.stdout ?? '');

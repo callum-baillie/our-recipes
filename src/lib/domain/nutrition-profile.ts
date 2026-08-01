@@ -143,7 +143,7 @@ export const nutritionProfileInputSchema = z
     displayName: z.string().trim().min(1).max(100),
     avatarUrl: z.union([z.literal(''), z.string().trim().url().max(2_048)]).default(''),
     linkedHouseholdProfileId: nullableUuid.default(null),
-    profileType: z.enum(['adult', 'dependent', 'guest', 'unassigned']).default('adult'),
+    profileType: z.enum(['adult', 'dependent', 'unassigned']).default('adult'),
     ...nutritionProfileSettingsShape,
     comparisonVisibility: z.enum(['hidden', 'named', 'anonymized']).default('hidden'),
     diaryVisibility: z.enum(['private', 'authorized']).default('private'),

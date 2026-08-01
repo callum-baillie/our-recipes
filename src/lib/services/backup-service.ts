@@ -1,3 +1,5 @@
+import 'server-only';
+
 import Database from 'better-sqlite3';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -16,7 +18,12 @@ import {
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { c as createTar, t as listTar, x as extractTar } from 'tar';
 
-import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
+import {
+  getBackupDirectory,
+  getBackupStorageConfiguration,
+  getDataDirectory,
+  getRuntimeConfig,
+} from '@/lib/config';
 import {
   closeDatabaseConnection,
   ensureDatabase,
@@ -52,16 +59,12 @@ export class BackupError extends Error {}
 export class BackupNotFoundError extends Error {}
 export class BackupValidationError extends Error {}
 
-function backupsDirectory(): string {
-  return join(/* turbopackIgnore: true */ getDataDirectory(), 'backups');
-}
-
 function stageDirectoryPrefix(): string {
   return join(/* turbopackIgnore: true */ getDataDirectory(), '.backup-stage-');
 }
 
 function archivePath(id: string): string {
-  return join(backupsDirectory(), `${backupIdSchema.parse(id)}.tar.gz`);
+  return join(getBackupDirectory(), `${backupIdSchema.parse(id)}.tar.gz`);
 }
 
 function pathInside(root: string, candidate: string): boolean {
@@ -143,6 +146,16 @@ async function copyDirectoryIfPresent(source: string, destination: string): Prom
   await listRegularFiles(destination);
 }
 
+async function ensureBackupDirectory(): Promise<string> {
+  const directory = getBackupDirectory();
+  await mkdir(directory, { recursive: true });
+  const details = await lstat(directory);
+  if (!details.isDirectory() || details.isSymbolicLink()) {
+    throw new BackupError('BACKUP_DIR must be a real directory, not a symbolic link.');
+  }
+  return directory;
+}
+
 function assertDatabaseWithinDataDirectory(databasePath: string): void {
   if (databasePath !== ':memory:' && !pathInside(getDataDirectory(), databasePath)) {
     throw new BackupError(
@@ -178,11 +191,12 @@ function removeTransientFoodData(databasePath: string): void {
 }
 
 async function removeExpiredBackups(): Promise<void> {
+  const backupDirectory = await ensureBackupDirectory();
   const retentionMs = getRuntimeConfig().backupRetentionDays * 24 * 60 * 60 * 1000;
   const cutoff = Date.now() - retentionMs;
-  for (const entry of await readdir(backupsDirectory(), { withFileTypes: true })) {
+  for (const entry of await readdir(backupDirectory, { withFileTypes: true })) {
     if (!entry.isFile() || !/^[0-9a-f-]{36}\.tar\.gz$/i.test(entry.name)) continue;
-    const filePath = join(backupsDirectory(), entry.name);
+    const filePath = join(backupDirectory, entry.name);
     if ((await stat(filePath)).mtimeMs < cutoff) await rm(filePath, { force: true });
   }
 }
@@ -285,12 +299,12 @@ async function validateBackup(id: string): Promise<ValidatedBackup> {
 }
 
 export async function listBackups(): Promise<BackupSummary[]> {
-  await mkdir(backupsDirectory(), { recursive: true });
+  const backupDirectory = await ensureBackupDirectory();
   const backups: BackupSummary[] = [];
-  for (const entry of await readdir(backupsDirectory(), { withFileTypes: true })) {
+  for (const entry of await readdir(backupDirectory, { withFileTypes: true })) {
     const match = entry.isFile() && /^([0-9a-f-]{36})\.tar\.gz$/i.exec(entry.name);
     if (!match) continue;
-    const details = await stat(join(backupsDirectory(), entry.name));
+    const details = await stat(join(backupDirectory, entry.name));
     backups.push({ id: match[1]!, createdAt: details.mtime, bytes: details.size });
   }
   return backups.sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
@@ -312,11 +326,11 @@ export async function createBackup(reason: BackupReason = 'manual'): Promise<Bac
   assertDatabaseWithinDataDirectory(currentDatabasePath);
   const id = randomUUID();
   const createdAt = new Date();
+  const backupDirectory = await ensureBackupDirectory();
   const stagingDirectory = await mkdtemp(stageDirectoryPrefix());
-  const temporaryArchive = join(backupsDirectory(), `.${id}.tmp`);
+  const temporaryArchive = join(backupDirectory, `.${id}.tmp`);
   const destination = archivePath(id);
   try {
-    await mkdir(backupsDirectory(), { recursive: true });
     await getSqliteDatabase().backup(join(stagingDirectory, 'database.sqlite'));
     removeTransientFoodData(join(stagingDirectory, 'database.sqlite'));
     await copyDirectoryIfPresent(
@@ -425,10 +439,11 @@ export async function restoreBackup(id: string): Promise<{ safetyBackup: BackupP
       join(validated.stagingDirectory, 'config.json'),
       join(restoredDirectory, 'config', 'backup-export.json'),
     );
-    await copyDirectoryIfPresent(
-      join(dataDirectory, 'backups'),
-      join(restoredDirectory, 'backups'),
-    );
+    const backupDirectory = getBackupDirectory();
+    if (pathInside(dataDirectory, backupDirectory)) {
+      const backupRelativePath = relative(dataDirectory, backupDirectory);
+      await copyDirectoryIfPresent(backupDirectory, join(restoredDirectory, backupRelativePath));
+    }
     closeDatabaseConnection();
     await rename(dataDirectory, previousDirectory);
     movedPrevious = true;
@@ -448,6 +463,10 @@ export async function restoreBackup(id: string): Promise<{ safetyBackup: BackupP
     await rm(restoredDirectory, { recursive: true, force: true });
     await rm(validated.stagingDirectory, { recursive: true, force: true });
   }
+}
+
+export function getBackupStorageStatus(): ReturnType<typeof getBackupStorageConfiguration> {
+  return getBackupStorageConfiguration();
 }
 
 type SchedulerState = typeof globalThis & {

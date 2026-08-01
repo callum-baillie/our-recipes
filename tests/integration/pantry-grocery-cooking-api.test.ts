@@ -68,7 +68,7 @@ describe('Pantry grocery and cooking API boundary', () => {
     ).toBe(403);
     expect(
       (await generateShortages(request('/shopping-lists/pantry-shortages', body))).status,
-    ).toBe(201);
+    ).toBe(409);
   });
 
   it('requires explicit Pantry confirmation before cook completion', async () => {

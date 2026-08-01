@@ -8,7 +8,7 @@
   padding: 0.75rem 1rem;
   border: 1px solid var(--tomato);
   border-radius: 0.55rem;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--tomato);
   font: inherit;
   font-size: 0.9rem;
@@ -424,7 +424,7 @@
 
 .aiAction {
   border: 1px solid var(--tomato);
-  color: #fff;
+  color: var(--on-accent);
   background: var(--tomato);
 }
 
@@ -512,7 +512,7 @@
 
 .conflictRow button[aria-pressed='true'] {
   border-color: var(--leaf);
-  color: #fff;
+  color: var(--on-primary);
   background: var(--leaf);
 }
 
@@ -650,7 +650,7 @@
 
 .reviewActions .confirmAction {
   border-color: var(--tomato);
-  color: #fff;
+  color: var(--on-accent);
   background: var(--tomato);
 }
 

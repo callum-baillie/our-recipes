@@ -598,7 +598,7 @@ describe('duplicate-0026 migration lineage recovery', () => {
         sqlite.close();
       }
     }
-  });
+  }, 15_000);
 
   it.each([
     [

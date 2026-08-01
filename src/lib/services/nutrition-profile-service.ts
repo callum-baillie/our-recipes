@@ -158,6 +158,16 @@ function authorize(
   }
   if (profile.linkedHouseholdProfileId !== null) {
     if (profile.ownerPrincipalId !== requesterPrincipalId) {
+      const decision = authorizeNutritionProfileAccess({
+        requesterPrincipalId,
+        profile: {
+          ownerPrincipalId: profile.ownerPrincipalId,
+          comparisonVisibility: profile.comparisonVisibility,
+        },
+        action,
+        grants: latestGrants(executor, profileId),
+      });
+      if (decision.allowed) return profile;
       throw new NutritionProfileForbiddenError(
         'This change belongs to the Nutrition profile linked to the active household profile.',
       );
@@ -672,6 +682,9 @@ export function listAccessibleNutritionProfiles(
     .all()
     .flatMap((profile): AccessibleNutritionProfile[] => {
       const owner = profile.ownerPrincipalId === requesterPrincipalId;
+      const grant = latestGrants(database, profile.id).find(
+        (candidate) => candidate.principalId === requesterPrincipalId,
+      );
       return [
         {
           id: profile.id,
@@ -688,14 +701,14 @@ export function listAccessibleNutritionProfiles(
           showRecipeCardNutrition: profile.showRecipeCardNutrition,
           recipeCardNutrientCodes: recipeCardNutrientCodes(profile.recipeCardNutrientCodes),
           showMealPlanNutrition: profile.showMealPlanNutrition,
-          relationship: owner ? 'owner' : 'viewer',
-          canViewDiary: owner,
-          canViewMeasurements: owner,
-          canManageProfile: owner,
-          canManageGoals: owner,
-          canViewComparison: true,
-          canExportData: false,
-          canDeleteData: false,
+          relationship: owner ? 'owner' : (grant?.role ?? 'viewer'),
+          canViewDiary: owner || Boolean(grant?.canViewDiary),
+          canViewMeasurements: owner || Boolean(grant?.canViewMeasurements),
+          canManageProfile: owner || Boolean(grant?.canManageProfile),
+          canManageGoals: owner || Boolean(grant?.canManageGoals),
+          canViewComparison: owner || Boolean(grant?.canViewComparison),
+          canExportData: owner || Boolean(grant?.canExportData),
+          canDeleteData: owner || Boolean(grant?.canDeleteData),
           version: profile.version,
         },
       ];
@@ -766,6 +779,68 @@ export function updateNutritionProfileSettings(
 export type PermissionInput = Omit<NutritionPermissionGrant, 'principalId'> & {
   principalId: string;
 };
+function writeNutritionPermission(
+  profileId: string,
+  requesterPrincipalId: string,
+  input: PermissionInput,
+  state: 'granted' | 'revoked' = 'granted',
+) {
+  const database = db();
+  const profile = required(
+    database.select().from(nutritionProfiles).where(eq(nutritionProfiles.id, profileId)).get(),
+    'Nutrition profile was not found.',
+  );
+  if (profile.ownerPrincipalId !== requesterPrincipalId) {
+    throw new NutritionProfileForbiddenError(
+      'Only the Nutrition profile owner may change sharing permissions.',
+    );
+  }
+  const principal = database
+    .select()
+    .from(nutritionPrincipals)
+    .where(eq(nutritionPrincipals.id, input.principalId))
+    .get();
+  if (!principal || principal.archivedAt) {
+    throw new NutritionProfileNotFoundError('The guardian Nutrition principal was not found.');
+  }
+  if (input.principalId === profile.ownerPrincipalId) {
+    throw new NutritionProfileConflictError('A profile owner cannot be granted duplicate access.');
+  }
+  const previous = database
+    .select()
+    .from(nutritionPermissionVersions)
+    .where(
+      and(
+        eq(nutritionPermissionVersions.nutritionProfileId, profileId),
+        eq(nutritionPermissionVersions.principalId, input.principalId),
+      ),
+    )
+    .orderBy(desc(nutritionPermissionVersions.revision))
+    .get();
+  const record = {
+    id: randomUUID(),
+    nutritionProfileId: profileId,
+    principalId: input.principalId,
+    revision: (previous?.revision ?? 0) + 1,
+    state,
+    role: input.role,
+    canViewDiary: input.canViewDiary,
+    canViewMeasurements: input.canViewMeasurements,
+    canManageProfile: input.canManageProfile,
+    canManageGoals: input.canManageGoals,
+    canViewComparison: input.canViewComparison,
+    canExportData: input.canExportData,
+    canDeleteData: input.canDeleteData,
+    expiresAt: input.expiresAt,
+    supersedesPermissionId: previous?.id ?? null,
+    createdByPrincipalId: requesterPrincipalId,
+    actorHouseholdProfileId: profile.linkedHouseholdProfileId,
+    createdAt: new Date(),
+  };
+  database.insert(nutritionPermissionVersions).values(record).run();
+  return record;
+}
+
 export function appendNutritionPermission(
   profileId: string,
   requesterPrincipalId: string,
@@ -776,7 +851,98 @@ export function appendNutritionPermission(
   void requesterPrincipalId;
   void input;
   void state;
-  throw new NutritionProfileForbiddenError('Nutrition permissions are retired.');
+  throw new NutritionProfileForbiddenError(
+    'Nutrition sharing is managed through household guardian assignments.',
+  );
+}
+
+export function setHouseholdGuardianGrant(input: {
+  childHouseholdProfileId: string;
+  parentHouseholdProfileId: string;
+  enabled: boolean;
+}) {
+  const database = db();
+  const child = required(
+    database
+      .select()
+      .from(nutritionProfiles)
+      .where(eq(nutritionProfiles.linkedHouseholdProfileId, input.childHouseholdProfileId))
+      .get(),
+    'The child Nutrition profile was not found.',
+  );
+  const parent = required(
+    database
+      .select()
+      .from(nutritionProfiles)
+      .where(eq(nutritionProfiles.linkedHouseholdProfileId, input.parentHouseholdProfileId))
+      .get(),
+    'The parent Nutrition profile was not found.',
+  );
+  return writeNutritionPermission(
+    child.id,
+    child.ownerPrincipalId,
+    {
+      principalId: parent.ownerPrincipalId,
+      role: 'guardian',
+      canViewDiary: true,
+      canViewMeasurements: true,
+      canManageProfile: true,
+      canManageGoals: true,
+      canViewComparison: true,
+      canExportData: true,
+      canDeleteData: false,
+      expiresAt: null,
+    },
+    input.enabled ? 'granted' : 'revoked',
+  );
+}
+
+export function listHouseholdGuardianAssignments() {
+  const database = db();
+  const linked = database
+    .select({
+      householdProfileId: nutritionProfiles.linkedHouseholdProfileId,
+      nutritionProfileId: nutritionProfiles.id,
+      principalId: nutritionProfiles.ownerPrincipalId,
+    })
+    .from(nutritionProfiles)
+    .where(isNull(nutritionProfiles.archivedAt))
+    .all()
+    .filter(
+      (
+        row,
+      ): row is typeof row & {
+        householdProfileId: string;
+      } => Boolean(row.householdProfileId),
+    );
+  const householdByPrincipal = new Map(
+    linked.map((row) => [row.principalId, row.householdProfileId]),
+  );
+  const childByNutritionProfile = new Map(
+    linked.map((row) => [row.nutritionProfileId, row.householdProfileId]),
+  );
+  const seen = new Set<string>();
+  return database
+    .select()
+    .from(nutritionPermissionVersions)
+    .orderBy(desc(nutritionPermissionVersions.revision))
+    .all()
+    .flatMap((row) => {
+      const key = `${row.nutritionProfileId}:${row.principalId}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      const childProfileId = childByNutritionProfile.get(row.nutritionProfileId);
+      const parentProfileId = householdByPrincipal.get(row.principalId);
+      if (
+        row.state !== 'granted' ||
+        row.role !== 'guardian' ||
+        !childProfileId ||
+        !parentProfileId
+      ) {
+        return [];
+      }
+      return [{ childProfileId, parentProfileId }];
+    });
 }
 export function revokeNutritionPermission(
   profileId: string,

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { onboardingEmail, TEST_PASSPHRASE, TEST_PROFILE_PIN } from './helpers/onboarding';
+
 const recipePayload = (title: string, category: string, item: string) => ({
   title,
   summary: `${title} for the household table.`,
@@ -34,24 +36,40 @@ const recipePayload = (title: string, category: string, item: string) => ({
 test('planner assigns recipes by selected meal and scales the shopping list to diners', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await page.goto('/');
   await page.getByLabel('Kitchen name').fill('Planner test kitchen');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
+  await page.getByLabel('Email').fill(onboardingEmail('Planner test kitchen', 'Callum'));
+  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Open the cookbook' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
+  await page.getByLabel('I saved these one-time codes somewhere private.').check();
+  await page.getByRole('button', { name: 'Continue to sign in' }).click();
+  await page.getByLabel('Email').fill(onboardingEmail('Planner test kitchen', 'Callum'));
+  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.waitForURL(/\/recipes\//u);
 
   await page.goto('/settings/profiles');
   await page.getByRole('button', { name: 'Add another profile' }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await profileOnboarding.getByLabel('Display name').fill('Julia');
+  await profileOnboarding.getByLabel('Email').fill('julia-planner@example.test');
+  await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await profileOnboarding.getByLabel('Profile PIN').fill('593817');
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
+  await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();
+  await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
 
   let pastaIngredientId = '';
   for (const payload of [
@@ -150,7 +168,9 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
-  await expect(page.getByRole('heading', { name: /^Pantry shortages · /u })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /^Meal Plan \d{2}\/\d{2} - \d{2}\/\d{2}$/u }),
+  ).toBeVisible();
   await expect(page.getByLabel('pasta quantity')).toHaveValue('200');
 
   await page.goto('/settings/ai');

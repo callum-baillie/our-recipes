@@ -287,7 +287,7 @@ input:checked ~ .checkMark {
 
 .primaryButton,
 .shoppingButton {
-  color: white;
+  color: var(--on-accent);
   background: var(--tomato);
   border: 1px solid var(--tomato);
   box-shadow: 0 9px 22px rgb(168 80 50 / 18%);
@@ -1470,7 +1470,7 @@ input:checked ~ .checkMark {
 
 .primaryButton,
 .shoppingButton {
-  color: white;
+  color: var(--on-accent);
   background: var(--tomato);
   border-color: var(--tomato);
 }
@@ -2877,7 +2877,7 @@ input:checked ~ .checkMark {
 
   .mobileToolbar .mobileAddButton {
     gap: 0.45rem;
-    color: white;
+    color: var(--on-accent);
     background: var(--tomato);
     border-color: var(--tomato);
     font-size: 0.9rem;
@@ -3286,7 +3286,7 @@ input:checked ~ .checkMark {
 .autoPlanAction > button {
   width: 100%;
   min-height: 2.7rem;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--tomato);
   border-color: var(--tomato);
   font-size: 0.76rem;
@@ -3294,7 +3294,7 @@ input:checked ~ .checkMark {
 }
 
 .autoPlanAction > button:hover:not(:disabled) {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--tomato-dark);
   border-color: var(--tomato-dark);
 }
@@ -4371,14 +4371,14 @@ input:checked ~ .checkMark {
 
   .mobileCommandActions .mobileAddButton {
     gap: 0.35rem;
-    color: white;
+    color: var(--on-accent);
     background: var(--tomato);
     border-color: var(--tomato);
   }
 
   .mobileCommandActions .mobileAddButton:hover,
   .mobileCommandActions .mobileAddButton:focus-visible {
-    color: white;
+    color: var(--on-accent);
     background: color-mix(in srgb, var(--tomato) 88%, black);
   }
 }
