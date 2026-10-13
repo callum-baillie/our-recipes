@@ -928,7 +928,11 @@ export function OnboardingWizard({
       return;
     }
     setError(null);
-    if (currentStep === 'goals') setProfileReviewMode(null);
+    if (currentStep === 'goals' && profileReviewMode) {
+      setProfileReviewMode(null);
+      setStepIndex(steps.indexOf('review'));
+      return;
+    }
     setStepIndex((current) => Math.min(current + 1, steps.length - 1));
   }
 

@@ -128,26 +128,39 @@ export function useServerActions() {
       }
     },
     async completeShopping(listId: string, items: ShoppingItem[]) {
-      await Promise.all(
-        items
-          .filter((item) => item.shoppingState === 'in_cart')
-          .map((item) =>
-            request(
-              `/api/v1/shopping-lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(item.id)}`,
-              {
-                method: 'PATCH',
-                body: JSON.stringify({
-                  quantity: item.quantity ?? '',
-                  unit: item.unit ?? '',
-                  item: item.name,
-                  note: item.note ?? '',
-                  aisleId: item.aisleId ?? '',
-                  checked: true,
-                  shoppingState: 'sourced',
-                }),
-              },
-            ),
-          ),
+      void items;
+      await request(`/api/v1/shopping-lists/${encodeURIComponent(listId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'complete' }),
+      });
+      await refresh();
+    },
+    async setRestockTarget(listId: string) {
+      await request(`/api/v1/shopping-lists/${encodeURIComponent(listId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'set_restock_target' }),
+      });
+      await refresh();
+    },
+    async setShoppingPolicyControl(
+      listId: string,
+      itemId: string,
+      action: 'skip_policy' | 'restore_policy' | 'assume_empty_for_trip',
+    ) {
+      await request(
+        `/api/v1/shopping-lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}/pantry-controls`,
+        { method: 'PATCH', body: JSON.stringify({ action }) },
+      );
+      await refresh();
+    },
+    async setShoppingPolicyReview(
+      listId: string,
+      productId: string,
+      action: 'skip_policy' | 'restore_policy' | 'assume_empty_for_trip',
+    ) {
+      await request(
+        `/api/v1/shopping-lists/${encodeURIComponent(listId)}/policies/${encodeURIComponent(productId)}`,
+        { method: 'PATCH', body: JSON.stringify({ action }) },
       );
       await refresh();
     },

@@ -11,6 +11,7 @@ import {
   pantryShoppingItemDetails,
   pantryBatches,
   pantryProducts,
+  shoppingPolicyInstances,
   profiles,
   mealPlanEntries,
   nutritionPreparedRecipeInstances,
@@ -25,6 +26,7 @@ import {
   convertInventoryQuantity,
   normalizeInventoryUnit,
 } from '@/lib/domain/inventory-units';
+import { calculatePantryRestock } from '@/lib/domain/pantry-restock';
 import { parseServingCount } from '@/lib/domain/ingredient-scaling';
 import { localIsoDate } from '@/lib/domain/local-date';
 import {
@@ -57,13 +59,69 @@ import {
   type AppTransaction,
   undoPantryConsumptionEventsInTransaction,
 } from '@/lib/services/pantry-service';
-import { getListSettings, resolveShoppingAisle } from '@/lib/services/list-settings-service';
+import {
+  getListSettings,
+  resolveShoppingAisle,
+  setAutomaticRestockList,
+} from '@/lib/services/list-settings-service';
 
 export class PantryGroceryCookingNotFoundError extends Error {}
 export class PantryGroceryCookingConflictError extends Error {}
 export class PantryGroceryCookingPrerequisiteError extends Error {}
 
 export type ShoppingDetail = typeof pantryShoppingItemDetails.$inferSelect;
+
+export type ShoppingPolicyBreakdown = {
+  mode: 'always_have' | 'always_buy';
+  trigger: 'below_target' | 'reorder_point' | 'empty';
+  recipeRequirement: number;
+  targetStock: number | null;
+  purchaseIncrement: number | null;
+  policyContribution: number | null;
+  usablePantry: number;
+  pendingCoverage: number;
+  recordedCoverage: number;
+  unroundedPurchaseGoal: number | null;
+  roundedPurchaseGoal: number | null;
+  finalBuyQuantity: number | null;
+  unit: string;
+  needsReview: boolean;
+  reviewReason: string | null;
+};
+
+export function shoppingPolicyBreakdown(
+  detail: ShoppingDetail | null,
+): ShoppingPolicyBreakdown | null {
+  if (!detail) return null;
+  try {
+    const value = JSON.parse(detail.formulaInputs) as Record<string, unknown>;
+    if (value.restockMode !== 'always_have' && value.restockMode !== 'always_buy') return null;
+    const numberOrNull = (input: unknown) =>
+      typeof input === 'number' && Number.isFinite(input) ? input : null;
+    return {
+      mode: value.restockMode,
+      trigger:
+        value.restockTrigger === 'reorder_point' || value.restockTrigger === 'empty'
+          ? value.restockTrigger
+          : 'below_target',
+      recipeRequirement: numberOrNull(value.recipeRequirement) ?? 0,
+      targetStock: numberOrNull(value.targetStock),
+      purchaseIncrement: numberOrNull(value.purchaseIncrement),
+      policyContribution: numberOrNull(value.policyContribution),
+      usablePantry: numberOrNull(value.usablePantry) ?? 0,
+      pendingCoverage: numberOrNull(value.pendingCoverage) ?? 0,
+      recordedCoverage: (numberOrNull(value.purchased) ?? 0) + (numberOrNull(value.covered) ?? 0),
+      unroundedPurchaseGoal: numberOrNull(value.unroundedPurchaseGoal),
+      roundedPurchaseGoal: numberOrNull(value.roundedPurchaseGoal),
+      finalBuyQuantity: detail.shortageQuantity,
+      unit: typeof value.unit === 'string' ? value.unit : detail.generatedUnit,
+      needsReview: value.needsReview === true,
+      reviewReason: typeof value.reviewReason === 'string' ? value.reviewReason : null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function provenanceForDemand(demand: ReturnType<typeof getProjectedPantryDemand>) {
   return {
@@ -162,6 +220,59 @@ function demandContributionIndex(demand: ReturnType<typeof getProjectedPantryDem
   return result;
 }
 
+function retireInactivePolicyInstances(
+  listId: string,
+  actorProfileId: string,
+  transaction: AppTransaction,
+) {
+  const rows = transaction
+    .select({ instance: shoppingPolicyInstances, product: pantryProducts, item: shoppingListItems })
+    .from(shoppingPolicyInstances)
+    .innerJoin(pantryProducts, eq(pantryProducts.id, shoppingPolicyInstances.productId))
+    .leftJoin(
+      shoppingListItems,
+      eq(shoppingListItems.id, shoppingPolicyInstances.shoppingListItemId),
+    )
+    .where(eq(shoppingPolicyInstances.listId, listId))
+    .all()
+    .filter(({ product }) => product.archivedAt !== null || product.restockMode === 'none');
+  for (const { instance, item } of rows) {
+    const detail = item
+      ? transaction
+          .select()
+          .from(pantryShoppingItemDetails)
+          .where(eq(pantryShoppingItemDetails.shoppingListItemId, item.id))
+          .get()
+      : null;
+    let sources: unknown = ['protected'];
+    try {
+      sources = JSON.parse(item?.sourceRecipeIds || '[]');
+    } catch {
+      /* preserve malformed rows */
+    }
+    const autoOnly =
+      Boolean(item) &&
+      Array.isArray(sources) &&
+      sources.length === 0 &&
+      !detail?.manualQuantityOverride &&
+      !detail?.manualUnitOverride &&
+      !detail?.manualItemOverride &&
+      !detail?.manualNoteOverride;
+    transaction
+      .update(shoppingPolicyInstances)
+      .set({
+        state: 'moved',
+        shoppingListItemId: autoOnly ? null : instance.shoppingListItemId,
+        updatedByProfileId: actorProfileId,
+        updatedAt: new Date(),
+      })
+      .where(eq(shoppingPolicyInstances.id, instance.id))
+      .run();
+    if (autoOnly && item)
+      transaction.delete(shoppingListItems).where(eq(shoppingListItems.id, item.id)).run();
+  }
+}
+
 function sourceRecipeIds(contributions: DemandContribution[]): string[] {
   return [...new Set(contributions.map((contribution) => contribution.recipeId))];
 }
@@ -197,6 +308,7 @@ export function generatePantryShortageList(
           .where(eq(shoppingLists.sourceKey, sourceKey))
           .get();
     const listId = parsedInput.listId ?? durableList?.id ?? randomUUID();
+    retireInactivePolicyInstances(listId, actorProfileId, transaction);
     const existingList =
       durableList ??
       transaction.select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
@@ -289,28 +401,51 @@ export function generatePantryShortageList(
       ...line,
       recipeRequirement: line.requiredQuantity,
       stapleTarget: 0,
+      restockMode: 'none' as 'none' | 'always_have' | 'always_buy',
+      restockTrigger: 'below_target' as 'below_target' | 'reorder_point' | 'empty',
+      restockTarget: null as number | null,
+      restockReorder: null as number | null,
+      purchaseIncrement: null as number | null,
     }));
+    const includeRestockPolicies = getListSettings().automaticRestockListId === listId;
+    const policyInstances = new Map(
+      transaction
+        .select()
+        .from(shoppingPolicyInstances)
+        .where(eq(shoppingPolicyInstances.listId, listId))
+        .all()
+        .map((instance) => [instance.productId, instance]),
+    );
     for (const product of transaction
       .select()
       .from(pantryProducts)
       .all()
       .filter(
         (candidate) =>
+          includeRestockPolicies &&
           candidate.archivedAt === null &&
-          candidate.isStaple &&
-          candidate.suggestGroceryRestock &&
-          candidate.reorderThreshold !== null &&
-          candidate.targetStock !== null &&
-          candidate.targetStock > 0,
+          candidate.restockMode !== 'none' &&
+          Boolean(candidate.stockUnit),
       )) {
       const unit = normalizeInventoryUnit(product.stockUnit || product.defaultInventoryUnit);
-      const totalStock = exactStock(product.id, unit);
-      if (totalStock.uncertain || totalStock.quantity > product.reorderThreshold!) continue;
       const existing = candidateLines.find(
         (line) => line.productId === product.id && areInventoryUnitsCompatible(line.unit, unit),
       );
       if (existing) {
-        existing.stapleTarget = convertInventoryQuantity(product.targetStock!, unit, existing.unit);
+        existing.restockMode = product.restockMode;
+        existing.restockTrigger = product.restockTrigger;
+        existing.restockTarget =
+          product.targetStock === null
+            ? null
+            : convertInventoryQuantity(product.targetStock, unit, existing.unit);
+        existing.restockReorder =
+          product.reorderThreshold === null
+            ? null
+            : convertInventoryQuantity(product.reorderThreshold, unit, existing.unit);
+        existing.purchaseIncrement =
+          product.preferredPurchaseQuantity === null
+            ? null
+            : convertInventoryQuantity(product.preferredPurchaseQuantity, unit, existing.unit);
       } else {
         const stock = exactStock(product.id, unit);
         candidateLines.push({
@@ -334,7 +469,12 @@ export function generatePantryShortageList(
           expiryConflicts: [],
           meals: [],
           recipeRequirement: 0,
-          stapleTarget: product.targetStock!,
+          stapleTarget: 0,
+          restockMode: product.restockMode,
+          restockTrigger: product.restockTrigger,
+          restockTarget: product.targetStock,
+          restockReorder: product.reorderThreshold,
+          purchaseIncrement: product.preferredPurchaseQuantity,
         });
       }
     }
@@ -410,19 +550,42 @@ export function generatePantryShortageList(
         const covered = previous
           ? convertStored(previous.coveredQuantity, previous.coveredUnit)
           : 0;
-        const requiredQuantity = Math.max(line.recipeRequirement, line.stapleTarget);
         // A batch created by this exact shopping item is represented by purchased coverage below.
         // Excluding it here prevents a confirmed intake from being subtracted twice.
-        const stock = exactStock(line.productId, line.unit, previous?.shoppingListItemId);
+        const policyInstance = policyInstances.get(line.productId);
+        const assumedEmpty = policyInstance?.assumedEmpty ?? false;
+        const stock = assumedEmpty
+          ? { quantity: 0, uncertain: false }
+          : exactStock(line.productId, line.unit, previous?.shoppingListItemId);
         const usablePantry = previous?.coverageState === 'ignored' ? 0 : stock.quantity;
-        const shortageQuantity = Number(
-          Math.max(0, requiredQuantity + manualExtra - usablePantry - purchased - covered).toFixed(
-            6,
-          ),
-        );
+        const policySuppressed =
+          policyInstance?.state === 'dismissed' ||
+          (line.restockMode === 'always_buy' && policyInstance?.state === 'satisfied');
+        const effectiveRestockMode = policySuppressed ? 'none' : line.restockMode;
+        const pendingCoverage =
+          effectiveRestockMode === 'always_have'
+            ? pendingAutomaticCoverage(line.productId, line.unit, listId)
+            : 0;
+        const restock = calculatePantryRestock({
+          mode: effectiveRestockMode,
+          trigger: line.restockTrigger,
+          recipeRequirement: line.recipeRequirement,
+          usablePantry,
+          pendingCoverage,
+          purchasedCoverage: purchased + covered,
+          manualExtra,
+          targetStock: line.restockTarget,
+          reorderThreshold: line.restockReorder,
+          purchaseIncrement: line.purchaseIncrement,
+          stockCertain: !stock.uncertain,
+        });
+        const shortageQuantity = restock.remainingToBuy ?? 0;
         const uncertain =
           previous?.coverageState === 'inaccurate' ||
-          (shortageQuantity > 0 && (line.state === 'uncertain' || stock.uncertain));
+          (effectiveRestockMode === 'always_have' && restock.needsReview) ||
+          (effectiveRestockMode === 'none' &&
+            shortageQuantity > 0 &&
+            (line.state === 'uncertain' || stock.uncertain));
         return [
           (() => {
             const contributions = [
@@ -453,11 +616,18 @@ export function generatePantryShortageList(
               quantity: uncertain ? null : shortageQuantity,
               unit: line.unit,
               note: uncertain
-                ? previous?.controlNote || line.uncertaintyReason || 'Grocery amount needs review.'
+                ? previous?.controlNote ||
+                  restock.reviewReason ||
+                  line.uncertaintyReason ||
+                  'Grocery amount needs review.'
                 : previous?.coverageState === 'ignored'
                   ? 'Pantry stock is ignored for this grocery item.'
                   : shortageQuantity > 0
-                    ? 'Projected Pantry shortage'
+                    ? effectiveRestockMode === 'always_buy'
+                      ? 'Always buy amount for this shopping trip'
+                      : effectiveRestockMode === 'always_have'
+                        ? 'Meal-plan demand plus Pantry reserve'
+                        : 'Projected Pantry shortage'
                     : 'Covered by usable Pantry or recorded purchases.',
               state: uncertain
                 ? ('uncertain' as const)
@@ -465,18 +635,35 @@ export function generatePantryShortageList(
                   ? ('shortage' as const)
                   : ('shortage' as const),
               formulaInputs: {
-                version: 'pantry-grocery-v2',
+                version: 'pantry-grocery-v3',
                 productId: line.productId,
                 recipeRequirement: line.recipeRequirement,
-                stapleTarget: line.stapleTarget,
+                restockMode: effectiveRestockMode,
+                restockTrigger: line.restockTrigger,
+                targetStock: line.restockTarget,
+                purchaseIncrement: line.purchaseIncrement,
+                policyTriggered: restock.triggered,
+                policyContribution: restock.policyContribution,
+                projectedRemainder: restock.projectedRemainder,
+                recipeShortage: restock.recipeShortage,
+                unroundedPurchaseGoal: restock.unroundedPurchaseGoal,
+                roundedPurchaseGoal: restock.roundedPurchaseGoal,
                 manualExtra,
                 usablePantry,
+                pendingCoverage,
                 purchased,
                 covered,
                 shortageQuantity: uncertain ? null : shortageQuantity,
+                needsReview: restock.needsReview,
+                reviewReason: restock.reviewReason,
+                assumedEmpty,
                 unit: line.unit,
                 formula:
-                  'max(0, max(recipeRequirement, stapleTarget) + manualExtra - usablePantry - purchased - covered)',
+                  effectiveRestockMode === 'always_have'
+                    ? 'trigger ? roundUp(recipeRequirement + targetStock - usablePantry + manualExtra) - purchasedCoverage : recipe shortage'
+                    : effectiveRestockMode === 'always_buy'
+                      ? 'roundUp(max(alwaysBuyAmount, recipeShortage) + manualExtra) - purchasedCoverage'
+                      : 'max(0, recipeRequirement + manualExtra - usablePantry - purchasedCoverage)',
                 excludedBatchPolicy:
                   'excludeFromGrocery and inactive batches are not usable Pantry',
                 coverageState: previous?.coverageState ?? 'active',
@@ -521,6 +708,64 @@ export function generatePantryShortageList(
       }),
     ];
 
+    const recordPolicyInstance = (item: (typeof desired)[number], shoppingListItemId: string) => {
+      if (!item.productId) return;
+      const formula = item.formulaInputs as Record<string, unknown>;
+      const mode = formula.restockMode;
+      if (mode !== 'always_have' && mode !== 'always_buy') return;
+      const existingInstance = policyInstances.get(item.productId);
+      const calculatedState =
+        formula.needsReview === true && mode === 'always_have'
+          ? ('needs_review' as const)
+          : (item.quantity ?? 0) > 0
+            ? ('active' as const)
+            : ('satisfied' as const);
+      const state =
+        existingInstance?.state === 'dismissed' ||
+        (mode === 'always_buy' && existingInstance?.state === 'satisfied')
+          ? existingInstance.state
+          : calculatedState;
+      const values = {
+        id: existingInstance?.id ?? randomUUID(),
+        listId,
+        productId: item.productId,
+        shoppingListItemId,
+        mode,
+        trigger:
+          formula.restockTrigger === 'reorder_point' || formula.restockTrigger === 'empty'
+            ? formula.restockTrigger
+            : ('below_target' as const),
+        state,
+        assumedEmpty: existingInstance?.assumedEmpty ?? false,
+        policyQuantity:
+          typeof formula.policyContribution === 'number' ? formula.policyContribution : null,
+        unit: item.unit,
+        reviewReason: typeof formula.reviewReason === 'string' ? formula.reviewReason : null,
+        createdByProfileId: existingInstance?.createdByProfileId ?? actorProfileId,
+        updatedByProfileId: actorProfileId,
+        createdAt: existingInstance?.createdAt ?? now,
+        updatedAt: now,
+      } satisfies typeof shoppingPolicyInstances.$inferInsert;
+      transaction
+        .insert(shoppingPolicyInstances)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [shoppingPolicyInstances.listId, shoppingPolicyInstances.productId],
+          set: {
+            shoppingListItemId: values.shoppingListItemId,
+            mode: values.mode,
+            trigger: values.trigger,
+            state: values.state,
+            policyQuantity: values.policyQuantity,
+            unit: values.unit,
+            reviewReason: values.reviewReason,
+            updatedByProfileId: actorProfileId,
+            updatedAt: now,
+          },
+        })
+        .run();
+    };
+
     for (const item of desired) {
       activeKeys.add(item.key);
       const existing = byKey.get(item.key);
@@ -564,6 +809,7 @@ export function generatePantryShortageList(
           })
           .where(eq(pantryShoppingItemDetails.shoppingListItemId, current.id))
           .run();
+        recordPolicyInstance(item, current.id);
         continue;
       }
       const shoppingListItemId = randomUUID();
@@ -606,6 +852,7 @@ export function generatePantryShortageList(
           updatedAt: now,
         })
         .run();
+      recordPolicyInstance(item, shoppingListItemId);
     }
 
     for (const row of existingDetails) {
@@ -652,6 +899,655 @@ export function generatePantryShortageList(
   });
 }
 
+function pendingAutomaticCoverage(productId: string, unit: string, currentListId: string) {
+  return Number(
+    getDatabase()
+      .select({
+        instance: shoppingPolicyInstances,
+        list: shoppingLists,
+        item: shoppingListItems,
+      })
+      .from(shoppingPolicyInstances)
+      .innerJoin(shoppingLists, eq(shoppingLists.id, shoppingPolicyInstances.listId))
+      .innerJoin(
+        shoppingListItems,
+        eq(shoppingListItems.id, shoppingPolicyInstances.shoppingListItemId),
+      )
+      .where(
+        and(
+          eq(shoppingPolicyInstances.productId, productId),
+          eq(shoppingPolicyInstances.mode, 'always_have'),
+          eq(shoppingPolicyInstances.state, 'satisfied'),
+        ),
+      )
+      .all()
+      .filter(
+        ({ list, item }) =>
+          list.id !== currentListId &&
+          list.archivedAt === null &&
+          (item.checked || item.shoppingState === 'sourced') &&
+          item.quantity !== null &&
+          areInventoryUnitsCompatible(item.unit, unit),
+      )
+      .reduce(
+        (total, { item }) => total + convertInventoryQuantity(item.quantity!, item.unit, unit),
+        0,
+      )
+      .toFixed(6),
+  );
+}
+
+function exactPolicyStock(productId: string, unit: string, excludeShoppingItemId?: string) {
+  let quantity = 0;
+  let uncertain = false;
+  for (const batch of getDatabase()
+    .select()
+    .from(pantryBatches)
+    .where(eq(pantryBatches.productId, productId))
+    .all()
+    .filter(
+      (candidate) =>
+        !['depleted', 'discarded', 'donated'].includes(candidate.status) &&
+        !candidate.excludeFromGrocery &&
+        candidate.sourceShoppingListItemId !== excludeShoppingItemId &&
+        (candidate.quantityRemaining === null || candidate.quantityRemaining > 0),
+    )) {
+    if (
+      batch.quantityRemaining === null ||
+      batch.approximateState !== null ||
+      !areInventoryUnitsCompatible(batch.unit, unit)
+    ) {
+      uncertain = true;
+      continue;
+    }
+    quantity += convertInventoryQuantity(batch.quantityRemaining, batch.unit, unit);
+  }
+  return { quantity: Number(quantity.toFixed(6)), uncertain };
+}
+
+function policyCalculationForProduct(
+  product: typeof pantryProducts.$inferSelect,
+  assumedEmpty = false,
+  excludeShoppingItemId?: string,
+  purchasedCoverage = 0,
+  manualExtra = 0,
+  pendingCoverage = 0,
+) {
+  const unit = normalizeInventoryUnit(product.stockUnit || product.defaultInventoryUnit);
+  const stock = assumedEmpty
+    ? { quantity: 0, uncertain: false }
+    : exactPolicyStock(product.id, unit, excludeShoppingItemId);
+  return {
+    unit,
+    stock,
+    calculation: calculatePantryRestock({
+      mode: product.restockMode,
+      trigger: product.restockTrigger,
+      recipeRequirement: 0,
+      usablePantry: stock.quantity,
+      pendingCoverage,
+      purchasedCoverage,
+      manualExtra,
+      targetStock: product.targetStock,
+      reorderThreshold: product.reorderThreshold,
+      purchaseIncrement: product.preferredPurchaseQuantity,
+      stockCertain: !stock.uncertain,
+    }),
+  };
+}
+
+export function reconcileRestockPoliciesForList(listId: string, actorProfileId: string) {
+  ensureDatabase();
+  const db = getDatabase();
+  const list = db.select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
+  if (!list || list.archivedAt) {
+    throw new PantryGroceryCookingNotFoundError('Choose an active shopping list as Next shop.');
+  }
+  if (getListSettings().automaticRestockListId !== listId) return getShoppingPolicyReviews(listId);
+  const products = db
+    .select()
+    .from(pantryProducts)
+    .all()
+    .filter(
+      (product) =>
+        product.archivedAt === null && product.restockMode !== 'none' && Boolean(product.stockUnit),
+    );
+  db.transaction((transaction) => {
+    const now = new Date();
+    retireInactivePolicyInstances(listId, actorProfileId, transaction);
+    let nextPosition =
+      transaction
+        .select({ position: shoppingListItems.position })
+        .from(shoppingListItems)
+        .where(eq(shoppingListItems.listId, listId))
+        .all()
+        .reduce((highest, row) => Math.max(highest, row.position), -1) + 1;
+    for (const product of products) {
+      const policyMode = product.restockMode;
+      if (policyMode === 'none') continue;
+      const instance = transaction
+        .select()
+        .from(shoppingPolicyInstances)
+        .where(
+          and(
+            eq(shoppingPolicyInstances.listId, listId),
+            eq(shoppingPolicyInstances.productId, product.id),
+          ),
+        )
+        .get();
+      if (
+        instance?.state === 'dismissed' ||
+        (product.restockMode === 'always_buy' && instance?.state === 'satisfied')
+      ) {
+        continue;
+      }
+      const existing = transaction
+        .select({ item: shoppingListItems, detail: pantryShoppingItemDetails })
+        .from(shoppingListItems)
+        .innerJoin(
+          pantryShoppingItemDetails,
+          eq(pantryShoppingItemDetails.shoppingListItemId, shoppingListItems.id),
+        )
+        .where(
+          and(
+            eq(shoppingListItems.listId, listId),
+            eq(pantryShoppingItemDetails.productId, product.id),
+          ),
+        )
+        .get();
+      const unit = normalizeInventoryUnit(product.stockUnit || product.defaultInventoryUnit);
+      const purchased =
+        existing?.detail.purchasedQuantity &&
+        existing.detail.purchasedUnit &&
+        areInventoryUnitsCompatible(existing.detail.purchasedUnit, unit)
+          ? convertInventoryQuantity(
+              existing.detail.purchasedQuantity,
+              existing.detail.purchasedUnit,
+              unit,
+            )
+          : 0;
+      const manualExtra =
+        existing?.detail.manualExtraQuantity &&
+        existing.detail.manualExtraUnit &&
+        areInventoryUnitsCompatible(existing.detail.manualExtraUnit, unit)
+          ? convertInventoryQuantity(
+              existing.detail.manualExtraQuantity,
+              existing.detail.manualExtraUnit,
+              unit,
+            )
+          : 0;
+      const policyResult = policyCalculationForProduct(
+        product,
+        instance?.assumedEmpty ?? false,
+        existing?.item.id,
+        purchased,
+        manualExtra,
+        product.restockMode === 'always_have'
+          ? pendingAutomaticCoverage(product.id, unit, listId)
+          : 0,
+      );
+      const stock = policyResult.stock;
+      const calculation = policyResult.calculation;
+      const needsReview = product.restockMode === 'always_have' && calculation.needsReview;
+      const due = needsReview || (calculation.remainingToBuy ?? 0) > 0;
+      if (!due) {
+        if (
+          existing &&
+          !existing.detail.manualQuantityOverride &&
+          !existing.detail.manualUnitOverride &&
+          !existing.detail.manualItemOverride &&
+          !existing.detail.manualNoteOverride &&
+          JSON.parse(existing.item.sourceRecipeIds || '[]').length === 0
+        ) {
+          transaction
+            .delete(shoppingListItems)
+            .where(eq(shoppingListItems.id, existing.item.id))
+            .run();
+        }
+        if (instance) {
+          transaction
+            .update(shoppingPolicyInstances)
+            .set({
+              shoppingListItemId: null,
+              state: 'satisfied',
+              policyQuantity: 0,
+              unit,
+              reviewReason: null,
+              updatedByProfileId: actorProfileId,
+              updatedAt: now,
+            })
+            .where(eq(shoppingPolicyInstances.id, instance.id))
+            .run();
+        }
+        continue;
+      }
+      const quantity = needsReview ? null : calculation.remainingToBuy;
+      const note = needsReview
+        ? calculation.reviewReason!
+        : product.restockMode === 'always_buy'
+          ? 'Always buy amount for this shopping trip'
+          : 'Maintain the household Pantry reserve';
+      const formulaInputs = JSON.stringify({
+        version: 'pantry-grocery-v3',
+        productId: product.id,
+        restockMode: product.restockMode,
+        restockTrigger: product.restockTrigger,
+        recipeRequirement: 0,
+        targetStock: product.targetStock,
+        purchaseIncrement: product.preferredPurchaseQuantity,
+        policyTriggered: calculation.triggered,
+        policyContribution: calculation.policyContribution,
+        projectedRemainder: calculation.projectedRemainder,
+        recipeShortage: calculation.recipeShortage,
+        unroundedPurchaseGoal: calculation.unroundedPurchaseGoal,
+        roundedPurchaseGoal: calculation.roundedPurchaseGoal,
+        usablePantry: stock.quantity,
+        purchased,
+        covered: 0,
+        pendingCoverage:
+          product.restockMode === 'always_have'
+            ? pendingAutomaticCoverage(product.id, unit, listId)
+            : 0,
+        manualExtra,
+        shortageQuantity: quantity,
+        needsReview,
+        reviewReason: calculation.reviewReason,
+        assumedEmpty: instance?.assumedEmpty ?? false,
+        unit,
+        formula:
+          product.restockMode === 'always_buy'
+            ? 'roundUp(max(alwaysBuyAmount, recipeShortage))'
+            : 'trigger ? roundUp(recipeRequirement + targetStock - usablePantry) : recipe shortage',
+        contributions: [],
+      });
+      const shoppingListItemId = existing?.item.id ?? randomUUID();
+      if (existing) {
+        transaction
+          .update(shoppingListItems)
+          .set({
+            quantity: existing.detail.manualQuantityOverride ? existing.item.quantity : quantity,
+            unit: existing.detail.manualUnitOverride ? existing.item.unit : unit,
+            item: existing.detail.manualItemOverride ? existing.item.item : product.displayName,
+            note: existing.detail.manualNoteOverride ? existing.item.note : note,
+            aisleId: resolveShoppingAisle(
+              list.supermarketProfileId,
+              { item: product.displayName, productId: product.id },
+              transaction,
+            ),
+            updatedAt: now,
+          })
+          .where(eq(shoppingListItems.id, shoppingListItemId))
+          .run();
+        transaction
+          .update(pantryShoppingItemDetails)
+          .set({
+            demandState: needsReview ? 'uncertain' : 'shortage',
+            generatedQuantity: quantity,
+            generatedUnit: unit,
+            shortageQuantity: quantity,
+            uncertaintyReason: needsReview ? note : null,
+            formulaInputs,
+            provenance: JSON.stringify({
+              generatedFrom: 'pantry-restock-policy-v1',
+              contributions: [],
+            }),
+            generationMode: 'all',
+            generatedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(pantryShoppingItemDetails.shoppingListItemId, shoppingListItemId))
+          .run();
+      } else {
+        transaction
+          .insert(shoppingListItems)
+          .values({
+            id: shoppingListItemId,
+            listId,
+            position: nextPosition++,
+            quantity,
+            unit,
+            item: product.displayName,
+            note,
+            aisleId: resolveShoppingAisle(
+              list.supermarketProfileId,
+              { item: product.displayName, productId: product.id },
+              transaction,
+            ),
+            checked: false,
+            shoppingState: 'to_buy',
+            sourceRecipeIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+        transaction
+          .insert(pantryShoppingItemDetails)
+          .values({
+            shoppingListItemId,
+            productId: product.id,
+            demandState: needsReview ? 'uncertain' : 'shortage',
+            generatedQuantity: quantity,
+            generatedUnit: unit,
+            shortageQuantity: quantity,
+            uncertaintyReason: needsReview ? note : null,
+            formulaInputs,
+            provenance: JSON.stringify({
+              generatedFrom: 'pantry-restock-policy-v1',
+              contributions: [],
+            }),
+            generationKey: `policy:${product.id}:${unit}`,
+            generationMode: 'all',
+            generatedAt: now,
+            updatedAt: now,
+          })
+          .run();
+      }
+      const policyState = needsReview ? ('needs_review' as const) : ('active' as const);
+      transaction
+        .insert(shoppingPolicyInstances)
+        .values({
+          id: instance?.id ?? randomUUID(),
+          listId,
+          productId: product.id,
+          shoppingListItemId,
+          mode: policyMode,
+          trigger: product.restockTrigger,
+          state: policyState,
+          assumedEmpty: instance?.assumedEmpty ?? false,
+          policyQuantity: calculation.policyContribution,
+          unit,
+          reviewReason: calculation.reviewReason,
+          createdByProfileId: instance?.createdByProfileId ?? actorProfileId,
+          updatedByProfileId: actorProfileId,
+          createdAt: instance?.createdAt ?? now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [shoppingPolicyInstances.listId, shoppingPolicyInstances.productId],
+          set: {
+            shoppingListItemId,
+            mode: policyMode,
+            trigger: product.restockTrigger,
+            state: policyState,
+            policyQuantity: calculation.policyContribution,
+            unit,
+            reviewReason: calculation.reviewReason,
+            updatedByProfileId: actorProfileId,
+            updatedAt: now,
+          },
+        })
+        .run();
+    }
+    transaction
+      .update(shoppingLists)
+      .set({ updatedAt: now })
+      .where(eq(shoppingLists.id, listId))
+      .run();
+  });
+  return getShoppingPolicyReviews(listId);
+}
+
+export function reconcileAutomaticRestockPolicies(actorProfileId: string) {
+  ensureDatabase();
+  const settings = getListSettings();
+  if (settings.automaticRestockListId) {
+    reconcileListPoliciesBySource(settings.automaticRestockListId, actorProfileId);
+    return settings.automaticRestockListId;
+  }
+  const dueAlwaysHave = getDatabase()
+    .select()
+    .from(pantryProducts)
+    .all()
+    .filter(
+      (product) =>
+        product.archivedAt === null &&
+        product.restockMode === 'always_have' &&
+        Boolean(product.stockUnit),
+    )
+    .some((product) => {
+      const result = policyCalculationForProduct(product);
+      return !result.calculation.needsReview && (result.calculation.remainingToBuy ?? 0) > 0;
+    });
+  if (!dueAlwaysHave) return null;
+  const now = new Date();
+  const listId = randomUUID();
+  getDatabase()
+    .insert(shoppingLists)
+    .values({
+      id: listId,
+      name: 'Next shop',
+      weekStart: '',
+      weekEnd: '',
+      sourceMode: 'manual',
+      sourceKey: null,
+      archivedAt: null,
+      supermarketProfileId: settings.defaultSupermarketProfileId,
+      createdByProfileId: actorProfileId,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  setAutomaticRestockList(listId, actorProfileId);
+  reconcileRestockPoliciesForList(listId, actorProfileId);
+  return listId;
+}
+
+/** Changes the household's Next shop without moving recipe or manual work. */
+export function switchAutomaticRestockTarget(listId: string | null, actorProfileId: string) {
+  ensureDatabase();
+  const database = getDatabase();
+  const previousListId = getListSettings().automaticRestockListId;
+  if (previousListId === listId) {
+    if (listId) reconcileListPoliciesBySource(listId, actorProfileId);
+    return getListSettings();
+  }
+
+  let previousList: typeof shoppingLists.$inferSelect | null = null;
+  if (previousListId) {
+    previousList =
+      database.select().from(shoppingLists).where(eq(shoppingLists.id, previousListId)).get() ??
+      null;
+    database.transaction((transaction) => {
+      const instances = transaction
+        .select({ instance: shoppingPolicyInstances, item: shoppingListItems })
+        .from(shoppingPolicyInstances)
+        .leftJoin(
+          shoppingListItems,
+          eq(shoppingPolicyInstances.shoppingListItemId, shoppingListItems.id),
+        )
+        .where(eq(shoppingPolicyInstances.listId, previousListId))
+        .all();
+      for (const { instance, item } of instances) {
+        if (item && (item.checked || item.shoppingState === 'sourced')) {
+          transaction
+            .update(shoppingPolicyInstances)
+            .set({ state: 'satisfied', updatedByProfileId: actorProfileId, updatedAt: new Date() })
+            .where(eq(shoppingPolicyInstances.id, instance.id))
+            .run();
+          continue;
+        }
+        const detail = item
+          ? transaction
+              .select()
+              .from(pantryShoppingItemDetails)
+              .where(eq(pantryShoppingItemDetails.shoppingListItemId, item.id))
+              .get()
+          : null;
+        let recipeSources: unknown = [];
+        try {
+          recipeSources = item ? JSON.parse(item.sourceRecipeIds || '[]') : [];
+        } catch {
+          recipeSources = ['protected'];
+        }
+        const autoOnly =
+          Boolean(item) &&
+          Array.isArray(recipeSources) &&
+          recipeSources.length === 0 &&
+          (detail?.manualExtraQuantity ?? 0) === 0 &&
+          !detail?.manualQuantityOverride &&
+          !detail?.manualUnitOverride &&
+          !detail?.manualItemOverride &&
+          !detail?.manualNoteOverride;
+        transaction
+          .update(shoppingPolicyInstances)
+          .set({
+            state: 'moved',
+            shoppingListItemId: autoOnly ? null : instance.shoppingListItemId,
+            updatedByProfileId: actorProfileId,
+            updatedAt: new Date(),
+          })
+          .where(eq(shoppingPolicyInstances.id, instance.id))
+          .run();
+        if (autoOnly && item) {
+          transaction.delete(shoppingListItems).where(eq(shoppingListItems.id, item.id)).run();
+        }
+      }
+    });
+  }
+
+  setAutomaticRestockList(listId, actorProfileId);
+  if (previousList?.weekStart && previousList.weekEnd && !previousList.archivedAt) {
+    generatePantryShortageList(
+      {
+        weekStart: previousList.weekStart,
+        weekEnd: previousList.weekEnd,
+        listId: previousList.id,
+        mode: previousList.sourceMode === 'pantry_missing' ? 'missing' : 'all',
+      },
+      actorProfileId,
+    );
+  }
+  if (listId) reconcileListPoliciesBySource(listId, actorProfileId);
+  return getListSettings();
+}
+
+function reconcileListPoliciesBySource(listId: string, actorProfileId: string) {
+  const list = getDatabase().select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
+  if (!list || list.archivedAt) {
+    throw new PantryGroceryCookingNotFoundError('Choose an active shopping list as Next shop.');
+  }
+  if (list.weekStart && list.weekEnd) {
+    generatePantryShortageList(
+      {
+        weekStart: list.weekStart,
+        weekEnd: list.weekEnd,
+        listId,
+        mode: list.sourceMode === 'pantry_missing' ? 'missing' : 'all',
+      },
+      actorProfileId,
+    );
+    return;
+  }
+  reconcileRestockPoliciesForList(listId, actorProfileId);
+}
+
+export type ShoppingPolicyReview = {
+  productId: string;
+  productName: string;
+  shoppingListItemId: string | null;
+  mode: 'always_have' | 'always_buy';
+  trigger: 'below_target' | 'reorder_point' | 'empty';
+  state: 'active' | 'needs_review' | 'satisfied' | 'dismissed' | 'moved';
+  reviewReason: string | null;
+  assumedEmpty: boolean;
+  policyQuantity: number | null;
+  unit: string;
+};
+
+export function getShoppingPolicyReviews(listId: string): ShoppingPolicyReview[] {
+  ensureDatabase();
+  return getDatabase()
+    .select({ instance: shoppingPolicyInstances, productName: pantryProducts.displayName })
+    .from(shoppingPolicyInstances)
+    .innerJoin(pantryProducts, eq(pantryProducts.id, shoppingPolicyInstances.productId))
+    .where(eq(shoppingPolicyInstances.listId, listId))
+    .all()
+    .map(({ instance, productName }) => ({
+      productId: instance.productId,
+      productName,
+      shoppingListItemId: instance.shoppingListItemId,
+      mode: instance.mode,
+      trigger: instance.trigger,
+      state: instance.state,
+      reviewReason: instance.reviewReason,
+      assumedEmpty: instance.assumedEmpty,
+      policyQuantity: instance.policyQuantity,
+      unit: instance.unit,
+    }));
+}
+
+export function updateShoppingPolicyForTrip(
+  listId: string,
+  productId: string,
+  action: 'skip_policy' | 'restore_policy' | 'assume_empty_for_trip',
+  actorProfileId: string,
+) {
+  ensureDatabase();
+  const database = getDatabase();
+  const instance = database
+    .select()
+    .from(shoppingPolicyInstances)
+    .where(
+      and(
+        eq(shoppingPolicyInstances.listId, listId),
+        eq(shoppingPolicyInstances.productId, productId),
+      ),
+    )
+    .get();
+  if (!instance) {
+    throw new PantryGroceryCookingNotFoundError(
+      'That product does not have a recurring policy on this shopping trip.',
+    );
+  }
+  database
+    .update(shoppingPolicyInstances)
+    .set({
+      state: action === 'skip_policy' ? 'dismissed' : 'active',
+      assumedEmpty: action === 'assume_empty_for_trip' ? true : instance.assumedEmpty,
+      reviewReason: action === 'assume_empty_for_trip' ? null : instance.reviewReason,
+      updatedByProfileId: actorProfileId,
+      updatedAt: new Date(),
+    })
+    .where(eq(shoppingPolicyInstances.id, instance.id))
+    .run();
+  if (action === 'skip_policy' && instance.shoppingListItemId) {
+    const item = database
+      .select()
+      .from(shoppingListItems)
+      .where(eq(shoppingListItems.id, instance.shoppingListItemId))
+      .get();
+    const detail = database
+      .select()
+      .from(pantryShoppingItemDetails)
+      .where(eq(pantryShoppingItemDetails.shoppingListItemId, instance.shoppingListItemId))
+      .get();
+    let sources: unknown = ['protected'];
+    try {
+      sources = JSON.parse(item?.sourceRecipeIds || '[]');
+    } catch {
+      /* protect malformed rows */
+    }
+    if (
+      item &&
+      Array.isArray(sources) &&
+      sources.length === 0 &&
+      !detail?.manualQuantityOverride &&
+      !detail?.manualUnitOverride &&
+      !detail?.manualItemOverride &&
+      !detail?.manualNoteOverride
+    ) {
+      database
+        .update(shoppingPolicyInstances)
+        .set({ shoppingListItemId: null, updatedAt: new Date() })
+        .where(eq(shoppingPolicyInstances.id, instance.id))
+        .run();
+      database.delete(shoppingListItems).where(eq(shoppingListItems.id, item.id)).run();
+    }
+  }
+  reconcileListPoliciesBySource(listId, actorProfileId);
+  return getShoppingPolicyReviews(listId);
+}
+
 export function recordShoppingItemManualOverrides(
   shoppingListItemId: string,
   previous: Pick<typeof shoppingListItems.$inferSelect, 'quantity' | 'unit' | 'item' | 'note'>,
@@ -685,7 +1581,6 @@ export function updateShoppingItemPantryControl(
   actorProfileId: string,
 ) {
   ensureDatabase();
-  void actorProfileId; // Preserve the signed ActorContext service seam for future audit history.
   const parsedInput = pantryShoppingControlSchema.parse(input);
   const db = getDatabase();
   const row = db
@@ -700,6 +1595,70 @@ export function updateShoppingItemPantryControl(
   if (!row)
     throw new PantryGroceryCookingNotFoundError('That generated shopping item no longer exists.');
   const now = new Date();
+  if (
+    parsedInput.action === 'skip_policy' ||
+    parsedInput.action === 'restore_policy' ||
+    parsedInput.action === 'assume_empty_for_trip'
+  ) {
+    const instance = db
+      .select()
+      .from(shoppingPolicyInstances)
+      .where(
+        and(
+          eq(shoppingPolicyInstances.listId, listId),
+          eq(shoppingPolicyInstances.shoppingListItemId, itemId),
+        ),
+      )
+      .get();
+    if (!instance) {
+      throw new PantryGroceryCookingNotFoundError(
+        'That item does not have an automatic shopping policy for this trip.',
+      );
+    }
+    db.update(shoppingPolicyInstances)
+      .set({
+        state: parsedInput.action === 'skip_policy' ? 'dismissed' : 'active',
+        assumedEmpty: parsedInput.action === 'assume_empty_for_trip' ? true : instance.assumedEmpty,
+        reviewReason: parsedInput.action === 'assume_empty_for_trip' ? null : instance.reviewReason,
+        updatedByProfileId: actorProfileId,
+        updatedAt: now,
+      })
+      .where(eq(shoppingPolicyInstances.id, instance.id))
+      .run();
+    const list = db.select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
+    if (
+      parsedInput.action === 'skip_policy' &&
+      JSON.parse(row.item.sourceRecipeIds || '[]').length === 0 &&
+      !row.detail.manualQuantityOverride &&
+      !row.detail.manualUnitOverride &&
+      !row.detail.manualItemOverride &&
+      !row.detail.manualNoteOverride
+    ) {
+      db.update(shoppingPolicyInstances)
+        .set({ shoppingListItemId: null, updatedAt: now })
+        .where(eq(shoppingPolicyInstances.id, instance.id))
+        .run();
+      db.delete(shoppingListItems).where(eq(shoppingListItems.id, itemId)).run();
+    }
+    if (list?.weekStart && list.weekEnd) {
+      generatePantryShortageList(
+        {
+          weekStart: list.weekStart,
+          weekEnd: list.weekEnd,
+          listId,
+          mode: list.sourceMode === 'pantry_all' ? 'all' : 'missing',
+        },
+        actorProfileId,
+      );
+    } else if (list && getListSettings().automaticRestockListId === listId) {
+      reconcileRestockPoliciesForList(listId, actorProfileId);
+    }
+    return db
+      .select()
+      .from(pantryShoppingItemDetails)
+      .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
+      .get();
+  }
   const updates =
     parsedInput.action === 'reset'
       ? {
@@ -853,7 +1812,7 @@ export function intakePurchasedShoppingItem(
 ) {
   ensureDatabase();
   const parsedInput = pantryPurchaseIntakeSchema.parse(input);
-  return getDatabase().transaction((transaction) => {
+  const result = getDatabase().transaction((transaction) => {
     const item = transaction
       .select()
       .from(shoppingListItems)
@@ -957,6 +1916,8 @@ export function intakePurchasedShoppingItem(
     }
     return { batchId: batch.id, replayed: false };
   });
+  reconcileAutomaticRestockPolicies(actorProfileId);
+  return result;
 }
 
 export function getCookSessionPantryPreview(sessionId: string, actorProfileId: string) {
@@ -1032,7 +1993,7 @@ export function confirmCookSessionWithPantry(
 ) {
   ensureDatabase();
   const preview = getCookSessionPantryPreview(sessionId, actorProfileId);
-  return getDatabase().transaction((transaction) => {
+  const result = getDatabase().transaction((transaction) => {
     const session = transaction
       .select()
       .from(cookSessions)
@@ -1157,13 +2118,15 @@ export function confirmCookSessionWithPantry(
       .run();
     return { deductions, leftovers };
   });
+  reconcileAutomaticRestockPolicies(actorProfileId);
+  return result;
 }
 
 export function undoCookSessionPantry(sessionId: string, actorProfileId: string) {
   ensureDatabase();
   const db = getDatabase();
   try {
-    return db.transaction((transaction) => {
+    const result = db.transaction((transaction) => {
       const plan = transaction
         .select()
         .from(pantryCookSessionPlans)
@@ -1220,6 +2183,8 @@ export function undoCookSessionPantry(sessionId: string, actorProfileId: string)
         );
       return { undoEventIds };
     });
+    reconcileAutomaticRestockPolicies(actorProfileId);
+    return result;
   } catch (error) {
     if (error instanceof PantryConflictError || error instanceof PantryNotFoundError)
       throw new PantryGroceryCookingConflictError(error.message);

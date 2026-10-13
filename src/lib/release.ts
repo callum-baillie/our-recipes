@@ -57,6 +57,7 @@ export function getRedactedRuntimeDiagnostics() {
       betterAuthSecretPresent: Boolean(process.env.BETTER_AUTH_SECRET),
       betterAuthUrlPresent: Boolean(process.env.BETTER_AUTH_URL || process.env.APP_ORIGIN),
       smtpConfigured: config.auth.smtp.configured,
+      emailVerificationRequired: config.auth.requireEmailVerification,
       appOriginPresent: Boolean(process.env.APP_ORIGIN),
       trustedOriginsConfigured: config.trustedOrigins.length > 0,
       openAiConfigured: Boolean(process.env.OPENAI_API_KEY),

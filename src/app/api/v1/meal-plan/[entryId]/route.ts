@@ -9,6 +9,7 @@ import {
   updateMealPlanEntryWithNutrition,
   updateMealPlanEntryStatusWithNutrition,
 } from '@/lib/services/nutrition-planning-orchestration-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 
@@ -40,19 +41,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ entry
       'Check the planned date, meal, recipe, servings, and note.',
     );
   try {
+    const meal = statusUpdate.success
+      ? updateMealPlanEntryStatusWithNutrition(
+          (await context.params).entryId,
+          statusUpdate.data.status,
+          authorization.principal.profileId,
+        )
+      : updateMealPlanEntryWithNutrition(
+          (await context.params).entryId,
+          entryUpdate.data!,
+          authorization.principal.profileId,
+        );
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return withApiRequestId(
       NextResponse.json({
-        meal: statusUpdate.success
-          ? updateMealPlanEntryStatusWithNutrition(
-              (await context.params).entryId,
-              statusUpdate.data.status,
-              authorization.principal.profileId,
-            )
-          : updateMealPlanEntryWithNutrition(
-              (await context.params).entryId,
-              entryUpdate.data!,
-              authorization.principal.profileId,
-            ),
+        meal,
       }),
       authorization.requestId,
     );
@@ -77,6 +80,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ entr
       (await context.params).entryId,
       authorization.principal.profileId,
     );
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return withApiRequestId(new NextResponse(null, { status: 204 }), authorization.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)

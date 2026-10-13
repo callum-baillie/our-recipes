@@ -26,6 +26,8 @@ Current controls:
   all API keys in the restored database.
 - Production refuses missing/short independent `COOKIE_SECRET` and `BETTER_AUTH_SECRET` values,
   and requires canonical Better Auth URL and SMTP configuration.
+- Email verification is required in production by default and can be explicitly disabled with
+  `AUTH_REQUIRE_EMAIL_VERIFICATION=false` only for a trusted deployment.
 - Baseline CSP, anti-framing, nosniff, referrer, permissions, COOP, and CORP headers are applied application-wide.
 - Input is Zod-validated at the HTTP boundary. OpenAI provider modules are marked server-only; `OPENAI_API_KEY` takes precedence, while ignored `.api_keys` may be read only in local development and is excluded from Docker.
 - AI readiness reports only configured/unconfigured state. OpenAI review and image requests require trusted origin, active profile, literal confirmation, bounded source input, a four-action-per-profile ten-minute process limit, strict Structured Outputs, and an audit row containing only source digest/label, operation/model/status/timestamps, and local IDs. Selecting a scan and creating its local import operation never contacts the provider; a paid vision request begins only after the user presses the expressly labeled OpenAI review action. Raw source, provider URLs, and credentials are neither audited nor returned. Tests use deterministic doubles; no live paid request is made here.

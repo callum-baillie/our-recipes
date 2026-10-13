@@ -60,6 +60,7 @@ export default async function ShoppingListPage({
           <h1>{list.name}</h1>
           <span>
             {list.weekStart ? `${list.weekStart} — ${list.weekEnd}` : 'Manual household list'}
+            {list.isAutomaticRestockTarget ? ' · Next shop' : ''}
           </span>
         </div>
         <div className={styles.heroMeta}>

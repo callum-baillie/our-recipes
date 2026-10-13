@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { pantryBatchActionSchema } from '@/lib/domain/pantry';
 import { jsonError } from '@/lib/http';
 import { applyPantryBatchAction } from '@/lib/services/pantry-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 import {
   pantryServiceError,
@@ -21,8 +22,14 @@ export async function POST(request: Request, context: { params: Promise<{ batchI
   if (!parsed.success)
     return jsonError(400, 'invalid_pantry_action', 'Check the quantity and Pantry action.');
   try {
+    const batch = applyPantryBatchAction(
+      (await context.params).batchId,
+      parsed.data,
+      actor.profileId,
+    );
+    reconcileAutomaticRestockPolicies(actor.profileId);
     return NextResponse.json({
-      batch: applyPantryBatchAction((await context.params).batchId, parsed.data, actor.profileId),
+      batch,
     });
   } catch (error) {
     const response = pantryServiceError(error);

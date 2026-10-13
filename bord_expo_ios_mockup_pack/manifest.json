@@ -1,0 +1,258 @@
+[
+  {
+    "id": "01-sign-in",
+    "label": "Sign in",
+    "category": "auth",
+    "note": "Native sign-in hierarchy with passkey as a first-class action.",
+    "html": "source/html/01-sign-in.html",
+    "image": "mockups/01-sign-in.png"
+  },
+  {
+    "id": "02-forgot-password",
+    "label": "Forgot password",
+    "category": "auth",
+    "note": "Focused recovery flow with one primary action and clear alternatives.",
+    "html": "source/html/02-forgot-password.html",
+    "image": "mockups/02-forgot-password.png"
+  },
+  {
+    "id": "03-reset-password",
+    "label": "Reset password",
+    "category": "auth",
+    "note": "Recovery-code flow with visible password requirements.",
+    "html": "source/html/03-reset-password.html",
+    "image": "mockups/03-reset-password.png"
+  },
+  {
+    "id": "04-account-security",
+    "label": "Account security",
+    "category": "auth",
+    "note": "Grouped iOS security settings instead of a long web form.",
+    "html": "source/html/04-account-security.html",
+    "image": "mockups/04-account-security.png"
+  },
+  {
+    "id": "05-home",
+    "label": "Home",
+    "category": "core",
+    "note": "Editorial welcome, next-meal focus, and thumb-reachable quick actions.",
+    "html": "source/html/05-home.html",
+    "image": "mockups/05-home.png"
+  },
+  {
+    "id": "06-recipes",
+    "label": "Recipe library",
+    "category": "recipes",
+    "note": "Search-first two-column library with compact native filters.",
+    "html": "source/html/06-recipes.html",
+    "image": "mockups/06-recipes.png"
+  },
+  {
+    "id": "07-collections",
+    "label": "Collections",
+    "category": "recipes",
+    "note": "Visual cookbook shelves with stacked recipe previews.",
+    "html": "source/html/07-collections.html",
+    "image": "mockups/07-collections.png"
+  },
+  {
+    "id": "08-tags",
+    "label": "Tags",
+    "category": "recipes",
+    "note": "Scannable tag list with color, counts, and native row actions.",
+    "html": "source/html/08-tags.html",
+    "image": "mockups/08-tags.png"
+  },
+  {
+    "id": "09-import",
+    "label": "Import recipe",
+    "category": "recipes",
+    "note": "Camera, photo, document, and URL entry points in one native chooser.",
+    "html": "source/html/09-import.html",
+    "image": "mockups/09-import.png"
+  },
+  {
+    "id": "10-capture",
+    "label": "Capture notes",
+    "category": "recipes",
+    "note": "Single compose surface with mode switcher and bottom action bar.",
+    "html": "source/html/10-capture.html",
+    "image": "mockups/10-capture.png"
+  },
+  {
+    "id": "11-recipes-new",
+    "label": "New recipe",
+    "category": "recipes",
+    "note": "Full-screen structured form with progressive sections.",
+    "html": "source/html/11-recipes-new.html",
+    "image": "mockups/11-recipes-new.png"
+  },
+  {
+    "id": "12-recipe-detail",
+    "label": "Recipe detail",
+    "category": "recipes",
+    "note": "Rich hero, condensed metadata, and a clear cooking action.",
+    "html": "source/html/12-recipe-detail.html",
+    "image": "mockups/12-recipe-detail.png"
+  },
+  {
+    "id": "13-recipe-edit",
+    "label": "Edit recipe",
+    "category": "recipes",
+    "note": "Native form groups with persistent Save action.",
+    "html": "source/html/13-recipe-edit.html",
+    "image": "mockups/13-recipe-edit.png"
+  },
+  {
+    "id": "14-recipe-cook",
+    "label": "Cook mode",
+    "category": "recipes",
+    "note": "Immersive step-by-step cooking with timer and one-handed controls.",
+    "html": "source/html/14-recipe-cook.html",
+    "image": "mockups/14-recipe-cook.png"
+  },
+  {
+    "id": "15-pantry",
+    "label": "Pantry",
+    "category": "core",
+    "note": "Inventory summary, search, location scopes, and swipe-ready rows.",
+    "html": "source/html/15-pantry.html",
+    "image": "mockups/15-pantry.png"
+  },
+  {
+    "id": "16-planner",
+    "label": "Meal planner",
+    "category": "core",
+    "note": "Day-focused mobile planner with compact date carousel.",
+    "html": "source/html/16-planner.html",
+    "image": "mockups/16-planner.png"
+  },
+  {
+    "id": "17-nutrition",
+    "label": "Nutrition",
+    "category": "core",
+    "note": "At-a-glance rings and a concise daily log.",
+    "html": "source/html/17-nutrition.html",
+    "image": "mockups/17-nutrition.png"
+  },
+  {
+    "id": "18-lists",
+    "label": "Shopping lists",
+    "category": "core",
+    "note": "List-first dashboard with visible progress and quick creation.",
+    "html": "source/html/18-lists.html",
+    "image": "mockups/18-lists.png"
+  },
+  {
+    "id": "19-list-detail",
+    "label": "Shopping list detail",
+    "category": "core",
+    "note": "Sticky glass action bar and clear item-state segmentation.",
+    "html": "source/html/19-list-detail.html",
+    "image": "mockups/19-list-detail.png"
+  },
+  {
+    "id": "20-kitchen-assistant",
+    "label": "Kitchen assistant",
+    "category": "assistant",
+    "note": "Native chat layout with contextual prompts and review-safe framing.",
+    "html": "source/html/20-kitchen-assistant.html",
+    "image": "mockups/20-kitchen-assistant.png"
+  },
+  {
+    "id": "21-offline",
+    "label": "Offline",
+    "category": "system",
+    "note": "Calm offline state with downloaded-content status.",
+    "html": "source/html/21-offline.html",
+    "image": "mockups/21-offline.png"
+  },
+  {
+    "id": "22-settings",
+    "label": "Settings",
+    "category": "settings",
+    "note": "Inset-grouped navigation modeled on native iOS Settings.",
+    "html": "source/html/22-settings.html",
+    "image": "mockups/22-settings.png"
+  },
+  {
+    "id": "23-settings-profiles",
+    "label": "Profiles & roles",
+    "category": "settings",
+    "note": "Profile management with clear ownership and role hierarchy.",
+    "html": "source/html/23-settings-profiles.html",
+    "image": "mockups/23-settings-profiles.png"
+  },
+  {
+    "id": "24-settings-recipes",
+    "label": "Recipe settings",
+    "category": "settings",
+    "note": "Compact defaults using pickers, steppers, and toggles.",
+    "html": "source/html/24-settings-recipes.html",
+    "image": "mockups/24-settings-recipes.png"
+  },
+  {
+    "id": "25-settings-meal-plan",
+    "label": "Meal-plan settings",
+    "category": "settings",
+    "note": "Planning defaults and meal visibility in native controls.",
+    "html": "source/html/25-settings-meal-plan.html",
+    "image": "mockups/25-settings-meal-plan.png"
+  },
+  {
+    "id": "26-settings-lists",
+    "label": "List settings",
+    "category": "settings",
+    "note": "Store, completion, pantry intake, and aisle organization.",
+    "html": "source/html/26-settings-lists.html",
+    "image": "mockups/26-settings-lists.png"
+  },
+  {
+    "id": "27-settings-pantry",
+    "label": "Pantry settings",
+    "category": "settings",
+    "note": "Inventory defaults and expiry reminders.",
+    "html": "source/html/27-settings-pantry.html",
+    "image": "mockups/27-settings-pantry.png"
+  },
+  {
+    "id": "28-settings-nutrition",
+    "label": "Nutrition settings",
+    "category": "settings",
+    "note": "Profile-specific goals, units, and optional inputs.",
+    "html": "source/html/28-settings-nutrition.html",
+    "image": "mockups/28-settings-nutrition.png"
+  },
+  {
+    "id": "29-settings-ai",
+    "label": "AI settings",
+    "category": "settings",
+    "note": "Explicit permissions, model choice, and privacy controls.",
+    "html": "source/html/29-settings-ai.html",
+    "image": "mockups/29-settings-ai.png"
+  },
+  {
+    "id": "30-settings-system",
+    "label": "System settings",
+    "category": "settings",
+    "note": "Kitchen identity, appearance, icon, and recovery actions.",
+    "html": "source/html/30-settings-system.html",
+    "image": "mockups/30-settings-system.png"
+  },
+  {
+    "id": "31-settings-backups",
+    "label": "Backups",
+    "category": "settings",
+    "note": "Backup health, automation, export, and restore.",
+    "html": "source/html/31-settings-backups.html",
+    "image": "mockups/31-settings-backups.png"
+  },
+  {
+    "id": "32-settings-api",
+    "label": "API & integrations",
+    "category": "settings",
+    "note": "Scoped keys and trusted integrations with security status.",
+    "html": "source/html/32-settings-api.html",
+    "image": "mockups/32-settings-api.png"
+  }
+]

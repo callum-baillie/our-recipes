@@ -9,7 +9,8 @@ services:
       DATA_DIR: /data
       DATABASE_URL: /data/bord.db
       APP_ORIGIN: https://recipes.tower
-      COOKIE_SECRET: replace-with-a-unique-secret-of-at-least-32-characters
+      AUTH_REQUIRE_EMAIL_VERIFICATION: ${AUTH_REQUIRE_EMAIL_VERIFICATION:-true}
+      COOKIE_SECRET: ${COOKIE_SECRET:?Set COOKIE_SECRET in your private configuration}
       TZ: America/Los_Angeles
       HOMEPAGE_INTEGRATION_TOKEN: ${HOMEPAGE_INTEGRATION_TOKEN:-}
       BACKUP_DIR: /backup

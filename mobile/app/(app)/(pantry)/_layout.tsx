@@ -4,6 +4,7 @@ export default function PantryLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="[itemId]" />
+      <Stack.Screen name="policy/[productId]" />
     </Stack>
   );
 }

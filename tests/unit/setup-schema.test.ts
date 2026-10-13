@@ -94,6 +94,12 @@ describe('setupSchema', () => {
     ).toBe(false);
   });
 
+  it('returns an added profile to review without repeating the first-recipe step', () => {
+    const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
+    expect(source).toContain("currentStep === 'goals' && profileReviewMode");
+    expect(source).toContain("setStepIndex(steps.indexOf('review'))");
+  });
+
   it('uses US onboarding defaults and derives hidden regional settings from the browser', () => {
     const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
     const settingsSource = readFileSync('src/components/profile-settings.tsx', 'utf8');

@@ -1069,6 +1069,7 @@ paths:
                   properties:
                     kind: { type: string, const: manual }
                     name: { type: string, minLength: 1, maxLength: 120 }
+                    makeAutomaticRestockTarget: { type: boolean, default: false }
                 - type: object
                   additionalProperties: false
                   required: [kind, weekStart, weekEnd]
@@ -1078,6 +1079,7 @@ paths:
                     weekEnd: { type: string, format: date }
                     sourceMode:
                       { type: string, enum: [pantry_missing, pantry_all], default: pantry_all }
+                    makeAutomaticRestockTarget: { type: boolean, default: false }
                 - type: object
                   description: Backward-compatible untagged manual request
                   additionalProperties: false
@@ -1121,6 +1123,8 @@ paths:
                 ]
               properties:
                 defaultSupermarketProfileId:
+                  oneOf: [{ type: string, const: '' }, { type: string, format: uuid }]
+                automaticRestockListId:
                   oneOf: [{ type: string, const: '' }, { type: string, format: uuid }]
                 completedItemsBehavior:
                   type: string
@@ -1211,13 +1215,52 @@ paths:
       operationId: getShoppingList
       summary: Read an editable list with household aisle definitions in saved order
       responses:
-        '200': { description: Shopping list and aisle catalog }
+        '200':
+          description: Shopping list, target state, structured policy reviews, and item breakdowns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  list:
+                    type: object
+                    properties:
+                      isAutomaticRestockTarget: { type: boolean }
+                      policyReviews:
+                        type: array
+                        items: { $ref: '#/components/schemas/ShoppingPolicyReview' }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            policyBreakdown:
+                              oneOf:
+                                - { $ref: '#/components/schemas/ShoppingPolicyBreakdown' }
+                                - { type: 'null' }
         '404': { description: Shopping list not found }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
       x-api-key-scope: shoppingLists.update
       operationId: reorderShoppingListItems
-      summary: Replace the complete explicit order for the current list items
+      summary: Reorder, rename, archive, complete, restore, or designate a shopping list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [itemIds]
+                  properties:
+                    itemIds: { type: array, items: { type: string, format: uuid } }
+                - type: object
+                  required: [action]
+                  properties:
+                    action:
+                      type: string
+                      enum: [rename, archive, restore, duplicate, set_restock_target, complete]
+                    name: { type: string, minLength: 1, maxLength: 120 }
       responses:
         '200': { description: List order saved }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -1389,7 +1432,7 @@ paths:
         schema: { type: string, format: uuid }
     patch:
       operationId: updateShoppingItemPantryControl
-      summary: Mark coverage, ignore Pantry stock, flag inaccurate inventory, add extra demand, or reset
+      summary: Control Pantry coverage or the recurring policy for this shopping trip
       requestBody:
         required: true
         content:
@@ -1399,7 +1442,19 @@ paths:
               additionalProperties: false
               required: [action]
               properties:
-                action: { type: string, enum: [covered, ignore, inaccurate, reset, extra] }
+                action:
+                  type: string
+                  enum:
+                    [
+                      covered,
+                      ignore,
+                      inaccurate,
+                      reset,
+                      extra,
+                      skip_policy,
+                      restore_policy,
+                      assume_empty_for_trip,
+                    ]
                 quantity: { type: number, minimum: 0, maximum: 1000000 }
                 unit: { type: string, maxLength: 30 }
                 note: { type: string, maxLength: 500 }
@@ -1438,6 +1493,47 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Generated shopping item or Pantry product not found }
         '409': { description: Profile selection required }
+  /shopping-lists/{listId}/policies/{productId}:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: productId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-key-scope: shoppingLists.update
+      operationId: updateShoppingPolicyForTrip
+      summary: Skip, restore, or resolve one recurring product policy for this trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [skip_policy, restore_policy, assume_empty_for_trip]
+      responses:
+        '200':
+          description: Updated per-trip policy review states
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShoppingPolicyReview' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Policy instance not found }
   /shopping-lists/aisles:
     get:
       operationId: listShoppingAisles
@@ -2315,8 +2411,56 @@ components:
         defaultInventoryUnit: { type: string, maxLength: 30, default: each }
         defaultStorageType: { type: string, enum: [pantry, refrigerator, freezer, counter, other] }
         isStaple: { type: boolean, default: false }
+        restockMode: { type: string, enum: [none, always_have, always_buy], default: none }
+        restockTrigger:
+          { type: string, enum: [below_target, reorder_point, empty], default: below_target }
+        targetStock: { type: [number, 'null'], exclusiveMinimum: 0 }
         reorderThreshold: { type: [number, 'null'], minimum: 0 }
+        preferredPurchaseQuantity: { type: [number, 'null'], exclusiveMinimum: 0 }
         stockUnit: { type: string, maxLength: 30 }
+    ShoppingPolicyBreakdown:
+      type: object
+      required:
+        [
+          mode,
+          trigger,
+          recipeRequirement,
+          usablePantry,
+          pendingCoverage,
+          recordedCoverage,
+          unit,
+          needsReview,
+        ]
+      properties:
+        mode: { type: string, enum: [always_have, always_buy] }
+        trigger: { type: string, enum: [below_target, reorder_point, empty] }
+        recipeRequirement: { type: number, minimum: 0 }
+        targetStock: { type: [number, 'null'], minimum: 0 }
+        purchaseIncrement: { type: [number, 'null'], minimum: 0 }
+        policyContribution: { type: [number, 'null'], minimum: 0 }
+        usablePantry: { type: number, minimum: 0 }
+        pendingCoverage: { type: number, minimum: 0 }
+        recordedCoverage: { type: number, minimum: 0 }
+        unroundedPurchaseGoal: { type: [number, 'null'], minimum: 0 }
+        roundedPurchaseGoal: { type: [number, 'null'], minimum: 0 }
+        finalBuyQuantity: { type: [number, 'null'], minimum: 0 }
+        unit: { type: string }
+        needsReview: { type: boolean }
+        reviewReason: { type: [string, 'null'] }
+    ShoppingPolicyReview:
+      type: object
+      required: [productId, productName, mode, trigger, state, assumedEmpty, unit]
+      properties:
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        shoppingListItemId: { type: [string, 'null'], format: uuid }
+        mode: { type: string, enum: [always_have, always_buy] }
+        trigger: { type: string, enum: [below_target, reorder_point, empty] }
+        state: { type: string, enum: [active, needs_review, satisfied, dismissed, moved] }
+        reviewReason: { type: [string, 'null'] }
+        assumedEmpty: { type: boolean }
+        policyQuantity: { type: [number, 'null'], minimum: 0 }
+        unit: { type: string }
     PantryLocationInput:
       type: object
       required: [name, storageType]

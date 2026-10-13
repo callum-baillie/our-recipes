@@ -12,6 +12,7 @@ const configSchema = z.object({
     secret: z.string().min(32),
     baseUrl: z.string().url(),
     emailFrom: z.string().min(3),
+    requireEmailVerification: z.boolean(),
     smtp: z.object({
       configured: z.boolean(),
       host: z.string().min(1).nullable(),
@@ -71,6 +72,14 @@ function defaultDatabaseUrl(dataDir: string): string {
   return legacy;
 }
 
+function environmentBoolean(name: string, fallback: boolean): boolean {
+  const value = process.env[name]?.trim().toLocaleLowerCase('en-US');
+  if (!value) return fallback;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`${name} must be either true or false.`);
+}
+
 export function getRuntimeConfig(): RuntimeConfig {
   const isProduction = process.env.NODE_ENV === 'production';
   const dataDir = process.env.DATA_DIR ?? './data';
@@ -88,6 +97,10 @@ export function getRuntimeConfig(): RuntimeConfig {
     .filter(Boolean);
   const usdaApiKey = process.env.USDA_FDC_API_KEY?.trim() || null;
   const usdaExplicitlyDisabled = process.env.USDA_FDC_ENABLED === 'false';
+  const requireEmailVerification = environmentBoolean(
+    'AUTH_REQUIRE_EMAIL_VERIFICATION',
+    isProduction,
+  );
   const backupDir = process.env.BACKUP_DIR?.trim() || join(dataDir, 'backups');
 
   if (isProduction && (!process.env.COOKIE_SECRET || cookieSecret.length < 32)) {
@@ -120,6 +133,7 @@ export function getRuntimeConfig(): RuntimeConfig {
       secret: authSecret,
       baseUrl: authBaseUrl,
       emailFrom: process.env.AUTH_EMAIL_FROM ?? 'Bòrd <bord@localhost>',
+      requireEmailVerification,
       smtp: {
         configured: smtpConfigured,
         host: smtpHost,

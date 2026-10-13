@@ -389,7 +389,7 @@
   margin-top: 0.35rem;
 }
 
-.aisleGroup > h3 {
+.aisleGroup > h2 {
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -402,7 +402,7 @@
   text-transform: uppercase;
 }
 
-.aisleGroup > h3 small {
+.aisleGroup > h2 small {
   display: inline-grid;
   place-items: center;
   min-width: 1.25rem;

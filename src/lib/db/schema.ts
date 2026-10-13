@@ -977,6 +977,7 @@ export const householdListSettings = sqliteTable('household_list_settings', {
     .notNull()
     .default(true),
   keepScreenAwake: integer('keep_screen_awake', { mode: 'boolean' }).notNull().default(false),
+  automaticRestockListId: text('automatic_restock_list_id'),
   updatedByProfileId: text('updated_by_profile_id')
     .notNull()
     .references(() => profiles.id),
@@ -1163,6 +1164,16 @@ export const pantryProducts = sqliteTable(
     suggestGroceryRestock: integer('suggest_grocery_restock', { mode: 'boolean' })
       .notNull()
       .default(false),
+    restockMode: text('restock_mode', {
+      enum: ['none', 'always_have', 'always_buy'],
+    })
+      .notNull()
+      .default('none'),
+    restockTrigger: text('restock_trigger', {
+      enum: ['below_target', 'reorder_point', 'empty'],
+    })
+      .notNull()
+      .default('below_target'),
     archivedAt: integer('archived_at', { mode: 'timestamp' }),
     createdByProfileId: text('created_by_profile_id')
       .notNull()
@@ -1594,6 +1605,48 @@ export const pantryShoppingItemDetails = sqliteTable(
     index('pantry_shopping_details_product_idx').on(table.productId),
     index('pantry_shopping_details_generation_idx').on(table.generationKey),
     index('pantry_shopping_details_coverage_idx').on(table.coverageState),
+  ],
+);
+
+export const shoppingPolicyInstances = sqliteTable(
+  'shopping_policy_instances',
+  {
+    id: text('id').primaryKey(),
+    listId: text('list_id')
+      .notNull()
+      .references(() => shoppingLists.id, { onDelete: 'cascade' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => pantryProducts.id, { onDelete: 'restrict' }),
+    shoppingListItemId: text('shopping_list_item_id').references(() => shoppingListItems.id, {
+      onDelete: 'set null',
+    }),
+    mode: text('mode', { enum: ['always_have', 'always_buy'] }).notNull(),
+    trigger: text('trigger', {
+      enum: ['below_target', 'reorder_point', 'empty'],
+    }).notNull(),
+    state: text('state', {
+      enum: ['active', 'needs_review', 'satisfied', 'dismissed', 'moved'],
+    })
+      .notNull()
+      .default('active'),
+    assumedEmpty: integer('assumed_empty', { mode: 'boolean' }).notNull().default(false),
+    policyQuantity: real('policy_quantity'),
+    unit: text('unit').notNull().default(''),
+    reviewReason: text('review_reason'),
+    createdByProfileId: text('created_by_profile_id')
+      .notNull()
+      .references(() => profiles.id),
+    updatedByProfileId: text('updated_by_profile_id')
+      .notNull()
+      .references(() => profiles.id),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('shopping_policy_instances_list_product_idx').on(table.listId, table.productId),
+    index('shopping_policy_instances_product_state_idx').on(table.productId, table.state),
+    index('shopping_policy_instances_item_idx').on(table.shoppingListItemId),
   ],
 );
 

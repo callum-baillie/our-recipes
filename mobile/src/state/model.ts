@@ -5,6 +5,7 @@ export const initialState: BordState = {
   recipes: [],
   favorites: [],
   pantry: [],
+  pantryPolicies: [],
   mealPlan: [],
   lists: [],
   settings: defaultSettings,

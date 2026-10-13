@@ -5,6 +5,7 @@ import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { duplicateWeekSchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import { duplicateWeekWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,8 +23,7 @@ export async function POST(request: Request) {
   const parsed = duplicateWeekSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return jsonError(400, 'invalid_week_copy', 'Use valid source and destination weeks.');
-  return NextResponse.json(
-    { meals: duplicateWeekWithNutrition(parsed.data, actor.profileId) },
-    { status: 201 },
-  );
+  const meals = duplicateWeekWithNutrition(parsed.data, actor.profileId);
+  reconcileAutomaticRestockPolicies(actor.profileId);
+  return NextResponse.json({ meals }, { status: 201 });
 }

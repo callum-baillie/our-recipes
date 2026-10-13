@@ -5,6 +5,7 @@ import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { swapMealPlanEntriesSchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import { PlanningNotFoundError, swapMealPlanEntries } from '@/lib/services/planning-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
   if (!parsed.success)
     return jsonError(400, 'invalid_meal_swap', 'Choose two current planned meals to swap.');
   try {
-    return NextResponse.json({ meals: swapMealPlanEntries(parsed.data, actor.profileId) });
+    const meals = swapMealPlanEntries(parsed.data, actor.profileId);
+    reconcileAutomaticRestockPolicies(actor.profileId);
+    return NextResponse.json({ meals });
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
       return jsonError(409, 'planned_meal_changed', error.message);

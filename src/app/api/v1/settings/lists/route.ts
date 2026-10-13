@@ -10,6 +10,7 @@ import {
   ListSettingsNotFoundError,
   updateListSettings,
 } from '@/lib/services/list-settings-service';
+import { switchAutomaticRestockTarget } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,19 @@ export async function PATCH(request: Request) {
   const parsed = listSettingsInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_list_settings', 'Check the list settings.');
   try {
-    return NextResponse.json(updateListSettings(parsed.data, actor.profileId));
+    const previousTarget = getListSettingsWorkspace().settings.automaticRestockListId;
+    const workspace = updateListSettings(
+      { ...parsed.data, automaticRestockListId: undefined },
+      actor.profileId,
+    );
+    if (
+      parsed.data.automaticRestockListId !== undefined &&
+      (parsed.data.automaticRestockListId || null) !== previousTarget
+    ) {
+      switchAutomaticRestockTarget(parsed.data.automaticRestockListId || null, actor.profileId);
+      return NextResponse.json(getListSettingsWorkspace());
+    }
+    return NextResponse.json(workspace);
   } catch (error) {
     if (error instanceof ListSettingsNotFoundError)
       return jsonError(404, 'supermarket_not_found', error.message);

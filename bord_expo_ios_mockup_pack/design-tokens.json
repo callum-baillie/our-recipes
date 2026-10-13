@@ -1,0 +1,102 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "meta": {
+    "name": "Bord mobile design tokens",
+    "version": "1.0.0",
+    "intent": "iOS-first Expo design direction with Android-native adaptation"
+  },
+  "color": {
+    "background": {
+      "paper": "#F7F3EB",
+      "paperRaised": "#FCF9F2",
+      "paperMuted": "#EEE9DE",
+      "dark": "#183525"
+    },
+    "surface": {
+      "primary": "#FFFDF8",
+      "secondary": "#F3EFE6",
+      "sage": "#DDE8D1",
+      "sageStrong": "#C8DDB8",
+      "glassTint": "rgba(255, 253, 248, 0.72)",
+      "darkGlassTint": "rgba(24, 53, 37, 0.76)"
+    },
+    "ink": {
+      "primary": "#203128",
+      "secondary": "#626A63",
+      "tertiary": "#858B84",
+      "inverse": "#FFFDF8"
+    },
+    "accent": {
+      "terracotta": "#C4512F",
+      "terracottaPressed": "#A94327",
+      "olive": "#5E7C3D",
+      "olivePressed": "#4E6833",
+      "teal": "#3F7C7E",
+      "gold": "#B98738"
+    },
+    "semantic": {
+      "success": "#54763D",
+      "warning": "#A56B21",
+      "danger": "#B64B3A",
+      "info": "#3F747F",
+      "separator": "#DDD6C9",
+      "focus": "#2767C9"
+    }
+  },
+  "typography": {
+    "displayFamily": "EB Garamond",
+    "functionalFamily": "System",
+    "roles": {
+      "editorialLarge": { "fontSize": 40, "lineHeight": 40, "fontWeight": "500" },
+      "editorialTitle": { "fontSize": 32, "lineHeight": 32, "fontWeight": "500" },
+      "sectionTitle": { "fontSize": 22, "lineHeight": 26, "fontWeight": "600" },
+      "headline": { "fontSize": 17, "lineHeight": 22, "fontWeight": "600" },
+      "body": { "fontSize": 17, "lineHeight": 24, "fontWeight": "400" },
+      "callout": { "fontSize": 16, "lineHeight": 21, "fontWeight": "400" },
+      "footnote": { "fontSize": 13, "lineHeight": 18, "fontWeight": "400" },
+      "caption": { "fontSize": 12, "lineHeight": 16, "fontWeight": "500" },
+      "eyebrow": { "fontSize": 11, "lineHeight": 14, "fontWeight": "700", "letterSpacing": 1.2 }
+    }
+  },
+  "spacing": {
+    "2xs": 4,
+    "xs": 8,
+    "sm": 12,
+    "md": 16,
+    "lg": 20,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 40
+  },
+  "radius": {
+    "small": 10,
+    "control": 14,
+    "card": 18,
+    "largeCard": 22,
+    "glass": 24,
+    "capsule": 999
+  },
+  "stroke": {
+    "hairline": 0.5,
+    "standard": 1,
+    "emphasis": 1.5
+  },
+  "shadow": {
+    "card": "0 6px 18px rgba(73, 55, 35, 0.08)",
+    "floating": "0 12px 34px rgba(36, 47, 39, 0.16)",
+    "glass": "0 10px 30px rgba(29, 42, 33, 0.14)"
+  },
+  "motion": {
+    "fast": 140,
+    "standard": 240,
+    "deliberate": 360,
+    "spring": { "damping": 22, "stiffness": 220, "mass": 0.9 }
+  },
+  "layout": {
+    "screenHorizontalPadding": 16,
+    "contentMaxWidth": 680,
+    "minimumTouchTarget": 44,
+    "tabBarItems": 5,
+    "recipeGridMinimumCardWidth": 164
+  }
+}

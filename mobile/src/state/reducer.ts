@@ -3,6 +3,7 @@ import type {
   HouseholdProfile,
   NutritionCache,
   PantryItem,
+  PantryPolicy,
   Recipe,
   RecipeCollection,
   RecipeDraft,
@@ -16,6 +17,7 @@ export type BordState = {
   recipes: Recipe[];
   favorites: string[];
   pantry: PantryItem[];
+  pantryPolicies: PantryPolicy[];
   mealPlan: MealPlanItem[];
   lists: ShoppingList[];
   settings: Settings;
@@ -52,6 +54,7 @@ export type BordAction =
         | 'recipes'
         | 'favorites'
         | 'pantry'
+        | 'pantryPolicies'
         | 'mealPlan'
         | 'lists'
         | 'nutrition'
@@ -69,6 +72,7 @@ export function bordReducer(state: BordState, action: BordAction): BordState {
         recipes: [],
         favorites: [],
         pantry: [],
+        pantryPolicies: [],
         mealPlan: [],
         lists: [],
         settings: {},

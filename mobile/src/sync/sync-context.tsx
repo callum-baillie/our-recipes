@@ -5,11 +5,13 @@ import type {
   MealPlanItem,
   NutritionCache,
   PantryItem,
+  PantryPolicy,
   Recipe,
   RecipeCollection,
   RecipeStepCategory,
   RecipeTag,
   ShoppingList,
+  ShoppingPolicyBreakdown,
 } from '@/data/types';
 import { useAuth } from '@/auth/auth-context';
 import { useBord } from '@/state/bord-store';
@@ -56,10 +58,27 @@ type PantryDashboard = {
     quantityLabel: string;
     status: string;
     productId: string;
+    quantityRemaining: number | null;
+    unit: string;
+    approximateState: string | null;
+    excludeFromGrocery: boolean;
     product: { displayName: string; category?: string };
     location: { storageType: string; name: string };
     expiry: { state: string; date: string | null };
   }[];
+};
+
+type PantryProductPolicy = {
+  id: string;
+  displayName: string;
+  restockMode?: 'none' | 'always_have' | 'always_buy';
+  restockTrigger?: 'below_target' | 'reorder_point' | 'empty';
+  targetStock?: number | null;
+  reorderThreshold?: number | null;
+  preferredPurchaseQuantity?: number | null;
+  stockUnit?: string;
+  isStaple?: boolean;
+  suggestGroceryRestock?: boolean;
 };
 
 type PlannedMeal = {
@@ -77,10 +96,13 @@ type ShoppingSummary = {
   archivedAt: string | null;
   supermarketName?: string | null;
   supermarketLocation?: string;
+  isAutomaticRestockTarget?: boolean;
 };
 type ShoppingDetail = ShoppingSummary & {
   supermarketProfile?: { id: string; name: string; locationLabel?: string } | null;
   aisles: { id: string; name: string }[];
+  isAutomaticRestockTarget?: boolean;
+  policyReviews?: ShoppingList['policyReviews'];
   items: {
     id: string;
     item: string;
@@ -91,6 +113,7 @@ type ShoppingDetail = ShoppingSummary & {
     checked: boolean;
     shoppingState: string;
     sourceRecipeIds: string;
+    policyBreakdown?: ShoppingPolicyBreakdown | null;
   }[];
 };
 
@@ -240,6 +263,7 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
         const range = todayRange();
         const [
           pantryResult,
+          pantryProductsResult,
           mealsResult,
           listResult,
           nutritionProfiles,
@@ -249,6 +273,7 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           profileResult,
         ] = await Promise.all([
           request<{ dashboard: PantryDashboard }>('/api/v1/pantry/summary'),
+          request<{ products: PantryProductPolicy[] }>('/api/v1/pantry/products'),
           request<{ meals: PlannedMeal[] }>(
             `/api/v1/meal-plan?start=${range.start}&end=${range.end}`,
           ),
@@ -302,6 +327,56 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           icon: pantryIcon(batch.product.category),
           version: batch.version,
         }));
+        const pantryPolicies: PantryPolicy[] = pantryProductsResult.products.flatMap((product) => {
+          const mode = product.restockMode ?? 'none';
+          const trigger = product.restockTrigger ?? 'below_target';
+          const unit = product.stockUnit ?? '';
+          const needsSetup =
+            mode === 'none' && Boolean(product.isStaple && product.suggestGroceryRestock);
+          if ((mode === 'none' && !needsSetup) || (!unit && !needsSetup)) return [];
+          const batches = pantryResult.dashboard.batches.filter(
+            (batch) =>
+              batch.productId === product.id &&
+              !batch.excludeFromGrocery &&
+              !['depleted', 'discarded', 'donated'].includes(batch.status),
+          );
+          const uncertain = batches.some(
+            (batch) =>
+              batch.quantityRemaining === null ||
+              batch.approximateState !== null ||
+              batch.unit !== unit,
+          );
+          const stock = batches.reduce(
+            (total, batch) =>
+              batch.quantityRemaining !== null && batch.unit === unit
+                ? total + batch.quantityRemaining
+                : total,
+            0,
+          );
+          const due =
+            needsSetup ||
+            mode === 'always_buy' ||
+            (trigger === 'empty'
+              ? stock <= 0
+              : trigger === 'reorder_point'
+                ? stock <= (product.reorderThreshold ?? 0)
+                : stock < (product.targetStock ?? 0));
+          return [
+            {
+              id: product.id,
+              name: product.displayName,
+              mode,
+              trigger,
+              targetStock: product.targetStock ?? null,
+              reorderThreshold: product.reorderThreshold ?? null,
+              preferredPurchaseQuantity: product.preferredPurchaseQuantity ?? null,
+              stockUnit: unit,
+              stock,
+              state: needsSetup || uncertain ? 'review' : due ? 'due' : 'healthy',
+              needsSetup,
+            },
+          ];
+        });
         const mealPlan: MealPlanItem[] = mealsResult.meals.map((meal) => ({
           id: meal.id,
           day: Number(meal.plannedFor.slice(-2)),
@@ -317,6 +392,8 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           id: list.id,
           name: list.name,
           status: list.archivedAt ? 'completed' : 'active',
+          isNextShop: list.isAutomaticRestockTarget ?? false,
+          policyReviews: list.policyReviews ?? [],
           supermarket: list.supermarketProfile
             ? {
                 id: list.supermarketProfile.id,
@@ -337,6 +414,13 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
             note: item.note,
             aisleId: item.aisleId,
             shoppingState: item.shoppingState as 'to_buy' | 'in_cart' | 'cant_find' | 'sourced',
+            policyBreakdown: item.policyBreakdown
+              ? {
+                  ...item.policyBreakdown,
+                  pendingCoverage: item.policyBreakdown.pendingCoverage ?? 0,
+                  recordedCoverage: item.policyBreakdown.recordedCoverage ?? 0,
+                }
+              : null,
           })),
         }));
         const nutrition: NutritionCache = {
@@ -350,6 +434,7 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
             recipes: mappedRecipes,
             favorites: library.filter((recipe) => recipe.isFavorite).map((recipe) => recipe.id),
             pantry,
+            pantryPolicies,
             mealPlan,
             lists,
             nutrition,

@@ -84,13 +84,14 @@ export async function POST(request: Request) {
         console.error('The example Stovies recipe was created without its optional image.', error);
       }
     }
+    const requireEmailVerification = getRuntimeConfig().auth.requireEmailVerification;
     const response = NextResponse.json(
       {
         household: state.household,
         profiles: state.profiles,
         firstRecipeId,
         recoveryCodes,
-        requiresEmailVerification: getRuntimeConfig().isProduction,
+        requiresEmailVerification: requireEmailVerification,
       },
       { status: 201 },
     );
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
       maxAge: 0,
       sameSite: 'lax',
     });
-    if (getRuntimeConfig().isProduction) {
+    if (requireEmailVerification) {
       for (const email of normalizedEmails) {
         void auth.api
           .sendVerificationEmail({

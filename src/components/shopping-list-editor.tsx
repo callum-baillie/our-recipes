@@ -926,7 +926,15 @@ export function ShoppingListEditor({
   const updatePantryControl = async (
     item: Item,
     payload:
-      | { action: 'ignore' | 'inaccurate' | 'reset' }
+      | {
+          action:
+            | 'ignore'
+            | 'inaccurate'
+            | 'reset'
+            | 'skip_policy'
+            | 'restore_policy'
+            | 'assume_empty_for_trip';
+        }
       | { action: 'extra'; quantity: number; unit: string },
   ) => {
     setBusy(`pantry-control:${item.id}`);
@@ -953,6 +961,49 @@ export function ShoppingListEditor({
         'Could not update this Pantry calculation. Check the connection and try again.',
         'error',
       );
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const makeNextShop = async () => {
+    if (
+      !window.confirm(
+        'Make this the Next shop? Outstanding untouched recurring amounts will move here; recipe and manual items stay on their current lists.',
+      )
+    )
+      return;
+    setBusy('next-shop');
+    try {
+      const response = await fetch(`/api/v1/shopping-lists/${list.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_restock_target' }),
+      });
+      if (!response.ok) throw new Error('Could not designate this list as Next shop.');
+      window.location.reload();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not update Next shop.', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const updatePolicyReview = async (
+    productId: string,
+    action: 'restore_policy' | 'skip_policy' | 'assume_empty_for_trip',
+  ) => {
+    setBusy(`policy:${productId}`);
+    try {
+      const response = await fetch(`/api/v1/shopping-lists/${list.id}/policies/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!response.ok) throw new Error('Could not change that recurring policy for this trip.');
+      window.location.reload();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not update the policy.', 'error');
     } finally {
       setBusy('');
     }
@@ -1061,6 +1112,16 @@ export function ShoppingListEditor({
           }`}
         >
           <strong>{item.item}</strong>
+          <span>
+            {pantryContributions(item).length ? (
+              <small className={styles.aisleBadge}>Meal plan</small>
+            ) : null}
+            {item.policyBreakdown ? (
+              <small className={styles.aisleBadge}>
+                {item.policyBreakdown.mode === 'always_have' ? 'Always have' : 'Always buy'}
+              </small>
+            ) : null}
+          </span>
           <span
             className={`${styles.quantitySummary} ${
               quantitySummary.isEstimate ? styles.quantitySummaryEstimate : ''
@@ -1204,7 +1265,61 @@ export function ShoppingListEditor({
         ) : null}
         {item.pantry && matchedProduct ? (
           <details className={styles.provenance}>
-            <summary>Pantry details</summary>
+            <summary>
+              {item.policyBreakdown ? 'Demand and policy breakdown' : 'Pantry details'}
+            </summary>
+            {item.policyBreakdown ? (
+              <dl>
+                <div>
+                  <dt>Meal plan</dt>
+                  <dd>
+                    {item.policyBreakdown.recipeRequirement} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    {item.policyBreakdown.mode === 'always_have'
+                      ? 'Always have reserve'
+                      : 'Always buy baseline'}
+                  </dt>
+                  <dd>
+                    {item.policyBreakdown.policyContribution ?? 'Review'}{' '}
+                    {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Usable Pantry</dt>
+                  <dd>
+                    {item.policyBreakdown.usablePantry} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Pending coverage</dt>
+                  <dd>
+                    {item.policyBreakdown.pendingCoverage} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Recorded this trip</dt>
+                  <dd>
+                    {item.policyBreakdown.recordedCoverage} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Before package rounding</dt>
+                  <dd>
+                    {item.policyBreakdown.unroundedPurchaseGoal ?? 'Review'}{' '}
+                    {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Final buy amount</dt>
+                  <dd>
+                    {item.policyBreakdown.finalBuyQuantity ?? 'Review'} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
             {pantryContributions(item).length ? (
               <ul>
                 {pantryContributions(item).map((entry) => (
@@ -1258,6 +1373,26 @@ export function ShoppingListEditor({
                 </button>
               </form>
               <div className={styles.pantryControlActions}>
+                {item.policyBreakdown ? (
+                  <button
+                    type="button"
+                    disabled={busy === `pantry-control:${item.id}`}
+                    onClick={() => void updatePantryControl(item, { action: 'skip_policy' })}
+                  >
+                    Skip recurring purchase
+                  </button>
+                ) : null}
+                {item.policyBreakdown?.needsReview ? (
+                  <button
+                    type="button"
+                    disabled={busy === `pantry-control:${item.id}`}
+                    onClick={() =>
+                      void updatePantryControl(item, { action: 'assume_empty_for_trip' })
+                    }
+                  >
+                    Assume empty for this trip
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   disabled={busy === `pantry-control:${item.id}`}
@@ -1446,10 +1581,10 @@ export function ShoppingListEditor({
             groupMode === 'aisle' ? (
               groupedItems.map((group) => (
                 <section className={styles.aisleGroup} key={group.id}>
-                  <h3>
+                  <h2>
                     <span>{group.name}</span>
                     <small>{group.items.length}</small>
-                  </h3>
+                  </h2>
                   <div>{group.items.map(renderItem)}</div>
                 </section>
               ))
@@ -1478,6 +1613,9 @@ export function ShoppingListEditor({
             </strong>
             <small>{progress}% complete</small>
           </span>
+          {list.isAutomaticRestockTarget ? (
+            <strong className={styles.aisleBadge}>Next shop</strong>
+          ) : null}
         </div>
       </div>
 
@@ -1533,11 +1671,51 @@ export function ShoppingListEditor({
               ))}
             </select>
           </label>
+          {list.isAutomaticRestockTarget ? (
+            <strong className={styles.aisleBadge}>Next shop</strong>
+          ) : (
+            <button
+              type="button"
+              disabled={busy === 'next-shop'}
+              onClick={() => void makeNextShop()}
+            >
+              {busy === 'next-shop' ? 'Updating…' : 'Make Next shop'}
+            </button>
+          )}
           <Link href="/settings/lists">
             <Settings size={17} /> List settings
           </Link>
         </section>
       </div>
+
+      {list.policyReviews.some((review) => review.state === 'needs_review') ? (
+        <section className={styles.restoredNotice} role="status">
+          <strong>Pantry review needed</strong>{' '}
+          {list.policyReviews
+            .filter((review) => review.state === 'needs_review')
+            .map((review) => review.productName)
+            .join(', ')}{' '}
+          has approximate or incompatible stock. Update Pantry, or open its row and assume empty for
+          this trip.
+        </section>
+      ) : null}
+      {list.policyReviews.some((review) => review.state === 'dismissed') ? (
+        <section className={styles.restoredNotice} role="status">
+          <strong>Skipped for this trip:</strong>{' '}
+          {list.policyReviews
+            .filter((review) => review.state === 'dismissed')
+            .map((review) => (
+              <button
+                key={review.productId}
+                type="button"
+                disabled={busy === `policy:${review.productId}`}
+                onClick={() => void updatePolicyReview(review.productId, 'restore_policy')}
+              >
+                Restore {review.productName}
+              </button>
+            ))}
+        </section>
+      ) : null}
 
       <div className={styles.toolbar}>
         <div className={styles.mobileSearchRow}>

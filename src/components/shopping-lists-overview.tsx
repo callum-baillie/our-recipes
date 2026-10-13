@@ -74,6 +74,7 @@ export function ShoppingListsOverview({
   const router = useRouter();
   const { showToast } = useToast();
   const [name, setName] = useState('');
+  const [makeNextShop, setMakeNextShop] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ListFilter>('all');
@@ -124,7 +125,7 @@ export function ShoppingListsOverview({
       const response = await fetch('/api/v1/shopping-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ kind: 'manual', name, makeAutomaticRestockTarget: makeNextShop }),
       });
       const body = (await response.json().catch(() => null)) as { list?: { id: string } } | null;
       if (!response.ok || !body?.list) {
@@ -142,7 +143,7 @@ export function ShoppingListsOverview({
 
   async function manage(
     listId: string,
-    action: 'rename' | 'archive' | 'restore' | 'duplicate',
+    action: 'rename' | 'archive' | 'restore' | 'duplicate' | 'set_restock_target' | 'complete',
     nextName?: string,
   ) {
     setBusy(listId);
@@ -163,7 +164,11 @@ export function ShoppingListsOverview({
             ? 'Shopping list archived.'
             : action === 'restore'
               ? 'Shopping list restored.'
-              : 'Shopping list renamed.',
+              : action === 'set_restock_target'
+                ? 'Next shop updated.'
+                : action === 'complete'
+                  ? 'Shopping trip completed.'
+                  : 'Shopping list renamed.',
         'success',
       );
       setEditingId(null);
@@ -240,6 +245,14 @@ export function ShoppingListsOverview({
               <button type="submit" aria-busy={busy === 'create'} disabled={busy === 'create'}>
                 {busy === 'create' ? 'Creating…' : 'Create list'}
               </button>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={makeNextShop}
+                  onChange={(event) => setMakeNextShop(event.target.checked)}
+                />{' '}
+                Make this the Next shop
+              </label>
             </form>
           </section>
 
@@ -313,6 +326,7 @@ export function ShoppingListsOverview({
                           </span>
                         </div>
                         <h3>{list.name}</h3>
+                        {list.isAutomaticRestockTarget ? <strong>Next shop</strong> : null}
                         <p>
                           <strong>{list.needsAttentionCount}</strong> to find
                           {list.inCartCount ? ` · ${list.inCartCount} in cart` : ''}
@@ -377,6 +391,23 @@ export function ShoppingListsOverview({
                           >
                             Duplicate
                           </button>
+                          {!list.isAutomaticRestockTarget && !list.archivedAt ? (
+                            <button
+                              type="button"
+                              disabled={busy === list.id}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    'Make this the Next shop? Untouched recurring amounts will move from the current target.',
+                                  )
+                                ) {
+                                  void manage(list.id, 'set_restock_target');
+                                }
+                              }}
+                            >
+                              Make Next shop
+                            </button>
+                          ) : null}
                           <details>
                             <summary aria-label={`More actions for ${list.name}`}>
                               <MoreHorizontal size={20} aria-hidden="true" />
@@ -393,6 +424,15 @@ export function ShoppingListsOverview({
                                 <Archive size={15} aria-hidden="true" />
                                 {list.archivedAt ? 'Restore' : 'Archive'}
                               </button>
+                              {list.isAutomaticRestockTarget ? (
+                                <button
+                                  type="button"
+                                  disabled={busy === list.id}
+                                  onClick={() => void manage(list.id, 'complete')}
+                                >
+                                  <CheckCircle2 size={15} aria-hidden="true" /> Complete trip
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 aria-busy={busy === list.id}

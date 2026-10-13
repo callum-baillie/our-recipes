@@ -77,6 +77,34 @@ describe('profile authentication enrollment', () => {
     ).resolves.toEqual({ ok: true });
   });
 
+  it('marks a new account verified only when email verification is disabled', async () => {
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'false');
+    await expect(
+      prepareProfileEnrollment(
+        'Maya',
+        {
+          email: 'maya@example.com',
+          passphrase: 'a long household passphrase',
+          pin: '739204',
+        },
+        'admin',
+      ),
+    ).resolves.toMatchObject({ user: { emailVerified: true } });
+
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'true');
+    await expect(
+      prepareProfileEnrollment(
+        'Avery',
+        {
+          email: 'avery@example.com',
+          passphrase: 'another long household passphrase',
+          pin: '628419',
+        },
+        'parent',
+      ),
+    ).resolves.toMatchObject({ user: { emailVerified: false } });
+  });
+
   it('locks repeated PIN failures for the target profile and session', async () => {
     const enrollment = await prepareProfileEnrollment(
       'Maya',

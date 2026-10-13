@@ -9,6 +9,7 @@ import {
   getPantryBatch,
   updatePantryBatch,
 } from '@/lib/services/pantry-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 import { pantryServiceError } from '../../_shared';
 
@@ -36,13 +37,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ batch
   if (!parsed.success)
     return jsonError(400, 'invalid_pantry_batch', 'Check the Pantry item details and try again.');
   try {
+    const batch = updatePantryBatch(
+      (await context.params).batchId,
+      parsed.data,
+      authorization.principal.profileId,
+    );
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return withApiRequestId(
       NextResponse.json({
-        batch: updatePantryBatch(
-          (await context.params).batchId,
-          parsed.data,
-          authorization.principal.profileId,
-        ),
+        batch,
       }),
       authorization.requestId,
     );
@@ -82,6 +85,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ batc
       parsed.data,
       authorization.principal.profileId,
     );
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return withApiRequestId(NextResponse.json({ batch }), authorization.requestId);
   } catch (error) {
     const response = pantryServiceError(error);

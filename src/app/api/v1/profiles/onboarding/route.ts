@@ -44,7 +44,8 @@ export async function POST(request: Request) {
       parsed.data.role,
     );
     const result = onboardProfileWithEnrollment(parsed.data, enrollment);
-    if (getRuntimeConfig().isProduction) {
+    const requireEmailVerification = getRuntimeConfig().auth.requireEmailVerification;
+    if (requireEmailVerification) {
       void auth.api
         .sendVerificationEmail({
           body: {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
         .catch((error) => console.error('Could not queue the verification email.', error));
     }
     return NextResponse.json(
-      { ...result, requiresEmailVerification: getRuntimeConfig().isProduction },
+      { ...result, requiresEmailVerification: requireEmailVerification },
       { status: 201 },
     );
   } catch (error) {

@@ -39,6 +39,7 @@ export class ListSettingsConflictError extends Error {}
 
 export type ListSettingsView = {
   defaultSupermarketProfileId: string | null;
+  automaticRestockListId: string | null;
   completedItemsBehavior: 'completed_section' | 'hide' | 'in_place';
   openPantryPurchaseOnCheck: boolean;
   keepScreenAwake: boolean;
@@ -63,6 +64,7 @@ export type ListSettingsWorkspace = {
 
 const DEFAULT_LIST_SETTINGS: ListSettingsView = {
   defaultSupermarketProfileId: null,
+  automaticRestockListId: null,
   completedItemsBehavior: 'completed_section',
   openPantryPurchaseOnCheck: true,
   keepScreenAwake: false,
@@ -101,6 +103,7 @@ function settingsView(
   if (!row) return DEFAULT_LIST_SETTINGS;
   return {
     defaultSupermarketProfileId: row.defaultSupermarketProfileId,
+    automaticRestockListId: row.automaticRestockListId,
     completedItemsBehavior: row.completedItemsBehavior,
     openPantryPurchaseOnCheck: row.openPantryPurchaseOnCheck,
     keepScreenAwake: row.keepScreenAwake,
@@ -201,6 +204,7 @@ function ensureSettingsRow(actorProfileId: string, executor: DatabaseExecutor) {
     .values({
       householdId: household.id,
       defaultSupermarketProfileId: null,
+      automaticRestockListId: null,
       completedItemsBehavior: DEFAULT_LIST_SETTINGS.completedItemsBehavior,
       openPantryPurchaseOnCheck: DEFAULT_LIST_SETTINGS.openPantryPurchaseOnCheck,
       keepScreenAwake: DEFAULT_LIST_SETTINGS.keepScreenAwake,
@@ -228,6 +232,11 @@ export function updateListSettings(
     const household = requireHousehold(transaction);
     ensureSettingsRow(actorProfileId, transaction);
     const defaultId = parsed.defaultSupermarketProfileId || null;
+    const settingsRow = ensureSettingsRow(actorProfileId, transaction);
+    const automaticRestockListId =
+      parsed.automaticRestockListId === undefined
+        ? settingsRow.automaticRestockListId
+        : parsed.automaticRestockListId || null;
     if (defaultId) {
       const selected = transaction
         .select()
@@ -242,10 +251,21 @@ export function updateListSettings(
       if (!selected || selected.archivedAt)
         throw new ListSettingsNotFoundError('Choose an active supermarket as the default.');
     }
+    if (automaticRestockListId) {
+      const selectedList = transaction
+        .select({ id: shoppingLists.id, archivedAt: shoppingLists.archivedAt })
+        .from(shoppingLists)
+        .where(eq(shoppingLists.id, automaticRestockListId))
+        .get();
+      if (!selectedList || selectedList.archivedAt) {
+        throw new ListSettingsNotFoundError('Choose an active shopping list as Next shop.');
+      }
+    }
     transaction
       .update(householdListSettings)
       .set({
         defaultSupermarketProfileId: defaultId,
+        automaticRestockListId,
         completedItemsBehavior: parsed.completedItemsBehavior,
         openPantryPurchaseOnCheck: parsed.openPantryPurchaseOnCheck,
         keepScreenAwake: parsed.keepScreenAwake,
@@ -253,6 +273,38 @@ export function updateListSettings(
         updatedAt: new Date(),
       })
       .where(eq(householdListSettings.householdId, household.id))
+      .run();
+  });
+  return getListSettingsWorkspace();
+}
+
+export function setAutomaticRestockList(
+  listId: string | null,
+  actorProfileId: string,
+): ListSettingsWorkspace {
+  ensureDatabase();
+  const database = getDatabase();
+  database.transaction((transaction) => {
+    requireActor(actorProfileId, transaction);
+    const settings = ensureSettingsRow(actorProfileId, transaction);
+    if (listId) {
+      const list = transaction
+        .select({ id: shoppingLists.id, archivedAt: shoppingLists.archivedAt })
+        .from(shoppingLists)
+        .where(eq(shoppingLists.id, listId))
+        .get();
+      if (!list || list.archivedAt) {
+        throw new ListSettingsNotFoundError('Choose an active shopping list as Next shop.');
+      }
+    }
+    transaction
+      .update(householdListSettings)
+      .set({
+        automaticRestockListId: listId,
+        updatedByProfileId: actorProfileId,
+        updatedAt: new Date(),
+      })
+      .where(eq(householdListSettings.householdId, settings.householdId))
       .run();
   });
   return getListSettingsWorkspace();

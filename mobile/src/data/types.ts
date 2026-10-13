@@ -62,6 +62,36 @@ export type PantryItem = {
   icon: string;
   version?: number;
 };
+export type PantryPolicy = {
+  id: string;
+  name: string;
+  mode: 'none' | 'always_have' | 'always_buy';
+  trigger: 'below_target' | 'reorder_point' | 'empty';
+  targetStock: number | null;
+  reorderThreshold: number | null;
+  preferredPurchaseQuantity: number | null;
+  stockUnit: string;
+  stock: number;
+  state: 'healthy' | 'due' | 'review';
+  needsSetup: boolean;
+};
+export type ShoppingPolicyBreakdown = {
+  mode: 'always_have' | 'always_buy';
+  trigger: 'below_target' | 'reorder_point' | 'empty';
+  recipeRequirement: number;
+  targetStock: number | null;
+  purchaseIncrement: number | null;
+  policyContribution: number | null;
+  usablePantry: number;
+  pendingCoverage: number;
+  recordedCoverage: number;
+  unroundedPurchaseGoal: number | null;
+  roundedPurchaseGoal: number | null;
+  finalBuyQuantity: number | null;
+  unit: string;
+  needsReview: boolean;
+  reviewReason: string | null;
+};
 export type MealPlanItem = {
   id: string;
   day: number;
@@ -84,6 +114,7 @@ export type ShoppingItem = {
   note?: string;
   aisleId?: string | null;
   shoppingState?: 'to_buy' | 'in_cart' | 'cant_find' | 'sourced';
+  policyBreakdown?: ShoppingPolicyBreakdown | null;
 };
 export type ShoppingList = {
   id: string;
@@ -91,6 +122,14 @@ export type ShoppingList = {
   status: 'active' | 'planned' | 'completed';
   supermarket?: { id?: string; name: string; locationLabel?: string } | null;
   items: ShoppingItem[];
+  isNextShop?: boolean;
+  policyReviews?: {
+    productId: string;
+    productName: string;
+    shoppingListItemId: string | null;
+    state: 'active' | 'needs_review' | 'satisfied' | 'dismissed' | 'moved';
+    reviewReason: string | null;
+  }[];
 };
 export type Settings = Record<string, boolean | string | number>;
 

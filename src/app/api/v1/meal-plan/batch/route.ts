@@ -6,6 +6,7 @@ import { mealPlanBatchSchema } from '@/lib/domain/planning';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import { addMealPlanEntriesWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
 import { PlanningNotFoundError } from '@/lib/services/planning-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,10 +28,9 @@ export async function POST(request: Request) {
     return jsonError(400, 'invalid_planned_meals', 'Check the meal plan details and try again.');
   }
   try {
-    return NextResponse.json(
-      { meals: addMealPlanEntriesWithNutrition(parsed.data, actor.profileId) },
-      { status: 201 },
-    );
+    const meals = addMealPlanEntriesWithNutrition(parsed.data, actor.profileId);
+    reconcileAutomaticRestockPolicies(actor.profileId);
+    return NextResponse.json({ meals }, { status: 201 });
   } catch (error) {
     if (error instanceof PlanningNotFoundError) {
       return jsonError(404, 'recipe_not_found', error.message);

@@ -148,7 +148,7 @@ export async function prepareProfileEnrollment(
       id: userId,
       name: displayName.trim(),
       email: normalizeEmail(credentials.email),
-      emailVerified: !getRuntimeConfig().isProduction,
+      emailVerified: !getRuntimeConfig().auth.requireEmailVerification,
       image: null,
       role,
       banned: false,

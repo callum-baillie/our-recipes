@@ -5,6 +5,7 @@ import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-ide
 import { pantryProductInputSchema } from '@/lib/domain/pantry';
 import { jsonError } from '@/lib/http';
 import { createPantryProduct, listPantryProducts } from '@/lib/services/pantry-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 import { pantryServiceError } from '../_shared';
 
@@ -44,10 +45,12 @@ export async function POST(request: Request) {
       'Check the product name, units, and stock targets.',
     );
   try {
+    const product = createPantryProduct(parsed.data, authorization.principal.profileId);
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return idempotentJsonResponse(
       idempotency.context,
       {
-        product: createPantryProduct(parsed.data, authorization.principal.profileId),
+        product,
       },
       authorization.requestId,
       201,

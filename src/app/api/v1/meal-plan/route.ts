@@ -6,6 +6,7 @@ import { isoDateSchema, mealPlanEntrySchema } from '@/lib/domain/planning';
 import { jsonError } from '@/lib/http';
 import { listPlannedMeals, PlanningNotFoundError } from '@/lib/services/planning-service';
 import { addMealPlanEntryWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,12 +44,9 @@ export async function POST(request: Request) {
   if (!parsed.success)
     return jsonError(400, 'invalid_planned_meal', 'Check the planned meal details.');
   try {
-    return idempotentJsonResponse(
-      idempotency.context,
-      { meal: addMealPlanEntryWithNutrition(parsed.data, authorization.principal.profileId) },
-      authorization.requestId,
-      201,
-    );
+    const meal = addMealPlanEntryWithNutrition(parsed.data, authorization.principal.profileId);
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
+    return idempotentJsonResponse(idempotency.context, { meal }, authorization.requestId, 201);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
       return jsonError(404, 'recipe_not_found', error.message);

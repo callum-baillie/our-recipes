@@ -56,6 +56,8 @@ type Product = {
   preferredPurchaseQuantity: number | null;
   stockUnit: string;
   suggestGroceryRestock: boolean;
+  restockMode: 'none' | 'always_have' | 'always_buy';
+  restockTrigger: 'below_target' | 'reorder_point' | 'empty';
   archivedAt: string | null;
 };
 
@@ -162,6 +164,7 @@ const units = [
 ];
 const views = [
   ['all', 'All'],
+  ['essentials', 'Essentials'],
   ['pantry', 'Pantry'],
   ['refrigerator', 'Refrigerator'],
   ['freezer', 'Freezer'],
@@ -295,6 +298,8 @@ function jsonList(value: string): string[] {
 }
 
 function ProductEditFields({ product }: { product: Product }) {
+  const [restockMode, setRestockMode] = useState(product.restockMode ?? 'none');
+  const [restockTrigger, setRestockTrigger] = useState(product.restockTrigger ?? 'below_target');
   return (
     <>
       <div className={styles.formRow}>
@@ -386,51 +391,150 @@ function ProductEditFields({ product }: { product: Product }) {
           <span>Preferred store</span>
           <input name="preferredStore" defaultValue={product.preferredStore} />
         </label>
-        <label>
-          <span>Minimum stock</span>
-          <input
-            name="minimumStock"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={product.minimumStock ?? ''}
-          />
-        </label>
-        <label>
-          <span>Target stock</span>
-          <input
-            name="targetStock"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={product.targetStock ?? ''}
-          />
-        </label>
-        <label>
-          <span>Reorder threshold</span>
-          <input
-            name="reorderThreshold"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={product.reorderThreshold ?? ''}
-          />
-        </label>
-        <label>
-          <span>Purchase quantity</span>
-          <input
-            name="preferredPurchaseQuantity"
-            type="number"
-            min="0.000001"
-            step="any"
-            defaultValue={product.preferredPurchaseQuantity ?? ''}
-          />
-        </label>
-        <label>
-          <span>Stock unit</span>
-          <input name="stockUnit" defaultValue={product.stockUnit} />
-        </label>
       </div>
+      <fieldset>
+        <legend>Shopping policy</legend>
+        <p className={styles.muted}>
+          Maintain an essential reserve, or buy a baseline amount on every Next shop.
+        </p>
+        <div className={styles.formRow}>
+          <label>
+            <span>Policy</span>
+            <select
+              name="restockMode"
+              value={restockMode}
+              onChange={(event) => setRestockMode(event.target.value as Product['restockMode'])}
+            >
+              <option value="none">Off</option>
+              <option value="always_have">Always have</option>
+              <option value="always_buy">Always buy</option>
+            </select>
+          </label>
+          {restockMode !== 'none' ? (
+            <label>
+              <span>Comparison and purchase unit</span>
+              <select
+                name="stockUnit"
+                defaultValue={product.stockUnit || product.defaultInventoryUnit}
+              >
+                {units.map((unit) => (
+                  <option key={unit}>{unit}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <input name="stockUnit" type="hidden" defaultValue={product.stockUnit} />
+          )}
+          {restockMode === 'always_have' ? (
+            <>
+              <label>
+                <span>Keep after planned meals</span>
+                <input
+                  name="targetStock"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue={product.targetStock ?? ''}
+                  required
+                />
+              </label>
+              <label>
+                <span>Reorder when</span>
+                <select
+                  name="restockTrigger"
+                  value={restockTrigger}
+                  onChange={(event) =>
+                    setRestockTrigger(event.target.value as Product['restockTrigger'])
+                  }
+                >
+                  <option value="below_target">Below target</option>
+                  <option value="reorder_point">At reorder point</option>
+                  <option value="empty">Empty</option>
+                </select>
+              </label>
+              {restockTrigger === 'reorder_point' ? (
+                <label>
+                  <span>Reorder point</span>
+                  <input
+                    name="reorderThreshold"
+                    type="number"
+                    min="0"
+                    step="any"
+                    defaultValue={product.reorderThreshold ?? ''}
+                    required
+                  />
+                </label>
+              ) : (
+                <input
+                  name="reorderThreshold"
+                  type="hidden"
+                  defaultValue={product.reorderThreshold ?? ''}
+                />
+              )}
+              <label>
+                <span>Buy in increments (optional)</span>
+                <input
+                  name="preferredPurchaseQuantity"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue={product.preferredPurchaseQuantity ?? ''}
+                />
+              </label>
+            </>
+          ) : null}
+          {restockMode === 'always_buy' ? (
+            <>
+              <input name="restockTrigger" type="hidden" value="below_target" />
+              <input name="targetStock" type="hidden" defaultValue={product.targetStock ?? ''} />
+              <input
+                name="reorderThreshold"
+                type="hidden"
+                defaultValue={product.reorderThreshold ?? ''}
+              />
+              <label>
+                <span>Amount per Next shop</span>
+                <input
+                  name="preferredPurchaseQuantity"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue={product.preferredPurchaseQuantity ?? ''}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {restockMode === 'none' ? (
+            <>
+              <input name="restockTrigger" type="hidden" defaultValue={product.restockTrigger} />
+              <input name="targetStock" type="hidden" defaultValue={product.targetStock ?? ''} />
+              <input
+                name="reorderThreshold"
+                type="hidden"
+                defaultValue={product.reorderThreshold ?? ''}
+              />
+              <input
+                name="preferredPurchaseQuantity"
+                type="hidden"
+                defaultValue={product.preferredPurchaseQuantity ?? ''}
+              />
+            </>
+          ) : null}
+        </div>
+        {restockMode === 'always_have' ? (
+          <p className={styles.muted}>
+            Keep {product.targetStock ?? 'the target'}{' '}
+            {product.stockUnit || product.defaultInventoryUnit} after planned meals; reorder{' '}
+            {restockTrigger.replaceAll('_', ' ')}.
+          </p>
+        ) : restockMode === 'always_buy' ? (
+          <p className={styles.muted}>
+            Buy at least {product.preferredPurchaseQuantity ?? 'the configured amount'}{' '}
+            {product.stockUnit || product.defaultInventoryUnit} on every Next shop.
+          </p>
+        ) : null}
+      </fieldset>
       <label>
         <span>Storage instructions</span>
         <textarea name="storageInstructions" defaultValue={product.storageInstructions} rows={2} />
@@ -438,14 +542,8 @@ function ProductEditFields({ product }: { product: Product }) {
       <label className={styles.checkbox}>
         <input name="isStaple" type="checkbox" defaultChecked={product.isStaple} /> Staple product
       </label>
-      <label className={styles.checkbox}>
-        <input
-          name="suggestGroceryRestock"
-          type="checkbox"
-          defaultChecked={product.suggestGroceryRestock}
-        />{' '}
-        Suggest grocery restock
-      </label>
+      <input name="minimumStock" type="hidden" defaultValue={product.minimumStock ?? ''} />
+      <input name="suggestGroceryRestock" type="hidden" value="off" />
       <label className={styles.checkbox}>
         <input name="archived" type="checkbox" defaultChecked={Boolean(product.archivedAt)} />{' '}
         Archive product
@@ -713,7 +811,7 @@ export function PantryManager({
     const requestId = ++loadRequestRef.current;
     const query = new URLSearchParams({
       q,
-      view,
+      view: view === 'essentials' ? 'all' : view,
       sort,
       includeInactive: String(includeInactive),
     });
@@ -773,6 +871,14 @@ export function PantryManager({
     }
     return [...groups.entries()];
   }, [dashboard, group]);
+  const essentialProducts = useMemo(
+    () =>
+      (dashboard?.products ?? []).filter(
+        (product) =>
+          product.restockMode !== 'none' || (product.isStaple && product.suggestGroceryRestock),
+      ),
+    [dashboard],
+  );
   const useFirstIds = useMemo(() => {
     const byProduct = new Map<string, Batch[]>();
     for (const batch of dashboard?.batches ?? [])
@@ -936,6 +1042,8 @@ export function PantryManager({
       reorderThreshold: nullableNumber(formData.get('reorderThreshold')),
       preferredPurchaseQuantity: nullableNumber(formData.get('preferredPurchaseQuantity')),
       stockUnit: formData.get('stockUnit'),
+      restockMode: formData.get('restockMode'),
+      restockTrigger: formData.get('restockTrigger'),
       suggestGroceryRestock: formData.get('suggestGroceryRestock') === 'on',
       archived: formData.get('archived') === 'on',
       productId: product.id,
@@ -997,6 +1105,8 @@ export function PantryManager({
             defaultStorageType: formData.get('storageType'),
             aliases: [],
             isStaple: formData.get('isStaple') === 'on',
+            restockMode: 'none',
+            restockTrigger: 'below_target',
           }),
         });
         if (!productResponse.ok) {
@@ -1818,11 +1928,107 @@ export function PantryManager({
         <section aria-labelledby="stock-title">
           <div className={styles.sectionHeading}>
             <div>
-              <p className={styles.eyebrow}>ON HAND</p>
-              <h2 id="stock-title">{dashboard.batches.length} batches</h2>
+              <p className={styles.eyebrow}>
+                {view === 'essentials' ? 'SHOPPING POLICIES' : 'ON HAND'}
+              </p>
+              <h2 id="stock-title">
+                {view === 'essentials'
+                  ? `${essentialProducts.length} essentials`
+                  : `${dashboard.batches.length} batches`}
+              </h2>
             </div>
           </div>
-          {dashboard.batches.length ? (
+          {view === 'essentials' ? (
+            essentialProducts.length ? (
+              <div className={styles.grid}>
+                {essentialProducts.map((product) => {
+                  const needsSetup = product.restockMode === 'none';
+                  const relevant = dashboard.batches.filter(
+                    (batch) =>
+                      batch.productId === product.id &&
+                      !batch.excludeFromGrocery &&
+                      !['depleted', 'discarded', 'donated'].includes(batch.status),
+                  );
+                  const uncertain = relevant.some(
+                    (batch) =>
+                      batch.quantityRemaining === null ||
+                      batch.approximateState !== null ||
+                      batch.unit !== product.stockUnit,
+                  );
+                  const stock = relevant.reduce(
+                    (total, batch) =>
+                      batch.quantityRemaining !== null && batch.unit === product.stockUnit
+                        ? total + batch.quantityRemaining
+                        : total,
+                    0,
+                  );
+                  const due =
+                    needsSetup ||
+                    product.restockMode === 'always_buy' ||
+                    (product.restockTrigger === 'empty'
+                      ? stock <= 0
+                      : product.restockTrigger === 'reorder_point'
+                        ? stock <= (product.reorderThreshold ?? 0)
+                        : stock < (product.targetStock ?? 0));
+                  return (
+                    <article className={styles.card} key={product.id}>
+                      <div className={styles.rowMain}>
+                        <div className={styles.productCell}>
+                          <span className={styles.productIcon} aria-hidden="true">
+                            <Package size={18} />
+                          </span>
+                          <div>
+                            <h3>{product.displayName}</h3>
+                            <p className={styles.productMeta}>
+                              {needsSetup
+                                ? 'Legacy restock · needs setup'
+                                : product.restockMode === 'always_have'
+                                  ? 'Always have'
+                                  : 'Always buy'}
+                            </p>
+                          </div>
+                        </div>
+                        <p className={styles.quantity}>
+                          {stock} {product.stockUnit}
+                        </p>
+                        <span className={styles.statusChip}>
+                          {needsSetup
+                            ? 'Needs setup'
+                            : uncertain
+                              ? 'Review'
+                              : due
+                                ? 'Due'
+                                : 'Healthy'}
+                        </span>
+                      </div>
+                      <p className={styles.muted}>
+                        {needsSetup
+                          ? 'This legacy restock preference is incomplete. Choose Always have or Always buy to activate it.'
+                          : product.restockMode === 'always_have'
+                            ? `Keep ${product.targetStock} ${product.stockUnit} after planned meals; reorder ${product.restockTrigger.replaceAll('_', ' ')}${product.preferredPurchaseQuantity ? `; buy in ${product.preferredPurchaseQuantity} ${product.stockUnit} increments` : ''}.`
+                            : `Buy at least ${product.preferredPurchaseQuantity} ${product.stockUnit} on every Next shop; recipe demand is included, not duplicated.`}
+                      </p>
+                      <details>
+                        <summary>Quick edit</summary>
+                        <form
+                          action={(formData) => editProduct(product, formData)}
+                          className={styles.form}
+                        >
+                          <ProductEditFields product={product} />
+                          <button disabled={busy || !canEdit}>Save policy</button>
+                        </form>
+                      </details>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.empty}>
+                <h2>No essentials yet</h2>
+                <p>Open Manage products and choose Always have or Always buy.</p>
+              </div>
+            )
+          ) : dashboard.batches.length ? (
             <div className={styles.groups}>
               {groupedBatches.map(([groupLabel, batches]) => (
                 <section className={styles.batchGroup} key={groupLabel}>

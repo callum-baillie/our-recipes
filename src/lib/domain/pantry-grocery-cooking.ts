@@ -44,7 +44,16 @@ export const pantryPurchaseIntakeSchema = z
 
 export const pantryShoppingControlSchema = z
   .object({
-    action: z.enum(['covered', 'ignore', 'inaccurate', 'reset', 'extra']),
+    action: z.enum([
+      'covered',
+      'ignore',
+      'inaccurate',
+      'reset',
+      'extra',
+      'skip_policy',
+      'restore_policy',
+      'assume_empty_for_trip',
+    ]),
     quantity: z.coerce.number().min(0).max(1_000_000).optional(),
     unit: z.string().trim().max(30).default(''),
     note: z.string().trim().max(500).default(''),

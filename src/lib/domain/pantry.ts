@@ -37,6 +37,9 @@ export const pantryBatchStatusSchema = z.enum([
   'donated',
 ]);
 
+export const pantryRestockModeSchema = z.enum(['none', 'always_have', 'always_buy']);
+export const pantryRestockTriggerSchema = z.enum(['below_target', 'reorder_point', 'empty']);
+
 export const pantryProductInputSchema = z
   .object({
     displayName: requiredText(160),
@@ -67,6 +70,8 @@ export const pantryProductInputSchema = z
     preferredPurchaseQuantity: optionalPositive.default(null),
     stockUnit: boundedText(30).default(''),
     suggestGroceryRestock: z.boolean().default(false),
+    restockMode: pantryRestockModeSchema.optional(),
+    restockTrigger: pantryRestockTriggerSchema.optional(),
     archived: z.boolean().default(false),
   })
   .strict()
@@ -80,6 +85,53 @@ export const pantryProductInputSchema = z
         code: 'custom',
         path: ['targetStock'],
         message: 'Target stock must be at least the minimum stock.',
+      });
+    }
+    const legacyAlwaysHave =
+      value.restockMode === undefined &&
+      value.isStaple &&
+      value.suggestGroceryRestock &&
+      value.targetStock !== null &&
+      value.targetStock > 0 &&
+      value.reorderThreshold !== null &&
+      Boolean(value.stockUnit);
+    const mode = value.restockMode ?? (legacyAlwaysHave ? 'always_have' : 'none');
+    const trigger = value.restockTrigger ?? (legacyAlwaysHave ? 'reorder_point' : 'below_target');
+    if (mode !== 'none' && !value.stockUnit) {
+      context.addIssue({
+        code: 'custom',
+        path: ['stockUnit'],
+        message: 'Choose a stock unit for an automatic shopping policy.',
+      });
+    }
+    if (mode === 'always_have' && !(value.targetStock && value.targetStock > 0)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targetStock'],
+        message: 'Always have needs a target stock greater than zero.',
+      });
+    }
+    if (
+      mode === 'always_have' &&
+      trigger === 'reorder_point' &&
+      (value.reorderThreshold === null ||
+        value.reorderThreshold < 0 ||
+        (value.targetStock !== null && value.reorderThreshold >= value.targetStock))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['reorderThreshold'],
+        message: 'Reorder point must be at least zero and lower than target stock.',
+      });
+    }
+    if (
+      mode === 'always_buy' &&
+      !(value.preferredPurchaseQuantity && value.preferredPurchaseQuantity > 0)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['preferredPurchaseQuantity'],
+        message: 'Always buy needs a positive amount for each shopping trip.',
       });
     }
   });

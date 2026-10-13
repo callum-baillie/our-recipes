@@ -8,6 +8,7 @@ import {
   getPantryProduct,
   updatePantryProduct,
 } from '@/lib/services/pantry-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 import { pantryServiceError } from '../../_shared';
 
@@ -39,13 +40,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ produ
       'Check the product name, units, and stock targets.',
     );
   try {
+    const product = updatePantryProduct(
+      (await context.params).productId,
+      parsed.data,
+      authorization.principal.profileId,
+    );
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return withApiRequestId(
       NextResponse.json({
-        product: updatePantryProduct(
-          (await context.params).productId,
-          parsed.data,
-          authorization.principal.profileId,
-        ),
+        product,
       }),
       authorization.requestId,
     );
@@ -73,6 +76,7 @@ export async function DELETE(
       (await context.params).productId,
       authorization.principal.profileId,
     );
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return withApiRequestId(NextResponse.json({ product }), authorization.requestId);
   } catch (error) {
     const response = pantryServiceError(error);

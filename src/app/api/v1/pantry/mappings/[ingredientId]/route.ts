@@ -7,6 +7,7 @@ import {
   removeRecipeIngredientPantryMapping,
   setRecipeIngredientPantryMapping,
 } from '@/lib/services/pantry-availability-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 import { rejectUntrustedPantryMutation, requirePantryActor } from '../../_shared';
 
@@ -24,12 +25,14 @@ export async function PUT(
   if (!parsed.success)
     return jsonError(400, 'invalid_pantry_mapping', 'Choose a valid Pantry product mapping.');
   try {
+    const mapping = setRecipeIngredientPantryMapping(
+      (await context.params).ingredientId,
+      parsed.data,
+      actor.profileId,
+    );
+    reconcileAutomaticRestockPolicies(actor.profileId);
     return NextResponse.json({
-      mapping: setRecipeIngredientPantryMapping(
-        (await context.params).ingredientId,
-        parsed.data,
-        actor.profileId,
-      ),
+      mapping,
     });
   } catch (error) {
     if (error instanceof PantryAvailabilityNotFoundError)
@@ -48,6 +51,7 @@ export async function DELETE(
   if (actor.response) return actor.response;
   try {
     removeRecipeIngredientPantryMapping((await context.params).ingredientId);
+    reconcileAutomaticRestockPolicies(actor.profileId);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     if (error instanceof PantryAvailabilityNotFoundError)
