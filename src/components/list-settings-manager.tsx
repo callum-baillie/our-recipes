@@ -312,9 +312,11 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
               run(
                 () =>
                   requestWorkspace('/api/v1/settings/lists', 'PATCH', {
-                    ...workspace.settings,
                     defaultSupermarketProfileId:
                       workspace.settings.defaultSupermarketProfileId ?? '',
+                    completedItemsBehavior: workspace.settings.completedItemsBehavior,
+                    openPantryPurchaseOnCheck: workspace.settings.openPantryPurchaseOnCheck,
+                    keepScreenAwake: workspace.settings.keepScreenAwake,
                   }),
                 'List preferences saved.',
               )
