@@ -42,7 +42,8 @@ test('onboarding calculates a gradual target timeline only from entered measurem
   await page.getByLabel('When were you born?').fill('1990-01-01');
   await page.getByRole('button', { name: 'Female reference', exact: true }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'lb', exact: true }).click();
+  await page.getByRole('button', { name: 'Pounds', exact: true }).click();
+  await page.getByRole('button', { name: 'Feet & inches', exact: true }).click();
   await page.getByLabel('Feet', { exact: true }).fill('5');
   await page.getByLabel('Inches', { exact: true }).fill('8');
   await page.getByLabel('Current weight').fill('200');
@@ -111,8 +112,9 @@ test('a fresh household can complete the supported local release acceptance work
   expect(JSON.stringify(aiStatusBody)).not.toMatch(/sk-(?:proj-)?/u);
   expect(
     (
-      await page.request.get('/api/v1/exports/recipes', {
+      await page.request.post('/api/v1/recipes', {
         headers: { Origin: 'https://untrusted.example.test' },
+        data: {},
       })
     ).status(),
   ).toBe(403);
@@ -123,6 +125,7 @@ test('a fresh household can complete the supported local release acceptance work
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save AI settings' })).toBeVisible();
   await page.goto('/settings/lists');
+  await page.getByRole('button', { name: /Add supermarket.*Start with a useful route/u }).click();
   await page.getByLabel('Store name').fill('Garden Market');
   await page.getByLabel('Section 1 name').fill('Produce');
   await page.getByLabel('Section 1 keywords').fill('lemons, fruit, vegetables, herbs');
@@ -162,7 +165,7 @@ test('a fresh household can complete the supported local release acceptance work
   await jonProfile.getByRole('button', { name: 'Restore' }).click();
   await expect(jonProfile.getByText('Archived', { exact: true })).not.toBeVisible();
   await page.goto('/tags');
-  await expect(page.getByRole('heading', { name: 'Tags with a little order.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tags', exact: true })).toBeVisible();
   await page.getByLabel('Tag name').fill('freezer-friendly');
   await page.getByRole('button', { name: 'Add tag' }).click();
   await expect(page.getByText('freezer-friendly', { exact: true })).toBeVisible();
@@ -555,9 +558,7 @@ test('a fresh household can complete the supported local release acceptance work
     'bord-portable-recipes.tar.gz',
   );
   await page.goto('/collections');
-  await expect(
-    page.getByRole('heading', { name: 'A shelf for the recipes that belong together.' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Collections', exact: true })).toBeVisible();
   await page.getByLabel('Collection name').fill('Weeknight keepers');
   await page.getByRole('button', { name: 'Create collection' }).click();
   await page.getByRole('link', { name: 'Open collection' }).click();
@@ -679,12 +680,14 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Finish cooking' }).click();
   await page.getByRole('link', { name: '← Recipe card' }).click();
   await page.goto('/planner');
+  await page.getByRole('button', { name: 'Plan settings', exact: true }).click();
   await page.locator('button[aria-controls="planner-date-range-picker"]').click();
   const weekStart = await page.getByLabel('Start date').inputValue();
   const weekEndDate = new Date(`${weekStart}T12:00:00Z`);
   weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
   const weekEnd = weekEndDate.toISOString().slice(0, 10);
   await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Close plan settings' }).click();
   await page.locator(`[data-planner-slot="${weekStart}:dinner"]`).click();
   const recipeSelector = page.getByRole('dialog', { name: 'Select recipes' });
   await expect(recipeSelector).toBeVisible();
