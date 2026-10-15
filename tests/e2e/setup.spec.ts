@@ -161,9 +161,9 @@ test('a fresh household can complete the supported local release acceptance work
     has: page.getByRole('heading', { name: 'Jon', exact: true }),
   });
   await jonProfile.getByRole('button', { name: 'Archive' }).click();
-  await expect(jonProfile.getByText('Archived', { exact: true })).toBeVisible();
+  await expect(jonProfile.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
   await jonProfile.getByRole('button', { name: 'Restore' }).click();
-  await expect(jonProfile.getByText('Archived', { exact: true })).not.toBeVisible();
+  await expect(jonProfile.getByRole('button', { name: 'Archive', exact: true })).toBeVisible();
   await page.goto('/tags');
   await expect(page.getByRole('heading', { name: 'Tags', exact: true })).toBeVisible();
   await page.getByLabel('Tag name').fill('freezer-friendly');
@@ -571,9 +571,7 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('link', { name: 'Lemon pasta' })).toBeVisible();
   await page.getByLabel('A small note (optional)').fill('A shelf for busy evenings.');
   await page.getByRole('button', { name: 'Save collection' }).click();
-  await expect(
-    page.locator('p').filter({ hasText: /^A shelf for busy evenings\.$/u }),
-  ).toBeVisible();
+  await expect(page.getByText('A shelf for busy evenings.', { exact: true })).toBeVisible();
   await page.goto(recipeUrl);
   const tinyRecipePhoto = await sharp({
     create: { width: 2, height: 2, channels: 3, background: '#9f482f' },
@@ -725,8 +723,8 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(
     page.getByRole('heading', { name: /^Meal Plan \d{2}\/\d{2} - \d{2}\/\d{2}$/u }),
   ).toBeVisible();
-  await page.getByLabel('New shopping item').fill('lemons');
-  await page.getByRole('button', { name: 'Add item' }).click();
+  await page.getByLabel('New shopping item', { exact: true }).fill('lemons');
+  await page.getByRole('button', { name: 'Add item', exact: true }).click();
   await expect(page.getByRole('article').filter({ hasText: 'lemons' })).toBeVisible();
 
   const manifestResponse = await page.request.get('/manifest.webmanifest');

@@ -2060,6 +2060,7 @@ export function MealPlanner({
           </section>{' '}
           <section className={styles.assistanceSection} aria-label="Meal suggestions">
             <DecisionAssistance
+              headingLevel={3}
               embedded
               initialTask="meal_rank"
               tasks={['meal_rank']}

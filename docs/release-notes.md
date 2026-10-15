@@ -7,6 +7,7 @@
 - Added contextual AI reviews with evidence, cached decisions, retained corrections and reviewed chat actions.
 - Unified page headers, widened laptop layouts and reorganized the full-width planner and sidebar.
 - Replaced household profile PINs with account password confirmation and expanded core API access.
+- Fixed shopping-preference saves when the automatic restock target is unset, dark-mode control contrast, and contextual review heading order.
 - Includes database migrations through `0061_decision_assistance`.
 
 ## 1.0.0-rc.2

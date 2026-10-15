@@ -29,14 +29,17 @@ export function SuggestionCard({
   onChange,
   onApplied,
   disabled = false,
+  headingLevel = 3,
   onChoose,
 }: {
   onChoose?: (card: DecisionCard, choice: string) => void;
+  headingLevel?: 3 | 4;
   disabled?: boolean;
   onApplied?: () => void;
   card: DecisionCard;
   onChange: (id: string, patch: Partial<DecisionCard>) => void;
 }) {
+  const CardHeading = headingLevel === 4 ? 'h4' : 'h3';
   const [choice, setChoice] = useState(card.choice);
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
@@ -92,7 +95,7 @@ export function SuggestionCard({
         </span>
         {card.cached && <small>Reused saved result</small>}
       </div>
-      <h3>{card.title}</h3>
+      <CardHeading>{card.title}</CardHeading>
       <p>{card.reason}</p>
       {card.evidenceChanged && (
         <p className={styles.notice}>
@@ -202,6 +205,7 @@ type AssistanceProps = {
   inputQuery?: string;
   onChoose?: (card: DecisionCard, choice: string) => void;
   embedded?: boolean;
+  headingLevel?: 2 | 3;
   onApplied?: () => void;
 };
 export function DecisionAssistance({
@@ -215,8 +219,10 @@ export function DecisionAssistance({
   inputQuery,
   onChoose,
   embedded = false,
+  headingLevel = 2,
   onApplied,
 }: AssistanceProps) {
+  const ContextHeading = headingLevel === 3 ? 'h3' : 'h2';
   const router = useRouter();
   const [expanded, setExpanded] = useState(!embedded);
   const [selected, setSelected] = useState<string[]>([]);
@@ -355,7 +361,7 @@ export function DecisionAssistance({
         <div className={styles.contextHeader}>
           <div>
             <span className={styles.badge}>ASSISTED REVIEW</span>
-            <h3>{title ?? DECISION_TASKS[initialTask].label}</h3>
+            <ContextHeading>{title ?? DECISION_TASKS[initialTask].label}</ContextHeading>
             <p>{description ?? DECISION_TASKS[initialTask].help}</p>
           </div>
           <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
@@ -560,6 +566,7 @@ export function DecisionAssistance({
               </button>
             </div>
           )}
+          {!embedded && cards.length > 0 && <h2>Review outcomes</h2>}
           <div className={styles.cards}>
             {cards
               .filter((card) => showDismissed || card.status !== 'dismissed')
@@ -585,6 +592,7 @@ export function DecisionAssistance({
                       </label>
                     )}
                   <SuggestionCard
+                    headingLevel={embedded && headingLevel === 3 ? 4 : 3}
                     disabled={pending}
                     onApplied={applied}
                     onChoose={onChoose}

@@ -9991,12 +9991,12 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   font-weight: 600;
   text-decoration: none;
   color: var(--ink);
-  background: var(--surface, #fffefb);
+  background: var(--field);
 }
 .kitchen-quick-views a[aria-current='page'] {
-  background: var(--leaf);
+  background: var(--leaf-pale);
   border-color: var(--leaf);
-  color: white;
+  color: var(--ink);
 }
 .kitchen-quick-views a:hover {
   border-color: var(--leaf);

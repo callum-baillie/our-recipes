@@ -1420,6 +1420,7 @@ export function PantryManager({
                     </div>
                     {manualProductName.trim().length > 1 && (
                       <DecisionAssistance
+                        headingLevel={3}
                         embedded
                         inputQuery={manualProductName}
                         onChoose={(_card, choice) => {
@@ -1974,6 +1975,7 @@ export function PantryManager({
             </div>
           </div>
           <DecisionAssistance
+            headingLevel={3}
             embedded
             key={view === 'essentials' ? 'restock' : 'stock'}
             initialTask={view === 'essentials' ? 'restock' : 'pantry_review'}

@@ -4457,12 +4457,12 @@ input:checked ~ .checkMark {
   cursor: pointer;
 }
 .addMealsButton {
-  background: var(--leaf);
+  background: var(--leaf-pale);
   border-color: var(--leaf);
-  color: white;
+  color: var(--ink);
 }
 .planOptionsButton {
-  background: var(--surface, #fffefb);
+  background: var(--field);
   color: var(--ink);
 }
 @media (min-width: 901px) {

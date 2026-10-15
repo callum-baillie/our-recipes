@@ -166,7 +166,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(profileMenu).toHaveAttribute('data-dismissible-ready', 'true');
   await profileMenu.locator('summary').click();
   await expect(profileMenu).toHaveJSProperty('open', true);
-  await expect(profileMenu.getByRole('menuitem', { name: 'Manage profiles' })).toHaveAttribute(
+  await expect(profileMenu.getByRole('link', { name: 'Manage profiles' })).toHaveAttribute(
     'href',
     '/settings/profiles',
   );
@@ -216,32 +216,27 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   expect((await createMenuTrigger.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   await createMenuTrigger.click();
   await expect(createMenu).toHaveJSProperty('open', true);
-  await expect(createMenu.getByRole('menuitem')).toHaveText([
-    'Recipe',
-    'Meal Plan',
-    'Nutrition Entry',
-    'Shopping List',
-  ]);
-  await expect(createMenu.getByRole('menuitem', { name: 'Meal Plan' })).toHaveAttribute(
+  await expect(
+    createMenu.locator('.create-menu-panel > button, .create-menu-panel > a'),
+  ).toHaveText(['Recipe', 'Meal Plan', 'Nutrition Entry', 'Shopping List']);
+  await expect(createMenu.getByRole('link', { name: 'Meal Plan', exact: true })).toHaveAttribute(
     'href',
     '/planner#meal-plan-setup-title',
   );
-  await expect(createMenu.getByRole('menuitem', { name: 'Nutrition Entry' })).toHaveAttribute(
-    'href',
-    '/nutrition?view=diary',
-  );
-  await expect(createMenu.getByRole('menuitem', { name: 'Shopping List' })).toHaveAttribute(
-    'href',
-    '/lists#new-shopping-list',
-  );
-  await createMenu.getByRole('menuitem', { name: 'Recipe' }).click();
+  await expect(
+    createMenu.getByRole('link', { name: 'Nutrition Entry', exact: true }),
+  ).toHaveAttribute('href', '/nutrition?view=diary');
+  await expect(
+    createMenu.getByRole('link', { name: 'Shopping List', exact: true }),
+  ).toHaveAttribute('href', '/lists#new-shopping-list');
+  await createMenu.getByRole('button', { name: 'Recipe', exact: true }).click();
   await expect(addRecipeDialog).toBeVisible();
   await expect(page).toHaveURL('/collections');
   await page.getByRole('button', { name: 'Close add recipe dialog' }).click();
   await expect(addRecipeDialog).toBeHidden();
   await expect(page).toHaveURL('/collections');
   await createMenuTrigger.click();
-  await createMenu.getByRole('menuitem', { name: 'Recipe' }).click();
+  await createMenu.getByRole('button', { name: 'Recipe', exact: true }).click();
   await page.locator('.add-recipe-dialog-dismiss').click({
     force: true,
     position: { x: 2, y: 2 },
@@ -541,7 +536,8 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
 
   await page.unroute('**/api/v1/recipes/*/nutrition/estimate');
   const nutritionRecipeUrl = page.url();
-  await page.context().clearCookies();
+  // A missing convenience cookie must not discard the authenticated account session.
+  await page.context().clearCookies({ name: /^(bord|our_recipes)_active_profile$/u });
   await page.goto(`${nutritionRecipeUrl}/edit`);
   await expect(page.locator('.profile-switcher summary .profile-dot')).toHaveText('M');
   const editCategoryInput = page.getByRole('combobox', { name: 'Categories (optional)' });

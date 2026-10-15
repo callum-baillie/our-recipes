@@ -1318,6 +1318,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           )}
           {recommendationEvidence}
           <DecisionAssistance
+            headingLevel={3}
             embedded
             initialTask="insights"
             tasks={['insights']}

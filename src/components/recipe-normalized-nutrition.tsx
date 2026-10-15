@@ -82,6 +82,7 @@ export function RecipeNormalizedNutrition({
       )}
       {recipeId && (
         <DecisionAssistance
+          headingLevel={3}
           embedded
           recipeId={recipeId}
           initialTask="ingredient_match"
