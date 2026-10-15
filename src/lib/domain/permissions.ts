@@ -87,6 +87,10 @@ export function authorizeAppRequest(input: {
   const method = input.method.toUpperCase();
   const isRead = readMethods.has(method);
 
+  // Integration routes enforce real account ownership and target permissions themselves.
+  if (pathname === '/settings/integrations' || pathname === '/api/v1/integrations')
+    return { allowed: true };
+
   if (pathname === '/account/security' || pathname.startsWith('/api/auth/')) {
     return { allowed: true };
   }

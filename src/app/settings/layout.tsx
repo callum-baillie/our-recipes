@@ -15,14 +15,17 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsLayout({ children }: Readonly<{ children: ReactNode }>) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || (session.user as { role?: string }).role !== 'admin') notFound();
+  const requestHeaders = await headers();
+  const session = await auth.api.getSession({ headers: requestHeaders });
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
+  if (!session || (!isAdmin && requestHeaders.get('x-bord-pathname') !== '/settings/integrations'))
+    notFound();
 
   return (
     <div className="settings-workspace">
       <aside className="settings-sidebar" aria-label="Settings navigation">
         <h2>Settings</h2>
-        <SettingsNav />
+        <SettingsNav personalOnly={!isAdmin} />
         <div className="settings-security-note">
           <ShieldCheck size={17} aria-hidden="true" />
           <strong>Security at Bòrd</strong>

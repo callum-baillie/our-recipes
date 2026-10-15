@@ -160,7 +160,9 @@ export function NutritionSetupOverview({
           <Target size={26} aria-hidden="true" />
         </div>
         <div>
-          <p className={styles.eyebrow}>{nextStep ? `Next: ${nextStep.title}` : 'Nutrition baseline ready'}</p>
+          <p className={styles.eyebrow}>
+            {nextStep ? `Next: ${nextStep.title}` : 'Nutrition baseline ready'}
+          </p>
           <h2 id="nutrition-setup-title">
             {nextStep ? 'Continue your nutrition setup' : 'Your nutrition baseline is ready'}
           </h2>
@@ -200,7 +202,9 @@ export function NutritionSetupOverview({
               Body, preference, and body-weight direction settings from onboarding are saved for{' '}
               {profileName}.
             </p>
-            {savedGoalDescription ? <p className={styles.savedValue}>{savedGoalDescription}</p> : null}
+            {savedGoalDescription ? (
+              <p className={styles.savedValue}>{savedGoalDescription}</p>
+            ) : null}
             <Link href="/settings/nutrition">
               Review Nutrition profile <ArrowRight size={15} aria-hidden="true" />
             </Link>

@@ -5,7 +5,7 @@ import {
   authenticationEnrollmentStatus,
   isAuthenticationConfigured,
   prepareProfileEnrollment,
-  verifyProfilePin,
+  verifyProfilePassword,
 } from '@/lib/services/auth-service';
 import { completeSetupWithResult } from '@/lib/services/household-service';
 
@@ -23,13 +23,12 @@ describe('profile authentication enrollment', () => {
     vi.unstubAllEnvs();
   });
 
-  it('atomically links a profile account, recovery codes, and a PIN', async () => {
+  it('atomically links a profile account, recovery codes, and a password', async () => {
     const enrollment = await prepareProfileEnrollment(
       'Maya',
       {
         email: 'maya@example.com',
         passphrase: 'a long household passphrase',
-        pin: '739204',
       },
       'admin',
     );
@@ -68,22 +67,47 @@ describe('profile authentication enrollment', () => {
       codes: expect.arrayContaining([expect.stringMatching(/^BORD-/u)]),
     });
     await expect(
-      verifyProfilePin({
+      verifyProfilePassword({
         sessionId: 'session-a',
         userId: enrollment.user.id,
         profileId,
-        pin: '739204',
+        password: 'a long household passphrase',
       }),
     ).resolves.toEqual({ ok: true });
   });
 
-  it('locks repeated PIN failures for the target profile and session', async () => {
+  it('marks a new account verified only when email verification is disabled', async () => {
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'false');
+    await expect(
+      prepareProfileEnrollment(
+        'Maya',
+        {
+          email: 'maya@example.com',
+          passphrase: 'a long household passphrase',
+        },
+        'admin',
+      ),
+    ).resolves.toMatchObject({ user: { emailVerified: true } });
+
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'true');
+    await expect(
+      prepareProfileEnrollment(
+        'Avery',
+        {
+          email: 'avery@example.com',
+          passphrase: 'another long household passphrase',
+        },
+        'parent',
+      ),
+    ).resolves.toMatchObject({ user: { emailVerified: false } });
+  });
+
+  it('locks repeated password failures for the target profile and session', async () => {
     const enrollment = await prepareProfileEnrollment(
       'Maya',
       {
         email: 'maya@example.com',
         passphrase: 'a long household passphrase',
-        pin: '739204',
       },
       'admin',
     );
@@ -107,28 +131,28 @@ describe('profile authentication enrollment', () => {
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
       await expect(
-        verifyProfilePin({
+        verifyProfilePassword({
           sessionId: 'session-a',
           userId: enrollment.user.id,
           profileId,
-          pin: '840315',
+          password: 'incorrect password',
         }),
       ).resolves.toEqual({ ok: false });
     }
-    const locked = await verifyProfilePin({
+    const locked = await verifyProfilePassword({
       sessionId: 'session-a',
       userId: enrollment.user.id,
       profileId,
-      pin: '840315',
+      password: 'incorrect password',
     });
     expect(locked.ok).toBe(false);
     expect(locked).toHaveProperty('retryAfterSeconds', 900);
     await expect(
-      verifyProfilePin({
+      verifyProfilePassword({
         sessionId: 'session-a',
         userId: enrollment.user.id,
         profileId,
-        pin: '739204',
+        password: 'a long household passphrase',
       }),
     ).resolves.toMatchObject({ ok: false, retryAfterSeconds: expect.any(Number) });
   });

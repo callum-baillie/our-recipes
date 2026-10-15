@@ -146,6 +146,7 @@ export function getAiDataPolicy(profileId: string): AiDataPolicy {
     sharePersonalMetrics: row.sharePersonalMetrics,
     shareWeight: row.shareWeight,
     shareShoppingLists: row.shareShoppingLists,
+    sharePantry: row.sharePantry,
     dailySummaryEnabled: row.dailySummaryEnabled,
     weeklySummaryEnabled: row.weeklySummaryEnabled,
     summaryFrequency: row.summaryFrequency,

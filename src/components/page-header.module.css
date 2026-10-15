@@ -1,0 +1,203 @@
+.header {
+  position: relative;
+  z-index: 2;
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+  margin-block: 0 var(--workspace-section-gap, 1.5rem);
+  color: var(--ink);
+}
+.headingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem 2rem;
+}
+.copy {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+.header .title {
+  margin: 0;
+  max-width: none;
+  font-family: var(--font-display, Georgia), serif;
+  font-size: clamp(2rem, 3.4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+  color: var(--leaf);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.description {
+  max-width: 70ch;
+  margin-top: 0.7rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.description > p {
+  margin: 0;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  max-width: 100%;
+}
+.actions,
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+.options {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.leading {
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+.workspaceTools {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.toolbarRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+.toolbarLeft,
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.toolbarLeft {
+  flex: 1 1 auto;
+}
+.toolbarRight {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.filters {
+  min-width: 0;
+}
+/* Navigation owns its active state; the header owns its spacing and wrapping. */
+.header :global(.recipebook-nav),
+.header :global(.kitchen-quick-views) {
+  margin: 0;
+}
+.header :global(.recipebook-nav) {
+  flex-wrap: wrap;
+  width: auto;
+  overflow: visible;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.header :global(.recipebook-nav) a {
+  min-height: 2.5rem;
+  padding-inline: 0.65rem;
+  font-weight: 650;
+}
+.header :global(.kitchen-quick-views) {
+  flex-wrap: wrap;
+  padding: 0;
+}
+.header :global(.library-toolbar) {
+  margin: 0;
+}
+.header button,
+.header a {
+  touch-action: manipulation;
+}
+.header :is(button, a, input, select):focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
+}
+@container (max-width: 640px) {
+  .headingRow {
+    gap: 1rem;
+  }
+  .copy {
+    flex-basis: 100%;
+  }
+  .controls {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .actions,
+  .options {
+    justify-content: flex-start;
+  }
+  .toolbarLeft,
+  .toolbarRight {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+  .header .title {
+    font-size: 2rem;
+  }
+}
+
+.header[data-density='compact'] .title {
+  font-size: clamp(1.75rem, 2.4vw, 2.4rem);
+}
+.header[data-density='compact'] .description {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+.header[data-density='compact'] .eyebrow {
+  margin-bottom: 0.3rem;
+}
+.actions > :is(button, a) {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+}
+.header :global(.recipe-detail-toolbar) {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.header :global(.editor-back-link) {
+  margin: 0;
+}

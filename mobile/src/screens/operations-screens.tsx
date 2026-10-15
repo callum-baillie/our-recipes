@@ -54,7 +54,11 @@ export function PantryScreen() {
   const [scope, setScope] = React.useState('All');
   const bottomInset = useBottomContentInset();
   const data =
-    scope === 'All' ? state.pantry : state.pantry.filter((item) => item.location === scope);
+    scope === 'Essentials'
+      ? []
+      : scope === 'All'
+        ? state.pantry
+        : state.pantry.filter((item) => item.location === scope);
   const pantrySummary = [
     [String(state.pantry.length), 'items'],
     [
@@ -129,7 +133,7 @@ export function PantryScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 8 }}
             >
-              {['All', 'Pantry', 'Fridge', 'Freezer'].map((entry) => (
+              {['All', 'Essentials', 'Pantry', 'Fridge', 'Freezer'].map((entry) => (
                 <Pressable
                   key={entry}
                   accessibilityRole="button"
@@ -160,24 +164,76 @@ export function PantryScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-              }}
-            >
-              <EditorialText variant="section">Use soon</EditorialText>
-              <Button label="See all" tone="quiet" onPress={() => setScope('All')} />
-            </View>
+            {scope === 'Essentials' ? (
+              <View style={{ gap: tokens.space.sm }}>
+                <EditorialText variant="section">Household essentials</EditorialText>
+                {state.pantryPolicies.map((policy) => (
+                  <Pressable
+                    key={policy.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit shopping policy for ${policy.name}`}
+                    onPress={() => router.push(`/(app)/(pantry)/policy/${policy.id}`)}
+                  >
+                    <Surface elevated>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          gap: tokens.space.sm,
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[tokens.type.headline, { color: tokens.color.ink }]}>
+                            {policy.name}
+                          </Text>
+                          <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
+                            {policy.needsSetup
+                              ? 'Legacy restock preference needs setup'
+                              : policy.mode === 'always_have'
+                                ? `Keep ${policy.targetStock} ${policy.stockUnit}; reorder ${policy.trigger.replaceAll('_', ' ')}`
+                                : `Buy ${policy.preferredPurchaseQuantity} ${policy.stockUnit} every Next shop`}
+                          </Text>
+                        </View>
+                        <StatusPill tone={policy.state === 'review' ? 'warning' : 'olive'}>
+                          {policy.state}
+                        </StatusPill>
+                      </View>
+                      <Body muted>
+                        {policy.stock} {policy.stockUnit} currently usable
+                      </Body>
+                    </Surface>
+                  </Pressable>
+                ))}
+                {!state.pantryPolicies.length ? (
+                  <EmptyState
+                    icon="target"
+                    title="No essentials yet"
+                    detail="Configure a product shopping policy to see it here."
+                  />
+                ) : null}
+              </View>
+            ) : (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <EditorialText variant="section">Use soon</EditorialText>
+                <Button label="See all" tone="quiet" onPress={() => setScope('All')} />
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={
-          <EmptyState
-            icon="archivebox"
-            title="Nothing in this location"
-            detail="Add an item or choose another pantry location."
-          />
+          scope === 'Essentials' ? null : (
+            <EmptyState
+              icon="archivebox"
+              title="Nothing in this location"
+              detail="Add an item or choose another pantry location."
+            />
+          )
         }
         renderItem={({ item, index }) => (
           <Surface style={{ padding: 0, marginBottom: index === data.length - 1 ? 0 : 8 }}>
@@ -592,6 +648,194 @@ export function PantryEditScreen({ itemId }: { itemId: string }) {
       ) : (
         <Body muted>Loading item…</Body>
       )}
+    </Screen>
+  );
+}
+
+export function PantryPolicyEditScreen({ productId }: { productId: string }) {
+  const { state } = useBord();
+  const { request } = useAuth();
+  const { refresh } = useSync();
+  const cached = state.pantryPolicies.find((entry) => entry.id === productId);
+  const [product, setProduct] = React.useState<Record<string, unknown> | null>(null);
+  const [mode, setMode] = React.useState<'none' | 'always_have' | 'always_buy'>(
+    cached?.mode ?? 'none',
+  );
+  const [trigger, setTrigger] = React.useState<'below_target' | 'reorder_point' | 'empty'>(
+    cached?.trigger ?? 'below_target',
+  );
+  const [unit, setUnit] = React.useState(cached?.stockUnit ?? 'each');
+  const [target, setTarget] = React.useState(
+    cached?.targetStock == null ? '' : String(cached.targetStock),
+  );
+  const [threshold, setThreshold] = React.useState(
+    cached?.reorderThreshold == null ? '' : String(cached.reorderThreshold),
+  );
+  const [purchase, setPurchase] = React.useState(
+    cached?.preferredPurchaseQuantity == null ? '' : String(cached.preferredPurchaseQuantity),
+  );
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (state.offline) return;
+    void request<{ product: Record<string, unknown> }>(
+      `/api/v1/pantry/products/${encodeURIComponent(productId)}`,
+    )
+      .then(({ product: next }) => {
+        setProduct(next);
+        setMode((next.restockMode as typeof mode | undefined) ?? 'none');
+        setTrigger((next.restockTrigger as typeof trigger | undefined) ?? 'below_target');
+        setUnit(String(next.stockUnit || next.defaultInventoryUnit || 'each'));
+        setTarget(next.targetStock == null ? '' : String(next.targetStock));
+        setThreshold(next.reorderThreshold == null ? '' : String(next.reorderThreshold));
+        setPurchase(
+          next.preferredPurchaseQuantity == null ? '' : String(next.preferredPurchaseQuantity),
+        );
+      })
+      .catch(() => undefined);
+  }, [productId, request, state.offline]);
+
+  const save = async () => {
+    if (!product || state.offline) return;
+    setSaving(true);
+    try {
+      const parseJsonList = (value: unknown) => {
+        if (Array.isArray(value)) return value;
+        try {
+          const parsed = JSON.parse(String(value ?? '[]')) as unknown;
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      };
+      await request(`/api/v1/pantry/products/${encodeURIComponent(productId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          displayName: product.displayName,
+          brand: product.brand ?? '',
+          variant: product.variant ?? '',
+          category: product.category ?? '',
+          subcategory: product.subcategory ?? '',
+          aliases: Array.isArray(product.aliases) ? product.aliases : [],
+          defaultInventoryUnit: product.defaultInventoryUnit ?? 'each',
+          defaultPackageAmount: product.defaultPackageAmount ?? null,
+          defaultPackageUnit: product.defaultPackageUnit ?? '',
+          defaultStorageType: product.defaultStorageType ?? 'pantry',
+          dietaryTags: parseJsonList(product.dietaryTags),
+          allergens: parseJsonList(product.allergens),
+          storageInstructions: product.storageInstructions ?? '',
+          defaultShelfLifeDays: product.defaultShelfLifeDays ?? null,
+          shelfLifeAfterOpeningDays: product.shelfLifeAfterOpeningDays ?? null,
+          isStaple: Boolean(product.isStaple),
+          preferredBrand: product.preferredBrand ?? '',
+          preferredStore: product.preferredStore ?? '',
+          minimumStock: product.minimumStock ?? null,
+          suggestGroceryRestock: Boolean(product.suggestGroceryRestock),
+          archived: Boolean(product.archivedAt),
+          restockMode: mode,
+          restockTrigger: trigger,
+          stockUnit: unit.trim(),
+          targetStock: target ? Number(target) : null,
+          reorderThreshold: threshold ? Number(threshold) : null,
+          preferredPurchaseQuantity: purchase ? Number(purchase) : null,
+        }),
+      });
+      await refresh();
+      router.back();
+    } catch (error) {
+      Alert.alert('Policy not saved', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <AppHeader back />
+      <View style={{ gap: tokens.space.xs }}>
+        <Eyebrow>SHOPPING POLICY</Eyebrow>
+        <EditorialText variant="title">
+          {cached?.name ?? String(product?.displayName ?? 'Essential')}
+        </EditorialText>
+        <Body muted>
+          Policies are shared by the household. Cached values remain readable offline; changes
+          require a connection.
+        </Body>
+      </View>
+      {state.offline ? <StatusPill tone="warning">Offline · read only</StatusPill> : null}
+      <Group title="Policy mode">
+        <View style={{ gap: tokens.space.xs }}>
+          {(['none', 'always_have', 'always_buy'] as const).map((entry) => (
+            <Button
+              key={entry}
+              label={entry === 'none' ? 'Off' : entry.replaceAll('_', ' ')}
+              tone={mode === entry ? 'primary' : 'secondary'}
+              onPress={() => setMode(entry)}
+              disabled={state.offline}
+            />
+          ))}
+        </View>
+      </Group>
+      {mode !== 'none' ? (
+        <FormField
+          label="Comparison and purchase unit"
+          value={unit}
+          onChangeText={setUnit}
+          editable={!state.offline}
+        />
+      ) : null}
+      {mode === 'always_have' ? (
+        <Group title="Reserve">
+          <FormField
+            label="Keep after planned meals"
+            value={target}
+            onChangeText={setTarget}
+            keyboardType="decimal-pad"
+            editable={!state.offline}
+          />
+          <View style={{ gap: tokens.space.xs }}>
+            {(['below_target', 'reorder_point', 'empty'] as const).map((entry) => (
+              <Button
+                key={entry}
+                label={entry.replaceAll('_', ' ')}
+                tone={trigger === entry ? 'primary' : 'secondary'}
+                onPress={() => setTrigger(entry)}
+                disabled={state.offline}
+              />
+            ))}
+          </View>
+          {trigger === 'reorder_point' ? (
+            <FormField
+              label="Reorder point"
+              value={threshold}
+              onChangeText={setThreshold}
+              keyboardType="decimal-pad"
+              editable={!state.offline}
+            />
+          ) : null}
+          <FormField
+            label="Buy in increments (optional)"
+            value={purchase}
+            onChangeText={setPurchase}
+            keyboardType="decimal-pad"
+            editable={!state.offline}
+          />
+        </Group>
+      ) : null}
+      {mode === 'always_buy' ? (
+        <FormField
+          label="Amount per Next shop"
+          value={purchase}
+          onChangeText={setPurchase}
+          keyboardType="decimal-pad"
+          editable={!state.offline}
+        />
+      ) : null}
+      <Button
+        label={saving ? 'Saving…' : 'Save policy'}
+        disabled={saving || state.offline || !product}
+        onPress={() => void save()}
+      />
     </Screen>
   );
 }
@@ -1130,6 +1374,7 @@ export function ListsScreen() {
   const { refresh } = useSync();
   const [creating, setCreating] = React.useState(false);
   const [name, setName] = React.useState('');
+  const [makeNextShop, setMakeNextShop] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const active = state.lists.filter((list) => list.status === 'active');
   const planned = state.lists.filter((list) => list.status === 'planned');
@@ -1140,7 +1385,11 @@ export function ListsScreen() {
       await request('/api/v1/shopping-lists', {
         method: 'POST',
         headers: { 'Idempotency-Key': randomUUID() },
-        body: JSON.stringify({ kind: 'manual', name: name.trim() }),
+        body: JSON.stringify({
+          kind: 'manual',
+          name: name.trim(),
+          makeAutomaticRestockTarget: makeNextShop,
+        }),
       });
       await refresh();
       setCreating(false);
@@ -1170,6 +1419,12 @@ export function ListsScreen() {
             onChangeText={setName}
             placeholder="Weekend groceries"
           />
+          <Button
+            label={makeNextShop ? 'Next shop selected' : 'Make this the Next shop'}
+            tone={makeNextShop ? 'primary' : 'secondary'}
+            disabled={state.offline}
+            onPress={() => setMakeNextShop((current) => !current)}
+          />
           <View style={{ flexDirection: 'row', gap: tokens.space.xs }}>
             <View style={{ flex: 1 }}>
               <Button label="Cancel" tone="secondary" onPress={() => setCreating(false)} />
@@ -1184,7 +1439,12 @@ export function ListsScreen() {
           </View>
         </Surface>
       ) : (
-        <Button label="New shopping list" icon="plus" onPress={() => setCreating(true)} />
+        <Button
+          label="New shopping list"
+          icon="plus"
+          disabled={state.offline}
+          onPress={() => setCreating(true)}
+        />
       )}
       <View>
         <View
@@ -1269,7 +1529,73 @@ export function ListDetailScreen({ listId }: { listId: string }) {
           <Body muted>
             {toBuy} to find · {inCart} in cart · {cantFind} need attention
           </Body>
+          {list.isNextShop ? <StatusPill>Next shop</StatusPill> : null}
         </View>
+        {!list.isNextShop ? (
+          <Button
+            label="Make this the Next shop"
+            tone="secondary"
+            disabled={state.offline}
+            onPress={() =>
+              Alert.alert(
+                'Change Next shop?',
+                'Untouched recurring amounts will move here. Recipe and manual items stay on their current lists.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Make Next shop',
+                    onPress: () =>
+                      void actions
+                        .setRestockTarget(list.id)
+                        .catch((error) =>
+                          Alert.alert(
+                            'Next shop not changed',
+                            error instanceof Error ? error.message : 'Try again.',
+                          ),
+                        ),
+                  },
+                ],
+              )
+            }
+          />
+        ) : null}
+        {list.policyReviews?.some((review) => review.state === 'needs_review') ? (
+          <Surface>
+            <StatusPill tone="warning">Pantry review needed</StatusPill>
+            <Body muted>
+              {list.policyReviews
+                .filter((review) => review.state === 'needs_review')
+                .map((review) => review.productName)
+                .join(', ')}{' '}
+              has approximate or incompatible stock. Update Pantry or assume empty for this trip.
+            </Body>
+          </Surface>
+        ) : null}
+        {list.policyReviews?.some((review) => review.state === 'dismissed') ? (
+          <Surface>
+            <Body muted>Skipped for this trip</Body>
+            {list.policyReviews
+              .filter((review) => review.state === 'dismissed')
+              .map((review) => (
+                <Button
+                  key={review.productId}
+                  label={`Restore ${review.productName}`}
+                  tone="secondary"
+                  disabled={state.offline}
+                  onPress={() =>
+                    void actions
+                      .setShoppingPolicyReview(list.id, review.productId, 'restore_policy')
+                      .catch((error) =>
+                        Alert.alert(
+                          'Policy not restored',
+                          error instanceof Error ? error.message : 'Try again.',
+                        ),
+                      )
+                  }
+                />
+              ))}
+          </Surface>
+        ) : null}
         <Surface style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm }}>
           <View
             style={{

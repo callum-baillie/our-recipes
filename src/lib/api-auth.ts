@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
 import type { ApiAction, ApiResource } from '@/lib/domain/auth';
+import type { ActorContext } from '@/lib/actor-context';
+import {
+  integrationPermission,
+  additionalIntegrationPermissions,
+} from '@/lib/domain/integration-routes';
+import { authorizeAppRequest } from '@/lib/domain/permissions';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   authenticateApiRequest,
@@ -21,8 +27,32 @@ export async function authorizeApi(
   const incoming = request.headers.get('x-request-id')?.trim();
   const requestId = incoming && incoming.length <= 128 ? incoming : randomUUID();
   try {
+    const principal = await authenticateApiRequest(request, resource, action);
+    if (principal.kind === 'api-key') {
+      for (const required of additionalIntegrationPermissions(
+        new URL(request.url).pathname,
+        request.method,
+      )) {
+        if (!principal.apiPermissions?.[required.resource]?.includes(required.action)) {
+          throw new RequestAuthError(
+            403,
+            'insufficient_api_key_permissions',
+            `This API key also needs ${required.resource}:${required.action} permission.`,
+          );
+        }
+      }
+    }
+    const permission = authorizeAppRequest({
+      role: principal.role,
+      profileId: principal.profileId,
+      pathname: new URL(request.url).pathname,
+      method: request.method,
+    });
+    if (!permission.allowed) {
+      throw new RequestAuthError(403, permission.code, permission.message);
+    }
     return {
-      principal: await authenticateApiRequest(request, resource, action),
+      principal,
       response: null,
       requestId,
     };
@@ -37,8 +67,46 @@ export async function authorizeApi(
   }
 }
 
-export function withApiRequestId<T extends NextResponse>(response: T, requestId: string): T {
+/** Authenticate the exact operation before reading input or calling its service. */
+export async function authorizeCoreApi(request: Request): Promise<ApiAuthorization> {
+  const permission = integrationPermission(new URL(request.url).pathname, request.method);
+  if (!permission) {
+    const requestId = randomUUID();
+    return {
+      principal: null,
+      requestId,
+      response: withApiRequestId(
+        jsonError(403, 'api_key_route_forbidden', 'This operation is not an integration endpoint.'),
+        requestId,
+      ),
+    };
+  }
+  const authorization = await authorizeApi(request, permission.resource, permission.action);
+  if (authorization.response) return authorization;
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    const response = requireTrustedSessionMutation(
+      request,
+      authorization.principal,
+      authorization.requestId,
+    );
+    if (response) return { principal: null, response, requestId: authorization.requestId };
+  }
+  return authorization;
+}
+
+export function actorFromPrincipal(
+  principal: RequestPrincipal,
+): ActorContext & { profileId: string } {
+  return {
+    profileId: principal.profileId,
+    source: principal.kind === 'api-key' ? 'api-key' : 'auth-session',
+  };
+}
+
+export function withApiRequestId<T extends Response>(response: T, requestId: string): T {
   response.headers.set('X-Request-Id', requestId);
+  if (!response.headers.has('Cache-Control'))
+    response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }
 

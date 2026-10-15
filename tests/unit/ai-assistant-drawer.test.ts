@@ -64,6 +64,7 @@ describe('AI assistant drawer', () => {
       if (url === '/api/v1/ai/chat/threads' && !init?.method) {
         return Response.json({ threads: [{ id: 'thread-1' }] });
       }
+      if (url.startsWith('/api/v1/ai/app-actions?')) return Response.json({ proposals: [] });
       if (url === '/api/v1/ai/chat/threads/thread-1' && !init?.method) {
         return Response.json({
           messages: [
@@ -105,10 +106,12 @@ describe('AI assistant drawer', () => {
     const composer = screen.getByLabelText('Message the AI assistant');
     fireEvent.change(composer, { target: { value: 'Plan a quick dinner' } });
     fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
 
     fireEvent.keyDown(composer, { key: 'Enter' });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1),
+    );
     expect(await screen.findByText('I can help with that.')).toBeTruthy();
   });
 });

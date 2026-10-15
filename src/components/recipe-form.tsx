@@ -526,7 +526,7 @@ export function RecipeForm({
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
-      {intro ? <header className="editor-intro">{intro}</header> : null}
+      {intro ? <div className="editor-intro">{intro}</div> : null}
       <div className="editor-card-column">
         {savedDraft && (
           <aside className="draft-recovery" aria-live="polite">

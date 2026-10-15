@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/page-header';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
@@ -20,19 +21,17 @@ export default async function EditRecipePage({
       <section className="editor-layout">
         <RecipeForm
           intro={
-            <>
-              <Link className="quiet-link editor-back-link" href={`/recipes/${recipe.id}`}>
-                <ArrowLeft size={16} aria-hidden="true" />
-                Back to recipe
-              </Link>
-              <div className="editor-title-copy">
-                <p className="eyebrow">REVISION {recipe.currentRevision + 1}</p>
-                <h1>Make it yours.</h1>
-                <p className="muted">
-                  Saving changes keeps the previous recipe card in its revision history.
-                </p>
-              </div>
-            </>
+            <PageHeader
+              title="Edit recipe"
+              eyebrow={`REVISION ${recipe.currentRevision + 1}`}
+              description="Saving changes keeps the previous recipe card in its revision history."
+              leading={
+                <Link className="quiet-link editor-back-link" href={`/recipes/${recipe.id}`}>
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  Back to recipe
+                </Link>
+              }
+            />
           }
           recipeId={recipe.id}
           initial={{

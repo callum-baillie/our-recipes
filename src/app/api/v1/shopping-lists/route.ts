@@ -11,6 +11,7 @@ import { jsonError } from '@/lib/http';
 import {
   generatePantryShortageList,
   PantryGroceryCookingPrerequisiteError,
+  switchAutomaticRestockTarget,
 } from '@/lib/services/pantry-grocery-cooking-service';
 import {
   createManualShoppingList,
@@ -50,10 +51,18 @@ export async function POST(request: Request) {
   const raw = idempotency.context.body;
   const tagged = shoppingListRequestSchema.safeParse(raw);
   if (tagged.success && tagged.data.kind === 'manual') {
+    const list = createManualShoppingList(
+      tagged.data.name,
+      authorization.principal.profileId,
+      false,
+    );
+    if (tagged.data.makeAutomaticRestockTarget) {
+      switchAutomaticRestockTarget(list.id, authorization.principal.profileId);
+    }
     return idempotentJsonResponse(
       idempotency.context,
       {
-        list: createManualShoppingList(tagged.data.name, authorization.principal.profileId),
+        list: getShoppingList(list.id),
       },
       authorization.requestId,
       201,
@@ -87,6 +96,13 @@ export async function POST(request: Request) {
       },
       authorization.principal.profileId,
     );
+    if (
+      tagged.success &&
+      tagged.data.kind === 'planner' &&
+      tagged.data.makeAutomaticRestockTarget
+    ) {
+      switchAutomaticRestockTarget(generated.listId, authorization.principal.profileId);
+    }
     return idempotentJsonResponse(
       idempotency.context,
       { list: getShoppingList(generated.listId), restored: generated.restored },

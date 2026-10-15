@@ -1,7 +1,11 @@
 'use client';
+import { PageHeader } from '@/components/page-header';
+import { DecisionAssistance } from '@/components/decision-assistance';
 
 import {
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   CalendarDays,
   ChefHat,
   ClipboardCopy,
@@ -43,6 +47,7 @@ import {
   NutritionSetupOverview,
   NutritionWeightTrackerCard,
 } from '@/components/nutrition-setup-overview';
+import { nutritionLocalDateKey } from '@/lib/domain/nutrition-view';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import type { NutritionChartDatasets } from '@/lib/domain/nutrition-chart-datasets';
 import type { AdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
@@ -54,7 +59,7 @@ export type NutritionView = (typeof VIEWS)[number];
 type LogMode = 'choose' | 'product' | 'recipe' | 'manual' | 'skipped' | 'copy' | 'weight';
 
 const VIEW_LABELS: Record<NutritionView, string> = {
-  overview: 'Overview',
+  overview: 'Today',
   diary: 'Food Diary',
   nutrients: 'Nutrients',
   trends: 'Trends',
@@ -62,10 +67,8 @@ const VIEW_LABELS: Record<NutritionView, string> = {
 };
 
 const VIEW_EXPLAINERS: Record<NutritionView, string> = {
-  overview:
-    'A daily summary of confirmed intake, planned portions, goals, and the quality of the available data.',
-  diary:
-    'A factual history of food marked as eaten. Corrections preserve the earlier record instead of rewriting it.',
+  overview: 'Your food, daily totals, and upcoming meals in one place.',
+  diary: 'Choose a day to see your meals, log food, or update a portion.',
   nutrients: 'Confirmed nutrient amounts and coverage. A missing value means unknown, never zero.',
   trends:
     'Patterns across recorded days. Trends appear only when enough comparable diary data exists.',
@@ -86,6 +89,7 @@ type ProfileSummary = {
   version?: number;
   measurementSystem?: 'metric' | 'imperial';
   trendRangeDays?: 7 | 14 | 30;
+  dailyResetTimezone?: string;
   showPlannedNutrition?: boolean;
   weightTrackingEnabled?: boolean;
 };
@@ -300,6 +304,8 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [showOlderDiary, setShowOlderDiary] = useState(false);
+  const [diaryDate, setDiaryDate] = useState(props.today ?? props.summary.trend.at(-1)?.date ?? '');
+  const [showDiaryHistory, setShowDiaryHistory] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [logMode, setLogMode] = useState<LogMode>('choose');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -317,6 +323,23 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const { activeProfile, summary } = props;
   const definition = new Map(props.definitions.map((item) => [item.code, item]));
   const today = props.today ?? summary.trend.at(-1)?.date ?? '';
+  const diaryEntries = summary.currentEntries.filter(
+    (entry) =>
+      nutritionLocalDateKey(
+        new Date(entry.occurredAt),
+        activeProfile.dailyResetTimezone ?? 'UTC',
+      ) === diaryDate &&
+      (showDiaryHistory || entry.state !== 'deleted'),
+  );
+  const eatenEntries = diaryEntries.filter(
+    (entry) => entry.state === 'eaten' || entry.state === 'corrected',
+  );
+  function shiftDiaryDate(amount: number) {
+    const date = new Date(`${diaryDate || today}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + amount);
+    setDiaryDate(date.toISOString().slice(0, 10));
+    setShowOlderDiary(false);
+  }
   const mealProjection = props.mealProjection ?? {
     range: { start: today, end: today },
     meals: [],
@@ -512,7 +535,14 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     const nutrient = definition.get(nutrientCode);
     const kind = String(data.get('kind'));
     const numeric = Number(data.get('value'));
-    if (await saveEnergyOrNutrientGoal({ nutrientCode, unit: nutrient?.canonicalUnit ?? '', kind, value: numeric })) {
+    if (
+      await saveEnergyOrNutrientGoal({
+        nutrientCode,
+        unit: nutrient?.canonicalUnit ?? '',
+        kind,
+        value: numeric,
+      })
+    ) {
       form.reset();
     }
   }
@@ -542,16 +572,19 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     setEstimatingPlan(true);
     setStatus('Calculating a maintenance estimate…');
     try {
-      const response = await fetch(`/api/v1/nutrition/profiles/${activeProfile.id}/goals/estimate`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'preview',
-          expectedProfileVersion: goalSetup.profileVersion,
-          effectiveOn: today,
-          palCategory: weightPlanPal,
-        }),
-      });
+      const response = await fetch(
+        `/api/v1/nutrition/profiles/${activeProfile.id}/goals/estimate`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'preview',
+            expectedProfileVersion: goalSetup.profileVersion,
+            effectiveOn: today,
+            palCategory: weightPlanPal,
+          }),
+        },
+      );
       if (!response.ok) {
         setStatus(await errorMessage(response));
         return;
@@ -1284,6 +1317,13 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             <p className={styles.compactEmpty}>No recipe recommendation has enough evidence yet.</p>
           )}
           {recommendationEvidence}
+          <DecisionAssistance
+            embedded
+            initialTask="insights"
+            tasks={['insights']}
+            title="Which insight should I focus on?"
+            description="Prioritize recommendations supported by your recorded nutrition. Missing diary data is never treated as zero."
+          />
         </section>
       </div>
     </div>
@@ -1291,31 +1331,11 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
 
   return (
     <main className={styles.page}>
-      <header className={styles.dashboardHeader}>
-        <div>
-          <p className={styles.eyebrow}>Your Nutrition</p>
-          <h1>{activeProfile.displayName}&apos;s nutrition</h1>
-          <p className={styles.muted}>
-            Confirmed food, planned portions, and Pantry availability stay separate.
-          </p>
-        </div>
-        <div className={styles.headerTools}>
-          <div className={styles.headerSelectors}>
-            <button
-              className={styles.profileSelector}
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => setProfileDialogOpen(true)}
-            >
-              <UserCircle size={18} aria-hidden="true" />
-              {activeProfile.displayName}
-              <ChevronDown size={15} aria-hidden="true" />
-            </button>
-            <span className={styles.dateSelector}>
-              <CalendarDays size={17} aria-hidden="true" />
-              {dateRangeLabel(mealProjection.range.start, mealProjection.range.end)}
-            </span>
-          </div>
+      <PageHeader
+        title={`${activeProfile.displayName}’s nutrition`}
+        eyebrow="YOUR NUTRITION"
+        description="Track your meals, see daily totals, and plan what comes next."
+        actions={
           <div className={styles.headerButtons}>
             <button
               className={styles.primaryAction}
@@ -1324,7 +1344,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               disabled={!activeProfile.canManageProfile}
               onClick={() => openLogDialog()}
             >
-              <Plus size={17} aria-hidden="true" /> Record nutrition
+              <Plus size={17} aria-hidden="true" /> Log food
             </button>
             <Link
               className={styles.secondaryButton}
@@ -1341,41 +1361,57 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               )}
             </Link>
           </div>
-        </div>
-      </header>
+        }
+        toolbarLeft={
+          <>
+            {/* View picker changes presentation on mobile. */}
+            <button
+              className={styles.mobileViewButton}
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setViewDialogOpen(true)}
+            >
+              <span>
+                <small>Nutrition view</small>
+                {VIEW_LABELS[props.view]}
+              </span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </button>
 
-      <button
-        className={styles.mobileViewButton}
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setViewDialogOpen(true)}
-      >
-        <span>
-          <small>Nutrition view</small>
-          {VIEW_LABELS[props.view]}
-        </span>
-        <ChevronDown size={18} aria-hidden="true" />
-      </button>
+            <nav className={styles.tabs} aria-label="Nutrition views">
+              {VIEWS.map((view) => (
+                <Link
+                  key={view}
+                  href={`/nutrition?view=${view}`}
+                  aria-current={props.view === view ? 'page' : undefined}
+                >
+                  {VIEW_LABELS[view]}
+                </Link>
+              ))}
+            </nav>
+          </>
+        }
+        toolbarRight={
+          <div className={styles.headerSelectors}>
+            <button
+              className={styles.profileSelector}
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setProfileDialogOpen(true)}
+            >
+              <UserCircle size={18} aria-hidden="true" />
+              {activeProfile.displayName}
+              <ChevronDown size={15} aria-hidden="true" />
+            </button>
+            <span className={styles.dateSelector}>
+              <CalendarDays size={17} aria-hidden="true" />
+              {props.view === 'diary' ? diaryDate : today}
+            </span>
+          </div>
+        }
+      />
 
-      <nav className={styles.tabs} aria-label="Nutrition views">
-        {VIEWS.map((view) => (
-          <Link
-            key={view}
-            href={`/nutrition?view=${view}`}
-            aria-current={props.view === view ? 'page' : undefined}
-          >
-            {VIEW_LABELS[view]}
-          </Link>
-        ))}
-      </nav>
-
-      <section className={styles.viewIntro} aria-labelledby="nutrition-view-heading">
-        <div>
-          <p className={styles.viewEyebrow}>You are viewing</p>
-          <h2 id="nutrition-view-heading">{VIEW_LABELS[props.view]}</h2>
-        </div>
-        <p>{VIEW_EXPLAINERS[props.view]}</p>
-      </section>
+      <p className={styles.viewDescription}>{VIEW_EXPLAINERS[props.view]}</p>
 
       <dialog
         ref={profileDialogRef}
@@ -1463,7 +1499,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 ? 'What would you like to record?'
                 : logMode === 'weight'
                   ? 'Record weight'
-                  : 'Record nutrition'}
+                  : 'Log food'}
             </h2>
           </div>
           <button
@@ -1620,7 +1656,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               <div className={styles.dialogFieldRow}>
                 <label>
                   When
-                  <input name="occurredAt" type="datetime-local" required />
+                  <input
+                    name="occurredAt"
+                    type="datetime-local"
+                    defaultValue={`${diaryDate || today}T12:00`}
+                    required
+                  />
                 </label>
                 <label>
                   Meal
@@ -1684,7 +1725,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               </div>
               <label>
                 When
-                <input name="occurredAt" type="datetime-local" required />
+                <input
+                  name="occurredAt"
+                  type="datetime-local"
+                  defaultValue={`${diaryDate || today}T12:00`}
+                  required
+                />
               </label>
               <button className={styles.dialogPrimary} type="submit">
                 Add recipe to food diary
@@ -1727,7 +1773,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             <div className={styles.dialogFieldRow}>
               <label>
                 When
-                <input name="occurredAt" type="datetime-local" required />
+                <input
+                  name="occurredAt"
+                  type="datetime-local"
+                  defaultValue={`${diaryDate || today}T12:00`}
+                  required
+                />
               </label>
               <label>
                 Meal
@@ -1769,7 +1820,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           <form className={styles.dialogForm} onSubmit={recordSkipped}>
             <label>
               When
-              <input name="occurredAt" type="datetime-local" required />
+              <input
+                name="occurredAt"
+                type="datetime-local"
+                defaultValue={`${diaryDate || today}T12:00`}
+                required
+              />
             </label>
             <label>
               Meal
@@ -1823,22 +1879,29 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
 
       {props.view === 'overview' ? (
         <>
-          {!hasConfiguredGoals || summary.currentEntries.length === 0 || mealProjection.meals.length === 0 ? (
-            <NutritionSetupOverview
-              profileName={activeProfile.displayName}
-              hasConfiguredGoals={hasConfiguredGoals}
-              canManageGoals={activeProfile.canManageGoals}
-              canManageProfile={activeProfile.canManageProfile}
-              hasDiaryEntries={summary.currentEntries.length > 0}
-              hasPlannedMeals={mealProjection.meals.length > 0}
-              savedGoalDescription={savedGoalDescription}
-              weightTrend={props.weightTrend}
-              onRecordNutrition={() => openLogDialog()}
-              onRecordWeight={() => openLogDialog('weight')}
-              onConfigureGoals={() => setGoalSetupDialogOpen(true)}
-            />
+          {!hasConfiguredGoals ||
+          summary.currentEntries.length === 0 ||
+          mealProjection.meals.length === 0 ? (
+            <details className={styles.optionalSetup}>
+              <summary>
+                Personalise nutrition targets and preferences <span>Optional</span>
+              </summary>
+              <NutritionSetupOverview
+                profileName={activeProfile.displayName}
+                hasConfiguredGoals={hasConfiguredGoals}
+                canManageGoals={activeProfile.canManageGoals}
+                canManageProfile={activeProfile.canManageProfile}
+                hasDiaryEntries={summary.currentEntries.length > 0}
+                hasPlannedMeals={mealProjection.meals.length > 0}
+                savedGoalDescription={savedGoalDescription}
+                weightTrend={props.weightTrend}
+                onRecordNutrition={() => openLogDialog()}
+                onRecordWeight={() => openLogDialog('weight')}
+                onConfigureGoals={() => setGoalSetupDialogOpen(true)}
+              />
+            </details>
           ) : null}
-          {hasConfiguredGoals ? redesignedOverview : null}
+          {redesignedOverview}
           {false ? (
             <div className={styles.stack}>
               <section className={styles.metricGrid} aria-label="Today's nutrition summary">
@@ -1900,7 +1963,84 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   meals, Pantry stock, cooked recipes, served portions, skipped meals, and deleted
                   diary rows are not consumption.
                 </p>
-                {summary.currentEntries.length === 0 ? (
+                <div className={styles.diaryDateNav}>
+                  <button
+                    type="button"
+                    aria-label="Previous diary day"
+                    onClick={() => shiftDiaryDate(-1)}
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <label>
+                    <span className="sr-only">Diary date</span>
+                    <input
+                      type="date"
+                      value={diaryDate}
+                      max={today}
+                      onChange={(event) => {
+                        if (event.target.value) {
+                          setDiaryDate(event.target.value);
+                          setShowOlderDiary(false);
+                        }
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    aria-label="Next diary day"
+                    disabled={diaryDate >= today}
+                    onClick={() => shiftDiaryDate(1)}
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiaryDate(today)}
+                    disabled={diaryDate === today}
+                  >
+                    Today
+                  </button>
+                </div>
+                <div className={styles.diaryDayTotals} aria-label="Selected day nutrition totals">
+                  {[
+                    ['energy_kcal', 'Energy', 'kcal'],
+                    ['protein', 'Protein', 'g'],
+                    ['carbohydrate', 'Carbs', 'g'],
+                    ['total_fat', 'Fat', 'g'],
+                  ].map(([code, label, unit]) => {
+                    const values = eatenEntries.flatMap((entry) =>
+                      entry.values.filter((value) => value.nutrientCode === code),
+                    );
+                    return (
+                      <div key={code}>
+                        <span>{label}</span>
+                        <strong>
+                          {values.length
+                            ? number(
+                                values.reduce((sum, value) => sum + value.amount, 0),
+                                code === 'energy_kcal' ? 0 : 1,
+                              )
+                            : '—'}{' '}
+                          <small>{unit}</small>
+                        </strong>
+                        <small>
+                          {eatenEntries.length
+                            ? `${values.length} of ${eatenEntries.length} foods have data`
+                            : 'No food logged'}
+                        </small>
+                      </div>
+                    );
+                  })}
+                </div>
+                <label className={styles.diaryHistoryToggle}>
+                  <input
+                    type="checkbox"
+                    checked={showDiaryHistory}
+                    onChange={(event) => setShowDiaryHistory(event.target.checked)}
+                  />{' '}
+                  Show deleted entries
+                </label>
+                {diaryEntries.length === 0 ? (
                   <p className={styles.callout}>
                     No confirmed diary entries yet. Nothing is assumed.
                   </p>
@@ -2056,14 +2196,13 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
 
       {props.view === 'diary' ? (
         <div className={styles.stack}>
-          <div className={styles.twoColumn}>
+          <div className={`${styles.twoColumn} ${styles.diaryWorkspace}`}>
             <section className={styles.panel}>
               <div className={styles.sectionHeading}>
                 <div>
-                  <h2>Current diary</h2>
+                  <h2>Your food diary</h2>
                   <p className={styles.muted}>
-                    Copies create new immutable series; moves, restores, and reassignments append
-                    audited history.
+                    Meals you have logged, with portions you can adjust.
                   </p>
                 </div>
                 {activeProfile.canExportData ? (
@@ -2076,14 +2215,91 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   </a>
                 ) : null}
               </div>
-              {summary.currentEntries.length === 0 ? (
+              <div className={styles.diaryDateNav}>
+                <button
+                  type="button"
+                  aria-label="Previous diary day"
+                  onClick={() => shiftDiaryDate(-1)}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <label>
+                  <span className="sr-only">Diary date</span>
+                  <input
+                    type="date"
+                    value={diaryDate}
+                    max={today}
+                    onChange={(event) => {
+                      if (event.target.value) {
+                        setDiaryDate(event.target.value);
+                        setShowOlderDiary(false);
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  aria-label="Next diary day"
+                  disabled={diaryDate >= today}
+                  onClick={() => shiftDiaryDate(1)}
+                >
+                  <ChevronRight size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiaryDate(today)}
+                  disabled={diaryDate === today}
+                >
+                  Today
+                </button>
+              </div>
+              <div className={styles.diaryDayTotals} aria-label="Selected day nutrition totals">
+                {[
+                  ['energy_kcal', 'Energy', 'kcal'],
+                  ['protein', 'Protein', 'g'],
+                  ['carbohydrate', 'Carbs', 'g'],
+                  ['total_fat', 'Fat', 'g'],
+                ].map(([code, label, unit]) => {
+                  const values = eatenEntries.flatMap((entry) =>
+                    entry.values.filter((value) => value.nutrientCode === code),
+                  );
+                  return (
+                    <div key={code}>
+                      <span>{label}</span>
+                      <strong>
+                        {values.length
+                          ? number(
+                              values.reduce((sum, value) => sum + value.amount, 0),
+                              code === 'energy_kcal' ? 0 : 1,
+                            )
+                          : '—'}{' '}
+                        <small>{unit}</small>
+                      </strong>
+                      <small>
+                        {eatenEntries.length
+                          ? `${values.length} of ${eatenEntries.length} foods have data`
+                          : 'No food logged'}
+                      </small>
+                    </div>
+                  );
+                })}
+              </div>
+              <label className={styles.diaryHistoryToggle}>
+                <input
+                  type="checkbox"
+                  checked={showDiaryHistory}
+                  onChange={(event) => setShowDiaryHistory(event.target.checked)}
+                />{' '}
+                Show deleted entries
+              </label>
+              {diaryEntries.length === 0 ? (
                 <div className={styles.emptyState}>
                   <NotebookTabs size={24} aria-hidden="true" />
                   <div>
-                    <h3>Your food diary is ready</h3>
+                    <h3>No food logged for this day</h3>
                     <p>
-                      Record food, a skipped meal, or copy a previous day. Nothing is assumed until
-                      you confirm it.
+                      Add a meal, snack, or drink to start your daily log. You can also copy food
+                      from another day.
                     </p>
                   </div>
                   <button
@@ -2091,18 +2307,27 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                     disabled={!activeProfile.canManageProfile}
                     onClick={() => openLogDialog()}
                   >
-                    Record nutrition
+                    Log food
                   </button>
                 </div>
               ) : (
                 <ol className={styles.diaryList}>
-                  {summary.currentEntries.slice(0, showOlderDiary ? undefined : 10).map((entry) => (
+                  {diaryEntries.slice(0, showOlderDiary ? undefined : 10).map((entry) => (
                     <li key={entry.id}>
                       <div>
                         <strong>{entry.sourceNameSnapshot || `${entry.mealSlot} skipped`}</strong>
                         <span>
-                          {new Date(entry.occurredAt).toLocaleString()} · {entry.state} · revision{' '}
-                          {entry.revision}
+                          {entry.mealSlot.charAt(0).toUpperCase() + entry.mealSlot.slice(1)} ·{' '}
+                          {new Date(entry.occurredAt).toLocaleTimeString(undefined, {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: activeProfile.dailyResetTimezone ?? 'UTC',
+                          })}
+                          {entry.state === 'deleted'
+                            ? ' · deleted'
+                            : entry.state === 'skipped'
+                              ? ' · skipped'
+                              : ''}
                         </span>
                       </div>
                       <b>
@@ -2113,7 +2338,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                       </b>
                       {entry.state === 'eaten' || entry.state === 'corrected' ? (
                         <details>
-                          <summary>Correct, copy, move, or reassign</summary>
+                          <summary>Edit entry or copy to another day</summary>
                           <form
                             className={styles.form}
                             onSubmit={(event) => void correctDiaryEntry(event, entry)}
@@ -2302,7 +2527,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   ))}
                 </ol>
               )}
-              {summary.currentEntries.length > 10 ? (
+              {diaryEntries.length > 10 ? (
                 <button
                   className={styles.secondaryButton}
                   type="button"
@@ -2310,7 +2535,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 >
                   {showOlderDiary
                     ? 'Show newest 10'
-                    : `Show ${summary.currentEntries.length - 10} older entries`}
+                    : `Show ${diaryEntries.length - 10} older entries`}
                 </button>
               ) : null}
             </section>
@@ -2443,7 +2668,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   disabled={!activeProfile.canManageProfile}
                   onClick={() => openLogDialog()}
                 >
-                  Record nutrition
+                  Log food
                 </button>
               </div>
             ) : null}
@@ -2551,8 +2776,8 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
               <div>
                 <h2 id="daily-calorie-goal-title">Daily calorie target</h2>
                 <p>
-                  Choose an editable starting point. These examples are general planning values,
-                  not a diagnosis or a prescription.
+                  Choose an editable starting point. These examples are general planning values, not
+                  a diagnosis or a prescription.
                 </p>
               </div>
               <div className={styles.goalExamples} aria-label="Daily calorie examples">
@@ -2626,11 +2851,13 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 </button>
                 {maintenanceEstimate !== null && guidedCalorieTarget !== null ? (
                   <div className={styles.goalEstimateResult} role="status">
-                    <strong>{maintenanceEstimate.toLocaleString()} kcal/day estimated maintenance</strong>
+                    <strong>
+                      {maintenanceEstimate.toLocaleString()} kcal/day estimated maintenance
+                    </strong>
                     {guidedTargetIsTooLow ? (
                       <p>
-                        This pace would suggest less than 1,200 kcal/day. Bòrd will not create
-                        this target; choose a gentler plan or talk with a qualified clinician.
+                        This pace would suggest less than 1,200 kcal/day. Bòrd will not create this
+                        target; choose a gentler plan or talk with a qualified clinician.
                       </p>
                     ) : (
                       <>

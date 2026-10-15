@@ -15,16 +15,13 @@ type UpgradeProfile = {
 type CredentialDraft = {
   email: string;
   passphrase: string;
-  pin: string;
 };
 
 export function SecurityUpgradeForm({ profiles }: { profiles: UpgradeProfile[] }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [drafts, setDrafts] = useState<Record<string, CredentialDraft>>(() =>
-    Object.fromEntries(
-      profiles.map((profile) => [profile.id, { email: '', passphrase: '', pin: '' }]),
-    ),
+    Object.fromEntries(profiles.map((profile) => [profile.id, { email: '', passphrase: '' }])),
   );
   const [recoveryCodes, setRecoveryCodes] = useState<Array<{
     profileId: string;
@@ -154,7 +151,7 @@ export function SecurityUpgradeForm({ profiles }: { profiles: UpgradeProfile[] }
           <h2>Secure every household profile.</h2>
           <p>
             Existing recipe data stays shared. Each profile receives its own email sign-in and a
-            quick-switch PIN.
+            password for profile switching.
           </p>
         </div>
       </div>
@@ -186,31 +183,12 @@ export function SecurityUpgradeForm({ profiles }: { profiles: UpgradeProfile[] }
                   required
                   type="password"
                   autoComplete="new-password"
-                  minLength={15}
+                  minLength={8}
                   maxLength={128}
                   value={draft.passphrase}
                   onChange={(event) => update(profile.id, { passphrase: event.target.value })}
                 />
-                <small>At least 15 characters.</small>
-              </label>
-              <label>
-                <span>Six-digit PIN</span>
-                <input
-                  required
-                  type="password"
-                  autoComplete="new-password"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  minLength={6}
-                  maxLength={6}
-                  value={draft.pin}
-                  onChange={(event) =>
-                    update(profile.id, {
-                      pin: event.target.value.replace(/\D/gu, '').slice(0, 6),
-                    })
-                  }
-                />
-                <small>Used only for quick switching after a full sign-in.</small>
+                <small>At least 8 characters.</small>
               </label>
             </div>
           </fieldset>

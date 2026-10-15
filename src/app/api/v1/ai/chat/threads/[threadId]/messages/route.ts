@@ -1,3 +1,5 @@
+import { decisionPrincipal, decisionErrorResponse } from '@/lib/services/decision-request-service';
+import { DecisionError } from '@/lib/providers/decisions-provider';
 import { cookies } from 'next/headers';
 import { ZodError } from 'zod';
 
@@ -24,7 +26,12 @@ export async function POST(request: Request, context: { params: Promise<{ thread
   if (!profileId)
     return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
   try {
+    const principal = await decisionPrincipal(request);
+    if (principal.profileId !== profileId)
+      throw new DecisionError('Select your current profile again before using chat.', 409);
     const result = await runAiChatTurn({
+      principal,
+      request,
       threadId: (await context.params).threadId,
       profileId,
       message: await request.json().catch(() => null),
@@ -40,6 +47,8 @@ export async function POST(request: Request, context: { params: Promise<{ thread
         preview: action.preview,
       })),
       ...result.jobs.map((job) => ({ type: 'job', job })),
+      ...result.suggestions.map((card) => ({ type: 'suggestion', card })),
+      ...result.appActions.map((proposal) => ({ type: 'app_action', proposal })),
       { type: 'done', messageId: result.message.id, actionId: result.message.actionId },
     ];
     return new Response(
@@ -59,6 +68,7 @@ export async function POST(request: Request, context: { params: Promise<{ thread
       },
     );
   } catch (error) {
+    if (error instanceof DecisionError) return decisionErrorResponse(error);
     if (error instanceof ZodError)
       return jsonError(400, 'invalid_message', 'Enter a valid message.');
     if (error instanceof AiChatNotFoundError)

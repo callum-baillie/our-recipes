@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { AI_GROUNDING_INSTRUCTIONS } from '@/lib/domain/ai-grounding';
+
 import { createHash, randomUUID } from 'node:crypto';
 
 import { and, asc, eq, inArray, lt } from 'drizzle-orm';
@@ -499,7 +501,7 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
         url: '/v1/responses',
         body: {
           model: job.model,
-          instructions: recipe.instructions,
+          instructions: [AI_GROUNDING_INSTRUCTIONS, recipe.instructions].join('\n'),
           input: [
             {
               role: 'user',
@@ -614,7 +616,7 @@ async function processDirectRecipe(item: AiJobItemRow, job: AiJobRow) {
         model: job.model,
         reasoningEffort: request.reasoningEffort,
         safetyIdentifier: request.safetyIdentifier,
-        instructions: request.instructions,
+        instructions: [AI_GROUNDING_INSTRUCTIONS, request.instructions].join('\n'),
         context: request.context,
       }),
     );

@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import {
   nutritionBodyMeasurements,
+  nutritionScaleConnections,
   nutritionConsumptionCommands,
   nutritionDiaryCommands,
   nutritionGoalVersions,
@@ -755,6 +756,10 @@ export function deletePrivateNutritionProfileData(
       }
     }
 
+    transaction
+      .delete(nutritionScaleConnections)
+      .where(eq(nutritionScaleConnections.nutritionProfileId, profileId))
+      .run();
     const now = new Date();
     transaction
       .update(nutritionProfiles)
@@ -766,6 +771,9 @@ export function deletePrivateNutritionProfileData(
         dateOfBirth: null,
         heightCentimeters: null,
         currentWeightKilograms: null,
+        advancedBodyMetrics: '{}',
+        bodyCompositionEstimate: null,
+        weightGoalPace: null,
         measurementSystem: 'metric',
         referenceSexCategory: null,
         activityLevel: null,

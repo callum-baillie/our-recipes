@@ -246,6 +246,9 @@ export async function generateAiMealPlanProposal(input: {
     );
   }
   const setting = getAiWorkloadSetting(input.actorProfileId, 'meal_plan_generation');
+  if (request.mode !== 'recipebook' && !setting.enabled) {
+    throw new AiMealPlanValidationError('AI meal planning is disabled in household AI settings.');
+  }
   if (request.options.generateRecipeImages) {
     const imageSetting = getAiWorkloadSetting(input.actorProfileId, 'image_generation');
     if (!imageSetting.enabled) {
@@ -260,6 +263,10 @@ export async function generateAiMealPlanProposal(input: {
     const expectedSlots =
       dateRange(request.startDate, request.endDate).size * request.mealSlots.length;
     if (request.options.generateMissingRecipes && rawCandidate.entries.length < expectedSlots) {
+      if (!setting.enabled)
+        throw new AiMealPlanValidationError(
+          'AI meal planning is disabled in household AI settings.',
+        );
       const generated = aiMealPlanCandidateSchema.parse(
         await getAiAssistantProvider().generateMealPlan({
           model: setting.model,

@@ -2,15 +2,7 @@ import 'server-only';
 
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { and, count, desc, eq, gt, isNull } from 'drizzle-orm';
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  randomUUID,
-  scrypt,
-  timingSafeEqual,
-} from 'node:crypto';
-import { promisify } from 'node:util';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 import { parseSessionBoundProfileValue } from '@/lib/actor-context';
 import { auth } from '@/lib/auth/server';
@@ -32,20 +24,16 @@ import {
 } from '@/lib/db/schema';
 import {
   accountRecoverySchema,
+  apiPermissionsSchema,
   type ApiAction,
+  type ApiPermissions,
   type ApiResource,
   type ProfileCredentialsInput,
 } from '@/lib/domain/auth';
-import {
-  effectiveAppRole,
-  normalizeAppRole,
-  type AppRole,
-} from '@/lib/domain/permissions';
+import { effectiveAppRole, normalizeAppRole, type AppRole } from '@/lib/domain/permissions';
 
-const scryptAsync = promisify(scrypt);
-const PIN_HASH_BYTES = 32;
-const PIN_WINDOW_MS = 15 * 60 * 1_000;
-const PIN_MAX_ATTEMPTS = 5;
+const PROFILE_PASSWORD_WINDOW_MS = 15 * 60 * 1_000;
+const PROFILE_PASSWORD_MAX_ATTEMPTS = 5;
 const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export type PreparedProfileEnrollment = {
@@ -66,6 +54,7 @@ export type RequestPrincipal = {
   apiKeyId: string | null;
   linkedProfileId: string;
   profileId: string;
+  apiPermissions?: ApiPermissions;
 };
 
 export class RequestAuthError extends Error {
@@ -90,22 +79,6 @@ export class AuthorizationConflictError extends Error {
 
 function normalizeEmail(email: string): string {
   return email.trim().toLocaleLowerCase('en-US');
-}
-
-function pinDigest(pin: string, salt: string): Promise<Buffer> {
-  return scryptAsync(pin, Buffer.from(salt, 'base64url'), PIN_HASH_BYTES) as Promise<Buffer>;
-}
-
-async function hashPin(pin: string): Promise<{ salt: string; hash: string }> {
-  const salt = randomBytes(16).toString('base64url');
-  const digest = await pinDigest(pin, salt);
-  return { salt, hash: digest.toString('base64url') };
-}
-
-async function pinMatches(pin: string, salt: string, expectedHash: string): Promise<boolean> {
-  const actual = await pinDigest(pin, salt);
-  const expected = Buffer.from(expectedHash, 'base64url');
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function recoveryCodeHash(code: string): string {
@@ -138,17 +111,14 @@ export async function prepareProfileEnrollment(
 ): Promise<PreparedProfileEnrollment> {
   const now = new Date();
   const userId = randomUUID();
-  const [passwordHash, pin] = await Promise.all([
-    hashPassword(credentials.passphrase),
-    hashPin(credentials.pin),
-  ]);
+  const passwordHash = await hashPassword(credentials.passphrase);
   const recoveryCodes = generateRecoveryCodes();
   return {
     user: {
       id: userId,
       name: displayName.trim(),
       email: normalizeEmail(credentials.email),
-      emailVerified: !getRuntimeConfig().isProduction,
+      emailVerified: !getRuntimeConfig().auth.requireEmailVerification,
       image: null,
       role,
       banned: false,
@@ -167,9 +137,9 @@ export async function prepareProfileEnrollment(
       updatedAt: now,
     },
     security: {
-      pinSalt: pin.salt,
-      pinHash: pin.hash,
-      pinVersion: 1,
+      pinSalt: '',
+      pinHash: '',
+      pinVersion: 0,
       createdAt: now,
       updatedAt: now,
     },
@@ -434,7 +404,13 @@ function cookieValue(request: Request, name: string): string | undefined {
   if (!cookie) return undefined;
   for (const part of cookie.split(';')) {
     const [candidate, ...rest] = part.trim().split('=');
-    if (candidate === name) return decodeURIComponent(rest.join('='));
+    if (candidate === name) {
+      try {
+        return decodeURIComponent(rest.join('='));
+      } catch {
+        return undefined;
+      }
+    }
   }
   return undefined;
 }
@@ -500,7 +476,7 @@ async function apiKeyPrincipal(
     throw new RequestAuthError(401, 'invalid_api_key', 'The API key is invalid.');
   }
   const result = await auth.api.verifyApiKey({
-    body: { key, permissions: { [resource]: [action] } },
+    body: { key },
   });
   if (!result.valid || !result.key) {
     const rateLimited = result.error?.code === 'RATE_LIMITED';
@@ -509,6 +485,14 @@ async function apiKeyPrincipal(
       rateLimited ? 'api_key_rate_limited' : 'invalid_api_key',
       rateLimited ? 'The API key rate limit has been reached.' : 'The API key is invalid.',
       rateLimited ? 60 : undefined,
+    );
+  }
+  const permissions = apiPermissionsSchema.safeParse(result.key.permissions);
+  if (!permissions.success || !permissions.data[resource]?.includes(action)) {
+    throw new RequestAuthError(
+      403,
+      'insufficient_api_key_permissions',
+      `This API key needs ${resource}:${action} permission.`,
     );
   }
   const owner = getDatabase()
@@ -541,6 +525,7 @@ async function apiKeyPrincipal(
     apiKeyId: result.key.id,
     linkedProfileId: owner.profileId,
     profileId: owner.profileId,
+    apiPermissions: permissions.data,
   };
 }
 
@@ -619,50 +604,99 @@ export async function requireAdminSession(
   return principal;
 }
 
-export async function verifyProfilePin(input: {
+export async function verifyProfilePassword(input: {
   sessionId: string;
   userId: string;
   profileId: string;
-  pin: string;
+  password: string;
   requestId?: string;
 }): Promise<{ ok: true } | { ok: false; retryAfterSeconds?: number }> {
   ensureDatabase();
   const db = getDatabase();
   const now = new Date();
-  const attempt = db
-    .select()
-    .from(profilePinAttempts)
+  // Keep the existing rate-limit table, but key by authenticated account so a
+  // new session cannot reset the password guessing budget. Reserve before hashing.
+  const bucket = `password:${input.userId}`;
+  const reserved = db.transaction((tx) => {
+    const attempt = tx
+      .select()
+      .from(profilePinAttempts)
+      .where(
+        and(
+          eq(profilePinAttempts.sessionId, bucket),
+          eq(profilePinAttempts.profileId, input.profileId),
+        ),
+      )
+      .get();
+    if (attempt?.lockedUntil && attempt.lockedUntil > now)
+      return {
+        blocked: true as const,
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((attempt.lockedUntil.getTime() - now.getTime()) / 1000),
+        ),
+      };
+    const expired =
+      !attempt || now.getTime() - attempt.windowStartedAt.getTime() >= PROFILE_PASSWORD_WINDOW_MS;
+    const failedAttempts = expired ? 1 : attempt.failedAttempts + 1;
+    const lockedUntil =
+      failedAttempts >= PROFILE_PASSWORD_MAX_ATTEMPTS
+        ? new Date(now.getTime() + PROFILE_PASSWORD_WINDOW_MS)
+        : null;
+    const id = attempt?.id ?? randomUUID();
+    const values = {
+      windowStartedAt: expired ? now : attempt.windowStartedAt,
+      failedAttempts,
+      lockedUntil,
+      updatedAt: now,
+    };
+    if (attempt)
+      tx.update(profilePinAttempts).set(values).where(eq(profilePinAttempts.id, id)).run();
+    else
+      tx.insert(profilePinAttempts)
+        .values({ id, sessionId: bucket, profileId: input.profileId, ...values })
+        .run();
+    return { blocked: false as const, id, failedAttempts, lockedUntil };
+  });
+  if (reserved.blocked) return { ok: false, retryAfterSeconds: reserved.retryAfterSeconds };
+  const credential = db
+    .select({ password: account.password, userId: user.id })
+    .from(profileAuthLinks)
+    .innerJoin(profiles, eq(profiles.id, profileAuthLinks.profileId))
+    .innerJoin(user, eq(user.id, profileAuthLinks.userId))
+    .innerJoin(account, and(eq(account.userId, user.id), eq(account.providerId, 'credential')))
     .where(
       and(
-        eq(profilePinAttempts.sessionId, input.sessionId),
-        eq(profilePinAttempts.profileId, input.profileId),
+        eq(profileAuthLinks.profileId, input.profileId),
+        isNull(profiles.archivedAt),
+        eq(user.banned, false),
       ),
     )
     .get();
-  if (attempt?.lockedUntil && attempt.lockedUntil > now) {
-    return {
-      ok: false,
-      retryAfterSeconds: Math.max(
-        1,
-        Math.ceil((attempt.lockedUntil.getTime() - Date.now()) / 1_000),
-      ),
-    };
-  }
-  const security = db
-    .select()
-    .from(profileSecurity)
-    .innerJoin(profiles, eq(profiles.id, profileSecurity.profileId))
-    .where(and(eq(profileSecurity.profileId, input.profileId), isNull(profiles.archivedAt)))
-    .get();
-  const valid =
-    security &&
-    (await pinMatches(
-      input.pin,
-      security.profile_security.pinSalt,
-      security.profile_security.pinHash,
-    ));
-  if (valid) {
-    if (attempt) db.delete(profilePinAttempts).where(eq(profilePinAttempts.id, attempt.id)).run();
+  const valid = credential?.password
+    ? await verifyPassword({ hash: credential.password, password: input.password })
+    : false;
+  // Do not accept credentials changed, revoked or archived during hashing.
+  const current = credential
+    ? db
+        .select({ password: account.password })
+        .from(account)
+        .innerJoin(user, eq(user.id, account.userId))
+        .innerJoin(profileAuthLinks, eq(profileAuthLinks.userId, user.id))
+        .innerJoin(profiles, eq(profiles.id, profileAuthLinks.profileId))
+        .where(
+          and(
+            eq(user.id, credential.userId),
+            eq(account.providerId, 'credential'),
+            eq(profileAuthLinks.profileId, input.profileId),
+            isNull(profiles.archivedAt),
+            eq(user.banned, false),
+          ),
+        )
+        .get()
+    : null;
+  if (valid && current?.password === credential?.password) {
+    db.delete(profilePinAttempts).where(eq(profilePinAttempts.id, reserved.id)).run();
     recordSecurityEvent({
       userId: input.userId,
       profileId: input.profileId,
@@ -671,43 +705,15 @@ export async function verifyProfilePin(input: {
     });
     return { ok: true };
   }
-
-  const windowExpired = !attempt || Date.now() - attempt.windowStartedAt.getTime() >= PIN_WINDOW_MS;
-  const failedAttempts = windowExpired ? 1 : attempt.failedAttempts + 1;
-  const lockedUntil =
-    failedAttempts >= PIN_MAX_ATTEMPTS ? new Date(Date.now() + PIN_WINDOW_MS) : null;
-  if (attempt) {
-    db.update(profilePinAttempts)
-      .set({
-        windowStartedAt: windowExpired ? now : attempt.windowStartedAt,
-        failedAttempts,
-        lockedUntil,
-        updatedAt: now,
-      })
-      .where(eq(profilePinAttempts.id, attempt.id))
-      .run();
-  } else {
-    db.insert(profilePinAttempts)
-      .values({
-        id: randomUUID(),
-        sessionId: input.sessionId,
-        profileId: input.profileId,
-        windowStartedAt: now,
-        failedAttempts,
-        lockedUntil,
-        updatedAt: now,
-      })
-      .run();
-  }
   recordSecurityEvent({
     userId: input.userId,
     profileId: input.profileId,
-    event: 'profile_pin_failed',
+    event: 'profile_password_failed',
     requestId: input.requestId,
-    details: { failedAttempts, locked: Boolean(lockedUntil) },
+    details: { failedAttempts: reserved.failedAttempts, locked: Boolean(reserved.lockedUntil) },
   });
-  return lockedUntil
-    ? { ok: false, retryAfterSeconds: Math.ceil(PIN_WINDOW_MS / 1_000) }
+  return reserved.lockedUntil
+    ? { ok: false, retryAfterSeconds: Math.ceil(PROFILE_PASSWORD_WINDOW_MS / 1000) }
     : { ok: false };
 }
 

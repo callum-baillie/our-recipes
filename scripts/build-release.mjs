@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { sanitizeStandaloneEnvironment } from './sanitize-standalone-environment.mjs';
 
 const build = spawnSync('pnpm', ['build'], {
   cwd: process.cwd(),
@@ -32,6 +33,8 @@ if (tracingWarning.test(`${build.stdout ?? ''}\n${build.stderr ?? ''}`)) {
   console.error('Release build rejected: Next.js traced the whole project unexpectedly.');
   process.exit(1);
 }
+
+sanitizeStandaloneEnvironment('.next/standalone');
 
 const hydrate = spawnSync('node', ['scripts/hydrate-standalone-dependencies.mjs'], {
   cwd: process.cwd(),

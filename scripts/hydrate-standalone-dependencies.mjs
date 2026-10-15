@@ -69,6 +69,7 @@ if (!existsSync(standaloneRoot)) {
 }
 
 const runtimePaths = [
+  '@formepdf',
   'tesseract.js',
   'tesseract.js-core',
   '@tesseract.js-data',

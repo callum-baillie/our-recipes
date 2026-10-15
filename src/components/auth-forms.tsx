@@ -31,39 +31,49 @@ export function SignInForm({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    setError(null);
-    const result = await authClient.signIn.email({
-      email,
-      password: passphrase,
-      rememberMe,
-      callbackURL: destination,
-    });
-    setPending(false);
-    if (result.error) {
-      const message =
-        result.error.message ??
-        'Sign-in failed. Check the email, passphrase, and email verification status.';
-      setError(message);
-      showToast(message, 'error');
-      return;
+    try {
+      setError(null);
+      const result = await authClient.signIn.email({
+        email,
+        password: passphrase,
+        rememberMe,
+        callbackURL: destination,
+      });
+      if (result.error) {
+        const message =
+          result.error.message ??
+          'Sign-in failed. Check the email, passphrase, and email verification status.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      showToast('Signed in securely.', 'success');
+      router.push(destination);
+      router.refresh();
+    } catch {
+      setError('Unable to reach the sign-in service. Check your connection and try again.');
+    } finally {
+      setPending(false);
     }
-    showToast('Signed in securely.', 'success');
-    router.push(destination);
-    router.refresh();
   }
 
   async function signInWithPasskey() {
     setPending(true);
-    setError(null);
-    const result = await authClient.signIn.passkey();
-    setPending(false);
-    if (result.error) {
-      const message = result.error.message ?? 'The passkey could not be verified.';
-      setError(message);
-      return;
+    try {
+      setError(null);
+      const result = await authClient.signIn.passkey();
+      if (result.error) {
+        const message = result.error.message ?? 'The passkey could not be verified.';
+        setError(message);
+        return;
+      }
+      router.push(destination);
+      router.refresh();
+    } catch {
+      setError('Unable to reach the sign-in service. Check your connection and try again.');
+    } finally {
+      setPending(false);
     }
-    router.push(destination);
-    router.refresh();
   }
 
   return (
@@ -101,7 +111,7 @@ export function SignInForm({
           required
           type="password"
           autoComplete="current-password"
-          minLength={15}
+          minLength={8}
           maxLength={128}
           value={passphrase}
           onChange={(event) => setPassphrase(event.target.value)}
@@ -146,16 +156,27 @@ export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    await authClient.requestPasswordReset({
-      email,
-      redirectTo: '/reset-password',
-    });
-    setPending(false);
-    setSent(true);
+    setError(null);
+    try {
+      const result = await authClient.requestPasswordReset({
+        email,
+        redirectTo: '/reset-password',
+      });
+      if (result.error) {
+        setError('The reset request could not be completed. Please try again later.');
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError('Unable to reach the sign-in service. Check your connection and try again.');
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -170,6 +191,11 @@ export function ForgotPasswordForm() {
           <p>We will send a one-time reset link if the email belongs to a profile.</p>
         </div>
       </div>
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
       {sent ? (
         <div className="setup-note" role="status">
           <span aria-hidden="true">✦</span>
@@ -208,29 +234,34 @@ export function ResetPasswordForm({ token }: { token?: string }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    setError(null);
-    const response = token
-      ? await fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, newPassword: newPassphrase }),
-        })
-      : await fetch('/api/v1/auth/recover', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, recoveryCode, newPassphrase }),
-        });
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-      message?: string;
-    } | null;
-    setPending(false);
-    if (!response.ok) {
-      setError(body?.error?.message ?? body?.message ?? 'The passphrase could not be reset.');
-      return;
+    try {
+      setError(null);
+      const response = token
+        ? await fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, newPassword: newPassphrase }),
+          })
+        : await fetch('/api/v1/auth/recover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, recoveryCode, newPassphrase }),
+          });
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+        message?: string;
+      } | null;
+      if (!response.ok) {
+        setError(body?.error?.message ?? body?.message ?? 'The passphrase could not be reset.');
+        return;
+      }
+      router.push('/sign-in?reset=1');
+      router.refresh();
+    } catch {
+      setError('Unable to reach the sign-in service. Check your connection and try again.');
+    } finally {
+      setPending(false);
     }
-    router.push('/sign-in?reset=1');
-    router.refresh();
   }
 
   return (
@@ -279,12 +310,12 @@ export function ResetPasswordForm({ token }: { token?: string }) {
           required
           type="password"
           autoComplete="new-password"
-          minLength={15}
+          minLength={8}
           maxLength={128}
           value={newPassphrase}
           onChange={(event) => setNewPassphrase(event.target.value)}
         />
-        <small>Use at least 15 characters.</small>
+        <small>Use at least 8 characters.</small>
       </label>
       {error ? (
         <p className="form-error" role="alert">

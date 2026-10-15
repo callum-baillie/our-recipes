@@ -1,6 +1,6 @@
 # API conventions
 
-Food discovery uses profile-scoped, exact-origin POST actions because requests consume shared upstream quota and populate a transient server cache. The stable routes and errors are documented in `openapi.yaml`; provider behavior is described in [food-data-integrations.md](food-data-integrations.md). Raw upstream responses and credentials are never response fields.
+Food discovery uses authenticated POST actions because requests consume shared upstream quota and populate a transient server cache. The stable routes and errors are documented in `openapi.yaml`; provider behavior is described in [food-data-integrations.md](food-data-integrations.md). Raw upstream responses and credentials are never response fields.
 
 Application routes are under `/api/v1`; the private Homepage integration is under `/api/integrations/homepage/v1`. Responses use JSON. Browser writes require an exact same/trusted `Origin`; server-to-server bearer requests use scoped API-key authentication instead. Failures use:
 
@@ -20,15 +20,15 @@ Only the first/admin account can manage keys at **Settings → API access**. Key
 - start with `bord_sk_`, are shown once, and are stored hashed;
 - expire after 1–365 days (90 by default);
 - have explicit `read`, `create`, `update`, and `delete` grants for Recipes, Meal Plans, Grocery
-  Lists, Collections, and Pantry;
+  Lists, Collections, and Pantry, plus optional `read`/`update` grants for workflow Settings;
 - are accepted only on those documented resource paths, at a default 120 requests/minute;
 - can be disabled, revoked, or rotated; rotation revokes the previous key immediately.
 
-Send a key as `Authorization: Bearer bord_sk_…`. API-key create requests also require an
-`Idempotency-Key` header (1–128 visible ASCII characters). Identical retries replay the stored JSON
+Send a key as `Authorization: Bearer bord_sk_…`. The core create endpoints for recipes, meal-plan entries, grocery lists, collections,
+pantry products, and pantry batches also require an `Idempotency-Key` header (1–128 visible ASCII characters). Identical retries replay the stored JSON
 response for 24 hours; changing the body while reusing the same key returns `409`.
 
-Every integration response includes `X-Request-Id`. The five `/bulk` endpoints return
+Authenticated integration responses include `X-Request-Id`. The five `/bulk` endpoints return
 `application/x-ndjson`: the first line is snapshot metadata and later lines contain records. A
 snapshot is limited to 50,000 records and 100 MB; `updatedSince` reduces the slice and
 `includeInactive=true` includes archived/trash/inactive records where the resource supports them.
@@ -174,3 +174,49 @@ Meal-plan POST input requires an ISO local date, a named meal slot, 1–100 serv
 Shopping aisle names are 1–80 trimmed characters and unique for the household. Reorder requests must name the complete current aisle set, preventing a stale client from silently dropping an aisle. Item writes accept only a current aisle ID or an empty assignment. The list read returns aisles in saved position order; clients should render those groups followed by **Unassigned**. Deleting an aisle never deletes a list item.
 
 Backup restore never accepts an uploaded archive. It operates only on a backup already listed by the server, validates its archive path/type/manifest/checksums/database integrity in isolated staging, and requires an active profile plus a trusted mutation origin for create/restore actions.
+
+## Core feature coverage
+
+Bearer keys can use the same core operations as the web UI. The explicit route registry in
+`src/lib/domain/integration-routes.ts` is shared by the proxy and route authorization; each
+OpenAPI operation declares `x-api-permissions`. Adding an endpoint to the registry does not
+skip authentication: handlers verify the key and its current owner before calling services.
+
+| Area                      | Supported operations                                                                                                                                                                    | Scope                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Recipes                   | Search/filter, create/edit, duplicate, archive/trash/restore, favorites/ratings, tags and tag merges, revision restore, image upload/download/removal, JSON-LD/Markdown/portable export | `recipes`                                                                                            |
+| Import and capture        | Upload/OCR drafts, inspect source files, JSON-LD and text drafts, confirm reviewed recipes                                                                                              | `recipes`                                                                                            |
+| Collections               | Create/edit/delete, order, membership changes and bulk export                                                                                                                           | `collections`                                                                                        |
+| Pantry                    | Products, locations, stock batches, consumption/move/freeze/split/undo actions, history, ingredient mappings, availability and projected demand                                         | `pantry`                                                                                             |
+| Food and recipe nutrition | Food search/barcode/details/import, manual product nutrition records and shared recipe nutrition calculations                                                                           | `pantry` / `recipes`                                                                                 |
+| Meal plans                | Date-range reads, single/batch additions, edits/status/removal, swaps, week duplication, refresh recipe snapshots and calendar/bulk exports                                             | `mealPlans`                                                                                          |
+| Cooking and groceries     | Cooking sessions and pantry previews, explicit stock deductions/undo, grocery generation, item lifecycle, restock policies, purchase intake, aisles and supermarket profiles            | `recipes` / `shoppingLists`; explicit stock-changing operations additionally require `pantry:update` |
+| Useful settings           | Recipe defaults, meal types/week defaults, pantry defaults, grocery/restock behavior                                                                                                    | `settings:read` / `settings:update`                                                                  |
+
+Settings access is opt-in; existing keys gain no new settings permissions. Read-only keys cannot
+mutate resources. POST food searches and cooking previews can be read operations; consult the
+operation's declared permissions rather than inferring access solely from its HTTP method.
+Recipe-specific AI requests still require their existing explicit confirmation and configured
+provider. They may incur provider charges; this review did not make any live provider calls.
+
+Account credentials, key administration, profile switching, household role/guardian changes,
+personal nutrition diaries/health records, destructive reset, backups, diagnostics, theme/branding,
+and assistant conversation history remain session-only. The separate Homepage integration keeps
+its dedicated configured token. An integration acts as its key owner's profile; it cannot choose
+an actor by supplying a profile cookie.
+
+Key administration requires a sign-in within the last ten minutes. Settings → API & Security
+now offers an inline passphrase confirmation without discarding the key form. The explicit
+`/sign-in?reauth=1&callbackUrl=/settings/api` flow also allows a passkey to renew the session.
+Missing credentials return `401`; missing permissions return `403`; a key's rate limit returns
+`429` with `Retry-After`. Expiry, revocation, or loss of the owner's admin role invalidates access.
+
+### Printable recipes and meal plans
+
+PDFs use locally rendered pdfcn components with Forme. No recipe data is sent to a PDF provider.
+
+- `GET /api/v1/recipes/{recipeId}/export/pdf?paper=A4&servings=4`: one recipe card (`recipes:read`).
+- `POST /api/v1/exports/recipes/pdf`: `{ "recipeIds": ["UUID"], "format": "zip", "paper": "A4" }` (`recipes:read`). Up to 100 recipes; `pdf` combines cards, `zip` creates separate PDFs.
+- `POST /api/v1/meal-plan/export/pdf`: `{ "start": "2026-10-19", "end": "2026-11-01", "includeRecipes": true, "format": "zip" }` (both `mealPlans:read` and `recipes:read`). Inclusive range of 1–56 days, at most 500 meals and 100 distinct recipe/serving/revision combinations.
+
+POST exports also accept `includeNutrition` and `includeNotes` (both default true), and paper `A4` or `Letter`. Recipe exports accept optional `servings`. Meal-plan cards preserve the saved recipe revision and scale to the planned servings; identical combinations share a card. Skipped/cancelled meals are omitted. Unavailable historical revisions return 409 rather than silently printing a newer recipe. ZIP meal-plan exports contain `meal-schedule.pdf` and a `recipes/` directory. Large archives return 413; busy queues return 429 with `Retry-After: 10`. Downloads use `Content-Disposition: attachment` and `Cache-Control: no-store`.

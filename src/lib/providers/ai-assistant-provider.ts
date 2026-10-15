@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { AI_GROUNDING_INSTRUCTIONS } from '@/lib/domain/ai-grounding';
+
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 
@@ -101,7 +103,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     try {
       const response = await this.responses.create({
         model: input.model,
-        instructions: input.instructions,
+        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
         input: input.messages,
         tools: input.tools,
         store: false,
@@ -143,7 +145,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     try {
       const response = await this.responses.parse({
         model: input.model,
-        instructions: input.instructions,
+        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
         input: [
           {
             role: 'user',
@@ -165,7 +167,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     try {
       const response = await this.responses.parse({
         model: input.model,
-        instructions: input.instructions,
+        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
         input: [
           {
             role: 'user',
@@ -199,7 +201,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     try {
       const response = await this.responses.parse({
         model: input.model,
-        instructions: input.instructions,
+        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
         input: [
           {
             role: 'user',

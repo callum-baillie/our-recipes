@@ -15,6 +15,7 @@ import {
   recipeIngredients,
   pantryProducts,
   recipes,
+  shoppingPolicyInstances,
   shoppingAisles,
   shoppingListItems,
   shoppingLists,
@@ -48,8 +49,13 @@ import {
 } from '@/lib/domain/inventory-units';
 import {
   getShoppingItemPantryDetails,
+  getShoppingPolicyReviews,
   recordShoppingItemManualOverrides,
+  shoppingPolicyBreakdown,
+  switchAutomaticRestockTarget,
   type ShoppingDetail,
+  type ShoppingPolicyBreakdown,
+  type ShoppingPolicyReview,
 } from '@/lib/services/pantry-grocery-cooking-service';
 import {
   getListSettings,
@@ -59,6 +65,7 @@ import {
   listSupermarketProfiles,
   rememberShoppingAisle,
   resolveShoppingAisle,
+  setAutomaticRestockList,
   type ListSettingsView,
   type SupermarketProfileView,
 } from '@/lib/services/list-settings-service';
@@ -145,11 +152,18 @@ function recipePlanSnapshot(
   };
 }
 export type ShoppingListDetail = typeof shoppingLists.$inferSelect & {
-  items: Array<typeof shoppingListItems.$inferSelect & { pantry: ShoppingDetail | null }>;
+  items: Array<
+    typeof shoppingListItems.$inferSelect & {
+      pantry: ShoppingDetail | null;
+      policyBreakdown: ShoppingPolicyBreakdown | null;
+    }
+  >;
   aisles: Array<typeof shoppingAisles.$inferSelect>;
   settings: ListSettingsView;
   supermarketProfile: SupermarketProfileView | null;
   supermarketProfiles: SupermarketProfileView[];
+  policyReviews: ShoppingPolicyReview[];
+  isAutomaticRestockTarget: boolean;
 };
 
 export type ShoppingListSummary = typeof shoppingLists.$inferSelect & {
@@ -164,6 +178,7 @@ export type ShoppingListSummary = typeof shoppingLists.$inferSelect & {
   sourceKind: ShoppingListSourceKind;
   supermarketName: string | null;
   supermarketLocation: string;
+  isAutomaticRestockTarget: boolean;
 };
 
 export function listPlannedMeals(weekStart: string, weekEnd: string): PlannedMeal[] {
@@ -774,6 +789,7 @@ export function listShoppingLists(includeArchived = false): ShoppingListSummary[
   ensureDatabase();
   const database = getDatabase();
   const profiles = new Map(listSupermarketProfiles(true).map((profile) => [profile.id, profile]));
+  const automaticRestockListId = getListSettings().automaticRestockListId;
   const itemCounts = new Map(
     database
       .select({
@@ -818,11 +834,16 @@ export function listShoppingLists(includeArchived = false): ShoppingListSummary[
         sourceKind: shoppingListSourceKind(list.sourceMode),
         supermarketName: profile?.name ?? null,
         supermarketLocation: profile?.locationLabel ?? '',
+        isAutomaticRestockTarget: list.id === automaticRestockListId,
       };
     });
 }
 
-export function createManualShoppingList(name: string, actorProfileId: string): ShoppingListDetail {
+export function createManualShoppingList(
+  name: string,
+  actorProfileId: string,
+  makeAutomaticRestockTarget = false,
+): ShoppingListDetail {
   ensureDatabase();
   const now = new Date();
   const id = randomUUID();
@@ -842,12 +863,17 @@ export function createManualShoppingList(name: string, actorProfileId: string): 
       updatedAt: now,
     })
     .run();
+  if (makeAutomaticRestockTarget) setAutomaticRestockList(id, actorProfileId);
   return getShoppingList(id)!;
 }
 
 export function manageShoppingList(
   listId: string,
-  action: { action: 'rename'; name: string } | { action: 'archive' | 'restore' | 'duplicate' },
+  action:
+    | { action: 'rename'; name: string }
+    | {
+        action: 'archive' | 'restore' | 'duplicate' | 'set_restock_target' | 'complete';
+      },
   actorProfileId: string,
 ) {
   ensureDatabase();
@@ -862,12 +888,56 @@ export function manageShoppingList(
       .run();
     return getShoppingList(listId)!;
   }
+  if (action.action === 'set_restock_target') {
+    switchAutomaticRestockTarget(listId, actorProfileId);
+    return getShoppingList(listId)!;
+  }
+  if (action.action === 'complete') {
+    database.transaction((transaction) => {
+      const now = new Date();
+      const inCartIds = transaction
+        .select({ id: shoppingListItems.id })
+        .from(shoppingListItems)
+        .where(
+          and(eq(shoppingListItems.listId, listId), eq(shoppingListItems.shoppingState, 'in_cart')),
+        )
+        .all()
+        .map((item) => item.id);
+      if (inCartIds.length) {
+        transaction
+          .update(shoppingPolicyInstances)
+          .set({ state: 'satisfied', updatedByProfileId: actorProfileId, updatedAt: now })
+          .where(inArray(shoppingPolicyInstances.shoppingListItemId, inCartIds))
+          .run();
+      }
+      transaction
+        .update(shoppingListItems)
+        .set({ checked: true, shoppingState: 'sourced', updatedAt: now })
+        .where(
+          and(eq(shoppingListItems.listId, listId), eq(shoppingListItems.shoppingState, 'in_cart')),
+        )
+        .run();
+      transaction
+        .update(shoppingLists)
+        .set({ archivedAt: now, updatedAt: now })
+        .where(eq(shoppingLists.id, listId))
+        .run();
+    });
+    if (getListSettings().automaticRestockListId === listId) {
+      setAutomaticRestockList(null, actorProfileId);
+    }
+    return getShoppingList(listId)!;
+  }
   if (action.action === 'archive' || action.action === 'restore') {
+    const archived = action.action === 'archive';
     database
       .update(shoppingLists)
-      .set({ archivedAt: action.action === 'archive' ? new Date() : null, updatedAt: new Date() })
+      .set({ archivedAt: archived ? new Date() : null, updatedAt: new Date() })
       .where(eq(shoppingLists.id, listId))
       .run();
+    if (archived && getListSettings().automaticRestockListId === listId) {
+      setAutomaticRestockList(null, actorProfileId);
+    }
     return getShoppingList(listId)!;
   }
   const duplicateId = randomUUID();
@@ -973,8 +1043,13 @@ export function getShoppingList(listId: string): ShoppingListDetail | null {
     settings: getListSettings(),
     supermarketProfile: getSupermarketProfile(list.supermarketProfileId),
     supermarketProfiles: listSupermarketProfiles(false),
+    policyReviews: getShoppingPolicyReviews(listId),
+    isAutomaticRestockTarget: getListSettings().automaticRestockListId === listId,
     items: items
-      .map((item) => ({ ...item, pantry: pantryDetails.get(item.id) ?? null }))
+      .map((item) => {
+        const pantry = pantryDetails.get(item.id) ?? null;
+        return { ...item, pantry, policyBreakdown: shoppingPolicyBreakdown(pantry) };
+      })
       .filter(
         (item) =>
           !item.pantry ||
@@ -1277,6 +1352,27 @@ export function updateShoppingListItem(
     if (!result.changes)
       throw new PlanningNotFoundError('That shopping-list item no longer exists.');
     recordShoppingItemManualOverrides(itemId, previous, next, transaction);
+    const policyInstance = transaction
+      .select()
+      .from(shoppingPolicyInstances)
+      .where(eq(shoppingPolicyInstances.shoppingListItemId, itemId))
+      .get();
+    if (policyInstance) {
+      const sourced = input.checked || input.shoppingState === 'sourced';
+      transaction
+        .update(shoppingPolicyInstances)
+        .set({
+          state: sourced
+            ? 'satisfied'
+            : policyInstance.state === 'satisfied'
+              ? 'active'
+              : policyInstance.state,
+          updatedByProfileId: actorProfileId ?? policyInstance.updatedByProfileId,
+          updatedAt: new Date(),
+        })
+        .where(eq(shoppingPolicyInstances.id, policyInstance.id))
+        .run();
+    }
     if (actorProfileId && input.aisleId !== undefined)
       rememberShoppingAisle(
         list.supermarketProfileId,
@@ -1397,11 +1493,31 @@ export function createRetryShoppingList(
 
 export function removeShoppingListItem(listId: string, itemId: string): void {
   ensureDatabase();
-  const result = getDatabase()
-    .delete(shoppingListItems)
-    .where(and(eq(shoppingListItems.id, itemId), eq(shoppingListItems.listId, listId)))
-    .run();
-  if (!result.changes) throw new PlanningNotFoundError('That shopping-list item no longer exists.');
+  getDatabase().transaction((transaction) => {
+    const instance = transaction
+      .select()
+      .from(shoppingPolicyInstances)
+      .where(
+        and(
+          eq(shoppingPolicyInstances.listId, listId),
+          eq(shoppingPolicyInstances.shoppingListItemId, itemId),
+        ),
+      )
+      .get();
+    if (instance) {
+      transaction
+        .update(shoppingPolicyInstances)
+        .set({ state: 'dismissed', shoppingListItemId: null, updatedAt: new Date() })
+        .where(eq(shoppingPolicyInstances.id, instance.id))
+        .run();
+    }
+    const result = transaction
+      .delete(shoppingListItems)
+      .where(and(eq(shoppingListItems.id, itemId), eq(shoppingListItems.listId, listId)))
+      .run();
+    if (!result.changes)
+      throw new PlanningNotFoundError('That shopping-list item no longer exists.');
+  });
 }
 
 export function reorderShoppingListItems(listId: string, itemIds: string[]): void {

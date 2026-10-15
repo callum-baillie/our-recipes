@@ -127,6 +127,31 @@ describe('Bòrd compatibility', () => {
     expect(existsSync(join(directory, 'bord.db'))).toBe(false);
   });
 
+  it('defaults email verification by environment and accepts an explicit override', () => {
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', undefined);
+    expect(getRuntimeConfig().auth.requireEmailVerification).toBe(false);
+
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('COOKIE_SECRET', 'test-cookie-secret-with-at-least-32-characters');
+    vi.stubEnv('BETTER_AUTH_SECRET', 'test-better-auth-secret-with-at-least-32-characters');
+    vi.stubEnv('BETTER_AUTH_URL', 'https://recipes.example.test');
+    vi.stubEnv('AUTH_SMTP_HOST', 'smtp.example.test');
+    vi.stubEnv('AUTH_SMTP_USER', 'bord');
+    vi.stubEnv('AUTH_SMTP_PASSWORD', 'test-password');
+    expect(getRuntimeConfig().auth.requireEmailVerification).toBe(true);
+
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'true');
+    expect(getRuntimeConfig().auth.requireEmailVerification).toBe(true);
+
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'false');
+    expect(getRuntimeConfig().auth.requireEmailVerification).toBe(false);
+
+    vi.stubEnv('AUTH_REQUIRE_EMAIL_VERIFICATION', 'sometimes');
+    expect(() => getRuntimeConfig()).toThrow(
+      'AUTH_REQUIRE_EMAIL_VERIFICATION must be either true or false',
+    );
+  });
+
   it('defaults backup storage below DATA_DIR and supports a dedicated directory', () => {
     const dataDirectory = mkdtempSync(join(tmpdir(), 'bord-data-'));
     const backupDirectory = mkdtempSync(join(tmpdir(), 'bord-backups-'));

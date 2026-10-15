@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { bodyMetricsSchema, bodyMetricsError } from './body-metrics';
 
 import { brandIconIdSchema, DEFAULT_BRAND_ICON } from '@/lib/appearance';
 import { DEFAULT_KITCHEN_NAME, legacyKitchenName } from '@/lib/brand';
@@ -85,6 +86,11 @@ export function onboardingWeightKilograms(
 export const onboardingNutritionSchema = z
   .object({
     profileType: z.enum(['adult', 'dependent']).default('adult'),
+    advancedMetrics: bodyMetricsSchema.default({}),
+    weightGoalPace: z.enum(['light', 'moderate', 'intense']).nullable().default(null),
+    lifeStage: z.enum(['pregnant', 'breastfeeding']).nullable().default(null),
+    vesyncConnectionId: z.string().uuid().nullable().default(null),
+    measurementRecordedAt: z.string().datetime().nullable().default(null),
     dateOfBirth: optionalDate.default(''),
     heightCentimeters: optionalPositive(300).default(null),
     currentWeightKilograms: optionalPositive(1_000).default(null),
@@ -105,6 +111,22 @@ export const onboardingNutritionSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    const metricsError = bodyMetricsError(value.advancedMetrics, value.currentWeightKilograms);
+    if (metricsError)
+      context.addIssue({ code: 'custom', path: ['advancedMetrics'], message: metricsError });
+    if (
+      value.dateOfBirth &&
+      (!Number.isFinite(Date.parse(`${value.dateOfBirth}T12:00:00Z`)) ||
+        new Date(`${value.dateOfBirth}T12:00:00Z`).toISOString().slice(0, 10) !==
+          value.dateOfBirth ||
+        value.dateOfBirth > new Date().toISOString().slice(0, 10))
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['dateOfBirth'],
+        message: 'Enter a real birthday that is not in the future.',
+      });
+
     if (
       (value.nutritionGoalType === 'gain' || value.nutritionGoalType === 'loss') &&
       value.targetWeightKilograms !== null
@@ -130,6 +152,18 @@ export const onboardingNutritionSchema = z
               : 'Choose a target above the current weight for a gain goal.',
         });
       }
+    }
+    if (
+      value.targetDate &&
+      (!Number.isFinite(Date.parse(`${value.targetDate}T12:00:00Z`)) ||
+        new Date(`${value.targetDate}T12:00:00Z`).toISOString().slice(0, 10) !== value.targetDate ||
+        value.targetDate < new Date().toISOString().slice(0, 10))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targetDate'],
+        message: 'Choose a real target date today or later.',
+      });
     }
     if (value.targetDate && value.targetWeightKilograms === null) {
       context.addIssue({
@@ -255,6 +289,11 @@ export const defaultProfileInput: ProfileInput = {
 
 export const defaultOnboardingNutrition: OnboardingNutritionInput = {
   profileType: 'adult',
+  advancedMetrics: {},
+  weightGoalPace: null,
+  lifeStage: null,
+  vesyncConnectionId: null,
+  measurementRecordedAt: null,
   dateOfBirth: '',
   heightCentimeters: null,
   currentWeightKilograms: null,

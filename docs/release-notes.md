@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.0-rc.3
+
+- Refined nutrition onboarding, VeSync account/profile sync and optional body composition estimates.
+- Improved pantry restocking policies, shopping workflows, Instacart list links and recipe/meal-plan PDF exports.
+- Added contextual AI reviews with evidence, cached decisions, retained corrections and reviewed chat actions.
+- Unified page headers, widened laptop layouts and reorganized the full-width planner and sidebar.
+- Replaced household profile PINs with account password confirmation and expanded core API access.
+- Includes database migrations through `0061_decision_assistance`.
+
 ## 1.0.0-rc.2
 
 This candidate adds Better Auth email/passphrase accounts, optional passkeys, six-digit

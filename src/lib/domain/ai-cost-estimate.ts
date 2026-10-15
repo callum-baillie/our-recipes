@@ -1,6 +1,8 @@
 export const AI_PRICING_AS_OF = '2026-07-28';
 
 const TEXT_PRICE_USD_PER_MILLION: Record<string, { input: number; output: number }> = {
+  // GPT-6 Luna standard rates checked 2026-10-15; legacy rates retain the date above.
+  'gpt-6-luna': { input: 0.1, output: 0.5 },
   'gpt-5.6-sol': { input: 5, output: 30 },
   'gpt-5.6-terra': { input: 2.5, output: 15 },
   'gpt-5.6-luna': { input: 1, output: 6 },

@@ -30,6 +30,7 @@ export default async function AiSettingsPage() {
         description="Choose a model for each task and decide which data this profile may send to OpenAI."
         icon={<Sparkles size={16} aria-hidden="true" />}
       />
+      <Link href="/assist">Open kitchen suggestions and saved corrections →</Link>
       <AiSettingsForm initialSettings={getAiSettings(actor.profileId)} />
     </main>
   );

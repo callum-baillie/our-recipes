@@ -1,9 +1,9 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   getCookSessionPantryPreview,
   PantryGroceryCookingNotFoundError,
@@ -24,48 +24,70 @@ const allocationSchema = z
   })
   .strict();
 
-async function actorProfileId() {
-  return getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value).profileId;
-}
-
 export async function GET(_request: Request, context: { params: Promise<{ sessionId: string }> }) {
-  const profileId = await actorProfileId();
+  const access = await authorizeCoreApi(_request);
+  if (access.response) return access.response;
+
+  const profileId = access.principal.profileId;
   if (!profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+    return withApiRequestId(
+      jsonError(409, 'profile_selection_required', 'Choose a household profile first.'),
+      access.requestId,
+    );
   try {
-    return NextResponse.json(
-      getCookSessionPantryPreview((await context.params).sessionId, profileId),
+    return withApiRequestId(
+      NextResponse.json(getCookSessionPantryPreview((await context.params).sessionId, profileId)),
+      access.requestId,
     );
   } catch (error) {
     if (error instanceof PantryGroceryCookingNotFoundError)
-      return jsonError(404, 'cook_session_not_found', error.message);
+      return withApiRequestId(
+        jsonError(404, 'cook_session_not_found', error.message),
+        access.requestId,
+      );
     throw error;
   }
 }
 
 export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
-  if (!hasTrustedMutationOrigin(request))
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const profileId = await actorProfileId();
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const profileId = access.principal.profileId;
   if (!profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+    return withApiRequestId(
+      jsonError(409, 'profile_selection_required', 'Choose a household profile first.'),
+      access.requestId,
+    );
   const parsed = allocationSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
-    return jsonError(400, 'invalid_pantry_preview', 'Use a valid product, quantity, and unit.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_pantry_preview', 'Use a valid product, quantity, and unit.'),
+      access.requestId,
+    );
   try {
     getCookSessionPantryPreview((await context.params).sessionId, profileId);
-    return NextResponse.json(
-      previewPantryProductConsumption(
-        parsed.data.productId,
-        parsed.data.quantity,
-        parsed.data.unit,
+    return withApiRequestId(
+      NextResponse.json(
+        previewPantryProductConsumption(
+          parsed.data.productId,
+          parsed.data.quantity,
+          parsed.data.unit,
+        ),
       ),
+      access.requestId,
     );
   } catch (error) {
     if (error instanceof PantryGroceryCookingNotFoundError || error instanceof PantryNotFoundError)
-      return jsonError(404, 'pantry_preview_not_found', error.message);
+      return withApiRequestId(
+        jsonError(404, 'pantry_preview_not_found', error.message),
+        access.requestId,
+      );
     if (error instanceof PantryValidationError)
-      return jsonError(400, 'invalid_pantry_preview', error.message);
+      return withApiRequestId(
+        jsonError(400, 'invalid_pantry_preview', error.message),
+        access.requestId,
+      );
     throw error;
   }
 }

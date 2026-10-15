@@ -16,7 +16,7 @@ import { normalizeAiRecipeCandidate } from '@/lib/domain/ai-candidate-normalizat
 import type { RecipePayload } from '@/lib/domain/recipe';
 import type { AiReasoningEffort } from '@/lib/domain/ai-assistant';
 
-export const OPENAI_REVIEW_MODEL = 'gpt-5.4-mini';
+export const OPENAI_REVIEW_MODEL = 'gpt-6-luna';
 export const OPENAI_IMAGE_MODEL = 'gpt-image-2';
 
 export type AiTextReviewInput = AiReviewRequest & {

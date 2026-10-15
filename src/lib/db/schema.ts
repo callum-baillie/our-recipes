@@ -208,6 +208,7 @@ export const profileSecurity = sqliteTable('profile_security', {
   profileId: text('profile_id')
     .primaryKey()
     .references(() => profiles.id, { onDelete: 'cascade' }),
+  // Retired PIN columns retained for schema compatibility; always empty.
   pinSalt: text('pin_salt').notNull(),
   pinHash: text('pin_hash').notNull(),
   pinVersion: integer('pin_version').notNull().default(1),
@@ -267,6 +268,7 @@ export const authSecurityEvents = sqliteTable(
         'sign_out',
         'profile_switch',
         'profile_pin_failed',
+        'profile_password_failed',
         'recovery_code_used',
         'api_key_created',
         'api_key_updated',
@@ -658,6 +660,7 @@ export const aiProfileSettings = sqliteTable('ai_profile_settings', {
     .notNull()
     .default(false),
   shareWeight: integer('share_weight', { mode: 'boolean' }).notNull().default(false),
+  sharePantry: integer('share_pantry', { mode: 'boolean' }).notNull().default(false),
   shareShoppingLists: integer('share_shopping_lists', { mode: 'boolean' }).notNull().default(true),
   dailySummaryEnabled: integer('daily_summary_enabled', { mode: 'boolean' })
     .notNull()
@@ -977,6 +980,7 @@ export const householdListSettings = sqliteTable('household_list_settings', {
     .notNull()
     .default(true),
   keepScreenAwake: integer('keep_screen_awake', { mode: 'boolean' }).notNull().default(false),
+  automaticRestockListId: text('automatic_restock_list_id'),
   updatedByProfileId: text('updated_by_profile_id')
     .notNull()
     .references(() => profiles.id),
@@ -1163,6 +1167,16 @@ export const pantryProducts = sqliteTable(
     suggestGroceryRestock: integer('suggest_grocery_restock', { mode: 'boolean' })
       .notNull()
       .default(false),
+    restockMode: text('restock_mode', {
+      enum: ['none', 'always_have', 'always_buy'],
+    })
+      .notNull()
+      .default('none'),
+    restockTrigger: text('restock_trigger', {
+      enum: ['below_target', 'reorder_point', 'empty'],
+    })
+      .notNull()
+      .default('below_target'),
     archivedAt: integer('archived_at', { mode: 'timestamp' }),
     createdByProfileId: text('created_by_profile_id')
       .notNull()
@@ -1597,6 +1611,48 @@ export const pantryShoppingItemDetails = sqliteTable(
   ],
 );
 
+export const shoppingPolicyInstances = sqliteTable(
+  'shopping_policy_instances',
+  {
+    id: text('id').primaryKey(),
+    listId: text('list_id')
+      .notNull()
+      .references(() => shoppingLists.id, { onDelete: 'cascade' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => pantryProducts.id, { onDelete: 'restrict' }),
+    shoppingListItemId: text('shopping_list_item_id').references(() => shoppingListItems.id, {
+      onDelete: 'set null',
+    }),
+    mode: text('mode', { enum: ['always_have', 'always_buy'] }).notNull(),
+    trigger: text('trigger', {
+      enum: ['below_target', 'reorder_point', 'empty'],
+    }).notNull(),
+    state: text('state', {
+      enum: ['active', 'needs_review', 'satisfied', 'dismissed', 'moved'],
+    })
+      .notNull()
+      .default('active'),
+    assumedEmpty: integer('assumed_empty', { mode: 'boolean' }).notNull().default(false),
+    policyQuantity: real('policy_quantity'),
+    unit: text('unit').notNull().default(''),
+    reviewReason: text('review_reason'),
+    createdByProfileId: text('created_by_profile_id')
+      .notNull()
+      .references(() => profiles.id),
+    updatedByProfileId: text('updated_by_profile_id')
+      .notNull()
+      .references(() => profiles.id),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('shopping_policy_instances_list_product_idx').on(table.listId, table.productId),
+    index('shopping_policy_instances_product_state_idx').on(table.productId, table.state),
+    index('shopping_policy_instances_item_idx').on(table.shoppingListItemId),
+  ],
+);
+
 export const pantryPurchaseIntakes = sqliteTable(
   'pantry_purchase_intakes',
   {
@@ -1927,6 +1983,9 @@ export const nutritionProfiles = sqliteTable(
     dateOfBirth: text('date_of_birth'),
     heightCentimeters: real('height_centimeters'),
     currentWeightKilograms: real('current_weight_kilograms'),
+    advancedBodyMetrics: text('advanced_body_metrics').notNull().default('{}'),
+    bodyCompositionEstimate: text('body_composition_estimate'),
+    weightGoalPace: text('weight_goal_pace', { enum: ['light', 'moderate', 'intense'] }),
     measurementSystem: text('measurement_system', { enum: ['metric', 'imperial'] }).notNull(),
     referenceSexCategory: text('reference_sex_category', { enum: ['female', 'male'] }),
     activityLevel: text('activity_level', {
@@ -2086,6 +2145,8 @@ export const nutritionBodyMeasurements = sqliteTable(
       .references(() => nutritionProfiles.id),
     measuredAt: integer('measured_at', { mode: 'timestamp' }).notNull(),
     weightKilograms: real('weight_kilograms').notNull(),
+    advancedBodyMetrics: text('advanced_body_metrics').notNull().default('{}'),
+    bodyCompositionEstimate: text('body_composition_estimate'),
     sourceType: text('source_type', { enum: ['manual', 'imported'] }).notNull(),
     approximate: integer('approximate', { mode: 'boolean' }).notNull(),
     note: text('note').notNull().default(''),
@@ -2396,3 +2457,96 @@ export const nutritionIntakeNutrientValues = sqliteTable(
     index('nutrition_intake_nutrient_code_idx').on(table.nutrientCode),
   ],
 );
+
+export const integrationAccounts = sqliteTable(
+  'integration_accounts',
+  {
+    id: text('id').primaryKey(),
+    ownerUserId: text('owner_user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull().default('vesync'),
+    label: text('label').notNull(),
+    encryptedSession: text('encrypted_session').notNull(),
+    syncIntervalMinutes: integer('sync_interval_minutes').notNull().default(0),
+    nextSyncAt: integer('next_sync_at', { mode: 'timestamp' }),
+    lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp' }),
+    lastSuccessAt: integer('last_success_at', { mode: 'timestamp' }),
+    lastError: text('last_error'),
+    leaseToken: text('lease_token'),
+    leaseUntil: integer('lease_until', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('integration_accounts_owner_idx').on(table.ownerUserId),
+    index('integration_accounts_due_idx').on(table.nextSyncAt),
+  ],
+);
+
+export const nutritionScaleConnections = sqliteTable('nutrition_scale_connections', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').references(() => integrationAccounts.id, { onDelete: 'cascade' }),
+  nutritionProfileId: text('nutrition_profile_id').references(() => nutritionProfiles.id),
+  bindingHash: text('binding_hash').notNull(),
+  encryptedSession: text('encrypted_session').notNull(),
+  deviceConfig: text('device_config').notNull().default(''),
+  selectedUser: text('selected_user'),
+  pendingExpiresAt: integer('pending_expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const shoppingListInstacartLinks = sqliteTable('shopping_list_instacart_links', {
+  listId: text('list_id')
+    .primaryKey()
+    .references(() => shoppingLists.id, { onDelete: 'cascade' }),
+  contentHash: text('content_hash').notNull(),
+  url: text('url').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const aiDecisionRecords = sqliteTable(
+  'ai_decision_records',
+  {
+    id: text('id').primaryKey(),
+    ownerUserId: text('owner_user_id').notNull(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    task: text('task').notNull(),
+    subjectKey: text('subject_key').notNull(),
+    contextHash: text('context_hash').notNull(),
+    evidenceJson: text('evidence_json').notNull(),
+    resultJson: text('result_json').notNull(),
+    correctionJson: text('correction_json'),
+    version: integer('version').notNull().default(1),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('ai_decision_scope_idx').on(
+      table.ownerUserId,
+      table.profileId,
+      table.task,
+      table.subjectKey,
+      table.createdAt,
+    ),
+    index('ai_decision_cache_idx').on(
+      table.ownerUserId,
+      table.profileId,
+      table.contextHash,
+      table.expiresAt,
+    ),
+  ],
+);
+export const aiDecisionFeedback = sqliteTable('ai_decision_feedback', {
+  id: text('id').primaryKey(),
+  decisionId: text('decision_id')
+    .notNull()
+    .references(() => aiDecisionRecords.id, { onDelete: 'cascade' }),
+  ownerUserId: text('owner_user_id').notNull(),
+  action: text('action').notNull(),
+  valueJson: text('value_json').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});

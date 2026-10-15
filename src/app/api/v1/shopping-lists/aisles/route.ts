@@ -1,9 +1,9 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { shoppingAisleOrderSchema, shoppingAisleSchema } from '@/lib/domain/planning';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   createShoppingAisle,
   listShoppingAisles,
@@ -14,47 +14,57 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export function GET() {
-  return NextResponse.json({ aisles: listShoppingAisles() });
-}
+export async function GET(request: Request) {
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
 
-async function requireActor(request: Request) {
-  if (!hasTrustedMutationOrigin(request))
-    return {
-      error: jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.'),
-    };
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  return actor.profileId
-    ? { actor }
-    : { error: jsonError(409, 'profile_selection_required', 'Choose a household profile first.') };
+  return withApiRequestId(NextResponse.json({ aisles: listShoppingAisles() }), access.requestId);
 }
 
 export async function POST(request: Request) {
-  const context = await requireActor(request);
-  if ('error' in context) return context.error;
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
   const parsed = shoppingAisleSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return jsonError(400, 'invalid_shopping_aisle', 'Use a short aisle name.');
+  if (!parsed.success)
+    return withApiRequestId(
+      jsonError(400, 'invalid_shopping_aisle', 'Use a short aisle name.'),
+      access.requestId,
+    );
   try {
-    return NextResponse.json({ aisle: createShoppingAisle(parsed.data) }, { status: 201 });
+    return withApiRequestId(
+      NextResponse.json({ aisle: createShoppingAisle(parsed.data) }, { status: 201 }),
+      access.requestId,
+    );
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
-      return jsonError(409, 'shopping_aisle_conflict', error.message);
+      return withApiRequestId(
+        jsonError(409, 'shopping_aisle_conflict', error.message),
+        access.requestId,
+      );
     throw error;
   }
 }
 
 export async function PATCH(request: Request) {
-  const context = await requireActor(request);
-  if ('error' in context) return context.error;
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
   const parsed = shoppingAisleOrderSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
-    return jsonError(400, 'invalid_aisle_order', 'Use the current set of aisles.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_aisle_order', 'Use the current set of aisles.'),
+      access.requestId,
+    );
   try {
     reorderShoppingAisles(parsed.data.aisleIds);
-    return NextResponse.json({ aisles: listShoppingAisles() });
+    return withApiRequestId(NextResponse.json({ aisles: listShoppingAisles() }), access.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError)
-      return jsonError(409, 'aisle_order_conflict', error.message);
+      return withApiRequestId(
+        jsonError(409, 'aisle_order_conflict', error.message),
+        access.requestId,
+      );
     throw error;
   }
 }

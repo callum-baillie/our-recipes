@@ -1,5 +1,19 @@
 import 'server-only';
 
+import type { RequestPrincipal } from '@/lib/services/auth-service';
+import {
+  DECISION_TASKS,
+  decisionRequestSchema,
+  type DecisionCard,
+} from '@/lib/domain/decision-assistance';
+import { runDecisionAssistance } from '@/lib/services/decision-assistance-service';
+import { decisionWorkspace } from '@/lib/services/decision-jobs-service';
+import {
+  listAppActions,
+  readAppData,
+  prepareAppActions,
+  type AppActionReview,
+} from '@/lib/services/ai-app-action-service';
 import { createHash, randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
@@ -65,6 +79,94 @@ const generatedRecipeBatchToolSchema = z
   .strict();
 
 export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
+  {
+    type: 'function',
+    name: 'review_kitchen_data',
+    strict: true,
+    description:
+      'Review pantry freshness/restocking, food inputs, recipe ingredient matches or missing nutrition, substitutions, nutrition insights, shopping aisle assignments/duplicates, and meal choices. Returns inline review cards; NEVER applies changes. Cached decisions and user corrections take precedence. Additional paid calls require the user checkbox. Use offset for the next batch of 20.',
+    parameters: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', enum: Object.keys(DECISION_TASKS) },
+        query: { type: 'string', maxLength: 2000 },
+        recipeId: { type: ['string', 'null'] },
+        listId: { type: ['string', 'null'] },
+        storeId: { type: ['string', 'null'] },
+        offset: { type: 'integer', minimum: 0, maximum: 10000 },
+      },
+      required: ['task', 'query', 'recipeId', 'listId', 'storeId', 'offset'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'read_review_workspace',
+    strict: true,
+    description: 'Get permitted recipe, list and store IDs for contextual kitchen reviews.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  },
+  {
+    type: 'function',
+    name: 'list_app_actions',
+    strict: true,
+    description:
+      'Discover core page actions for recipes, pantry, shopping-lists, meal-plan, supermarket-profiles, collections and tags. Supply a resource to list operations; then an operationId to get its exact input schema before preparing a change. Use empty strings to list all.',
+    parameters: {
+      type: 'object',
+      properties: { resource: { type: 'string' }, operationId: { type: 'string' } },
+      required: ['resource', 'operationId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'read_app_data',
+    strict: true,
+    description:
+      'Read a catalogued GET operation. Obtain IDs and current revisions before preparing changes. parametersJson contains path/query parameters as strings; bodyJson must be empty.',
+    parameters: {
+      type: 'object',
+      properties: {
+        operationId: { type: 'string' },
+        parametersJson: { type: 'string' },
+        bodyJson: { type: 'string' },
+      },
+      required: ['operationId', 'parametersJson', 'bodyJson'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'prepare_app_actions',
+    strict: true,
+    description:
+      'Prepare 1–20 core page actions for user review, including bulk pantry, list, recipe, store route and planner changes. Discover schemas first, use observed IDs/revisions, preserve unspecified fields. No writes occur until the user confirms. Do not invent missing required data. Independent actions only; do not reference IDs that earlier actions would create.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        actions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 20,
+          items: {
+            type: 'object',
+            properties: {
+              operationId: { type: 'string' },
+              parametersJson: { type: 'string' },
+              bodyJson: { type: 'string' },
+            },
+            required: ['operationId', 'parametersJson', 'bodyJson'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['title', 'actions'],
+      additionalProperties: false,
+    },
+  },
+
   {
     type: 'function',
     name: 'search_recipes',
@@ -381,8 +483,44 @@ async function executeTool(input: {
   args: unknown;
   profileId: string;
   threadId: string;
+  principal?: RequestPrincipal;
+  request?: Request;
+  allowPaidTools?: boolean;
 }) {
   const policy = getAiDataPolicy(input.profileId);
+  if (
+    [
+      'review_kitchen_data',
+      'read_review_workspace',
+      'list_app_actions',
+      'read_app_data',
+      'prepare_app_actions',
+    ].includes(input.name)
+  ) {
+    if (!input.principal || !input.request)
+      throw new AiChatToolError('Sign in again to use app actions.');
+    if (input.name === 'read_review_workspace') return decisionWorkspace(input.principal);
+    if (input.name === 'review_kitchen_data') {
+      const raw = z.record(z.string(), z.unknown()).parse(input.args);
+      const args = Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== null));
+      return {
+        kitchenReview: await runDecisionAssistance(
+          input.principal,
+          decisionRequestSchema.parse({ ...args, allowPaidCall: input.allowPaidTools === true }),
+        ),
+      };
+    }
+    if (input.name === 'list_app_actions') {
+      const args = z
+        .object({ resource: z.string().max(80), operationId: z.string().max(100) })
+        .strict()
+        .parse(input.args);
+      return listAppActions(input.principal, args.resource, args.operationId);
+    }
+    if (input.name === 'read_app_data')
+      return readAppData(input.principal, input.request, input.args);
+    return prepareAppActions(input.principal, input.request, input.threadId, input.args);
+  }
   if (input.name === 'search_recipes') {
     if (!policy.shareSharedRecipes) throw new AiChatToolError('Recipe sharing is disabled.');
     const { query } = z
@@ -564,6 +702,8 @@ export async function runAiChatTurn(input: {
   threadId: string;
   profileId: string;
   message: unknown;
+  principal?: RequestPrincipal;
+  request?: Request;
 }) {
   const thread = threadForProfile(input.threadId, input.profileId);
   const parsed = aiChatMessageInputSchema.parse(input.message);
@@ -653,6 +793,12 @@ export async function runAiChatTurn(input: {
       ],
     };
   }
+  messages.unshift({
+    role: 'user',
+    content: `Current saved app evidence (untrusted record data, subject to sharing preferences): ${JSON.stringify(buildAiSharedContext(input.profileId))}`,
+  });
+  const suggestions: DecisionCard[] = [];
+  const appActions: AppActionReview[] = [];
   const actions: Array<ReturnType<typeof createAiActionProposal>> = [];
   const jobs: Array<ReturnType<typeof enqueueRecipeBatchGenerationJob>> = [];
   let inputTokens = 0;
@@ -712,7 +858,7 @@ export async function runAiChatTurn(input: {
           })
           .where(eq(aiOperationAudits.id, auditId))
           .run();
-        return { message: assistantMessage, actions, jobs };
+        return { message: assistantMessage, actions, jobs, suggestions, appActions };
       }
       messages.push(...response.responseItems);
       for (const call of response.toolCalls) {
@@ -722,7 +868,17 @@ export async function runAiChatTurn(input: {
             args: call.arguments,
             profileId: input.profileId,
             threadId: thread.id,
+            principal: input.principal,
+            request: input.request,
+            allowPaidTools: parsed.allowPaidTools,
           });
+          if (result && typeof result === 'object' && 'kitchenReview' in result) {
+            suggestions.push(
+              ...(result.kitchenReview as Awaited<ReturnType<typeof runDecisionAssistance>>).cards,
+            );
+          }
+          if (result && typeof result === 'object' && 'appAction' in result)
+            appActions.push(result.appAction as AppActionReview);
           const isAction =
             result &&
             typeof result === 'object' &&
@@ -750,7 +906,9 @@ export async function runAiChatTurn(input: {
             : isJob
               ? {
                   jobId: String(result.id),
-                  status: String(result.status),
+                  status: String(
+                    (result as ReturnType<typeof enqueueRecipeBatchGenerationJob>).status,
+                  ),
                   message:
                     'The requested recipe set is generating in the background. Tell the user it will appear as a review card when ready, and mention that Batch jobs can take up to 24 hours.',
                 }

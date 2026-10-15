@@ -13,8 +13,10 @@ import {
   RefreshCw,
   ShieldCheck,
   ShieldOff,
+  Settings2,
 } from 'lucide-react';
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 
 import { authClient } from '@/lib/auth/client';
 import type { ApiKeyDto } from '@/lib/services/api-key-service';
@@ -27,6 +29,7 @@ const resources: Array<{ id: ApiResource; label: string; icon: typeof BookOpen }
   { id: 'shoppingLists', label: 'Grocery lists', icon: ListChecks },
   { id: 'collections', label: 'Collections', icon: Folder },
   { id: 'pantry', label: 'Pantry', icon: PackageOpen },
+  { id: 'settings', label: 'Workflow settings', icon: Settings2 },
 ];
 const actions: Array<{ id: ApiAction; label: string }> = [
   { id: 'read', label: 'Read' },
@@ -36,10 +39,20 @@ const actions: Array<{ id: ApiAction; label: string }> = [
 ];
 
 function initialPermissions(): ApiPermissions {
-  return Object.fromEntries(resources.map((resource) => [resource.id, ['read']])) as ApiPermissions;
+  return Object.fromEntries(
+    resources
+      .filter((resource) => resource.id !== 'settings')
+      .map((resource) => [resource.id, ['read']]),
+  ) as ApiPermissions;
 }
 
-export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
+export function ApiKeyManager({
+  initialKeys,
+  accountEmail,
+}: {
+  initialKeys: ApiKeyDto[];
+  accountEmail: string;
+}) {
   const { showToast } = useToast();
   const [keys, setKeys] = useState(initialKeys);
   const [name, setName] = useState('');
@@ -52,6 +65,22 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passkeyName, setPasskeyName] = useState('This device');
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const secretPanel = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (revealedSecret) {
+      secretPanel.current?.focus();
+      secretPanel.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [revealedSecret]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   function togglePermission(resource: ApiResource, action: ApiAction) {
     setPermissions((current) => {
@@ -76,9 +105,11 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
       const body = (await response.json().catch(() => null)) as {
         apiKey?: ApiKeyDto;
         secret?: string;
-        error?: { message?: string };
+        error?: { code?: string; message?: string };
       } | null;
       if (!response.ok) {
+        if (body?.error?.code === 'fresh_admin_session_required') setNeedsConfirmation(true);
+        if (body?.error?.code === 'authentication_required') setNeedsSignIn(true);
         throw new Error(body?.error?.message ?? 'The API key change failed.');
       }
       return body as Record<string, unknown>;
@@ -162,19 +193,43 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
   async function addPasskey() {
     setPending(true);
     setError(null);
-    const result = await authClient.passkey.addPasskey({ name: passkeyName });
-    setPending(false);
-    if (result.error) {
-      setError(result.error.message ?? 'The passkey could not be added.');
-      return;
+    try {
+      const result = await authClient.passkey.addPasskey({ name: passkeyName });
+      if (result.error) throw new Error(result.error.message ?? 'The passkey could not be added.');
+      showToast('Passkey added to the signed-in account.', 'success');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The passkey could not be added.');
+    } finally {
+      setPending(false);
     }
-    showToast('Passkey added to the signed-in account.', 'success');
   }
 
   return (
     <>
+      {needsConfirmation ? (
+        <ApiKeyConfirmation
+          email={accountEmail}
+          onConfirmed={() => {
+            setNeedsConfirmation(false);
+            setError(null);
+            showToast('Identity confirmed. You can now retry your key change.', 'success');
+          }}
+          onCancel={() => setNeedsConfirmation(false)}
+        />
+      ) : null}
+      {needsSignIn ? (
+        <p className="setup-note" role="alert">
+          Your session has ended.{' '}
+          <Link href="/sign-in?reauth=1&callbackUrl=%2Fsettings%2Fapi">Sign in to continue</Link>.
+        </p>
+      ) : null}
       {revealedSecret ? (
-        <section className="settings-card api-key-secret" aria-labelledby="new-api-key-heading">
+        <section
+          ref={secretPanel}
+          tabIndex={-1}
+          className="settings-card api-key-secret"
+          aria-labelledby="new-api-key-heading"
+        >
           <p className="eyebrow">COPY NOW</p>
           <h2 id="new-api-key-heading">{revealedSecret.name}</h2>
           <p>This secret is shown once. Store it in the integration&apos;s server environment.</p>
@@ -197,7 +252,9 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
 
       <form className="settings-card api-key-create" onSubmit={createKey}>
         <div className="settings-section-heading">
-          <span aria-hidden="true"><KeyRound size={20} /></span>
+          <span aria-hidden="true">
+            <KeyRound size={20} />
+          </span>
           <div>
             <h2>Create API key</h2>
             <p>Define a name, expiry, and the exact permissions for this key.</p>
@@ -229,7 +286,9 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
         </div>
         <aside className="api-least-privilege">
           <ShieldCheck size={18} aria-hidden="true" />
-          <span><strong>Start with least privilege.</strong> Grant only what this integration needs.</span>
+          <span>
+            <strong>Start with least privilege.</strong> Grant only what this integration needs.
+          </span>
         </aside>
         <fieldset className="api-scope-grid">
           <legend>Permissions</legend>
@@ -243,17 +302,26 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
             const ResourceIcon = resource.icon;
             return (
               <div className="api-scope-row" key={resource.id}>
-                <strong><ResourceIcon size={15} aria-hidden="true" />{resource.label}</strong>
+                <strong>
+                  <ResourceIcon size={15} aria-hidden="true" />
+                  {resource.label}
+                </strong>
                 {actions.map((action) => (
                   <label key={action.id}>
-                    <span className="visually-hidden">
-                      {action.label} {resource.label}
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={(permissions[resource.id] ?? []).includes(action.id)}
-                      onChange={() => togglePermission(resource.id, action.id)}
-                    />
+                    <span className="api-permission-label">{action.label}</span>
+                    {resource.id === 'settings' &&
+                    (action.id === 'create' || action.id === 'delete') ? (
+                      <span aria-label={`${action.label} is not available for workflow settings`}>
+                        —
+                      </span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        aria-label={`${action.label} ${resource.label}`}
+                        checked={(permissions[resource.id] ?? []).includes(action.id)}
+                        onChange={() => togglePermission(resource.id, action.id)}
+                      />
+                    )}
                   </label>
                 ))}
               </div>
@@ -265,7 +333,11 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
             {error}
           </p>
         ) : null}
-        <button className="primary-button" type="submit" disabled={pending}>
+        <button
+          className="primary-button"
+          type="submit"
+          disabled={pending || needsConfirmation || Boolean(revealedSecret)}
+        >
           <Plus size={16} aria-hidden="true" />
           {pending ? 'Creating…' : 'Create key'}
         </button>
@@ -273,14 +345,20 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
 
       <section className="settings-card api-key-list" aria-labelledby="api-key-list-heading">
         <div className="settings-section-heading">
-          <span aria-hidden="true"><ShieldCheck size={20} /></span>
+          <span aria-hidden="true">
+            <ShieldCheck size={20} />
+          </span>
           <div>
-            <h2 id="api-key-list-heading">Active credentials</h2>
+            <h2 id="api-key-list-heading">Your API keys</h2>
             <p>Rotate or revoke keys without exposing their stored secret.</p>
           </div>
         </div>
         {keys.length === 0 ? (
-          <p>No integration keys have been created.</p>
+          <div className="api-key-empty">
+            <KeyRound size={24} aria-hidden="true" />
+            <p>No API keys yet.</p>
+            <small>Create a key above to connect a dashboard, script, or another app.</small>
+          </div>
         ) : (
           <div className="api-key-rows">
             {keys.map((apiKey) => (
@@ -289,7 +367,12 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
                   <h3>{apiKey.name}</h3>
                   <code>{apiKey.start}…</code>
                   <p>
-                    {apiKey.enabled ? 'Active' : 'Revoked'} · expires{' '}
+                    {!apiKey.enabled
+                      ? 'Revoked'
+                      : apiKey.expiresAt && new Date(apiKey.expiresAt).getTime() <= now
+                        ? 'Expired'
+                        : 'Active'}{' '}
+                    · expires{' '}
                     {apiKey.expiresAt
                       ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
                           new Date(apiKey.expiresAt),
@@ -366,5 +449,90 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyDto[] }) {
         </div>
       </section>
     </>
+  );
+}
+
+function ApiKeyConfirmation({
+  email,
+  onConfirmed,
+  onCancel,
+}: {
+  email: string;
+  onConfirmed: () => void;
+  onCancel: () => void;
+}) {
+  const [passphrase, setPassphrase] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
+
+  async function confirm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    try {
+      const result = await authClient.signIn.email({ email, password: passphrase });
+      if (result.error)
+        throw new Error(result.error.message ?? 'Your identity could not be confirmed.');
+      setPassphrase('');
+      onConfirmed();
+    } catch (caught) {
+      setPassphrase('');
+      setError(caught instanceof Error ? caught.message : 'Unable to connect. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form
+      className="settings-card api-key-confirmation"
+      onSubmit={confirm}
+      aria-labelledby="confirm-api-identity"
+    >
+      <div className="settings-section-heading">
+        <ShieldCheck size={22} aria-hidden="true" />
+        <div>
+          <h2 id="confirm-api-identity">Confirm it’s you</h2>
+          <p>
+            For your security, key changes require a recent sign-in. Your key details are saved on
+            this page.
+          </p>
+        </div>
+      </div>
+      <label>
+        <span>Account</span>
+        <input type="email" value={email} readOnly autoComplete="username" />
+      </label>
+      <label>
+        <span>Current passphrase</span>
+        <input
+          ref={input}
+          type="password"
+          required
+          maxLength={128}
+          autoComplete="current-password"
+          value={passphrase}
+          onChange={(event) => setPassphrase(event.target.value)}
+        />
+      </label>
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="settings-inline-actions">
+        <button type="submit" className="primary-button" disabled={pending}>
+          {pending ? 'Confirming…' : 'Confirm identity'}
+        </button>
+        <button type="button" className="secondary-button" disabled={pending} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <Link href="/sign-in?reauth=1&callbackUrl=%2Fsettings%2Fapi">Use a passkey instead</Link>
+    </form>
   );
 }

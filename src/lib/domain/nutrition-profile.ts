@@ -1,3 +1,4 @@
+import { bodyMetricsSchema } from './body-metrics';
 import { z } from 'zod';
 
 import { NUTRIENT_CODES } from '@/lib/domain/nutrition';
@@ -205,6 +206,7 @@ export const nutritionGoalVersionInputSchema = z
 export type NutritionGoalVersionInput = z.input<typeof nutritionGoalVersionInputSchema>;
 
 export const bodyMeasurementInputSchema = z.object({
+  advancedMetrics: bodyMetricsSchema.default({}),
   measuredAt: z.string().datetime({ offset: true }),
   weightKilograms: z.number().finite().positive().max(1_000),
   sourceType: z.enum(['manual', 'imported']).default('manual'),

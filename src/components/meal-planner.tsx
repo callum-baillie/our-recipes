@@ -1,4 +1,8 @@
 'use client';
+import { PageHeader } from '@/components/page-header';
+import { DecisionAssistance } from '@/components/decision-assistance';
+
+import { KitchenPrintDialog } from '@/components/kitchen-print-dialog';
 
 import {
   ArrowRightLeft,
@@ -19,7 +23,6 @@ import {
   Redo2,
   Salad,
   Save,
-  SlidersHorizontal,
   ShoppingBasket,
   Trash2,
   Undo2,
@@ -256,7 +259,7 @@ function PlannedMealCard({
       </div>
       <div className={styles.plannedMealCopy}>
         <div className={styles.mealTitleRow}>
-          <strong>{meal.recipeTitle}</strong>
+          <strong title={meal.recipeTitle}>{meal.recipeTitle}</strong>
           <span
             className={`${styles.pantryDot} ${styles[`pantryDot${pantryStatus}`]}`}
             title={pantryLabel}
@@ -484,10 +487,14 @@ export function MealPlanner({
   const plannedDays = Object.values(nutritionByDate).filter(
     (totals) => Object.keys(totals).length > 0,
   );
-  const nutrientAverage = (code: string) =>
-    plannedDays.length
-      ? plannedDays.reduce((total, values) => total + (values[code] ?? 0), 0) / plannedDays.length
+  const nutrientAverage = (code: string) => {
+    const values = plannedDays
+      .map((day) => day[code])
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    return values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
       : undefined;
+  };
   const nutrition = [
     { code: 'energy_kcal', label: 'Calories', unit: 'kcal' },
     { code: 'protein', label: 'Protein', unit: 'g' },
@@ -708,26 +715,33 @@ export function MealPlanner({
 
   async function saveMealTypePreferences() {
     setPreferencesBusy(true);
-    setError(null);
-    const response = await fetch('/api/v1/settings/preferences', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: 'mealPlan', values: mealTypePreferences }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    setPreferencesBusy(false);
-    if (!response.ok) {
-      setError(body?.error?.message ?? 'We could not save those meal types.');
-      return;
+    try {
+      setError(null);
+      const response = await fetch('/api/v1/settings/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: 'mealPlan', values: mealTypePreferences }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      if (!response.ok) {
+        setError(body?.error?.message ?? 'We could not save those meal types.');
+        return;
+      }
+      setSelectedMeals((current) =>
+        current.filter((meal) => mealTypePreferences.visibleMealTypes.includes(meal)),
+      );
+      setMealTypeSettingsOpen(false);
+      setFeedback('Meal types saved.');
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setPreferencesBusy(false);
     }
-    setSelectedMeals((current) =>
-      current.filter((meal) => mealTypePreferences.visibleMealTypes.includes(meal)),
-    );
-    setMealTypeSettingsOpen(false);
-    setFeedback('Meal types saved.');
-    router.refresh();
   }
 
   function toggleProfile(profileId: string) {
@@ -762,110 +776,131 @@ export function MealPlanner({
     successMessage: string,
   ) {
     setBusyAction(meal.id);
-    setError(null);
-    const response = await fetch(`/api/v1/meal-plan/${meal.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatePayload(meal, overrides)),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      meal?: PlannedMeal;
-      error?: { message?: string };
-    } | null;
-    setBusyAction(null);
-    if (!response.ok || !body?.meal) {
-      setError(body?.error?.message ?? 'We could not update that meal. Refresh and try again.');
-      return;
+    try {
+      setError(null);
+      const response = await fetch(`/api/v1/meal-plan/${meal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload(meal, overrides)),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        meal?: PlannedMeal;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.meal) {
+        setError(body?.error?.message ?? 'We could not update that meal. Refresh and try again.');
+        return;
+      }
+      recordHistory({
+        kind: 'updated',
+        label: successMessage.replace(/\.$/u, '').toLocaleLowerCase(),
+        id: meal.id,
+        before: mealEntrySnapshot(meal),
+        after: mealEntrySnapshot(body.meal),
+        currentUpdatedAt: new Date(body.meal.updatedAt).toISOString(),
+      });
+      setFeedback(successMessage);
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    recordHistory({
-      kind: 'updated',
-      label: successMessage.replace(/\.$/u, '').toLocaleLowerCase(),
-      id: meal.id,
-      before: mealEntrySnapshot(meal),
-      after: mealEntrySnapshot(body.meal),
-      currentUpdatedAt: new Date(body.meal.updatedAt).toISOString(),
-    });
-    setFeedback(successMessage);
-    router.refresh();
   }
 
   async function duplicateMeal(meal: PlannedMeal) {
     const currentIndex = dates.indexOf(meal.plannedFor);
     const targetDate = dates[Math.min(dates.length - 1, currentIndex + 1)] ?? meal.plannedFor;
     setBusyAction(meal.id);
-    setError(null);
-    const response = await fetch('/api/v1/meal-plan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        plannedFor: targetDate,
-        meal: meal.meal,
-        recipeId: meal.recipeId ?? '',
-        title: meal.recipeId ? '' : meal.title,
-        servings: meal.servings,
-        note: meal.note,
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as { meal?: PlannedMeal } | null;
-    setBusyAction(null);
-    if (!response.ok || !body?.meal) {
-      setError('We could not duplicate that meal. Try again.');
-      return;
+    try {
+      setError(null);
+      const response = await fetch('/api/v1/meal-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plannedFor: targetDate,
+          meal: meal.meal,
+          recipeId: meal.recipeId ?? '',
+          title: meal.recipeId ? '' : meal.title,
+          servings: meal.servings,
+          note: meal.note,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as { meal?: PlannedMeal } | null;
+      if (!response.ok || !body?.meal) {
+        setError('We could not duplicate that meal. Try again.');
+        return;
+      }
+      recordHistory({
+        kind: 'added',
+        label: `adding ${meal.recipeTitle}`,
+        entries: [mealEntrySnapshot(body.meal)],
+        ids: [body.meal.id],
+      });
+      setFeedback(`Meal duplicated to ${formatPlannerDate(targetDate, { weekday: 'long' })}.`);
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    recordHistory({
-      kind: 'added',
-      label: `adding ${meal.recipeTitle}`,
-      entries: [mealEntrySnapshot(body.meal)],
-      ids: [body.meal.id],
-    });
-    setFeedback(`Meal duplicated to ${formatPlannerDate(targetDate, { weekday: 'long' })}.`);
-    router.refresh();
   }
 
   async function swapMeals(source: PlannedMeal, target: PlannedMeal) {
     setBusyAction(source.id);
-    setError(null);
-    const response = await fetch('/api/v1/meal-plan/swap', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      setError(null);
+      const response = await fetch('/api/v1/meal-plan/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceId: source.id,
+          targetId: target.id,
+          sourceExpectedUpdatedAt:
+            source.updatedAt instanceof Date
+              ? source.updatedAt.toISOString()
+              : new Date(source.updatedAt).toISOString(),
+          targetExpectedUpdatedAt:
+            target.updatedAt instanceof Date
+              ? target.updatedAt.toISOString()
+              : new Date(target.updatedAt).toISOString(),
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        meals?: PlannedMeal[];
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || body?.meals?.length !== 2) {
+        setError(body?.error?.message ?? 'We could not swap those meals. Refresh and try again.');
+        return;
+      }
+      const nextSource = body.meals.find((meal) => meal.id === source.id);
+      const nextTarget = body.meals.find((meal) => meal.id === target.id);
+      if (!nextSource || !nextTarget) {
+        setError('We could not verify the swapped meals. Refresh and try again.');
+        return;
+      }
+      recordHistory({
+        kind: 'swapped',
+        label: `swapping ${source.recipeTitle} and ${target.recipeTitle}`,
         sourceId: source.id,
         targetId: target.id,
-        sourceExpectedUpdatedAt:
-          source.updatedAt instanceof Date
-            ? source.updatedAt.toISOString()
-            : new Date(source.updatedAt).toISOString(),
-        targetExpectedUpdatedAt:
-          target.updatedAt instanceof Date
-            ? target.updatedAt.toISOString()
-            : new Date(target.updatedAt).toISOString(),
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      meals?: PlannedMeal[];
-      error?: { message?: string };
-    } | null;
-    setBusyAction(null);
-    if (!response.ok || body?.meals?.length !== 2) {
-      setError(body?.error?.message ?? 'We could not swap those meals. Refresh and try again.');
-      return;
+        sourceUpdatedAt: new Date(nextSource.updatedAt).toISOString(),
+        targetUpdatedAt: new Date(nextTarget.updatedAt).toISOString(),
+      });
+      setFeedback('Meals swapped.');
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    const nextSource = body.meals.find((meal) => meal.id === source.id);
-    const nextTarget = body.meals.find((meal) => meal.id === target.id);
-    if (!nextSource || !nextTarget) {
-      setError('We could not verify the swapped meals. Refresh and try again.');
-      return;
-    }
-    recordHistory({
-      kind: 'swapped',
-      label: `swapping ${source.recipeTitle} and ${target.recipeTitle}`,
-      sourceId: source.id,
-      targetId: target.id,
-      sourceUpdatedAt: new Date(nextSource.updatedAt).toISOString(),
-      targetUpdatedAt: new Date(nextTarget.updatedAt).toISOString(),
-    });
-    setFeedback('Meals swapped.');
-    router.refresh();
   }
 
   function handleDrop(date: string, mealType: MealType, targetMeal?: PlannedMeal) {
@@ -920,105 +955,140 @@ export function MealPlanner({
 
   async function copyWeek() {
     setBusyAction('copy');
-    setError(null);
-    setFeedback(null);
-    const response = await fetch('/api/v1/meal-plan/duplicate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weekStart, destinationWeekStart: nextWeekStart }),
-    });
-    setBusyAction(null);
-    if (!response.ok) {
-      setError('We could not copy this week yet. Try again in a moment.');
-      return;
+    try {
+      setError(null);
+      setFeedback(null);
+      const response = await fetch('/api/v1/meal-plan/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weekStart, destinationWeekStart: nextWeekStart }),
+      });
+      if (!response.ok) {
+        setError('We could not copy this week yet. Try again in a moment.');
+        return;
+      }
+      navigateWeek(nextWeekStart);
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    navigateWeek(nextWeekStart);
   }
 
   async function removeMeal(id: string) {
     const meal = meals.find((candidate) => candidate.id === id);
     if (!meal || !window.confirm(`Remove ${meal.recipeTitle} from this plan?`)) return;
     setBusyAction(id);
-    setError(null);
-    const response = await fetch(`/api/v1/meal-plan/${id}`, { method: 'DELETE' });
-    setBusyAction(null);
-    if (!response.ok) {
-      setError('We could not remove that meal. Try again.');
-      return;
+    try {
+      setError(null);
+      const response = await fetch(`/api/v1/meal-plan/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        setError('We could not remove that meal. Try again.');
+        return;
+      }
+      recordHistory({
+        kind: 'removed',
+        label: `removing ${meal.recipeTitle}`,
+        entries: [mealEntrySnapshot(meal)],
+        ids: [meal.id],
+      });
+      setFeedback('Meal removed from the plan.');
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    recordHistory({
-      kind: 'removed',
-      label: `removing ${meal.recipeTitle}`,
-      entries: [mealEntrySnapshot(meal)],
-      ids: [meal.id],
-    });
-    setFeedback('Meal removed from the plan.');
-    router.refresh();
   }
 
   async function updateMealStatus(id: string, status: 'planned' | 'skipped' | 'cancelled') {
     const meal = meals.find((candidate) => candidate.id === id);
     if (!meal || meal.status === status) return;
     setBusyAction(id);
-    setError(null);
-    const response = await fetch(`/api/v1/meal-plan/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      meal?: PlannedMeal;
-      error?: { message?: string };
-    } | null;
-    setBusyAction(null);
-    if (!response.ok || !body?.meal) {
-      setError(body?.error?.message ?? 'We could not update that meal status. Try again.');
-      return;
+    try {
+      setError(null);
+      const response = await fetch(`/api/v1/meal-plan/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        meal?: PlannedMeal;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.meal) {
+        setError(body?.error?.message ?? 'We could not update that meal status. Try again.');
+        return;
+      }
+      recordHistory({
+        kind: 'status',
+        label: `marking ${meal.recipeTitle} ${status}`,
+        id,
+        before: meal.status,
+        after: status,
+      });
+      setFeedback(`Meal marked ${status}.`);
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    recordHistory({
-      kind: 'status',
-      label: `marking ${meal.recipeTitle} ${status}`,
-      id,
-      before: meal.status,
-      after: status,
-    });
-    setFeedback(`Meal marked ${status}.`);
-    router.refresh();
   }
 
   async function refreshPlannedRecipe(id: string) {
     setBusyAction(id);
-    setError(null);
-    const response = await fetch(`/api/v1/meal-plan/${id}/refresh-recipe`, { method: 'POST' });
-    setBusyAction(null);
-    if (!response.ok) {
-      setError('We could not refresh that planned recipe. Try again.');
-      return;
+    try {
+      setError(null);
+      const response = await fetch(`/api/v1/meal-plan/${id}/refresh-recipe`, { method: 'POST' });
+      if (!response.ok) {
+        setError('We could not refresh that planned recipe. Try again.');
+        return;
+      }
+      setFeedback('The plan now uses the current recipe and Nutrition calculation.');
+      router.refresh();
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    setFeedback('The plan now uses the current recipe and Nutrition calculation.');
-    router.refresh();
   }
 
   async function generateList() {
     setBusyAction('shopping-list');
-    setError(null);
-    setFeedback(null);
-    const response = await fetch('/api/v1/shopping-lists/pantry-shortages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weekStart, weekEnd }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      listId?: string;
-      restored?: boolean;
-      error?: { message?: string };
-    } | null;
-    setBusyAction(null);
-    if (!response.ok || !body?.listId) {
-      setError(body?.error?.message ?? 'Plan at least one meal before generating a list.');
-      return;
+    try {
+      setError(null);
+      setFeedback(null);
+      const response = await fetch('/api/v1/shopping-lists/pantry-shortages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weekStart, weekEnd }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        listId?: string;
+        restored?: boolean;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !body?.listId) {
+        setError(body?.error?.message ?? 'Plan at least one meal before generating a list.');
+        return;
+      }
+      router.push(`/lists/${body.listId}${body.restored ? '?restored=1' : ''}`);
+    } catch {
+      setError(
+        'We could not confirm that change. Check your connection, refresh the plan, and try again.',
+      );
+    } finally {
+      setBusyAction(null);
     }
-    router.push(`/lists/${body.listId}${body.restored ? '?restored=1' : ''}`);
   }
 
   function handleRecipesSaved(count: number, addedMeals: PlannedMeal[]) {
@@ -1039,13 +1109,149 @@ export function MealPlanner({
 
   return (
     <>
-      <div className={`${styles.plannerLayout} planner-workspace-grid`}>
+      <PageHeader
+        className="planner-page-heading"
+        density="compact"
+        title="Meal planner"
+        titleId="planner-page-title"
+        eyebrow="MEAL PLANNER"
+        description="Choose your meals, check what you have, and make your shopping list."
+        actions={
+          <div className={styles.headerActions}>
+            {' '}
+            <button
+              className={styles.addMealsButton}
+              type="button"
+              onClick={() => openRecipePicker(weekStart)}
+              disabled={!recipes.length}
+            >
+              <Plus size={17} /> Add a meal
+            </button>
+            <button
+              className={styles.planOptionsButton}
+              type="button"
+              aria-expanded={showMobileSetup}
+              aria-controls="planner-settings-panel"
+              onClick={() => setShowMobileSetup((value) => !value)}
+            >
+              Plan settings
+            </button>
+            <KitchenPrintDialog kind="meal-plan" start={weekStart} end={weekEnd} />
+          </div>
+        }
+      />
+      <div className={styles.calendarControls} aria-label="Calendar controls">
+        <span className={styles.periodLabel}>
+          {viewMode === 'day'
+            ? formatPlannerDate(weekStart, {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : viewMode === 'month'
+              ? formatPlannerDate(weekStart, { month: 'long', year: 'numeric' })
+              : humanRange(weekStart, weekEnd)}
+        </span>
+
+        <div className={styles.weekNavigation} aria-label="Planner period navigation">
+          <button
+            type="button"
+            aria-label={`Previous ${viewMode}`}
+            title={`Previous ${viewMode}`}
+            onClick={() => navigatePeriod(previousWeekStart)}
+          >
+            <ChevronLeft size={18} aria-hidden="true" /> <span>Previous</span>
+          </button>
+          <div className={styles.viewModeControl} role="group" aria-label="Planner view">
+            {(['day', 'week', 'month'] as const).map((mode) => (
+              <button
+                type="button"
+                key={mode}
+                aria-pressed={viewMode === mode}
+                onClick={() => navigatePeriod(weekStart, mode)}
+              >
+                {mode.charAt(0).toLocaleUpperCase() + mode.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-label={`Next ${viewMode}`}
+            title={`Next ${viewMode}`}
+            onClick={() => navigatePeriod(nextWeekStart)}
+          >
+            <span>Next</span> <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className={styles.historyControls} aria-label="Planner save history">
+          <button
+            type="button"
+            disabled={!undoStack.length || Boolean(busyAction)}
+            title={undoStack.length ? `Undo ${undoStack.at(-1)?.label}` : 'Nothing to undo'}
+            aria-label="Undo last planner change"
+            onClick={() => void runHistory('undo')}
+          >
+            <Undo2 size={17} aria-hidden="true" /> <span>Undo</span>
+          </button>
+          <button
+            type="button"
+            disabled={!redoStack.length || Boolean(busyAction)}
+            title={redoStack.length ? `Redo ${redoStack.at(-1)?.label}` : 'Nothing to redo'}
+            aria-label="Redo last planner change"
+            onClick={() => void runHistory('redo')}
+          >
+            <Redo2 size={17} aria-hidden="true" /> <span>Redo</span>
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(busyAction)}
+            title="Planner changes save automatically"
+            aria-label="Confirm planner changes are saved"
+            onClick={confirmSaved}
+          >
+            <Save size={17} aria-hidden="true" />
+            <span>{busyAction ? 'Saving' : 'Saved'}</span>
+          </button>
+        </div>
+        <details className={styles.moreActions}>
+          <summary title="More planner actions">
+            <Ellipsis size={18} aria-hidden="true" /> More actions
+          </summary>
+          <div>
+            <button
+              type="button"
+              disabled={viewMode !== 'week' || Boolean(busyAction) || !meals.length}
+              onClick={copyWeek}
+            >
+              <Copy size={16} aria-hidden="true" /> Copy week
+            </button>
+            <a href={`/api/v1/meal-plan/export?start=${weekStart}&end=${weekEnd}`}>
+              <CalendarDays size={16} aria-hidden="true" /> Export calendar
+            </a>
+            <button type="button" onClick={() => window.print()}>
+              <Printer size={16} aria-hidden="true" /> Print plan
+            </button>
+          </div>
+        </details>
+      </div>
+      <div
+        className={`${styles.plannerLayout} ${styles.refinedPlanner} ${showMobileSetup ? styles.setupExpanded : ''} planner-workspace-grid`}
+      >
         <section
           className={`${styles.setupPanel} ${showMobileSetup ? styles.mobileSetupOpen : ''}`}
-          aria-label="Build your meal plan"
+          id="planner-settings-panel"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setShowMobileSetup(false);
+          }}
+          aria-label="Plan settings"
         >
           <div className={styles.setupHeading}>
-            <h2>Plan your week</h2>
+            <div>
+              <p className={styles.railEyebrow}>PLAN SETTINGS</p>
+              <h2>Build your plan</h2>
+              <p className={styles.railDescription}>Choose dates, meals and who’s eating.</p>
+            </div>
             <button
               type="button"
               aria-label="Close plan settings"
@@ -1332,107 +1538,8 @@ export function MealPlanner({
 
         <section
           className={`${styles.weekPlan} planner-workspace-center`}
-          aria-labelledby="week-plan-title"
+          aria-label="Meal calendar"
         >
-          <header className={styles.weekHeader}>
-            <div>
-              <h2 id="week-plan-title">
-                {viewMode === 'day'
-                  ? formatPlannerDate(weekStart, { weekday: 'long' })
-                  : viewMode === 'month'
-                    ? formatPlannerDate(weekStart, { month: 'long', year: 'numeric' })
-                    : 'This week at the table'}
-              </h2>
-              <p>
-                {viewMode === 'day'
-                  ? formatPlannerDate(weekStart, { month: 'long', day: 'numeric', year: 'numeric' })
-                  : humanRange(weekStart, weekEnd)}
-              </p>
-            </div>
-            <div className={styles.weekControls}>
-              <div className={styles.historyControls} aria-label="Planner save history">
-                <button
-                  type="button"
-                  disabled={!undoStack.length || Boolean(busyAction)}
-                  title={undoStack.length ? `Undo ${undoStack.at(-1)?.label}` : 'Nothing to undo'}
-                  aria-label="Undo last planner change"
-                  onClick={() => void runHistory('undo')}
-                >
-                  <Undo2 size={17} aria-hidden="true" /> <span>Undo</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={!redoStack.length || Boolean(busyAction)}
-                  title={redoStack.length ? `Redo ${redoStack.at(-1)?.label}` : 'Nothing to redo'}
-                  aria-label="Redo last planner change"
-                  onClick={() => void runHistory('redo')}
-                >
-                  <Redo2 size={17} aria-hidden="true" /> <span>Redo</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(busyAction)}
-                  title="Planner changes save automatically"
-                  aria-label="Confirm planner changes are saved"
-                  onClick={confirmSaved}
-                >
-                  <Save size={17} aria-hidden="true" />
-                  <span>{busyAction ? 'Saving' : 'Saved'}</span>
-                </button>
-              </div>
-              <div className={styles.weekNavigation} aria-label="Planner period navigation">
-                <button
-                  type="button"
-                  aria-label={`Previous ${viewMode}`}
-                  title={`Previous ${viewMode}`}
-                  onClick={() => navigatePeriod(previousWeekStart)}
-                >
-                  <ChevronLeft size={18} aria-hidden="true" /> <span>Previous</span>
-                </button>
-                <div className={styles.viewModeControl} role="group" aria-label="Planner view">
-                  {(['day', 'week', 'month'] as const).map((mode) => (
-                    <button
-                      type="button"
-                      key={mode}
-                      aria-pressed={viewMode === mode}
-                      onClick={() => navigatePeriod(weekStart, mode)}
-                    >
-                      {mode.charAt(0).toLocaleUpperCase() + mode.slice(1)}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Next ${viewMode}`}
-                  title={`Next ${viewMode}`}
-                  onClick={() => navigatePeriod(nextWeekStart)}
-                >
-                  <span>Next</span> <ChevronRight size={18} aria-hidden="true" />
-                </button>
-              </div>
-              <details className={styles.moreActions}>
-                <summary title="More planner actions">
-                  <Ellipsis size={18} aria-hidden="true" /> More actions
-                </summary>
-                <div>
-                  <button
-                    type="button"
-                    disabled={viewMode !== 'week' || Boolean(busyAction) || !meals.length}
-                    onClick={copyWeek}
-                  >
-                    <Copy size={16} aria-hidden="true" /> Copy week
-                  </button>
-                  <a href={`/api/v1/meal-plan/export?start=${weekStart}&end=${weekEnd}`}>
-                    <CalendarDays size={16} aria-hidden="true" /> Export calendar
-                  </a>
-                  <button type="button" onClick={() => window.print()}>
-                    <Printer size={16} aria-hidden="true" /> Print plan
-                  </button>
-                </div>
-              </details>
-            </div>
-          </header>
-
           {feedback ? (
             <div className={styles.feedback} role="status">
               <Check size={18} aria-hidden="true" /> {feedback}
@@ -1532,15 +1639,7 @@ export function MealPlanner({
                   <Save size={18} aria-hidden="true" />
                 </button>
               </div>
-              <button
-                className={styles.mobileDayPicker}
-                type="button"
-                aria-label="Plan settings"
-                title="Plan settings"
-                onClick={() => setShowMobileSetup(true)}
-              >
-                <SlidersHorizontal size={19} aria-hidden="true" />
-              </button>
+
               <button
                 className={styles.mobileNutritionAction}
                 type="button"
@@ -1840,11 +1939,91 @@ export function MealPlanner({
           </div>
         </section>
 
-        <aside className={styles.insightsRail} aria-label={`${mealLabel(viewMode)} plan insights`}>
+        <aside className={styles.insightsRail} aria-label="Plan overview and shopping">
+          <section
+            className={`${styles.insightCard} ${styles.planOverviewCard}`}
+            aria-label={`${mealLabel(viewMode)} plan at a glance`}
+          >
+            <header className={styles.planOverviewHeader}>
+              <span className={styles.planOverviewIcon} aria-hidden="true">
+                <CalendarDays size={18} />
+              </span>
+              <div>
+                <h2>Plan overview</h2>
+                <small>Your current calendar at a glance</small>
+              </div>
+            </header>
+            <div className={styles.planOverviewMetrics} aria-live="polite">
+              <div>
+                <strong>{meals.length}</strong>
+                <span>Meals planned</span>
+              </div>
+              <div>
+                <strong>{totalServings}</strong>
+                <span>Total servings</span>
+              </div>
+              <div>
+                <strong>{recipesUsed}</strong>
+                <span>Recipes used</span>
+              </div>
+            </div>
+          </section>{' '}
           <section className={styles.insightCard}>
             <header>
-              <strong>Nutrition preview</strong>
-              <span>Average per day</span>
+              <h3>Ready to shop?</h3>
+            </header>
+            {summaryBusy ? (
+              <div className={styles.summarySkeleton} aria-label="Updating Pantry coverage">
+                <InlineSkeleton label="Updating Pantry coverage" width="100%" />
+                <InlineSkeleton label="Updating Pantry coverage" width="70%" />
+              </div>
+            ) : meals.length && pantrySummary.total > 0 ? (
+              <>
+                <div className={styles.pantryCoverage}>
+                  <div
+                    className={styles.coverageRing}
+                    style={{ '--coverage': `${coveragePercent}%` } as CSSProperties}
+                  />
+                  <p>
+                    <strong>{coveragePercent}%</strong>
+                    <span>covered by pantry</span>
+                  </p>
+                </div>
+                <p className={styles.missingIngredients}>
+                  {pantrySummary.missing} ingredients missing
+                </p>
+                <Link className={styles.railButton} href="/pantry">
+                  View pantry
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className={styles.summaryEmpty}>
+                  {meals.length
+                    ? 'Pantry coverage is not available for these meals yet.'
+                    : 'Add a meal to see what you already have.'}
+                </p>
+              </>
+            )}
+            <button
+              className={`${styles.shoppingButton} ${styles.railGroceryButton}`}
+              type="button"
+              disabled={Boolean(busyAction) || !meals.length}
+              onClick={generateList}
+            >
+              {busyAction === 'shopping-list' ? (
+                <InlineSkeleton label="Generating shopping list" width="1.1rem" />
+              ) : (
+                <ShoppingBasket size={17} aria-hidden="true" />
+              )}
+              <span aria-hidden="true">Make grocery list</span>
+              <span className="sr-only">Make Pantry-aware grocery list</span>
+            </button>
+          </section>{' '}
+          <section className={styles.insightCard}>
+            <header>
+              <h3>Nutrition preview</h3>
+              <span>Daily average from recorded nutrient values</span>
             </header>
             {summaryBusy ? (
               <div className={styles.summarySkeleton} aria-label="Updating nutrition preview">
@@ -1862,104 +2041,45 @@ export function MealPlanner({
                       {item.target ? ` / ${number(item.target)}` : ''} {item.unit}
                     </small>
                   </span>
-                  <i>
-                    <b style={{ width: `${item.progress}%` }} />
-                  </i>
+                  {item.value !== undefined && (
+                    <i aria-hidden="true">
+                      <b style={{ width: `${item.progress}%` }} />
+                    </i>
+                  )}
                 </div>
               ))
             ) : (
               <p className={styles.summaryEmpty}>No nutrition data yet</p>
             )}
+            <p className={styles.railDescription}>
+              Missing nutrients remain unknown. Planned totals are estimates, not logged meals.
+            </p>
             <Link href="/nutrition?view=overview">
               View full nutrition <ChevronRight size={16} aria-hidden="true" />
             </Link>
-          </section>
-          <section className={styles.insightCard}>
-            <header>
-              <strong>Pantry coverage</strong>
-            </header>
-            {summaryBusy ? (
-              <div className={styles.summarySkeleton} aria-label="Updating Pantry coverage">
-                <InlineSkeleton label="Updating Pantry coverage" width="100%" />
-                <InlineSkeleton label="Updating Pantry coverage" width="70%" />
-              </div>
-            ) : meals.length ? (
-              <>
-                <div className={styles.pantryCoverage}>
-                  <div
-                    className={styles.coverageRing}
-                    style={{ '--coverage': `${coveragePercent}%` } as CSSProperties}
-                  />
-                  <p>
-                    <strong>{coveragePercent}%</strong>
-                    <span>covered by pantry</span>
-                  </p>
-                </div>
-                <p className={styles.missingIngredients}>
-                  {pantrySummary.missing} ingredients missing
-                </p>
-                <Link className={styles.railButton} href="/pantry">
-                  View missing items
-                </Link>
-              </>
-            ) : (
-              <>
-                <p className={styles.summaryEmpty}>Add meals to calculate coverage</p>
-                <button className={styles.railButton} type="button" disabled>
-                  View missing items
-                </button>
-              </>
-            )}
-          </section>
-          {meals.length ? (
-            <AiSummaryCards
-              domain="meal_plans"
-              placement="rail"
-              initialSummary={initialAiSummary}
+          </section>{' '}
+          <section className={styles.assistanceSection} aria-label="Meal suggestions">
+            <DecisionAssistance
+              embedded
+              initialTask="meal_rank"
+              tasks={['meal_rank']}
+              title="Choose the next meal"
+              description="Compare saved recipes using your shared preferences, nutrition and pantry evidence before adding them to the calendar."
             />
-          ) : null}
-          <section
-            className={`${styles.insightCard} ${styles.planOverviewCard}`}
-            aria-label={`${mealLabel(viewMode)} plan at a glance`}
-          >
-            <header className={styles.planOverviewHeader}>
-              <span className={styles.planOverviewIcon} aria-hidden="true">
-                <CalendarDays size={18} />
-              </span>
-              <span>
-                <strong>{mealLabel(viewMode)} summary</strong>
-                <small>{humanRange(weekStart, weekEnd)}</small>
-              </span>
-            </header>
-            <div className={styles.planOverviewMetrics} aria-live="polite">
-              <div>
-                <strong>{meals.length}</strong>
-                <span>Meals planned</span>
-              </div>
-              <div>
-                <strong>{totalServings}</strong>
-                <span>Total servings</span>
-              </div>
-              <div>
-                <strong>{recipesUsed}</strong>
-                <span>Recipes used</span>
-              </div>
-            </div>
           </section>
-          <button
-            className={`${styles.shoppingButton} ${styles.railGroceryButton}`}
-            type="button"
-            disabled={Boolean(busyAction) || !meals.length}
-            onClick={generateList}
-          >
-            {busyAction === 'shopping-list' ? (
-              <InlineSkeleton label="Generating shopping list" width="1.1rem" />
-            ) : (
-              <ShoppingBasket size={17} aria-hidden="true" />
-            )}
-            <span aria-hidden="true">Make grocery list</span>
-            <span className="sr-only">Make Pantry-aware grocery list</span>
-          </button>
+          {meals.length > 0 && (
+            <details className={styles.planningNotes}>
+              <summary>Planning notes</summary>
+
+              {meals.length ? (
+                <AiSummaryCards
+                  domain="meal_plans"
+                  placement="rail"
+                  initialSummary={initialAiSummary}
+                />
+              ) : null}
+            </details>
+          )}
         </aside>
       </div>
 

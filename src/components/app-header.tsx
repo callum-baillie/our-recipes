@@ -121,7 +121,11 @@ export function AppHeader({
                 >
                   Recipe
                 </button>
-                <Link hidden={role === 'child'} href="/planner#meal-plan-setup-title" data-menu-close>
+                <Link
+                  hidden={role === 'child'}
+                  href="/planner#meal-plan-setup-title"
+                  data-menu-close
+                >
                   Meal Plan
                 </Link>
                 <Link href="/nutrition?view=diary" data-menu-close>
@@ -132,30 +136,34 @@ export function AppHeader({
                 </Link>
               </div>
             </DismissibleDetails>
-            {role !== 'child' ? <button
-              ref={assistantTriggerRef}
-              type="button"
-              className={`${styles.utilityButton} settings-button`}
-              aria-label="Open AI assistant"
-              aria-controls="ai-assistant-drawer"
-              aria-expanded={assistantOpen}
-              title="AI assistant"
-              onClick={() => {
-                setAssistantMounted(true);
-                setAssistantOpen(true);
-              }}
-            >
-              <Sparkles size={19} aria-hidden="true" />
-            </button> : null}
-            {role === 'admin' ? <Link
-              className={`${styles.utilityButton} ${styles.settingsUtility} settings-button${pathname.startsWith('/settings') ? ' active' : ''}`}
-              href="/settings"
-              aria-label="App settings"
-              aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
-              title="Settings"
-            >
-              <Settings size={19} aria-hidden="true" />
-            </Link> : null}
+            {role !== 'child' ? (
+              <button
+                ref={assistantTriggerRef}
+                type="button"
+                className={`${styles.utilityButton} settings-button`}
+                aria-label="Open AI assistant"
+                aria-controls="ai-assistant-drawer"
+                aria-expanded={assistantOpen}
+                title="AI assistant"
+                onClick={() => {
+                  setAssistantMounted(true);
+                  setAssistantOpen(true);
+                }}
+              >
+                <Sparkles size={19} aria-hidden="true" />
+              </button>
+            ) : null}
+            {role === 'admin' ? (
+              <Link
+                className={`${styles.utilityButton} ${styles.settingsUtility} settings-button${pathname.startsWith('/settings') ? ' active' : ''}`}
+                href="/settings"
+                aria-label="App settings"
+                aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
+                title="Settings"
+              >
+                <Settings size={19} aria-hidden="true" />
+              </Link>
+            ) : null}
             <span className={styles.controlDivider} aria-hidden="true" />
             <ProfileSwitcher
               activeProfileId={activeProfileId}
@@ -179,13 +187,15 @@ export function AppHeader({
                     {link.label}
                   </Link>
                 ))}
-                {role === 'admin' ? <Link
-                  className={`${styles.mobileSettingsLink}${pathname.startsWith('/settings') ? ' active' : ''}`}
-                  href="/settings"
-                  aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
-                >
-                  Settings
-                </Link> : null}
+                {role === 'admin' ? (
+                  <Link
+                    className={`${styles.mobileSettingsLink}${pathname.startsWith('/settings') ? ' active' : ''}`}
+                    href="/settings"
+                    aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
+                  >
+                    Settings
+                  </Link>
+                ) : null}
                 <div className={styles.mobileCreateGroup} aria-label="Create">
                   <span>Create</span>
                   <button

@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useMemo, useState, useTransition } from 'react';
 
+import { StoreMapUpload } from '@/components/store-map-upload';
+
 import { InlineSkeleton } from '@/components/skeleton';
 import {
   SettingsActionBar,
@@ -405,6 +407,10 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
             </label>
           </div>
 
+          <StoreMapUpload
+            key={draft.id ?? 'new-store'}
+            onUse={(sections) => setDraft((current) => ({ ...current, sections }))}
+          />
           <div className={styles.routeHeader}>
             <div>
               <p className="eyebrow">IN-STORE ROUTE</p>

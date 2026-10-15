@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/page-header';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -15,20 +16,17 @@ export default function NewRecipePage() {
         <RecipeForm
           initial={{ ...emptyRecipeInput, servings: `${preferences.defaultServings} servings` }}
           intro={
-            <>
-              <Link className="quiet-link editor-back-link" href="/recipes">
-                <ArrowLeft size={16} aria-hidden="true" />
-                Back to recipe book
-              </Link>
-              <div className="editor-title-copy">
-                <p className="eyebrow">A RECIPE WORTH KEEPING</p>
-                <h1>Add it your way.</h1>
-                <p className="muted">
-                  Write the details you use at the stove. You can always revise this shared recipe
-                  later.
-                </p>
-              </div>
-            </>
+            <PageHeader
+              title="New recipe"
+              eyebrow="A RECIPE WORTH KEEPING"
+              description="Write the details you use at the stove. You can always revise this shared recipe later."
+              leading={
+                <Link className="quiet-link editor-back-link" href="/recipes">
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  Back to recipe book
+                </Link>
+              }
+            />
           }
         />
       </section>

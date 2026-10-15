@@ -1,0 +1,243 @@
+.workspace {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  display: grid;
+  gap: 1.5rem;
+}
+.header {
+  display: grid;
+  gap: 0.5rem;
+}
+.header h1,
+.header h2,
+.card h3 {
+  margin: 0;
+}
+.header p,
+.muted {
+  color: var(--muted);
+  line-height: 1.55;
+}
+.panel,
+.card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.25rem;
+  background: var(--card);
+  display: grid;
+  gap: 1rem;
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.field {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.field select,
+.field input,
+.field textarea,
+.route input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: inherit;
+  border-radius: 8px;
+  padding: 0.7rem;
+  font: inherit;
+}
+.field textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.actions button,
+.route button,
+.link {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0.6rem 0.85rem;
+  background: var(--card);
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+.actions button:disabled,
+.route button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.actions .primary {
+  background: #2f5945;
+  color: white;
+  border-color: #2f5945;
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+.check input {
+  margin-top: 0.25rem;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 1rem;
+}
+.badge {
+  font-size: 0.8rem;
+  background: var(--leaf-pale);
+  color: var(--ink);
+  border-radius: 20px;
+  padding: 0.3rem 0.65rem;
+  width: fit-content;
+}
+.card details {
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+}
+.card summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.evidence {
+  max-height: 350px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.evidence pre {
+  white-space: pre-wrap;
+  font: inherit;
+}
+.notice {
+  border-left: 3px solid #799168;
+  padding: 0.5rem 1rem;
+  line-height: 1.5;
+}
+.mapImage {
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  background: #fafafa;
+  border-radius: 12px;
+}
+.route {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 460px;
+  overflow: auto;
+}
+.route li {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.route small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+}
+
+.embedded {
+  margin-block: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--card);
+  overflow: hidden;
+  color: var(--ink);
+}
+.contextHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+.contextHeader h3 {
+  margin: 0.4rem 0;
+  font-size: 1.1rem;
+}
+.contextHeader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 65ch;
+}
+.contextHeader button,
+.bulkBar button {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--leaf-pale);
+  color: var(--ink);
+  cursor: pointer;
+}
+.embedded .panel {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+}
+.embedded > .cards,
+.embedded > .notice,
+.embedded > .actions,
+.embedded > .check,
+.embedded > p {
+  margin: 1rem;
+}
+.embedded .cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+}
+.bulkBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-block: 1px solid var(--line);
+  background: var(--leaf-pale);
+}
+@media (max-width: 600px) {
+  .contextHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.reviewValues {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+}
+.reviewValues > div {
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--line);
+}
+.reviewValues dt {
+  text-transform: capitalize;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.reviewValues dd {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+}

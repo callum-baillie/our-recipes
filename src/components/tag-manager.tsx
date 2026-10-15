@@ -1,4 +1,5 @@
 'use client';
+import { PageHeader } from '@/components/page-header';
 
 import { Merge, Plus, Save, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -97,15 +98,12 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
 
   return (
     <main className="settings-page">
-      <RecipebookNav current="tags" />
-      <section className="settings-intro">
-        <p className="eyebrow">HOUSEHOLD ORGANIZATION</p>
-        <h1>Tags with a little order.</h1>
-        <p>
-          Tags stay flexible, but a shared name and color make the cookbook easier for everyone to
-          scan. Renaming and merging retain the recipes already using a tag.
-        </p>
-      </section>
+      <PageHeader
+        title="Tags"
+        eyebrow="HOUSEHOLD ORGANIZATION"
+        description="Organize recipes with shared names and colors. Renaming and merging keeps tagged recipes together."
+        toolbarRight={<RecipebookNav current="tags" />}
+      />
       <section className="settings-card">
         <h2>Add a tag</h2>
         <form className="tag-create-form" onSubmit={create}>

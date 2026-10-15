@@ -65,7 +65,7 @@ async function runContainer() {
 }
 
 try {
-  await docker('build', '-t', image, '.');
+  if (process.env.DOCKER_SKIP_BUILD !== 'true') await docker('build', '-t', image, '.');
   await runContainer();
   const setup = await fetch(`${baseUrl}/api/v1/setup`, {
     method: 'POST',
@@ -76,7 +76,6 @@ try {
       credentials: {
         email: 'cook@example.invalid',
         passphrase: 'docker smoke passphrase',
-        pin: '739204',
       },
       profile: {
         displayName: 'Cook',
@@ -98,5 +97,26 @@ try {
   console.log('Docker build, health, and persistent-volume smoke test passed.');
 } finally {
   await docker('rm', '-f', container).catch(() => undefined);
-  await rm(dataDirectory, { recursive: true, force: true });
+  // The entrypoint assigns the mounted volume to the container account. Restore
+  // ownership of this disposable directory so the host can remove its contents.
+  try {
+    await rm(dataDirectory, { recursive: true, force: true });
+  } catch (error) {
+    if (process.platform !== 'linux' || error.code !== 'EACCES') throw error;
+    await docker(
+      'run',
+      '--rm',
+      '--user',
+      '0:0',
+      '--entrypoint',
+      'chown',
+      '-v',
+      `${dataDirectory}:/data`,
+      image,
+      '-R',
+      `${process.getuid()}:${process.getgid()}`,
+      '/data',
+    );
+    await rm(dataDirectory, { recursive: true, force: true });
+  }
 }

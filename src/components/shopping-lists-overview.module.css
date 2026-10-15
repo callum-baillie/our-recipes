@@ -821,3 +821,87 @@
     grid-column: 2;
   }
 }
+
+.createForm .nextShopOption {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  grid-column: 1 / -1;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+.createForm .nextShopOption input {
+  flex: 0 0 1.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--leaf);
+}
+
+.hero {
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.hero h1 {
+  font-size: clamp(2rem, 3.3vw, 3rem);
+  max-width: none;
+  line-height: 1.1;
+}
+.hero > p {
+  max-width: 26rem;
+  align-self: center;
+}
+.nextShopCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.2rem 1.3rem;
+  margin-bottom: 1.2rem;
+  background: #edf2e4;
+  border: 1px solid #cbd8b9;
+  border-radius: 0.8rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.nextShopCard > span:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+.nextShopCard small {
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  color: var(--leaf);
+}
+.nextShopCard strong {
+  font-size: 1.25rem;
+}
+.nextShopCard span span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.nextShopCard > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  font-size: 0.85rem;
+}
+
+/* Align workspace headers and content with the other kitchen pages. */
+.page {
+  width: 100%;
+  max-width: var(--workspace-width);
+  padding-top: var(--workspace-top-space);
+  padding-inline: var(--page-gutter);
+}
+.hero {
+  min-height: 0;
+}
+.mainColumn {
+  gap: var(--workspace-section-gap);
+}

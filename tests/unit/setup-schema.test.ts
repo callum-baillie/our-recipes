@@ -94,6 +94,12 @@ describe('setupSchema', () => {
     ).toBe(false);
   });
 
+  it('returns an added profile to review without repeating the first-recipe step', () => {
+    const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
+    expect(source).toContain("currentStep === 'goals' && profileReviewMode");
+    expect(source).toContain("setStepIndex(steps.indexOf('review'))");
+  });
+
   it('uses US onboarding defaults and derives hidden regional settings from the browser', () => {
     const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
     const settingsSource = readFileSync('src/components/profile-settings.tsx', 'utf8');
@@ -180,16 +186,17 @@ describe('setupSchema', () => {
     expect(onboardingWeightKilograms('imperial', '150', '16')).toBeNull();
   });
 
-  it('uses descriptive Nutrition choices, autocomplete fields, and switches during onboarding', () => {
+  it('keeps nutrition in a guided flow with explicit measurement and advanced options', () => {
     const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
-    expect(source).toContain('<h2>Setup your Nutrition profile</h2>');
-    expect(source).toContain('aria-label="Height inches"');
-    expect(source).toContain("'Weight ounces'");
-    expect(source.match(/<MultiValueCombobox/gu)).toHaveLength(3);
-    expect(source).toContain('role="switch"');
-    expect(source.match(/type="checkbox"/gu)).toHaveLength(1);
+    const nutrition = readFileSync('src/components/nutrition-onboarding-flow.tsx', 'utf8');
+    expect(source).toContain('<NutritionOnboardingFlow');
+    expect(nutrition).toContain('What are your measurements?');
+    expect(nutrition).toContain('aria-label="Height units"');
+    expect(nutrition).toContain('Feet &amp; inches');
+    expect(nutrition).toContain('Centimetres');
+    expect(nutrition).toContain('Advanced measurements');
+    expect(nutrition.match(/<MultiValueCombobox/gu)).toHaveLength(3);
     expect(source).toContain('I saved these one-time codes somewhere private.');
-    expect(source).not.toContain('<h2>Set up helpful Nutrition defaults.</h2>');
   });
 
   it('requires complete inputs and consent before enabling estimated nutrition targets', () => {
@@ -238,7 +245,7 @@ describe('setupSchema', () => {
         activityLevel: null,
         nutritionGoalType: 'loss',
         targetWeightKilograms: 75,
-        targetDate: '2026-10-06',
+        targetDate: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
         dietaryPreferences: [],
         foodAllergies: [],
         dietaryExclusions: [],
@@ -260,7 +267,7 @@ describe('setupSchema', () => {
         activityLevel: null,
         nutritionGoalType: 'gain',
         targetWeightKilograms: 75,
-        targetDate: '2026-10-06',
+        targetDate: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
         dietaryPreferences: [],
         foodAllergies: [],
         dietaryExclusions: [],

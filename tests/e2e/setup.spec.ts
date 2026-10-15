@@ -3,7 +3,7 @@ import sharp from 'sharp';
 
 import packageJson from '../../package.json';
 import { HEIC_FIXTURES } from './fixtures/heic-fixtures';
-import { onboardingEmail, TEST_PASSPHRASE, TEST_PROFILE_PIN } from './helpers/onboarding';
+import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
 
 test('a fresh install exposes only setup and operational APIs', async ({ page }) => {
   await page.goto('/');
@@ -26,9 +26,10 @@ test('AI status stays behind the setup boundary without leaking configuration', 
   expect(JSON.stringify(body)).not.toMatch(/sk-(?:proj-)?/u);
 });
 
-test('onboarding turns a weight direction into an editable, gradual target timeline', async ({
+test('onboarding calculates a gradual target timeline only from entered measurements', async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   await page.goto('/');
   await page.getByLabel('Kitchen name').fill('The Timeline Table');
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -36,18 +37,26 @@ test('onboarding turns a weight direction into an editable, gradual target timel
   await page.getByLabel('Display name').fill('Maya');
   await page.getByLabel('Email').fill(onboardingEmail('The Timeline Table', 'Maya'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
-
-  await page.getByLabel('Weight pounds').fill('200');
+  await page.getByRole('button', { name: 'Enter my details manually' }).click();
+  await page.getByLabel('When were you born?').fill('1990-01-01');
+  await page.getByRole('button', { name: 'Female reference', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'lb', exact: true }).click();
+  await page.getByLabel('Feet', { exact: true }).fill('5');
+  await page.getByLabel('Inches', { exact: true }).fill('8');
+  await page.getByLabel('Current weight').fill('200');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('radio', { name: /Lightly active/u }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('radio', { name: /Lose weight/u }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Target weight').fill('180');
-  await expect(page.getByText(/roughly 19 weeks/u)).toBeVisible();
-  await page.getByRole('button', { name: 'Use suggested date' }).click();
+  await page.getByRole('radio', { name: /Moderate/u }).check();
+  await expect(page.getByText('Approximately 19 weeks')).toBeVisible();
+  await page.getByRole('button', { name: /as a review date/u }).click();
   await expect(page.getByLabel('Target date')).not.toHaveValue('');
-  await expect(
-    page.getByText(/planning estimate, not medical advice or a calorie prescription/u),
-  ).toBeVisible();
+  await expect(page.getByText(/not a promised completion date/u)).toBeVisible();
 });
 
 test('a fresh household can complete the supported local release acceptance workflow', async ({
@@ -64,9 +73,8 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByLabel('Display name').fill('Callum');
   await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('checkbox', { name: /Feel organized at mealtime/u }).click();
   await page
     .getByLabel(/Why does this matter to you right now/u)
@@ -124,7 +132,7 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Save preferences' }).click();
   await expect(page.locator('.toast').filter({ hasText: 'List preferences saved.' })).toBeVisible();
   await page.goto('/recipes/new');
-  await expect(page.getByRole('heading', { name: 'Add it your way.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'New recipe' })).toBeVisible();
   await expect(page.getByLabel('Recipe name')).toBeVisible();
   await page.goto('/settings/profiles');
   await expect(
@@ -135,9 +143,8 @@ test('a fresh household can complete the supported local release acceptance work
   await profileOnboarding.getByLabel('Display name').fill('Jon');
   await profileOnboarding.getByLabel('Email').fill('jon-setup@example.test');
   await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await profileOnboarding.getByLabel('Profile PIN').fill('593817');
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
   await profileOnboarding.getByRole('checkbox', { name: /Cook at home more/u }).click();
   await profileOnboarding
     .getByLabel(/Why does this matter to you right now/u)
@@ -692,7 +699,7 @@ test('a fresh household can complete the supported local release acceptance work
   await recipeSelector.getByRole('button', { name: 'Add 1 recipe to plan' }).click();
   await expect(
     page
-      .getByRole('region', { name: 'This week at the table' })
+      .getByRole('region', { name: 'Meal calendar' })
       .getByText('Weeknight tomato soup', { exact: true })
       .filter({ visible: true }),
   ).toBeVisible();
@@ -706,7 +713,7 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page).toHaveURL(/\/planner\?view=week&date=/);
   await expect(
     page
-      .getByRole('region', { name: 'This week at the table' })
+      .getByRole('region', { name: 'Meal calendar' })
       .getByText('Weeknight tomato soup', { exact: true })
       .filter({ visible: true }),
   ).toBeVisible();

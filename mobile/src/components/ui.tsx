@@ -678,6 +678,7 @@ export function FormField({
   autoComplete,
   keyboardType,
   textContentType,
+  editable = true,
 }: {
   label: string;
   value: string;
@@ -689,6 +690,7 @@ export function FormField({
   autoComplete?: React.ComponentProps<typeof TextInput>['autoComplete'];
   keyboardType?: React.ComponentProps<typeof TextInput>['keyboardType'];
   textContentType?: React.ComponentProps<typeof TextInput>['textContentType'];
+  editable?: boolean;
 }) {
   return (
     <View style={{ gap: 6 }}>
@@ -705,6 +707,7 @@ export function FormField({
         autoComplete={autoComplete}
         keyboardType={keyboardType}
         textContentType={textContentType}
+        editable={editable}
         placeholderTextColor={tokens.color.inkTertiary}
         multiline={multiline}
         style={[

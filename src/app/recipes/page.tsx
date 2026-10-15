@@ -1,6 +1,9 @@
+import { PageHeader } from '@/components/page-header';
+import { DecisionAssistance } from '@/components/decision-assistance';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
+import { KitchenPrintDialog } from '@/components/kitchen-print-dialog';
 import { AiSummaryCards } from '@/components/ai-summary-cards';
 import { RecipeLibraryFilters } from '@/components/recipe-library-filters';
 import { RecipebookNav } from '@/components/recipebook-nav';
@@ -120,50 +123,94 @@ export default async function RecipeLibraryPage({
   const eagerRecipeId = library.recipes.find((recipe) => recipe.image)?.id;
   return (
     <main className="recipe-page">
-      <RecipebookNav current="library" />
-      <section className="library-heading" aria-labelledby="library-title">
-        <p className="eyebrow">THE SHARED COOKBOOK</p>
-        <div className="library-title-row">
-          <h1 id="library-title">Your recipe library</h1>
-          <div className="library-title-actions">
-            <p className="muted">
-              {library.total
-                ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
-                : 'A place for every recipe your household returns to.'}
-            </p>
-          </div>
-        </div>
-        <RecipeLibraryFilters
-          filters={{
-            q: query.q,
-            sort: query.sort,
-            creator: query.creator ?? '',
-            tag: query.tag ?? '',
-            collection: query.collection ?? '',
-            status: query.status,
-            category: query.category ?? '',
-            cuisine: query.cuisine ?? '',
-            maxTotalMinutes: query.maxTotalMinutes ?? '',
-            favorite: Boolean(query.favorite),
-            cooked: Boolean(query.cooked),
-            pantry: query.pantry ?? '',
-            maxCaloriesPerServing: query.maxCaloriesPerServing ?? '',
-            minProteinPerServing: query.minProteinPerServing ?? '',
-            minFiberPerServing: query.minFiberPerServing ?? '',
-            maxSodiumPerServing: query.maxSodiumPerServing ?? '',
-            minNutritionCompleteness: query.minNutritionCompleteness ?? '',
-            supportsNutrient: query.supportsNutrient ?? '',
-            nutritionFields: selectedNutritionFields,
-          }}
-          profiles={profiles.map((profile) => ({
-            value: profile.id,
-            label: profile.displayName,
-          }))}
-          tags={tags}
-          collections={collections.map((collection) => ({
-            value: collection.id,
-            label: collection.name,
-          }))}
+      <div className="library-heading">
+        <PageHeader
+          title="Your recipe library"
+          titleId="library-title"
+          eyebrow="THE SHARED COOKBOOK"
+          description={
+            library.total
+              ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
+              : 'A place for every recipe your household returns to.'
+          }
+          actions={
+            <KitchenPrintDialog
+              kind="recipes"
+              browse
+              recipes={library.recipes.map(({ id, title }) => ({ id, title }))}
+            />
+          }
+          toolbarLeft={
+            <nav className="kitchen-quick-views" aria-label="Recipe shortcuts">
+              <Link
+                href="/recipes"
+                aria-current={
+                  !query.favorite && !query.pantry && !query.maxTotalMinutes ? 'page' : undefined
+                }
+              >
+                All recipes
+              </Link>
+              <Link
+                href="/recipes?favorite=true"
+                aria-current={query.favorite ? 'page' : undefined}
+              >
+                Favourites
+              </Link>
+              <Link
+                href="/recipes?pantry=ready"
+                aria-current={query.pantry === 'ready' ? 'page' : undefined}
+              >
+                Ready to cook
+              </Link>
+              <Link
+                href="/recipes?maxTotalMinutes=30"
+                aria-current={query.maxTotalMinutes === 30 ? 'page' : undefined}
+              >
+                30 minutes or less
+              </Link>
+            </nav>
+          }
+          toolbarRight={<RecipebookNav current="library" />}
+        >
+          <RecipeLibraryFilters
+            filters={{
+              q: query.q,
+              sort: query.sort,
+              creator: query.creator ?? '',
+              tag: query.tag ?? '',
+              collection: query.collection ?? '',
+              status: query.status,
+              category: query.category ?? '',
+              cuisine: query.cuisine ?? '',
+              maxTotalMinutes: query.maxTotalMinutes ?? '',
+              favorite: Boolean(query.favorite),
+              cooked: Boolean(query.cooked),
+              pantry: query.pantry ?? '',
+              maxCaloriesPerServing: query.maxCaloriesPerServing ?? '',
+              minProteinPerServing: query.minProteinPerServing ?? '',
+              minFiberPerServing: query.minFiberPerServing ?? '',
+              maxSodiumPerServing: query.maxSodiumPerServing ?? '',
+              minNutritionCompleteness: query.minNutritionCompleteness ?? '',
+              supportsNutrient: query.supportsNutrient ?? '',
+              nutritionFields: selectedNutritionFields,
+            }}
+            profiles={profiles.map((profile) => ({
+              value: profile.id,
+              label: profile.displayName,
+            }))}
+            tags={tags}
+            collections={collections.map((collection) => ({
+              value: collection.id,
+              label: collection.name,
+            }))}
+          />
+        </PageHeader>
+        <DecisionAssistance
+          embedded
+          initialTask="cleanup"
+          tasks={['cleanup', 'recipe_review']}
+          title="Library maintenance"
+          description="Review saved recipes in batches for missing nutrition and unclear details. Open a recipe for ingredient matching and individual changes."
         />
         {activeNutritionProfile && !showRecipeCardNutrition ? (
           <p className="muted">
@@ -171,7 +218,7 @@ export default async function RecipeLibraryPage({
             Nutrition settings.
           </p>
         ) : null}
-      </section>
+      </div>
       {library.total ? (
         <AiSummaryCards
           domain="recipes"

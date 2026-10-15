@@ -1,9 +1,9 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { supermarketProfileUpdateSchema } from '@/lib/domain/list-settings';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   ListSettingsConflictError,
   ListSettingsNotFoundError,
@@ -13,23 +13,39 @@ import {
 export const runtime = 'nodejs';
 
 export async function PATCH(request: Request, context: { params: Promise<{ profileId: string }> }) {
-  if (!hasTrustedMutationOrigin(request))
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const actor = actorFromPrincipal(access.principal);
   if (!actor.profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+    return withApiRequestId(
+      jsonError(409, 'profile_selection_required', 'Choose a household profile first.'),
+      access.requestId,
+    );
   const parsed = supermarketProfileUpdateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
-    return jsonError(400, 'invalid_supermarket_profile', 'Check the supermarket details.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_supermarket_profile', 'Check the supermarket details.'),
+      access.requestId,
+    );
   try {
-    return NextResponse.json(
-      updateSupermarketProfile((await context.params).profileId, parsed.data, actor.profileId),
+    return withApiRequestId(
+      NextResponse.json(
+        updateSupermarketProfile((await context.params).profileId, parsed.data, actor.profileId),
+      ),
+      access.requestId,
     );
   } catch (error) {
     if (error instanceof ListSettingsNotFoundError)
-      return jsonError(404, 'supermarket_not_found', error.message);
+      return withApiRequestId(
+        jsonError(404, 'supermarket_not_found', error.message),
+        access.requestId,
+      );
     if (error instanceof ListSettingsConflictError)
-      return jsonError(409, 'supermarket_conflict', error.message);
+      return withApiRequestId(
+        jsonError(409, 'supermarket_conflict', error.message),
+        access.requestId,
+      );
     throw error;
   }
 }

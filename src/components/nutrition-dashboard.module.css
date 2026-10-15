@@ -2396,3 +2396,147 @@
     padding: 0.9rem;
   }
 }
+
+.viewDescription {
+  margin: 0.5rem 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.optionalSetup {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  margin-bottom: 1.1rem;
+  background: var(--surface, #fffefb);
+}
+.optionalSetup > summary {
+  padding: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.optionalSetup > summary span {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 0.6rem;
+}
+.diaryDateNav {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 1rem 0;
+}
+.diaryDateNav button,
+.diaryDateNav input {
+  min-height: 2.75rem;
+  background: var(--surface, #fffefb);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  color: var(--ink);
+  font: inherit;
+}
+.diaryDateNav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.diaryDateNav button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.diaryDateNav label {
+  flex: 1;
+  max-width: 15rem;
+  min-width: 0;
+}
+.diaryDateNav input {
+  width: 100%;
+  min-width: 0;
+}
+.diaryDayTotals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+.diaryDayTotals > div {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem;
+  border-radius: 0.6rem;
+  background: var(--linen);
+}
+.diaryDayTotals > div > span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.diaryDayTotals strong {
+  font-size: 1.3rem;
+}
+.diaryDayTotals strong small {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.diaryDayTotals > div > small {
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.diaryHistoryToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.diaryHistoryToggle input {
+  accent-color: var(--leaf);
+  width: 1rem;
+  height: 1rem;
+}
+@media (max-width: 600px) {
+  .diaryDayTotals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboardHeader h1 {
+    font-size: 2rem;
+  }
+  .diaryDateNav {
+    gap: 0.3rem;
+  }
+}
+
+@media (min-width: 1000px) {
+  .diaryWorkspace {
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    align-items: start;
+  }
+}
+
+/* Align workspace headers and content with the other kitchen pages. */
+.page {
+  width: 100%;
+  max-width: var(--workspace-width);
+  padding-top: var(--workspace-top-space);
+  padding-inline: var(--page-gutter);
+}
+.hero,
+.dashboardHeader {
+  margin-bottom: var(--workspace-section-gap);
+}
+
+/* The shared header owns spacing around its navigation row. */
+.tabs {
+  margin-bottom: 0;
+}
+.headerSelectors,
+.headerButtons {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.mobileViewButton {
+  margin-bottom: 0;
+}

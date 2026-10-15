@@ -22,16 +22,22 @@ export const AI_WORKLOAD_DEFAULTS: Record<
   AiWorkload,
   { model: string; reasoningEffort: AiReasoningEffort | null }
 > = {
-  chat: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
-  recipe_review: { model: 'gpt-5.4-mini', reasoningEffort: null },
-  recipe_generation: { model: 'gpt-5.6-luna', reasoningEffort: 'medium' },
-  meal_plan_generation: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
-  nutrition_estimation: { model: 'gpt-5.4-mini', reasoningEffort: null },
-  nutrition_summary: { model: 'gpt-5.6-luna', reasoningEffort: 'low' },
+  chat: { model: 'gpt-6-luna', reasoningEffort: 'medium' },
+  recipe_review: { model: 'gpt-6-luna', reasoningEffort: 'low' },
+  recipe_generation: { model: 'gpt-6-luna', reasoningEffort: 'medium' },
+  meal_plan_generation: { model: 'gpt-6-luna', reasoningEffort: 'medium' },
+  nutrition_estimation: { model: 'gpt-6-luna', reasoningEffort: 'low' },
+  nutrition_summary: { model: 'gpt-6-luna', reasoningEffort: 'low' },
   image_generation: { model: 'gpt-image-2', reasoningEffort: null },
 };
 
 export const AI_MODEL_CATALOG = [
+  {
+    id: 'gpt-6-luna',
+    label: 'GPT-6 Luna (recommended)',
+    workloads: aiWorkloadSchema.options.filter((item) => item !== 'image_generation'),
+    reasoning: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+  },
   {
     id: 'gpt-5.6-sol',
     label: 'GPT-5.6 Sol',
@@ -97,6 +103,7 @@ export const aiDataPolicySchema = z
     sharePersonalMetrics: z.boolean(),
     shareWeight: z.boolean(),
     shareShoppingLists: z.boolean(),
+    sharePantry: z.boolean().default(false),
     dailySummaryEnabled: z.boolean(),
     weeklySummaryEnabled: z.boolean(),
     summaryFrequency: z.enum(['off', 'daily', 'every_3_days', 'weekly', 'monthly']),
@@ -129,6 +136,7 @@ export const DEFAULT_AI_DATA_POLICY: Omit<AiDataPolicy, 'version'> = {
   sharePersonalMetrics: false,
   shareWeight: false,
   shareShoppingLists: true,
+  sharePantry: false,
   dailySummaryEnabled: false,
   weeklySummaryEnabled: false,
   summaryFrequency: 'off',
@@ -188,6 +196,7 @@ const aiChatAttachmentSchema = z
 export const aiChatMessageInputSchema = z
   .object({
     message: z.string().trim().max(8_000).default(''),
+    allowPaidTools: z.boolean().default(false),
     attachments: z.array(aiChatAttachmentSchema).max(4).default([]),
   })
   .strict()

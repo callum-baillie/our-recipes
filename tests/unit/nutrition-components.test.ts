@@ -1,6 +1,9 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -211,6 +214,7 @@ const props: NutritionDashboardProps = {
 };
 
 describe('Nutrition rendered boundary', () => {
+  afterEach(() => cleanup());
   it('renders household-profile guidance without credential controls', () => {
     const markup = renderToStaticMarkup(createElement(NutritionAccessPanel));
     expect(markup).toContain('Select a household profile to continue');
@@ -224,7 +228,7 @@ describe('Nutrition rendered boundary', () => {
     const markup = renderToStaticMarkup(createElement(NutritionDashboard, props));
     expect(markup).toContain('Calories consumed');
     expect(markup).toContain('not counted as consumed');
-    for (const label of ['Overview', 'Food Diary', 'Nutrients', 'Trends', 'Household']) {
+    for (const label of ['Today', 'Food Diary', 'Nutrients', 'Trends', 'Household']) {
       expect(markup).toContain(label);
     }
     expect(markup).not.toContain('>Goals<');
@@ -235,7 +239,7 @@ describe('Nutrition rendered boundary', () => {
     expect(markup).toContain('Table equivalent for confirmed macro composition');
   });
 
-  it('replaces the empty overview with guided setup when no goals are active', () => {
+  it('offers optional goal setup alongside daily tracking when no goals are active', () => {
     const markup = renderToStaticMarkup(
       createElement(NutritionDashboard, {
         ...props,
@@ -250,8 +254,8 @@ describe('Nutrition rendered boundary', () => {
     expect(markup).toContain('Set daily nutrition goal');
     expect(markup).toContain('Weight tracking is off');
     expect(markup).toContain('What you will see after setup');
-    expect(markup).not.toContain('Today at a glance');
-    expect(markup).not.toContain('Calories consumed');
+    expect(markup).toContain('Today at a glance');
+    expect(markup).toContain('Calories consumed');
   });
 
   it('places daily calorie goals in the onboarding dialog and shows a saved weight plan', () => {
@@ -555,7 +559,7 @@ describe('Nutrition rendered boundary', () => {
   });
 
   it('exposes audited diary lifecycle controls without profile deletion', () => {
-    const markup = renderToStaticMarkup(
+    const rendered = render(
       createElement(NutritionDashboard, {
         ...props,
         view: 'diary',
@@ -582,8 +586,11 @@ describe('Nutrition rendered boundary', () => {
         },
       }),
     );
+    expect(screen.queryByRole('button', { name: 'Restore entry' })).toBeNull();
+    fireEvent.click(screen.getByLabelText('Show deleted entries'));
+    expect(screen.getByRole('button', { name: 'Restore entry' })).toBeTruthy();
+    const markup = rendered.container.innerHTML;
     expect(markup).toContain('Export Nutrition JSON');
-    expect(markup).toContain('Restore entry');
     expect(markup).toContain('Copy a diary day');
     expect(markup).not.toContain('DELETE Private Avery');
     expect(markup).not.toContain('Permanently delete Nutrition data');

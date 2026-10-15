@@ -1068,6 +1068,7 @@ export function recordBodyMeasurement(
     nutritionProfileId: profileId,
     measuredAt: new Date(input.measuredAt),
     weightKilograms: input.weightKilograms,
+    advancedBodyMetrics: JSON.stringify(input.advancedMetrics),
     sourceType: input.sourceType,
     approximate: input.approximate,
     note: input.note,

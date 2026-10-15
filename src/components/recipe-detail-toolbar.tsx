@@ -1,18 +1,10 @@
 'use client';
 
-import {
-  Braces,
-  ChefHat,
-  ChevronDown,
-  Copy,
-  Download,
-  Edit3,
-  FileText,
-  Printer,
-} from 'lucide-react';
+import { Braces, ChefHat, ChevronDown, Copy, Download, Edit3, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { KitchenPrintDialog } from '@/components/kitchen-print-dialog';
 import { DismissibleDetails } from '@/components/dismissible-details';
 import { InlineSkeleton } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
@@ -42,7 +34,7 @@ async function writeClipboard(value: string): Promise<void> {
   if (!copied) throw new Error('The browser did not allow clipboard access.');
 }
 
-export function RecipeDetailToolbar({ recipeId }: { recipeId: string }) {
+export function RecipeDetailToolbar({ recipeId, title }: { recipeId: string; title: string }) {
   const { showToast } = useToast();
   const [copying, setCopying] = useState<ExportFormat | null>(null);
 
@@ -77,10 +69,7 @@ export function RecipeDetailToolbar({ recipeId }: { recipeId: string }) {
         <Edit3 size={17} aria-hidden="true" />
         Edit recipe
       </Link>
-      <button className="recipe-toolbar-button" type="button" onClick={() => window.print()}>
-        <Printer size={17} aria-hidden="true" />
-        Print recipe card
-      </button>
+      <KitchenPrintDialog kind="recipes" recipes={[{ id: recipeId, title }]} />
       <DismissibleDetails
         className="recipe-export-menu"
         summary={

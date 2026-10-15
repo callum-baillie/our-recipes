@@ -7,6 +7,7 @@ import {
 } from '@/lib/actor-context';
 import { getRuntimeConfig } from '@/lib/config';
 import { authorizeAppRequest } from '@/lib/domain/permissions';
+import { integrationPermission } from '@/lib/domain/integration-routes';
 import {
   getAuthenticatedSessionPrincipal,
   isAuthenticationConfigured,
@@ -48,6 +49,7 @@ function continueRequest(request: NextRequest, role?: string): NextResponse {
 }
 
 function isPublicAsset(pathname: string): boolean {
+  if (pathname.startsWith('/api/')) return false;
   return (
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
@@ -79,17 +81,6 @@ function isPublicOperationalPath(pathname: string): boolean {
   );
 }
 
-function isIntegrationApiPath(pathname: string): boolean {
-  const id = '[0-9a-fA-F-]{36}';
-  return [
-    new RegExp(`^/api/v1/recipes(?:/bulk|/${id})?$`, 'u'),
-    new RegExp(`^/api/v1/meal-plan(?:/bulk|/${id})?$`, 'u'),
-    new RegExp(`^/api/v1/shopping-lists(?:/bulk|/${id}(?:/items(?:/${id})?)?)?$`, 'u'),
-    new RegExp(`^/api/v1/collections(?:/bulk|/${id}(?:/recipes)?)?$`, 'u'),
-    new RegExp(`^/api/v1/pantry/(?:products(?:/${id})?|batches(?:/bulk|/${id})?)$`, 'u'),
-  ].some((pattern) => pattern.test(pathname));
-}
-
 function redirectTo(request: NextRequest, pathname: string): NextResponse {
   const target = request.nextUrl.clone();
   target.pathname = pathname;
@@ -103,12 +94,18 @@ export async function proxy(request: NextRequest) {
     return migrateLegacyCookies(request, continueRequest(request));
   }
 
+  // This integration has its own dedicated credential check in the route handler.
+  if (pathname === '/api/integrations/homepage/v1/summary' && request.method === 'GET') {
+    return continueRequest(request);
+  }
+
   const configured = isAuthenticationConfigured();
   if (!configured) {
     const householdExists = Boolean(getHouseholdState().household);
     const setupAllowed =
       isPublicAuthPath(pathname) ||
       pathname === '/api/v1/setup' ||
+      (!householdExists && pathname === '/api/v1/setup/vesync') ||
       (!householdExists && pathname === '/') ||
       (householdExists && (pathname === '/security-upgrade' || pathname === '/api/v1/auth/enroll'));
     if (setupAllowed) return migrateLegacyCookies(request, continueRequest(request));
@@ -126,13 +123,14 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicAuthPath(pathname)) {
     const principal = await getAuthenticatedSessionPrincipal(request);
-    if (principal && pathname === '/sign-in') return redirectTo(request, '/');
+    if (principal && pathname === '/sign-in' && request.nextUrl.searchParams.get('reauth') !== '1')
+      return redirectTo(request, '/');
     return migrateLegacyCookies(request, continueRequest(request));
   }
 
   const authorization = request.headers.get('authorization');
   if (authorization) {
-    if (!authorization.startsWith('Bearer ') || !isIntegrationApiPath(pathname)) {
+    if (!authorization.startsWith('Bearer ') || !integrationPermission(pathname, request.method)) {
       return apiError(
         403,
         'api_key_route_forbidden',

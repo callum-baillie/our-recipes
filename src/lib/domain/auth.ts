@@ -8,36 +8,13 @@ export const normalizedEmailSchema = z
 
 export const passphraseSchema = z
   .string()
-  .min(15, 'Use at least 15 characters for the passphrase.')
+  .min(8, 'Use at least 8 characters for the passphrase.')
   .max(128, 'Use no more than 128 characters for the passphrase.');
-
-const weakPins = new Set([
-  '000000',
-  '111111',
-  '123456',
-  '222222',
-  '333333',
-  '444444',
-  '555555',
-  '654321',
-  '666666',
-  '777777',
-  '888888',
-  '987654',
-  '999999',
-]);
-
-export const profilePinSchema = z
-  .string()
-  .regex(/^\d{6}$/u, 'Use an exact six-digit PIN.')
-  .refine((value) => !weakPins.has(value), 'Choose a less predictable PIN.')
-  .refine((value) => !/^(\d)\1{5}$/u.test(value), 'Choose a PIN that does not repeat one digit.');
 
 export const profileCredentialsSchema = z
   .object({
     email: normalizedEmailSchema,
     passphrase: passphraseSchema,
-    pin: profilePinSchema,
   })
   .strict();
 
@@ -50,7 +27,9 @@ export const signInSchema = z
   })
   .strict();
 
-export const profilePinSwitchSchema = z.object({ pin: profilePinSchema }).strict();
+export const profilePasswordSwitchSchema = z
+  .object({ password: z.string().min(1).max(128) })
+  .strict();
 
 export const recoveryCodeSchema = z
   .string()
@@ -72,6 +51,7 @@ export const apiResources = [
   'shoppingLists',
   'collections',
   'pantry',
+  'settings',
 ] as const;
 export const apiActions = ['read', 'create', 'update', 'delete'] as const;
 
@@ -86,6 +66,10 @@ export const apiPermissionsSchema = z
     shoppingLists: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
     collections: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
     pantry: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
+    settings: z
+      .array(z.enum(['read', 'update']))
+      .max(2)
+      .optional(),
   })
   .strict()
   .transform(

@@ -1,3 +1,4 @@
+import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 
 import { pantryLocationInputSchema } from '@/lib/domain/pantry';
@@ -8,33 +9,46 @@ import {
   listPantryLocations,
 } from '@/lib/services/pantry-service';
 
-import { pantryServiceError, rejectUntrustedPantryMutation, requirePantryActor } from '../_shared';
+import { pantryServiceError } from '../_shared';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
   const includeArchived = new URL(request.url).searchParams.get('includeArchived') === 'true';
-  return NextResponse.json({ locations: listPantryLocations(includeArchived) });
+  return withApiRequestId(
+    NextResponse.json({ locations: listPantryLocations(includeArchived) }),
+    access.requestId,
+  );
 }
 
 export async function POST(request: Request) {
-  const rejected = rejectUntrustedPantryMutation(request);
-  if (rejected) return rejected;
-  const actor = await requirePantryActor();
-  if (actor.response) return actor.response;
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const actor = actorFromPrincipal(access.principal);
+
   const parsed = pantryLocationInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
-    return jsonError(400, 'invalid_pantry_location', 'Check the location name and parent.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_pantry_location', 'Check the location name and parent.'),
+      access.requestId,
+    );
   try {
     ensureDefaultPantryLocations(actor.profileId);
-    return NextResponse.json(
-      { location: createPantryLocation(parsed.data, actor.profileId) },
-      { status: 201 },
+    return withApiRequestId(
+      NextResponse.json(
+        { location: createPantryLocation(parsed.data, actor.profileId) },
+        { status: 201 },
+      ),
+      access.requestId,
     );
   } catch (error) {
     const response = pantryServiceError(error);
-    if (response) return response;
+    if (response) return withApiRequestId(response, access.requestId);
     throw error;
   }
 }

@@ -8,6 +8,8 @@
   `APP_ORIGIN`/`BETTER_AUTH_URL` values matching the household browser URL.
 - SMTP host, sender, and credentials for verification and passphrase-reset email. Test delivery
   before accepting a production deployment.
+- `AUTH_REQUIRE_EMAIL_VERIFICATION` defaults to `true` in production. Set it to `false` only for a
+  trusted deployment where accounts may sign in before verifying email; passphrase resets still use SMTP.
 - Optional `OPENAI_API_KEY` only when the household intentionally enables review suggestions or generated serving images. Never put `.api_keys` in a bind mount, image, or backup.
 - Optional server-only `USDA_FDC_API_KEY` enables FoodData Central search. Open Food Facts exact barcode reads need no credential. Camera scanning requires the trusted Nginx Proxy Manager HTTPS route described in [food-data-integrations.md](food-data-integrations.md).
 

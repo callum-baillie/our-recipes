@@ -64,6 +64,7 @@ export const shoppingListRequestSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('manual'),
       name: z.string().trim().min(1).max(120),
+      makeAutomaticRestockTarget: z.boolean().default(false),
     })
     .strict(),
   z
@@ -72,6 +73,7 @@ export const shoppingListRequestSchema = z.discriminatedUnion('kind', [
       weekStart: isoDateSchema,
       weekEnd: isoDateSchema,
       sourceMode: z.enum(['pantry_missing', 'pantry_all']).default('pantry_all'),
+      makeAutomaticRestockTarget: z.boolean().default(false),
     })
     .strict(),
 ]);
@@ -130,6 +132,8 @@ export const shoppingListManageSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('archive') }).strict(),
   z.object({ action: z.literal('restore') }).strict(),
   z.object({ action: z.literal('duplicate') }).strict(),
+  z.object({ action: z.literal('set_restock_target') }).strict(),
+  z.object({ action: z.literal('complete') }).strict(),
 ]);
 
 export const shoppingAisleSchema = z.object({

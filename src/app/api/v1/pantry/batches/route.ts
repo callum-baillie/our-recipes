@@ -5,6 +5,7 @@ import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-ide
 import { pantryBatchInputSchema, pantryQuerySchema } from '@/lib/domain/pantry';
 import { jsonError } from '@/lib/http';
 import { createPantryBatch, getPantryDashboard } from '@/lib/services/pantry-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 import { pantryServiceError } from '../_shared';
 
@@ -47,10 +48,12 @@ export async function POST(request: Request) {
       'Enter a product, location, and an exact or approximate quantity.',
     );
   try {
+    const batch = createPantryBatch(parsed.data, authorization.principal.profileId);
+    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
     return idempotentJsonResponse(
       idempotency.context,
       {
-        batch: createPantryBatch(parsed.data, authorization.principal.profileId),
+        batch,
       },
       authorization.requestId,
       201,

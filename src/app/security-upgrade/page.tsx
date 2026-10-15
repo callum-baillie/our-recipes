@@ -20,7 +20,7 @@ export default function SecurityUpgradePage() {
         <h1 id="security-upgrade-title">Secure {household.kitchenName}</h1>
         <p>
           Your existing recipes and household data are intact. This required upgrade adds real
-          sessions, recovery, profile PINs, and admin-owned API keys.
+          sessions, recovery, password-protected profile switching, and admin-owned API keys.
         </p>
       </section>
       <SecurityUpgradeForm profiles={status.profiles} />

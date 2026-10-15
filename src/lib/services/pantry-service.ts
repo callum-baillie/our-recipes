@@ -71,6 +71,24 @@ export type PantryDashboard = {
   lowStockProductIds: string[];
 };
 
+function resolvedRestockPolicy(input: PantryProductInput) {
+  const legacyAlwaysHave =
+    input.restockMode === undefined &&
+    input.isStaple &&
+    input.suggestGroceryRestock &&
+    input.targetStock !== null &&
+    input.targetStock > 0 &&
+    input.reorderThreshold !== null &&
+    Boolean(input.stockUnit);
+  return {
+    restockMode:
+      input.restockMode ?? (legacyAlwaysHave ? ('always_have' as const) : ('none' as const)),
+    restockTrigger:
+      input.restockTrigger ??
+      (legacyAlwaysHave ? ('reorder_point' as const) : ('below_target' as const)),
+  };
+}
+
 type MutableBatchState = Pick<
   BatchRecord,
   | 'quantityRemaining'
@@ -461,6 +479,7 @@ export function createPantryProduct(
   if (duplicate) throw new PantryConflictError('That Pantry product already exists.');
   const now = new Date();
   const productId = randomUUID();
+  const restockPolicy = resolvedRestockPolicy(input);
   db.transaction((transaction) => {
     transaction
       .insert(pantryProducts)
@@ -493,6 +512,7 @@ export function createPantryProduct(
         preferredPurchaseQuantity: input.preferredPurchaseQuantity,
         stockUnit: input.stockUnit ? normalizeInventoryUnit(input.stockUnit) : '',
         suggestGroceryRestock: input.suggestGroceryRestock,
+        ...restockPolicy,
         archivedAt: input.archived ? now : null,
         createdByProfileId: actorProfileId,
         updatedByProfileId: actorProfileId,
@@ -515,6 +535,7 @@ export function updatePantryProduct(
   const existing = db.select().from(pantryProducts).where(eq(pantryProducts.id, productId)).get();
   if (!existing) throw new PantryNotFoundError('That Pantry product no longer exists.');
   const now = new Date();
+  const restockPolicy = resolvedRestockPolicy(input);
   db.transaction((transaction) => {
     if (input.archived && !existing.archivedAt) {
       const activeBatch = transaction
@@ -556,6 +577,7 @@ export function updatePantryProduct(
         preferredPurchaseQuantity: input.preferredPurchaseQuantity,
         stockUnit: input.stockUnit ? normalizeInventoryUnit(input.stockUnit) : '',
         suggestGroceryRestock: input.suggestGroceryRestock,
+        ...restockPolicy,
         archivedAt: input.archived ? (existing.archivedAt ?? now) : null,
         updatedByProfileId: actorProfileId,
         updatedAt: now,

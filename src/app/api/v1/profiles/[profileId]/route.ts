@@ -47,11 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ profil
       'Switch to another active profile before archiving this one.',
     );
   }
-  if (
-    body.archived &&
-    getProfileAccessRole(profileId) === 'admin' &&
-    countActiveAdmins() <= 1
-  ) {
+  if (body.archived && getProfileAccessRole(profileId) === 'admin' && countActiveAdmins() <= 1) {
     return jsonError(
       409,
       'last_admin_required',

@@ -15,16 +15,6 @@
     "reason": "Retired compatibility endpoint that returns 410."
   },
   {
-    "method": "DELETE",
-    "path": "/shopping-lists/aisles/{aisleId}",
-    "reason": "Deprecated compatibility alias; use the documented unambiguous canonical route."
-  },
-  {
-    "method": "DELETE",
-    "path": "/shopping-lists/{listId}",
-    "reason": "First-party list lifecycle command pending a stable external contract."
-  },
-  {
     "method": "GET",
     "path": "/ai/jobs",
     "reason": "First-party background AI task query."
@@ -59,7 +49,11 @@
     "path": "/ai/settings",
     "reason": "First-party settings UI query; external callers use the documented readiness endpoint."
   },
-  { "method": "GET", "path": "/ai/summaries", "reason": "First-party assistant dashboard query." },
+  {
+    "method": "GET",
+    "path": "/ai/summaries",
+    "reason": "First-party assistant dashboard query."
+  },
   {
     "method": "GET",
     "path": "/branding/icons/v1/{palette}/{icon}/{size}",
@@ -69,11 +63,6 @@
     "method": "GET",
     "path": "/nutrition/household",
     "reason": "First-party Nutrition dashboard projection."
-  },
-  {
-    "method": "GET",
-    "path": "/nutrition/products/{productId}/records",
-    "reason": "First-party normalized Nutrition data workspace query."
   },
   {
     "method": "GET",
@@ -122,18 +111,8 @@
   },
   {
     "method": "GET",
-    "path": "/nutrition/recipes/{recipeId}/calculations",
-    "reason": "First-party normalized calculation query."
-  },
-  {
-    "method": "GET",
     "path": "/nutrition/session",
     "reason": "First-party bridge from signed household profile to linked Nutrition profile."
-  },
-  {
-    "method": "GET",
-    "path": "/settings/preferences",
-    "reason": "First-party application preferences query."
   },
   {
     "method": "PATCH",
@@ -151,11 +130,6 @@
     "reason": "First-party linked Nutrition profile command."
   },
   {
-    "method": "PATCH",
-    "path": "/settings/preferences",
-    "reason": "First-party application preferences command."
-  },
-  {
     "method": "POST",
     "path": "/ai/chat/threads",
     "reason": "First-party assistant UI storage command."
@@ -170,27 +144,20 @@
     "path": "/ai/meal-plans/generate",
     "reason": "First-party deterministic proposal endpoint; not a stable external provider API."
   },
-  { "method": "POST", "path": "/ai/summaries", "reason": "First-party assistant summary command." },
-  { "method": "POST", "path": "/diagnostics", "reason": "First-party redacted support download." },
   {
     "method": "POST",
-    "path": "/meal-plan/batch",
-    "reason": "First-party atomic Planner batch command."
+    "path": "/ai/summaries",
+    "reason": "First-party assistant summary command."
   },
   {
     "method": "POST",
-    "path": "/meal-plan/{entryId}/refresh-recipe",
-    "reason": "First-party explicit pinned-plan refresh command."
+    "path": "/diagnostics",
+    "reason": "First-party redacted support download."
   },
   {
     "method": "POST",
     "path": "/nutrition/identity",
     "reason": "Retired compatibility endpoint that returns 410."
-  },
-  {
-    "method": "POST",
-    "path": "/nutrition/products/{productId}/records",
-    "reason": "First-party immutable normalized Nutrition record command."
   },
   {
     "method": "POST",
@@ -274,11 +241,6 @@
   },
   {
     "method": "POST",
-    "path": "/nutrition/recipes/{recipeId}/calculations",
-    "reason": "First-party normalized recipe calculation command."
-  },
-  {
-    "method": "POST",
     "path": "/nutrition/session",
     "reason": "Retired compatibility endpoint that returns 410."
   },
@@ -293,8 +255,88 @@
     "reason": "Destructive first-party local installation maintenance command."
   },
   {
-    "method": "PUT",
-    "path": "/recipes/{recipeId}/favorite",
-    "reason": "First-party profile-scoped preference command."
+    "method": "DELETE",
+    "path": "/shopping-lists/aisles/{aisleId}",
+    "reason": "Compatibility alias for documented DELETE /shopping-list-aisles/{aisleId}."
+  },
+  {
+    "method": "PATCH",
+    "path": "/admin/profiles/{profileId}/role",
+    "reason": "Session-only household account administration."
+  },
+  {
+    "method": "POST",
+    "path": "/admin/guardians",
+    "reason": "Session-only personal nutrition guardian administration."
+  },
+  {
+    "method": "POST",
+    "path": "/setup/vesync",
+    "reason": "First-party VeSync onboarding and scale connection management."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/scale",
+    "reason": "First-party VeSync onboarding and scale connection management."
+  },
+  {
+    "method": "POST",
+    "path": "/nutrition/profiles/{profileId}/scale",
+    "reason": "First-party VeSync onboarding and scale connection management."
+  },
+  {
+    "method": "DELETE",
+    "path": "/nutrition/profiles/{profileId}/scale",
+    "reason": "First-party VeSync onboarding and scale connection management."
+  },
+  {
+    "method": "POST",
+    "path": "/shopping-lists/{listId}/instacart",
+    "reason": "First-party shopping-list handoff to Instacart."
+  },
+  {
+    "method": "GET",
+    "path": "/integrations",
+    "reason": "First-party account-owned integration management; session authentication and trusted origins required. Provider credentials are never exposed to API keys."
+  },
+  {
+    "method": "POST",
+    "path": "/integrations",
+    "reason": "First-party account-owned integration management; session authentication and trusted origins required. Provider credentials are never exposed to API keys."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/decisions",
+    "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/decisions",
+    "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
+  },
+  {
+    "method": "PATCH",
+    "path": "/ai/decisions",
+    "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/store-map",
+    "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
+  },
+  {
+    "method": "PATCH",
+    "path": "/ai/store-map",
+    "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/app-actions",
+    "reason": "Session-only, account-owned chat proposals. Mutations require explicit review, trusted origins and existing core API authorization."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/app-actions",
+    "reason": "Session-only, account-owned chat proposals. Mutations require explicit review, trusted origins and existing core API authorization."
   }
 ]

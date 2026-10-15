@@ -1,4 +1,7 @@
 'use client';
+import { DecisionAssistance } from '@/components/decision-assistance';
+
+import { InstacartShopping } from './instacart-shopping';
 
 import {
   ArrowDown,
@@ -445,9 +448,11 @@ function pantryStockLabel(product: PantryOptions['products'][number] | undefined
 export function ShoppingListEditor({
   list,
   initialPantryOptions,
+  instacartEnabled = false,
 }: {
   list: ShoppingListDetail;
   initialPantryOptions?: PantryOptions;
+  instacartEnabled?: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -459,6 +464,10 @@ export function ShoppingListEditor({
   const [newUnit, setNewUnit] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [focusedShopping, setFocusedShopping] = useState(true);
+  const pendingStateChanges = useRef(new Set<string>());
+  const [pendingItems, setPendingItems] = useState<string[]>([]);
+  const [lastChecked, setLastChecked] = useState<{ item: Item; state: ShoppingState } | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
   const [groupMode, setGroupMode] = useState<GroupMode>('aisle');
   const [selectedSupermarketId, setSelectedSupermarketId] = useState(
@@ -569,7 +578,7 @@ export function ShoppingListEditor({
       'Can’t find',
       items.filter((item) => normalizedState(item) === 'cant_find').length,
     ],
-    ['sourced', 'Sourced', items.filter((item) => normalizedState(item) === 'sourced').length],
+    ['sourced', 'Done', items.filter((item) => normalizedState(item) === 'sourced').length],
   ];
   const scanMatches = useMemo(
     () =>
@@ -618,11 +627,23 @@ export function ShoppingListEditor({
     }
   };
 
-  const setItemState = async (item: Item, state: ShoppingState) => {
+  const setItemState = async (item: Item, state: ShoppingState, undo = false) => {
+    if (pendingStateChanges.current.has(item.id)) return;
+    pendingStateChanges.current.add(item.id);
+    setPendingItems((current) => [...current, item.id]);
+    const previous = normalizedState(item);
     const changed = { ...item, shoppingState: state, checked: state === 'sourced' };
     updateLocal(item.id, changed);
-    if (!(await save(changed))) updateLocal(item.id, item);
-    else if (state === 'cant_find') showToast(`${item.item} moved to Can’t Find.`, 'success');
+    try {
+      if (!(await save(changed))) updateLocal(item.id, item);
+      else {
+        setLastChecked(undo ? null : { item: changed, state: previous });
+        if (state === 'cant_find') showToast(`${item.item} moved to Can’t Find.`, 'success');
+      }
+    } finally {
+      pendingStateChanges.current.delete(item.id);
+      setPendingItems((current) => current.filter((id) => id !== item.id));
+    }
   };
 
   const lookupBarcode = async (value: string) => {
@@ -926,7 +947,15 @@ export function ShoppingListEditor({
   const updatePantryControl = async (
     item: Item,
     payload:
-      | { action: 'ignore' | 'inaccurate' | 'reset' }
+      | {
+          action:
+            | 'ignore'
+            | 'inaccurate'
+            | 'reset'
+            | 'skip_policy'
+            | 'restore_policy'
+            | 'assume_empty_for_trip';
+        }
       | { action: 'extra'; quantity: number; unit: string },
   ) => {
     setBusy(`pantry-control:${item.id}`);
@@ -953,6 +982,49 @@ export function ShoppingListEditor({
         'Could not update this Pantry calculation. Check the connection and try again.',
         'error',
       );
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const makeNextShop = async () => {
+    if (
+      !window.confirm(
+        'Make this the Next shop? Outstanding untouched recurring amounts will move here; recipe and manual items stay on their current lists.',
+      )
+    )
+      return;
+    setBusy('next-shop');
+    try {
+      const response = await fetch(`/api/v1/shopping-lists/${list.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_restock_target' }),
+      });
+      if (!response.ok) throw new Error('Could not designate this list as Next shop.');
+      window.location.reload();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not update Next shop.', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const updatePolicyReview = async (
+    productId: string,
+    action: 'restore_policy' | 'skip_policy' | 'assume_empty_for_trip',
+  ) => {
+    setBusy(`policy:${productId}`);
+    try {
+      const response = await fetch(`/api/v1/shopping-lists/${list.id}/policies/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!response.ok) throw new Error('Could not change that recurring policy for this trip.');
+      window.location.reload();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not update the policy.', 'error');
     } finally {
       setBusy('');
     }
@@ -1048,6 +1120,7 @@ export function ShoppingListEditor({
             type="checkbox"
             checked={state === 'sourced'}
             aria-label={`Mark ${item.item} complete`}
+            disabled={pendingItems.includes(item.id)}
             onChange={() => void setItemState(item, state === 'sourced' ? 'to_buy' : 'sourced')}
           />
           {state === 'sourced' ? <Check size={18} /> : null}
@@ -1061,6 +1134,16 @@ export function ShoppingListEditor({
           }`}
         >
           <strong>{item.item}</strong>
+          <span>
+            {pantryContributions(item).length ? (
+              <small className={styles.aisleBadge}>Meal plan</small>
+            ) : null}
+            {item.policyBreakdown ? (
+              <small className={styles.aisleBadge}>
+                {item.policyBreakdown.mode === 'always_have' ? 'Always have' : 'Always buy'}
+              </small>
+            ) : null}
+          </span>
           <span
             className={`${styles.quantitySummary} ${
               quantitySummary.isEstimate ? styles.quantitySummaryEstimate : ''
@@ -1085,6 +1168,7 @@ export function ShoppingListEditor({
             <button
               className={`${styles.stateButton} ${styles.foundButton}`}
               type="button"
+              disabled={pendingItems.includes(item.id)}
               onClick={() => void setItemState(item, 'in_cart')}
             >
               <CheckCircle2 size={19} /> <span>Found it!</span>
@@ -1104,6 +1188,7 @@ export function ShoppingListEditor({
                 state === 'in_cart' ? styles.stateButtonActive : ''
               }`}
               type="button"
+              disabled={pendingItems.includes(item.id)}
               onClick={() => void setItemState(item, state === 'in_cart' ? 'to_buy' : 'in_cart')}
             >
               <ShoppingCart size={19} /> <span>In Cart</span>
@@ -1111,6 +1196,7 @@ export function ShoppingListEditor({
             <button
               className={`${styles.stateButton} ${styles.cantFindButton}`}
               type="button"
+              disabled={pendingItems.includes(item.id)}
               onClick={() => void setItemState(item, 'cant_find')}
             >
               <CircleHelp size={19} /> <span>Can’t Find</span>
@@ -1204,7 +1290,61 @@ export function ShoppingListEditor({
         ) : null}
         {item.pantry && matchedProduct ? (
           <details className={styles.provenance}>
-            <summary>Pantry details</summary>
+            <summary>
+              {item.policyBreakdown ? 'Demand and policy breakdown' : 'Pantry details'}
+            </summary>
+            {item.policyBreakdown ? (
+              <dl>
+                <div>
+                  <dt>Meal plan</dt>
+                  <dd>
+                    {item.policyBreakdown.recipeRequirement} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    {item.policyBreakdown.mode === 'always_have'
+                      ? 'Always have reserve'
+                      : 'Always buy baseline'}
+                  </dt>
+                  <dd>
+                    {item.policyBreakdown.policyContribution ?? 'Review'}{' '}
+                    {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Usable Pantry</dt>
+                  <dd>
+                    {item.policyBreakdown.usablePantry} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Pending coverage</dt>
+                  <dd>
+                    {item.policyBreakdown.pendingCoverage} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Recorded this trip</dt>
+                  <dd>
+                    {item.policyBreakdown.recordedCoverage} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Before package rounding</dt>
+                  <dd>
+                    {item.policyBreakdown.unroundedPurchaseGoal ?? 'Review'}{' '}
+                    {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Final buy amount</dt>
+                  <dd>
+                    {item.policyBreakdown.finalBuyQuantity ?? 'Review'} {item.policyBreakdown.unit}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
             {pantryContributions(item).length ? (
               <ul>
                 {pantryContributions(item).map((entry) => (
@@ -1258,6 +1398,26 @@ export function ShoppingListEditor({
                 </button>
               </form>
               <div className={styles.pantryControlActions}>
+                {item.policyBreakdown ? (
+                  <button
+                    type="button"
+                    disabled={busy === `pantry-control:${item.id}`}
+                    onClick={() => void updatePantryControl(item, { action: 'skip_policy' })}
+                  >
+                    Skip recurring purchase
+                  </button>
+                ) : null}
+                {item.policyBreakdown?.needsReview ? (
+                  <button
+                    type="button"
+                    disabled={busy === `pantry-control:${item.id}`}
+                    onClick={() =>
+                      void updatePantryControl(item, { action: 'assume_empty_for_trip' })
+                    }
+                  >
+                    Assume empty for this trip
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   disabled={busy === `pantry-control:${item.id}`}
@@ -1426,7 +1586,11 @@ export function ShoppingListEditor({
           ].filter((group) => group.items.length)
         : [];
     return (
-      <details className={`${styles.listSection} ${className}`} open key={state}>
+      <details
+        className={`${styles.listSection} ${className}`}
+        open={state !== 'sourced' || filter === 'sourced'}
+        key={state}
+      >
         <summary>
           <span>
             {state === 'to_buy' ? (
@@ -1446,10 +1610,10 @@ export function ShoppingListEditor({
             groupMode === 'aisle' ? (
               groupedItems.map((group) => (
                 <section className={styles.aisleGroup} key={group.id}>
-                  <h3>
+                  <h2>
                     <span>{group.name}</span>
                     <small>{group.items.length}</small>
-                  </h3>
+                  </h2>
                   <div>{group.items.map(renderItem)}</div>
                 </section>
               ))
@@ -1465,7 +1629,57 @@ export function ShoppingListEditor({
   };
 
   return (
-    <section className={styles.shoppingMode}>
+    <section className={`${styles.shoppingMode} ${focusedShopping ? styles.focusedShopping : ''}`}>
+      <div className={styles.shoppingTaskbar}>
+        <div>
+          <strong>
+            {remaining
+              ? `${remaining} item${remaining === 1 ? '' : 's'} left to buy`
+              : total
+                ? 'Everything is checked off'
+                : 'Your list is ready'}
+          </strong>
+          <span>
+            {total
+              ? `${progressCount} of ${total} picked up or already available`
+              : 'Add an item or build a list from your meal plan.'}
+          </span>
+        </div>
+        <div className={styles.shoppingModeSwitch} aria-label="Shopping list display">
+          <button
+            type="button"
+            aria-pressed={focusedShopping}
+            onClick={() => setFocusedShopping(true)}
+          >
+            Shopping mode
+          </button>
+          <button
+            type="button"
+            aria-pressed={!focusedShopping}
+            onClick={() => setFocusedShopping(false)}
+          >
+            Manage list
+          </button>
+        </div>
+      </div>
+      {lastChecked ? (
+        <div className={styles.undoNotice} role="status">
+          <span>{lastChecked.item.item} updated.</span>
+          <button
+            type="button"
+            disabled={pendingItems.includes(lastChecked.item.id)}
+            onClick={() =>
+              void setItemState(
+                items.find((item) => item.id === lastChecked.item.id) ?? lastChecked.item,
+                lastChecked.state,
+                true,
+              )
+            }
+          >
+            Undo
+          </button>
+        </div>
+      ) : null}
       <div className={styles.mobileSummary}>
         <div className={styles.mobileProgressCard}>
           <span
@@ -1478,6 +1692,9 @@ export function ShoppingListEditor({
             </strong>
             <small>{progress}% complete</small>
           </span>
+          {list.isAutomaticRestockTarget ? (
+            <strong className={styles.aisleBadge}>Next shop</strong>
+          ) : null}
         </div>
       </div>
 
@@ -1533,12 +1750,53 @@ export function ShoppingListEditor({
               ))}
             </select>
           </label>
+          {list.isAutomaticRestockTarget ? (
+            <strong className={styles.aisleBadge}>Next shop</strong>
+          ) : (
+            <button
+              type="button"
+              disabled={busy === 'next-shop'}
+              onClick={() => void makeNextShop()}
+            >
+              {busy === 'next-shop' ? 'Updating…' : 'Make Next shop'}
+            </button>
+          )}
           <Link href="/settings/lists">
             <Settings size={17} /> List settings
           </Link>
         </section>
       </div>
 
+      {list.policyReviews.some((review) => review.state === 'needs_review') ? (
+        <section className={styles.restoredNotice} role="status">
+          <strong>Pantry review needed</strong>{' '}
+          {list.policyReviews
+            .filter((review) => review.state === 'needs_review')
+            .map((review) => review.productName)
+            .join(', ')}{' '}
+          has approximate or incompatible stock. Update Pantry, or open its row and assume empty for
+          this trip.
+        </section>
+      ) : null}
+      {list.policyReviews.some((review) => review.state === 'dismissed') ? (
+        <section className={styles.restoredNotice} role="status">
+          <strong>Skipped for this trip:</strong>{' '}
+          {list.policyReviews
+            .filter((review) => review.state === 'dismissed')
+            .map((review) => (
+              <button
+                key={review.productId}
+                type="button"
+                disabled={busy === `policy:${review.productId}`}
+                onClick={() => void updatePolicyReview(review.productId, 'restore_policy')}
+              >
+                Restore {review.productName}
+              </button>
+            ))}
+        </section>
+      ) : null}
+
+      <InstacartShopping listId={list.id} items={items} configured={instacartEnabled} />
       <div className={styles.toolbar}>
         <div className={styles.mobileSearchRow}>
           <label className={styles.search} aria-label="Search shopping items">
@@ -1641,10 +1899,39 @@ export function ShoppingListEditor({
 
       <div className={styles.contentGrid}>
         <div className={styles.listColumn}>
+          {!focusedShopping && (
+            <DecisionAssistance
+              embedded
+              key={`${list.id}:${list.supermarketProfileId}`}
+              listId={list.id}
+              storeId={list.supermarketProfileId ?? undefined}
+              initialTask="aisles"
+              onApplied={() => {
+                void fetch(`/api/v1/shopping-lists/${list.id}`)
+                  .then((response) => (response.ok ? response.json() : null))
+                  .then((body) => {
+                    if (body?.list)
+                      setItems(
+                        body.list.items.map((item: Item) => ({
+                          ...item,
+                          shoppingState: normalizedState(item),
+                        })),
+                      );
+                  })
+                  .catch(() =>
+                    showToast('Matches saved. Reload the list to see the updated route.', 'error'),
+                  );
+              }}
+              tasks={['aisles', 'duplicates']}
+              title="Prepare this shopping trip"
+              description="Place unassigned items along your store route and review possible duplicates. Your aisle corrections stay in place."
+            />
+          )}
+
           {section('to_buy', 'Items to buy', toBuy)}
           {section('in_cart', 'In cart', inCart, styles.inCartSection)}
           {section('cant_find', 'Can’t find', cantFind, styles.cantFindSection)}
-          {section('sourced', 'Sourced', sourced, styles.sourcedSection)}
+          {section('sourced', 'Done', sourced, styles.sourcedSection)}
           {cantFind.length ? (
             <section className={styles.retryPanel}>
               <div>
@@ -2003,7 +2290,11 @@ export function ShoppingListEditor({
                     {toBuy.map((item) => (
                       <li key={item.id}>
                         <span>{item.item}</span>
-                        <button type="button" onClick={() => void setItemState(item, 'in_cart')}>
+                        <button
+                          type="button"
+                          disabled={pendingItems.includes(item.id)}
+                          onClick={() => void setItemState(item, 'in_cart')}
+                        >
                           Found it
                         </button>
                       </li>

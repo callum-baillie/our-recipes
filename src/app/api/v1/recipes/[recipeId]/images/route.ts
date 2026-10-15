@@ -1,9 +1,9 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { MAX_RECIPE_IMAGE_BYTES, recipeImageAltTextSchema } from '@/lib/domain/recipe-image';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import { RecipeNotFoundError } from '@/lib/services/recipe-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
 import { RecipeImageUploadError } from '@/lib/domain/recipe-image';
@@ -16,32 +16,44 @@ function imageUploadError(error: RecipeImageUploadError) {
 }
 
 export async function POST(request: Request, context: { params: Promise<{ recipeId: string }> }) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_RECIPE_IMAGE_BYTES + 20_000) {
-    return jsonError(413, 'file_too_large', 'Recipe photos must be 10 MB or smaller.');
+    return withApiRequestId(
+      jsonError(413, 'file_too_large', 'Recipe photos must be 10 MB or smaller.'),
+      access.requestId,
+    );
   }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const actor = actorFromPrincipal(access.principal);
   if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before adding a photo.',
+    return withApiRequestId(
+      jsonError(
+        409,
+        'profile_selection_required',
+        'Choose a household profile before adding a photo.',
+      ),
+      access.requestId,
     );
   }
   const formData = await request.formData().catch(() => null);
   const image = formData?.get('image');
   if (!(image instanceof File)) {
-    return jsonError(400, 'invalid_image', 'Choose one JPEG, PNG, or WebP image to add.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_image', 'Choose one JPEG, PNG, or WebP image to add.'),
+      access.requestId,
+    );
   }
   const altTextValue = formData?.get('altText');
   const parsedAltText = recipeImageAltTextSchema.safeParse(
     typeof altTextValue === 'string' ? altTextValue : '',
   );
   if (!parsedAltText.success) {
-    return jsonError(400, 'invalid_alt_text', 'Keep the photo description under 180 characters.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_alt_text', 'Keep the photo description under 180 characters.'),
+      access.requestId,
+    );
   }
   try {
     const created = await createRecipeImage(
@@ -50,22 +62,26 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
       new Uint8Array(await image.arrayBuffer()),
       parsedAltText.data,
     );
-    return NextResponse.json(
-      {
-        image: {
-          id: created.id,
-          altText: created.altText,
-          width: created.width,
-          height: created.height,
-          createdAt: created.createdAt,
+    return withApiRequestId(
+      NextResponse.json(
+        {
+          image: {
+            id: created.id,
+            altText: created.altText,
+            width: created.width,
+            height: created.height,
+            createdAt: created.createdAt,
+          },
         },
-      },
-      { status: 201 },
+        { status: 201 },
+      ),
+      access.requestId,
     );
   } catch (error) {
-    if (error instanceof RecipeImageUploadError) return imageUploadError(error);
+    if (error instanceof RecipeImageUploadError)
+      return withApiRequestId(imageUploadError(error), access.requestId);
     if (error instanceof RecipeNotFoundError)
-      return jsonError(404, 'recipe_not_found', error.message);
+      return withApiRequestId(jsonError(404, 'recipe_not_found', error.message), access.requestId);
     throw error;
   }
 }

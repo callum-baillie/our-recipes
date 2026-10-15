@@ -468,7 +468,7 @@ export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' 
           <ShieldCheck size={21} aria-hidden="true" />
           <div>
             <p className="eyebrow">REVIEW BEFORE SAVING</p>
-            <h1>Make this recipe your own.</h1>
+            <h2>Make this recipe your own.</h2>
             <p>{draft.provenance.extractionNotice}</p>
             <dl>
               <div>
@@ -610,7 +610,7 @@ export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' 
   return (
     <section className="import-layout">
       <aside className="import-intro">
-        <h1>Add from an image.</h1>
+        <h2>Add from an image.</h2>
         <p>
           Upload a recipe photo, a set of scans, or a PDF. We prepare it carefully and show you an
           editable draft before anything is saved.

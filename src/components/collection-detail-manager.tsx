@@ -1,4 +1,5 @@
 'use client';
+import { PageHeader } from '@/components/page-header';
 
 import { ChevronDown, ChevronUp, FolderPlus, Save, Trash2 } from 'lucide-react';
 import Image from 'next/image';
@@ -106,20 +107,20 @@ export function CollectionDetailManager({
 
   return (
     <main className="settings-page collection-page">
-      <RecipebookNav current="collections" />
-      <header className="collection-detail-header">
-        <Link className="quiet-link" href="/collections">
-          ← All collections
-        </Link>
-      </header>
-      <section className="settings-intro">
-        <p className="eyebrow">CURATED COLLECTION</p>
-        <h1>{collection.name}</h1>
-        <p>
-          {collection.description ||
-            'Arrange recipes into a cookbook your household can return to.'}
-        </p>
-      </section>
+      <PageHeader
+        title={collection.name}
+        eyebrow="CURATED COLLECTION"
+        description={
+          collection.description || 'Arrange recipes into a cookbook your household can return to.'
+        }
+        leading={
+          <Link className="quiet-link" href="/collections">
+            ← All collections
+          </Link>
+        }
+        toolbarRight={<RecipebookNav current="collections" />}
+      />
+
       <section className="settings-card">
         <h2>Collection details</h2>
         <form className="collection-detail-form" onSubmit={saveDetails}>

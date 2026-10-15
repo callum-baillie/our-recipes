@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { scaleBindingHash, verifiedScaleReading } from './nutrition-scale-service';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import {
@@ -10,6 +11,8 @@ import {
   authSecurityEvents,
   households,
   nutritionPrincipals,
+  nutritionBodyMeasurements,
+  nutritionScaleConnections,
   nutritionProfiles,
   profileAuthLinks,
   profiles,
@@ -125,6 +128,7 @@ function applyNutritionOnboarding(
   transaction: Tx,
   profileId: string,
   input: OnboardingNutritionInput | undefined,
+  scaleBinding = '',
 ): void {
   if (!input) return;
   const current = transaction
@@ -140,6 +144,9 @@ function applyNutritionOnboarding(
       dateOfBirth: input.dateOfBirth || null,
       heightCentimeters: input.heightCentimeters,
       currentWeightKilograms: input.currentWeightKilograms,
+      advancedBodyMetrics: JSON.stringify(input.advancedMetrics),
+      weightGoalPace: input.weightGoalPace,
+      explicitlyEnteredLifeStage: input.lifeStage,
       referenceSexCategory: input.referenceSexCategory,
       activityLevel: input.activityLevel,
       nutritionGoalType: input.nutritionGoalType,
@@ -156,6 +163,66 @@ function applyNutritionOnboarding(
     })
     .where(eq(nutritionProfiles.id, current.id))
     .run();
+  let importedReading = null;
+  if (input.vesyncConnectionId) {
+    const connection = transaction
+      .select()
+      .from(nutritionScaleConnections)
+      .where(
+        and(
+          eq(nutritionScaleConnections.id, input.vesyncConnectionId),
+          eq(nutritionScaleConnections.bindingHash, scaleBindingHash(scaleBinding)),
+          isNull(nutritionScaleConnections.nutritionProfileId),
+        ),
+      )
+      .get();
+    if (
+      !scaleBinding ||
+      !connection ||
+      connection.selectedUser === null ||
+      connection.pendingExpiresAt.getTime() < Date.now()
+    )
+      throw new ConflictError(
+        'Reconnect your VeSync scale before finishing, or disconnect it to continue manually.',
+      );
+    importedReading = verifiedScaleReading(
+      connection.encryptedSession,
+      input.currentWeightKilograms,
+      input.measurementRecordedAt,
+    );
+    transaction
+      .update(nutritionScaleConnections)
+      .set({ nutritionProfileId: current.id, bindingHash: '', updatedAt: new Date() })
+      .where(eq(nutritionScaleConnections.id, connection.id))
+      .run();
+  }
+  const estimate = importedReading?.compositionEstimate
+    ? JSON.stringify(importedReading.compositionEstimate)
+    : null;
+  transaction
+    .update(nutritionProfiles)
+    .set({ bodyCompositionEstimate: estimate })
+    .where(eq(nutritionProfiles.id, current.id))
+    .run();
+  if (input.weightTrackingEnabled && input.currentWeightKilograms !== null) {
+    transaction
+      .insert(nutritionBodyMeasurements)
+      .values({
+        id: randomUUID(),
+        nutritionProfileId: current.id,
+        measuredAt: importedReading ? new Date(importedReading.measuredAt) : new Date(),
+        weightKilograms: input.currentWeightKilograms,
+        advancedBodyMetrics: JSON.stringify(input.advancedMetrics),
+        bodyCompositionEstimate: estimate,
+        sourceType: importedReading ? 'imported' : 'manual',
+        approximate: false,
+        note: importedReading ? 'VeSync onboarding measurement' : 'Initial onboarding measurement',
+        createdByPrincipalId: current.ownerPrincipalId,
+        actorHouseholdProfileId: profileId,
+        createdAt: new Date(),
+      })
+      .run();
+  }
 }
 
 export function listProfiles(includeArchived = false): ProfileRecord[] {
@@ -176,6 +243,7 @@ export function getHouseholdState(includeArchived = false): HouseholdState {
 export function completeSetupWithResult(
   input: SetupInput,
   enrollments: PreparedProfileEnrollment[] = [],
+  scaleBinding = '',
 ): SetupCompletionResult {
   ensureDatabase();
   const db = getDatabase();
@@ -233,7 +301,7 @@ export function completeSetupWithResult(
         .run();
       const profile = transaction.select().from(profiles).where(eq(profiles.id, profileId)).get()!;
       synchronizeHouseholdNutritionProfile(transaction, profile);
-      applyNutritionOnboarding(transaction, profile.id, entry.nutrition);
+      applyNutritionOnboarding(transaction, profile.id, entry.nutrition, scaleBinding);
       const enrollment = enrollments[index];
       if (enrollment) {
         transaction.insert(user).values(enrollment.user).run();
@@ -311,6 +379,7 @@ function addProfileInternal(
   rawInput: ProfileInput,
   nutrition?: OnboardingNutritionInput,
   enrollment?: PreparedProfileEnrollment,
+  scaleBinding = '',
 ): ProfileRecord {
   ensureDatabase();
   const household = getDatabase().select({ id: households.id }).from(households).limit(1).get();
@@ -336,7 +405,7 @@ function addProfileInternal(
   getDatabase().transaction((transaction) => {
     transaction.insert(profiles).values(profile).run();
     synchronizeHouseholdNutritionProfile(transaction, profile);
-    applyNutritionOnboarding(transaction, profile.id, nutrition);
+    applyNutritionOnboarding(transaction, profile.id, nutrition, scaleBinding);
     if (enrollment) {
       transaction.insert(user).values(enrollment.user).run();
       transaction.insert(account).values(enrollment.account).run();
@@ -378,9 +447,10 @@ export function onboardProfile(input: ProfileOnboardingInput): ProfileRecord {
 export function onboardProfileWithEnrollment(
   input: ProfileOnboardingInput,
   enrollment: PreparedProfileEnrollment,
+  scaleBinding = '',
 ): { profile: ProfileRecord; recoveryCodes: string[] } {
   return {
-    profile: addProfileInternal(input.profile, input.nutrition, enrollment),
+    profile: addProfileInternal(input.profile, input.nutrition, enrollment, scaleBinding),
     recoveryCodes: enrollment.recoveryCodes,
   };
 }

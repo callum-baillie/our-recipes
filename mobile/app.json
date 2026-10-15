@@ -4,6 +4,7 @@
     "slug": "bord-mobile",
     "scheme": "bord",
     "version": "0.1.0",
+    "icon": "./assets/brand/bord-app-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -19,6 +20,10 @@
     },
     "android": {
       "package": "com.bord.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/bord-adaptive-foreground.png",
+        "backgroundColor": "#536938"
+      },
       "predictiveBackGestureEnabled": true,
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -32,7 +37,13 @@
           "backgroundColor": "#F7F3EB",
           "image": "./assets/brand/bord-splash.png",
           "imageWidth": 220,
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "android": {
+            "backgroundColor": "#F7F3EB",
+            "image": "./assets/brand/bord-splash-mark.png",
+            "imageWidth": 128,
+            "resizeMode": "contain"
+          }
         }
       ],
       [
@@ -55,7 +66,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/with-bord-android-network-security"
     ],
     "experiments": {
       "typedRoutes": true

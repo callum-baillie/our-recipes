@@ -16,11 +16,7 @@ import {
   parsePalette,
 } from '@/lib/appearance';
 import { getHouseholdState } from '@/lib/services/household-service';
-import {
-  effectiveAppRole,
-  normalizeAppRole,
-  type AppRole,
-} from '@/lib/domain/permissions';
+import { effectiveAppRole, normalizeAppRole, type AppRole } from '@/lib/domain/permissions';
 import { getProfileAccessRole } from '@/lib/services/auth-service';
 import { isAuthenticationConfigured } from '@/lib/services/auth-service';
 import { brandedKitchenTitle, DEFAULT_KITCHEN_NAME, PRODUCT_NAME } from '@/lib/brand';
@@ -128,9 +124,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     ? await auth.api.getSession({ headers: requestHeaders })
     : null;
   const actor = getActorContext(cookieStore.get(ACTIVE_PROFILE_COOKIE)?.value);
-  const accountRole = normalizeAppRole(
-    (authSession?.user as { role?: string } | undefined)?.role,
-  );
+  const accountRole = normalizeAppRole((authSession?.user as { role?: string } | undefined)?.role);
   const activeProfileRole = actor.profileId
     ? (getProfileAccessRole(actor.profileId) ?? accountRole)
     : accountRole;

@@ -1,3 +1,4 @@
+import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 
 import { getRecipe, recipeAsMarkdown } from '@/lib/services/recipe-service';
@@ -15,19 +16,28 @@ function downloadName(title: string): string {
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ recipeId: string }> }) {
+  const access = await authorizeCoreApi(_request);
+  if (access.response) return access.response;
+
   const recipe = getRecipe((await context.params).recipeId);
   if (!recipe) {
-    return NextResponse.json(
-      { error: { code: 'recipe_not_found', message: 'That recipe no longer exists.' } },
-      { status: 404 },
+    return withApiRequestId(
+      NextResponse.json(
+        { error: { code: 'recipe_not_found', message: 'That recipe no longer exists.' } },
+        { status: 404 },
+      ),
+      access.requestId,
     );
   }
-  return new NextResponse(recipeAsMarkdown(recipe), {
-    headers: {
-      'Cache-Control': 'no-store',
-      'Content-Disposition': `attachment; filename="${downloadName(recipe.title)}"`,
-      'Content-Type': 'text/markdown; charset=utf-8',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
+  return withApiRequestId(
+    new NextResponse(recipeAsMarkdown(recipe), {
+      headers: {
+        'Cache-Control': 'no-store',
+        'Content-Disposition': `attachment; filename="${downloadName(recipe.title)}"`,
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    }),
+    access.requestId,
+  );
 }

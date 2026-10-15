@@ -1,9 +1,9 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { recipePreferenceInputSchema, recipeReactionInputSchema } from '@/lib/domain/recipe';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   RecipeNotFoundError,
   setRecipePreference,
@@ -14,71 +14,81 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function PUT(request: Request, context: { params: Promise<{ recipeId: string }> }) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const actor = actorFromPrincipal(access.principal);
   if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before saving a personal preference.',
+    return withApiRequestId(
+      jsonError(
+        409,
+        'profile_selection_required',
+        'Choose a household profile before saving a personal preference.',
+      ),
+      access.requestId,
     );
   }
   const parsed = recipePreferenceInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return jsonError(
-      400,
-      'invalid_recipe_preference',
-      'Use a rating from 1 to 5 and a shorter note.',
+    return withApiRequestId(
+      jsonError(400, 'invalid_recipe_preference', 'Use a rating from 1 to 5 and a shorter note.'),
+      access.requestId,
     );
   }
   try {
-    return NextResponse.json({
-      preference: setRecipePreference(
-        (await context.params).recipeId,
-        actor.profileId,
-        parsed.data,
-      ),
-    });
+    return withApiRequestId(
+      NextResponse.json({
+        preference: setRecipePreference(
+          (await context.params).recipeId,
+          actor.profileId,
+          parsed.data,
+        ),
+      }),
+      access.requestId,
+    );
   } catch (error) {
     if (error instanceof RecipeNotFoundError)
-      return jsonError(404, 'recipe_not_found', error.message);
+      return withApiRequestId(jsonError(404, 'recipe_not_found', error.message), access.requestId);
     throw error;
   }
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ recipeId: string }> }) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const actor = actorFromPrincipal(access.principal);
   if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before reacting to a recipe.',
+    return withApiRequestId(
+      jsonError(
+        409,
+        'profile_selection_required',
+        'Choose a household profile before reacting to a recipe.',
+      ),
+      access.requestId,
     );
   }
   const parsed = recipeReactionInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return jsonError(
-      400,
-      'invalid_recipe_reaction',
-      'Choose dislike, like, staple, or no reaction.',
+    return withApiRequestId(
+      jsonError(400, 'invalid_recipe_reaction', 'Choose dislike, like, staple, or no reaction.'),
+      access.requestId,
     );
   }
   try {
-    return NextResponse.json({
-      preference: setRecipeReaction(
-        (await context.params).recipeId,
-        actor.profileId,
-        parsed.data.score,
-      ),
-    });
+    return withApiRequestId(
+      NextResponse.json({
+        preference: setRecipeReaction(
+          (await context.params).recipeId,
+          actor.profileId,
+          parsed.data.score,
+        ),
+      }),
+      access.requestId,
+    );
   } catch (error) {
     if (error instanceof RecipeNotFoundError)
-      return jsonError(404, 'recipe_not_found', error.message);
+      return withApiRequestId(jsonError(404, 'recipe_not_found', error.message), access.requestId);
     throw error;
   }
 }

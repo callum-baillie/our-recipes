@@ -59,6 +59,8 @@ const nextConfig: NextConfig = {
   // installed files. Keep these Node-only packages external and copy them with
   // the standalone server output.
   serverExternalPackages: [
+    '@formepdf/core',
+    '@formepdf/react',
     'tar',
     'tesseract.js',
     'tesseract.js-core',

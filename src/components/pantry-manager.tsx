@@ -1,4 +1,6 @@
 'use client';
+import { PageHeader } from '@/components/page-header';
+import { DecisionAssistance } from '@/components/decision-assistance';
 
 import {
   ArrowDownUp,
@@ -21,6 +23,7 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PageSkeleton } from '@/components/skeleton';
@@ -56,6 +59,8 @@ type Product = {
   preferredPurchaseQuantity: number | null;
   stockUnit: string;
   suggestGroceryRestock: boolean;
+  restockMode: 'none' | 'always_have' | 'always_buy';
+  restockTrigger: 'below_target' | 'reorder_point' | 'empty';
   archivedAt: string | null;
 };
 
@@ -162,6 +167,7 @@ const units = [
 ];
 const views = [
   ['all', 'All'],
+  ['essentials', 'Essentials'],
   ['pantry', 'Pantry'],
   ['refrigerator', 'Refrigerator'],
   ['freezer', 'Freezer'],
@@ -295,6 +301,8 @@ function jsonList(value: string): string[] {
 }
 
 function ProductEditFields({ product }: { product: Product }) {
+  const [restockMode, setRestockMode] = useState(product.restockMode ?? 'none');
+  const [restockTrigger, setRestockTrigger] = useState(product.restockTrigger ?? 'below_target');
   return (
     <>
       <div className={styles.formRow}>
@@ -386,51 +394,150 @@ function ProductEditFields({ product }: { product: Product }) {
           <span>Preferred store</span>
           <input name="preferredStore" defaultValue={product.preferredStore} />
         </label>
-        <label>
-          <span>Minimum stock</span>
-          <input
-            name="minimumStock"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={product.minimumStock ?? ''}
-          />
-        </label>
-        <label>
-          <span>Target stock</span>
-          <input
-            name="targetStock"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={product.targetStock ?? ''}
-          />
-        </label>
-        <label>
-          <span>Reorder threshold</span>
-          <input
-            name="reorderThreshold"
-            type="number"
-            min="0"
-            step="any"
-            defaultValue={product.reorderThreshold ?? ''}
-          />
-        </label>
-        <label>
-          <span>Purchase quantity</span>
-          <input
-            name="preferredPurchaseQuantity"
-            type="number"
-            min="0.000001"
-            step="any"
-            defaultValue={product.preferredPurchaseQuantity ?? ''}
-          />
-        </label>
-        <label>
-          <span>Stock unit</span>
-          <input name="stockUnit" defaultValue={product.stockUnit} />
-        </label>
       </div>
+      <fieldset>
+        <legend>Shopping policy</legend>
+        <p className={styles.muted}>
+          Maintain an essential reserve, or buy a baseline amount on every Next shop.
+        </p>
+        <div className={styles.formRow}>
+          <label>
+            <span>Policy</span>
+            <select
+              name="restockMode"
+              value={restockMode}
+              onChange={(event) => setRestockMode(event.target.value as Product['restockMode'])}
+            >
+              <option value="none">Off</option>
+              <option value="always_have">Always have</option>
+              <option value="always_buy">Always buy</option>
+            </select>
+          </label>
+          {restockMode !== 'none' ? (
+            <label>
+              <span>Comparison and purchase unit</span>
+              <select
+                name="stockUnit"
+                defaultValue={product.stockUnit || product.defaultInventoryUnit}
+              >
+                {units.map((unit) => (
+                  <option key={unit}>{unit}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <input name="stockUnit" type="hidden" defaultValue={product.stockUnit} />
+          )}
+          {restockMode === 'always_have' ? (
+            <>
+              <label>
+                <span>Keep after planned meals</span>
+                <input
+                  name="targetStock"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue={product.targetStock ?? ''}
+                  required
+                />
+              </label>
+              <label>
+                <span>Reorder when</span>
+                <select
+                  name="restockTrigger"
+                  value={restockTrigger}
+                  onChange={(event) =>
+                    setRestockTrigger(event.target.value as Product['restockTrigger'])
+                  }
+                >
+                  <option value="below_target">Below target</option>
+                  <option value="reorder_point">At reorder point</option>
+                  <option value="empty">Empty</option>
+                </select>
+              </label>
+              {restockTrigger === 'reorder_point' ? (
+                <label>
+                  <span>Reorder point</span>
+                  <input
+                    name="reorderThreshold"
+                    type="number"
+                    min="0"
+                    step="any"
+                    defaultValue={product.reorderThreshold ?? ''}
+                    required
+                  />
+                </label>
+              ) : (
+                <input
+                  name="reorderThreshold"
+                  type="hidden"
+                  defaultValue={product.reorderThreshold ?? ''}
+                />
+              )}
+              <label>
+                <span>Buy in increments (optional)</span>
+                <input
+                  name="preferredPurchaseQuantity"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue={product.preferredPurchaseQuantity ?? ''}
+                />
+              </label>
+            </>
+          ) : null}
+          {restockMode === 'always_buy' ? (
+            <>
+              <input name="restockTrigger" type="hidden" value="below_target" />
+              <input name="targetStock" type="hidden" defaultValue={product.targetStock ?? ''} />
+              <input
+                name="reorderThreshold"
+                type="hidden"
+                defaultValue={product.reorderThreshold ?? ''}
+              />
+              <label>
+                <span>Amount per Next shop</span>
+                <input
+                  name="preferredPurchaseQuantity"
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  defaultValue={product.preferredPurchaseQuantity ?? ''}
+                  required
+                />
+              </label>
+            </>
+          ) : null}
+          {restockMode === 'none' ? (
+            <>
+              <input name="restockTrigger" type="hidden" defaultValue={product.restockTrigger} />
+              <input name="targetStock" type="hidden" defaultValue={product.targetStock ?? ''} />
+              <input
+                name="reorderThreshold"
+                type="hidden"
+                defaultValue={product.reorderThreshold ?? ''}
+              />
+              <input
+                name="preferredPurchaseQuantity"
+                type="hidden"
+                defaultValue={product.preferredPurchaseQuantity ?? ''}
+              />
+            </>
+          ) : null}
+        </div>
+        {restockMode === 'always_have' ? (
+          <p className={styles.muted}>
+            Keep {product.targetStock ?? 'the target'}{' '}
+            {product.stockUnit || product.defaultInventoryUnit} after planned meals; reorder{' '}
+            {restockTrigger.replaceAll('_', ' ')}.
+          </p>
+        ) : restockMode === 'always_buy' ? (
+          <p className={styles.muted}>
+            Buy at least {product.preferredPurchaseQuantity ?? 'the configured amount'}{' '}
+            {product.stockUnit || product.defaultInventoryUnit} on every Next shop.
+          </p>
+        ) : null}
+      </fieldset>
       <label>
         <span>Storage instructions</span>
         <textarea name="storageInstructions" defaultValue={product.storageInstructions} rows={2} />
@@ -438,14 +545,8 @@ function ProductEditFields({ product }: { product: Product }) {
       <label className={styles.checkbox}>
         <input name="isStaple" type="checkbox" defaultChecked={product.isStaple} /> Staple product
       </label>
-      <label className={styles.checkbox}>
-        <input
-          name="suggestGroceryRestock"
-          type="checkbox"
-          defaultChecked={product.suggestGroceryRestock}
-        />{' '}
-        Suggest grocery restock
-      </label>
+      <input name="minimumStock" type="hidden" defaultValue={product.minimumStock ?? ''} />
+      <input name="suggestGroceryRestock" type="hidden" value="off" />
       <label className={styles.checkbox}>
         <input name="archived" type="checkbox" defaultChecked={Boolean(product.archivedAt)} />{' '}
         Archive product
@@ -713,7 +814,7 @@ export function PantryManager({
     const requestId = ++loadRequestRef.current;
     const query = new URLSearchParams({
       q,
-      view,
+      view: view === 'essentials' ? 'all' : view,
       sort,
       includeInactive: String(includeInactive),
     });
@@ -749,7 +850,13 @@ export function PantryManager({
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const defaultLocationId = dashboard?.locations[0]?.id ?? '';
+  const defaultLocationId =
+    dashboard?.locations.find(
+      (location) => location.storageType === 'pantry' && location.depth === 0,
+    )?.id ??
+    dashboard?.locations.find((location) => location.storageType === 'pantry')?.id ??
+    dashboard?.locations[0]?.id ??
+    '';
   const productOptions = useMemo(() => dashboard?.products ?? [], [dashboard]);
   const categories = useMemo(
     () =>
@@ -773,6 +880,14 @@ export function PantryManager({
     }
     return [...groups.entries()];
   }, [dashboard, group]);
+  const essentialProducts = useMemo(
+    () =>
+      (dashboard?.products ?? []).filter(
+        (product) =>
+          product.restockMode !== 'none' || (product.isStaple && product.suggestGroceryRestock),
+      ),
+    [dashboard],
+  );
   const useFirstIds = useMemo(() => {
     const byProduct = new Map<string, Batch[]>();
     for (const batch of dashboard?.batches ?? [])
@@ -936,6 +1051,8 @@ export function PantryManager({
       reorderThreshold: nullableNumber(formData.get('reorderThreshold')),
       preferredPurchaseQuantity: nullableNumber(formData.get('preferredPurchaseQuantity')),
       stockUnit: formData.get('stockUnit'),
+      restockMode: formData.get('restockMode'),
+      restockTrigger: formData.get('restockTrigger'),
       suggestGroceryRestock: formData.get('suggestGroceryRestock') === 'on',
       archived: formData.get('archived') === 'on',
       productId: product.id,
@@ -997,6 +1114,8 @@ export function PantryManager({
             defaultStorageType: formData.get('storageType'),
             aliases: [],
             isStaple: formData.get('isStaple') === 'on',
+            restockMode: 'none',
+            restockTrigger: 'below_target',
           }),
         });
         if (!productResponse.ok) {
@@ -1190,362 +1309,370 @@ export function PantryManager({
 
   return (
     <div className={styles.page}>
-      <header className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>HOUSEHOLD INVENTORY</p>
-          <h1>Pantry</h1>
-          <p>Know what is on hand, what needs using, and where every batch lives.</p>
-        </div>
-        <button className={styles.addPanel} type="button" onClick={openAddItemDialog}>
-          <Plus size={22} aria-hidden="true" /> Add item
-        </button>
-        {addItemOpen ? (
-          <dialog
-            ref={addItemDialogRef}
-            className={styles.addDialog}
-            aria-labelledby="add-pantry-item-title"
-            onCancel={closeAddItemDialog}
-            onClose={closeAddItemDialog}
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) closeAddItemDialog();
-            }}
-          >
-            <div className={styles.addDialogShell}>
-              <header className={styles.addDialogHeader}>
-                <div>
-                  <h2 id="add-pantry-item-title">Add pantry item</h2>
-                  <p>Find a food or enter the item details manually.</p>
-                </div>
-                <button
-                  className={styles.addDialogClose}
-                  type="button"
-                  aria-label="Close add item dialog"
-                  onClick={closeAddItemDialog}
-                >
-                  <X size={20} aria-hidden="true" />
-                </button>
-              </header>
-              <div className={styles.addPanelBody}>
-                <FoodCatalogPicker
-                  context="pantry"
-                  locations={dashboard.locations.map(({ id, path }) => ({ id, path }))}
-                  disabled={!canEdit || !defaultLocationId}
-                  embedded
-                  initialTab="scan"
-                  searchSuggestions={productOptions.map((product) => product.displayName)}
-                  onManualRequest={showManualEntry}
-                  onImported={() => {
-                    showToast('Reviewed food data and Pantry batch added.', 'success');
-                    closeAddItemDialog();
-                    void load();
-                  }}
-                />
-                {manualEntryOpen ? (
-                  <div ref={manualEntryRef} className={styles.manualEntry}>
-                    <div className={styles.manualEntryHeading}>
-                      <strong>Enter details manually</strong>
-                      <span>
-                        Use this when a product is not available from food data providers.
-                      </span>
-                    </div>
-                    <form action={addItem} className={styles.form}>
-                      <label>
-                        <span>Existing product</span>
-                        <select
-                          name="productId"
-                          value={addProductId}
-                          onChange={(event) => setAddProductId(event.target.value)}
+      <PageHeader
+        title="Pantry"
+        eyebrow="HOUSEHOLD INVENTORY"
+        description="Know what is on hand, what needs using, and where every batch lives."
+        actions={
+          <button className={styles.addPanel} type="button" onClick={openAddItemDialog}>
+            <Plus size={20} aria-hidden="true" /> Add item
+          </button>
+        }
+      />
+      {addItemOpen ? (
+        <dialog
+          ref={addItemDialogRef}
+          className={styles.addDialog}
+          aria-labelledby="add-pantry-item-title"
+          onCancel={closeAddItemDialog}
+          onClose={closeAddItemDialog}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeAddItemDialog();
+          }}
+        >
+          <div className={styles.addDialogShell}>
+            <header className={styles.addDialogHeader}>
+              <div>
+                <h2 id="add-pantry-item-title">Add pantry item</h2>
+                <p>Find a food or enter the item details manually.</p>
+              </div>
+              <button
+                className={styles.addDialogClose}
+                type="button"
+                aria-label="Close add item dialog"
+                onClick={closeAddItemDialog}
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </header>
+            <div className={styles.addPanelBody}>
+              <FoodCatalogPicker
+                context="pantry"
+                locations={dashboard.locations.map(({ id, path }) => ({ id, path }))}
+                disabled={!canEdit || !defaultLocationId}
+                embedded
+                initialTab="scan"
+                searchSuggestions={productOptions.map((product) => product.displayName)}
+                onManualRequest={showManualEntry}
+                onImported={() => {
+                  showToast('Reviewed food data and Pantry batch added.', 'success');
+                  closeAddItemDialog();
+                  void load();
+                }}
+              />
+              {manualEntryOpen ? (
+                <div ref={manualEntryRef} className={styles.manualEntry}>
+                  <div className={styles.manualEntryHeading}>
+                    <strong>Enter details manually</strong>
+                    <span>Use this when a product is not available from food data providers.</span>
+                  </div>
+                  <form action={addItem} className={styles.form}>
+                    <label>
+                      <span>Existing product</span>
+                      <select
+                        name="productId"
+                        value={addProductId}
+                        onChange={(event) => setAddProductId(event.target.value)}
+                      >
+                        <option value="">Create a new product</option>
+                        {productOptions.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className={styles.manualSearchField}>
+                      <label htmlFor="manual-product-name">New product name</label>
+                      <div className={styles.manualSearchControl}>
+                        <input
+                          autoComplete="off"
+                          id="manual-product-name"
+                          list="add-item-product-options"
+                          name="productName"
+                          onChange={(event) => {
+                            setManualProductName(event.target.value);
+                            setManualSearchNotice('');
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Enter') return;
+                            event.preventDefault();
+                            void searchManualFood();
+                          }}
+                          placeholder="e.g. Chickpeas"
+                          value={manualProductName}
+                        />
+                        <button
+                          aria-label="Search food data for this product"
+                          disabled={manualSearchBusy || manualProductName.trim().length < 2}
+                          onClick={() => void searchManualFood()}
+                          title="Search USDA FoodData Central"
+                          type="button"
                         >
-                          <option value="">Create a new product</option>
-                          {productOptions.map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.displayName}
+                          <Search size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <datalist id="add-item-product-options">
+                        {productOptions.map((product) => (
+                          <option key={product.id} value={product.displayName} />
+                        ))}
+                      </datalist>
+                    </div>
+                    {manualProductName.trim().length > 1 && (
+                      <DecisionAssistance
+                        embedded
+                        inputQuery={manualProductName}
+                        onChoose={(_card, choice) => {
+                          const product = productOptions.find((item) => item.id === choice);
+                          if (product) {
+                            setAddProductId(product.id);
+                            setManualSearchNotice(
+                              `Selected ${product.displayName}. Check quantity and storage, then add the item.`,
+                            );
+                          }
+                        }}
+                        initialTask="pantry_input"
+                        tasks={['pantry_input', 'clarification', 'nutrition_match']}
+                        title="Need help identifying this food?"
+                        description="Compare your entry with existing products or reference nutrition, using the name you entered."
+                      />
+                    )}
+                    {manualSearchError ? (
+                      <p className={styles.manualSearchError} role="alert">
+                        {manualSearchError}
+                      </p>
+                    ) : null}
+                    {manualSearchNotice ? (
+                      <p className={styles.manualSearchNotice} role="status">
+                        {manualSearchNotice}
+                      </p>
+                    ) : null}
+                    {manualSearchResults.length ? (
+                      <div className={styles.manualSearchResults} aria-label="Food search results">
+                        <span>Choose a result to fill the form</span>
+                        {manualSearchResults.map((record) => (
+                          <button
+                            key={`${record.provider}:${record.providerRecordId}`}
+                            onClick={() => void selectManualFood(record)}
+                            type="button"
+                          >
+                            <strong>{record.displayName}</strong>
+                            <small>
+                              {[record.brand, foodProviderLabel(record.provider)]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </small>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <label>
+                      <span>Brand</span>
+                      <input
+                        name="brand"
+                        onChange={(event) => setManualBrand(event.target.value)}
+                        value={manualBrand}
+                      />
+                    </label>
+                    <div className={styles.formRow}>
+                      <label>
+                        <span>Quantity</span>
+                        <input
+                          name="quantityRemaining"
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Exact"
+                        />
+                      </label>
+                      <label>
+                        <span>Unit</span>
+                        <select
+                          name="unit"
+                          onChange={(event) => setManualUnit(event.target.value)}
+                          value={manualUnit}
+                        >
+                          {units.map((unit) => (
+                            <option key={unit} value={unit}>
+                              {unit}
                             </option>
                           ))}
                         </select>
                       </label>
-                      <div className={styles.manualSearchField}>
-                        <label htmlFor="manual-product-name">New product name</label>
-                        <div className={styles.manualSearchControl}>
-                          <input
-                            autoComplete="off"
-                            id="manual-product-name"
-                            list="add-item-product-options"
-                            name="productName"
-                            onChange={(event) => {
-                              setManualProductName(event.target.value);
-                              setManualSearchNotice('');
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key !== 'Enter') return;
-                              event.preventDefault();
-                              void searchManualFood();
-                            }}
-                            placeholder="e.g. Chickpeas"
-                            value={manualProductName}
-                          />
-                          <button
-                            aria-label="Search food data for this product"
-                            disabled={manualSearchBusy || manualProductName.trim().length < 2}
-                            onClick={() => void searchManualFood()}
-                            title="Search USDA FoodData Central"
-                            type="button"
-                          >
-                            <Search size={18} aria-hidden="true" />
-                          </button>
-                        </div>
-                        <datalist id="add-item-product-options">
-                          {productOptions.map((product) => (
-                            <option key={product.id} value={product.displayName} />
-                          ))}
-                        </datalist>
-                      </div>
-                      {manualSearchError ? (
-                        <p className={styles.manualSearchError} role="alert">
-                          {manualSearchError}
-                        </p>
-                      ) : null}
-                      {manualSearchNotice ? (
-                        <p className={styles.manualSearchNotice} role="status">
-                          {manualSearchNotice}
-                        </p>
-                      ) : null}
-                      {manualSearchResults.length ? (
-                        <div
-                          className={styles.manualSearchResults}
-                          aria-label="Food search results"
-                        >
-                          <span>Choose a result to fill the form</span>
-                          {manualSearchResults.map((record) => (
-                            <button
-                              key={`${record.provider}:${record.providerRecordId}`}
-                              onClick={() => void selectManualFood(record)}
-                              type="button"
-                            >
-                              <strong>{record.displayName}</strong>
-                              <small>
-                                {[record.brand, foodProviderLabel(record.provider)]
-                                  .filter(Boolean)
-                                  .join(' · ')}
-                              </small>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
+                    </div>
+                    <div className={styles.formRow}>
                       <label>
-                        <span>Brand</span>
+                        <span>Original quantity</span>
+                        <input name="originalQuantity" type="number" min="0" step="any" />
+                      </label>
+                      <label>
+                        <span>Separate batches</span>
+                        <input name="batchCount" type="number" min="1" max="20" defaultValue="1" />
+                      </label>
+                    </div>
+                    <label>
+                      <span>Or approximate amount</span>
+                      <select name="approximateState" defaultValue="unknown">
+                        <option value="full">Full</option>
+                        <option value="three_quarters">Three quarters</option>
+                        <option value="half">Half</option>
+                        <option value="quarter">Quarter</option>
+                        <option value="almost_empty">Almost empty</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Location</span>
+                      <select name="locationId" defaultValue={defaultLocationId} required>
+                        {dashboard.locations.map((location) => (
+                          <option key={location.id} value={location.id}>
+                            {location.path}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Shelf or sub-location</span>
+                      <input name="sublocation" placeholder="Upper shelf" />
+                    </label>
+                    <div className={styles.formRow}>
+                      <label>
+                        <span>Package count</span>
+                        <input name="packageCount" type="number" min="0" step="any" />
+                      </label>
+                      <label>
+                        <span>Amount per package</span>
+                        <input name="amountPerPackage" type="number" min="0" step="any" />
+                      </label>
+                    </div>
+                    <label>
+                      <span>Package unit</span>
+                      <select
+                        name="packageUnit"
+                        onChange={(event) => setManualPackageUnit(event.target.value)}
+                        value={manualPackageUnit}
+                      >
+                        <option value="">Not recorded</option>
+                        {units.map((unit) => (
+                          <option key={unit}>{unit}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className={styles.formRow}>
+                      <label>
+                        <span>Best before</span>
+                        <input name="bestBeforeDate" type="date" />
+                      </label>
+                      <label>
+                        <span>Category</span>
                         <input
-                          name="brand"
-                          onChange={(event) => setManualBrand(event.target.value)}
-                          value={manualBrand}
+                          name="category"
+                          onChange={(event) => setManualCategory(event.target.value)}
+                          placeholder="Canned goods"
+                          value={manualCategory}
                         />
                       </label>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Quantity</span>
-                          <input
-                            name="quantityRemaining"
-                            type="number"
-                            min="0"
-                            step="any"
-                            placeholder="Exact"
-                          />
-                        </label>
-                        <label>
-                          <span>Unit</span>
-                          <select
-                            name="unit"
-                            onChange={(event) => setManualUnit(event.target.value)}
-                            value={manualUnit}
-                          >
-                            {units.map((unit) => (
-                              <option key={unit} value={unit}>
-                                {unit}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Original quantity</span>
-                          <input name="originalQuantity" type="number" min="0" step="any" />
-                        </label>
-                        <label>
-                          <span>Separate batches</span>
-                          <input
-                            name="batchCount"
-                            type="number"
-                            min="1"
-                            max="20"
-                            defaultValue="1"
-                          />
-                        </label>
-                      </div>
+                    </div>
+                    <div className={styles.formRow}>
                       <label>
-                        <span>Or approximate amount</span>
-                        <select name="approximateState" defaultValue="unknown">
-                          <option value="full">Full</option>
-                          <option value="three_quarters">Three quarters</option>
-                          <option value="half">Half</option>
-                          <option value="quarter">Quarter</option>
-                          <option value="almost_empty">Almost empty</option>
+                        <span>Use by</span>
+                        <input name="useByDate" type="date" />
+                      </label>
+                      <label>
+                        <span>Sell by</span>
+                        <input name="sellByDate" type="date" />
+                      </label>
+                    </div>
+                    <div className={styles.formRow}>
+                      <label>
+                        <span>Purchased</span>
+                        <input name="purchaseDate" type="date" />
+                      </label>
+                      <label>
+                        <span>Prepared</span>
+                        <input name="preparedDate" type="date" />
+                      </label>
+                    </div>
+                    <div className={styles.formRow}>
+                      <label>
+                        <span>Date precision</span>
+                        <select name="expiryPrecision" defaultValue="unknown">
+                          <option value="exact">Exact</option>
+                          <option value="estimated">Estimated</option>
+                          <option value="month_only">Month only</option>
                           <option value="unknown">Unknown</option>
                         </select>
                       </label>
                       <label>
-                        <span>Location</span>
-                        <select name="locationId" defaultValue={defaultLocationId} required>
-                          {dashboard.locations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.path}
-                            </option>
-                          ))}
+                        <span>Status</span>
+                        <select name="status" defaultValue="unopened">
+                          <option value="unopened">Unopened</option>
+                          <option value="opened">Opened</option>
+                          <option value="frozen">Frozen</option>
+                          <option value="thawed">Thawed</option>
+                          <option value="reserved">Reserved</option>
                         </select>
                       </label>
+                    </div>
+                    <div className={styles.formRow}>
                       <label>
-                        <span>Shelf or sub-location</span>
-                        <input name="sublocation" placeholder="Upper shelf" />
+                        <span>Opened</span>
+                        <input name="openedDate" type="date" />
                       </label>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Package count</span>
-                          <input name="packageCount" type="number" min="0" step="any" />
-                        </label>
-                        <label>
-                          <span>Amount per package</span>
-                          <input name="amountPerPackage" type="number" min="0" step="any" />
-                        </label>
-                      </div>
                       <label>
-                        <span>Package unit</span>
-                        <select
-                          name="packageUnit"
-                          onChange={(event) => setManualPackageUnit(event.target.value)}
-                          value={manualPackageUnit}
-                        >
-                          <option value="">Not recorded</option>
-                          {units.map((unit) => (
-                            <option key={unit}>{unit}</option>
-                          ))}
-                        </select>
+                        <span>Frozen</span>
+                        <input name="frozenDate" type="date" />
                       </label>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Best before</span>
-                          <input name="bestBeforeDate" type="date" />
-                        </label>
-                        <label>
-                          <span>Category</span>
-                          <input
-                            name="category"
-                            onChange={(event) => setManualCategory(event.target.value)}
-                            placeholder="Canned goods"
-                            value={manualCategory}
-                          />
-                        </label>
-                      </div>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Use by</span>
-                          <input name="useByDate" type="date" />
-                        </label>
-                        <label>
-                          <span>Sell by</span>
-                          <input name="sellByDate" type="date" />
-                        </label>
-                      </div>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Purchased</span>
-                          <input name="purchaseDate" type="date" />
-                        </label>
-                        <label>
-                          <span>Prepared</span>
-                          <input name="preparedDate" type="date" />
-                        </label>
-                      </div>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Date precision</span>
-                          <select name="expiryPrecision" defaultValue="unknown">
-                            <option value="exact">Exact</option>
-                            <option value="estimated">Estimated</option>
-                            <option value="month_only">Month only</option>
-                            <option value="unknown">Unknown</option>
-                          </select>
-                        </label>
-                        <label>
-                          <span>Status</span>
-                          <select name="status" defaultValue="unopened">
-                            <option value="unopened">Unopened</option>
-                            <option value="opened">Opened</option>
-                            <option value="frozen">Frozen</option>
-                            <option value="thawed">Thawed</option>
-                            <option value="reserved">Reserved</option>
-                          </select>
-                        </label>
-                      </div>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Opened</span>
-                          <input name="openedDate" type="date" />
-                        </label>
-                        <label>
-                          <span>Frozen</span>
-                          <input name="frozenDate" type="date" />
-                        </label>
-                      </div>
+                    </div>
+                    <label>
+                      <span>Thawed</span>
+                      <input name="thawedDate" type="date" />
+                    </label>
+                    <div className={styles.formRow}>
                       <label>
-                        <span>Thawed</span>
-                        <input name="thawedDate" type="date" />
+                        <span>Price in cents</span>
+                        <input name="purchasePriceCents" type="number" min="0" step="1" />
                       </label>
-                      <div className={styles.formRow}>
-                        <label>
-                          <span>Price in cents</span>
-                          <input name="purchasePriceCents" type="number" min="0" step="1" />
-                        </label>
-                        <label>
-                          <span>Store or source</span>
-                          <input
-                            name="source"
-                            onChange={(event) => setManualSource(event.target.value)}
-                            value={manualSource}
-                          />
-                        </label>
-                      </div>
-                      <input name="storageType" type="hidden" value="pantry" />
                       <label>
-                        <span>Notes</span>
-                        <textarea name="notes" rows={2} />
+                        <span>Store or source</span>
+                        <input
+                          name="source"
+                          onChange={(event) => setManualSource(event.target.value)}
+                          value={manualSource}
+                        />
                       </label>
-                      <label className={styles.checkbox}>
-                        <input name="isStaple" type="checkbox" /> Staple product
-                      </label>
-                      <label className={styles.checkbox}>
-                        <input name="excludeFromGrocery" type="checkbox" /> Exclude this batch from
-                        grocery calculations
-                      </label>
-                      <button disabled={busy || !canEdit || !defaultLocationId} type="submit">
-                        {busy ? 'Saving…' : 'Add item'}
-                      </button>
-                    </form>
-                  </div>
-                ) : null}
-              </div>
+                    </div>
+                    <input name="storageType" type="hidden" value="pantry" />
+                    <label>
+                      <span>Notes</span>
+                      <textarea name="notes" rows={2} />
+                    </label>
+                    <label className={styles.checkbox}>
+                      <input name="isStaple" type="checkbox" /> Staple product
+                    </label>
+                    <label className={styles.checkbox}>
+                      <input name="excludeFromGrocery" type="checkbox" /> Exclude this batch from
+                      grocery calculations
+                    </label>
+                    <button disabled={busy || !canEdit || !defaultLocationId} type="submit">
+                      {busy ? 'Saving…' : 'Add item'}
+                    </button>
+                  </form>
+                </div>
+              ) : null}
             </div>
-          </dialog>
-        ) : null}
-      </header>
+          </div>
+        </dialog>
+      ) : null}
 
-      <section className={styles.quickAdd} aria-labelledby="quick-add-title">
-        <div className={styles.quickAddIntro}>
+      <details className={styles.quickAdd} aria-labelledby="quick-add-title">
+        <summary className={styles.quickAddIntro}>
           <Bolt size={20} aria-hidden="true" />
           <div>
-            <h2 id="quick-add-title">Quick add</h2>
+            <h2 id="quick-add-title">Quick add an item</h2>
             <p>Add items in seconds.</p>
           </div>
-        </div>
+        </summary>
         <form action={quickAddItem} className={styles.quickAddForm}>
           <label className={styles.quickName}>
             <span>Item name</span>
@@ -1603,7 +1730,7 @@ export function PantryManager({
             {busy ? 'Saving…' : 'Add item'}
           </button>
         </form>
-      </section>
+      </details>
 
       {!canEdit ? (
         <p className={styles.profilePrompt}>Choose a household profile to change Pantry stock.</p>
@@ -1615,7 +1742,18 @@ export function PantryManager({
       ) : null}
       <section className={styles.summary} aria-label="Pantry summary">
         {summaryCards(dashboard).map(({ detail, icon: Icon, label, tone, value }) => (
-          <article key={label}>
+          <button
+            key={label}
+            type="button"
+            onClick={() => {
+              clearPantryFilters();
+              if (label === 'Expiring soon') setExpiry('soon');
+              else if (label === 'Low stock') setView('low_stock');
+              else if (label === 'Opened') setView('opened');
+              else if (label === 'Recent changes') setView('recent');
+            }}
+            aria-label={`Show ${label.toLowerCase()}: ${value} items`}
+          >
             <span className={`${styles.summaryIcon} ${styles[tone]}`} aria-hidden="true">
               <Icon size={26} />
             </span>
@@ -1624,10 +1762,17 @@ export function PantryManager({
               <strong>{value}</strong>
               <small>{detail}</small>
             </span>
-          </article>
+          </button>
         ))}
       </section>
 
+      <div className={styles.kitchenActions}>
+        <span>
+          <strong>What can I make?</strong> Start with the ingredients you already have.
+        </span>
+        <Link href="/recipes?pantry=ready">Find recipes to cook</Link>
+        <Link href="/lists">Open shopping lists</Link>
+      </div>
       <div className={styles.mobileToolbar}>
         <section className={styles.toolbar} aria-label="Pantry filters">
           <label className={styles.search}>
@@ -1636,7 +1781,7 @@ export function PantryManager({
             <input
               value={q}
               onChange={(event) => setQ(event.target.value)}
-              placeholder="Search products, brands, or locations"
+              placeholder="Search your pantry"
             />
           </label>
           <button
@@ -1818,11 +1963,115 @@ export function PantryManager({
         <section aria-labelledby="stock-title">
           <div className={styles.sectionHeading}>
             <div>
-              <p className={styles.eyebrow}>ON HAND</p>
-              <h2 id="stock-title">{dashboard.batches.length} batches</h2>
+              <p className={styles.eyebrow}>
+                {view === 'essentials' ? 'SHOPPING POLICIES' : 'ON HAND'}
+              </p>
+              <h2 id="stock-title">
+                {view === 'essentials'
+                  ? `${essentialProducts.length} essentials`
+                  : `${dashboard.batches.length} batches`}
+              </h2>
             </div>
           </div>
-          {dashboard.batches.length ? (
+          <DecisionAssistance
+            embedded
+            key={view === 'essentials' ? 'restock' : 'stock'}
+            initialTask={view === 'essentials' ? 'restock' : 'pantry_review'}
+            tasks={['pantry_review', 'restock', 'pantry_input', 'clarification']}
+            title={view === 'essentials' ? 'Plan your next restock' : 'Stock checks worth making'}
+            description="Review household stock dates, storage and restocking evidence. Unknown freshness stays unknown; suggestions never discard food."
+          />
+          {view === 'essentials' ? (
+            essentialProducts.length ? (
+              <div className={styles.grid}>
+                {essentialProducts.map((product) => {
+                  const needsSetup = product.restockMode === 'none';
+                  const relevant = dashboard.batches.filter(
+                    (batch) =>
+                      batch.productId === product.id &&
+                      !batch.excludeFromGrocery &&
+                      !['depleted', 'discarded', 'donated'].includes(batch.status),
+                  );
+                  const uncertain = relevant.some(
+                    (batch) =>
+                      batch.quantityRemaining === null ||
+                      batch.approximateState !== null ||
+                      batch.unit !== product.stockUnit,
+                  );
+                  const stock = relevant.reduce(
+                    (total, batch) =>
+                      batch.quantityRemaining !== null && batch.unit === product.stockUnit
+                        ? total + batch.quantityRemaining
+                        : total,
+                    0,
+                  );
+                  const due =
+                    needsSetup ||
+                    product.restockMode === 'always_buy' ||
+                    (product.restockTrigger === 'empty'
+                      ? stock <= 0
+                      : product.restockTrigger === 'reorder_point'
+                        ? stock <= (product.reorderThreshold ?? 0)
+                        : stock < (product.targetStock ?? 0));
+                  return (
+                    <article className={styles.card} key={product.id}>
+                      <div className={styles.rowMain}>
+                        <div className={styles.productCell}>
+                          <span className={styles.productIcon} aria-hidden="true">
+                            <Package size={18} />
+                          </span>
+                          <div>
+                            <h3>{product.displayName}</h3>
+                            <p className={styles.productMeta}>
+                              {needsSetup
+                                ? 'Legacy restock · needs setup'
+                                : product.restockMode === 'always_have'
+                                  ? 'Always have'
+                                  : 'Always buy'}
+                            </p>
+                          </div>
+                        </div>
+                        <p className={styles.quantity}>
+                          {stock} {product.stockUnit}
+                        </p>
+                        <span className={styles.statusChip}>
+                          {needsSetup
+                            ? 'Needs setup'
+                            : uncertain
+                              ? 'Review'
+                              : due
+                                ? 'Due'
+                                : 'Healthy'}
+                        </span>
+                      </div>
+                      <p className={styles.muted}>
+                        {needsSetup
+                          ? 'This legacy restock preference is incomplete. Choose Always have or Always buy to activate it.'
+                          : product.restockMode === 'always_have'
+                            ? `Keep ${product.targetStock} ${product.stockUnit} after planned meals; reorder ${product.restockTrigger.replaceAll('_', ' ')}${product.preferredPurchaseQuantity ? `; buy in ${product.preferredPurchaseQuantity} ${product.stockUnit} increments` : ''}.`
+                            : `Buy at least ${product.preferredPurchaseQuantity} ${product.stockUnit} on every Next shop; recipe demand is included, not duplicated.`}
+                      </p>
+                      <details>
+                        <summary>Quick edit</summary>
+                        <form
+                          action={(formData) => editProduct(product, formData)}
+                          className={styles.form}
+                        >
+                          <ProductEditFields product={product} />
+                          <button disabled={busy || !canEdit}>Save policy</button>
+                        </form>
+                      </details>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.empty}>
+                <h2>No essentials yet</h2>
+                <p>Open Manage products and choose Always have or Always buy.</p>
+              </div>
+            )
+          ) : dashboard.batches.length ? (
             <div className={styles.groups}>
               {groupedBatches.map(([groupLabel, batches]) => (
                 <section className={styles.batchGroup} key={groupLabel}>

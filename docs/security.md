@@ -3,9 +3,11 @@
 Food providers are read-only and server-mediated. USDA keys stay in the server environment; provider calls, cache writes, and imports require an active signed actor and exact trusted origin. Logs and diagnostics exclude keys, raw queries/barcodes, headers, and upstream payloads. Camera access is limited to `camera=(self)` and trusted HTTPS.
 
 This app uses Better Auth accounts for access control. Each household profile has a unique email
-and passphrase, while its six-digit PIN only selects that profile as the active household actor
+and password. Verifying the destination profile’s account password selects it as the active household actor
 inside an authenticated session. Profiles remain convenience identity and attribution context,
 not a separate authorization boundary.
+
+Passwords require 8–128 characters. Switching profiles does not elevate the signed-in account’s permissions; access above that account’s role still requires full sign-in. Migration 0059 clears retired PIN hashes and salts.
 
 Current controls:
 
@@ -14,8 +16,8 @@ Current controls:
   bearer API keys are the only server-to-server exception and are accepted only on documented
   integration resource paths.
 - Better Auth email/passphrase sessions are HttpOnly. The active-profile cookie is additionally
-  signed and bound to the current session; switching profiles requires the target profile PIN.
-- PIN verification uses scrypt, five failed attempts trigger a 15-minute profile/session lock, and
+  signed and bound to the current session; switching profiles requires the target profile’s account password.
+- Password verification uses Better Auth’s password verifier; five failed attempts trigger a 15-minute target-profile/requesting-account lock, and
   recovery codes are HMAC-protected, displayed once, and consumed once.
 - Only the admin account can create API keys. Keys are hashed at rest, expire within 365 days,
   default to 120 requests/minute, and carry per-resource CRUD scopes. Raw secrets are returned only
@@ -26,6 +28,8 @@ Current controls:
   all API keys in the restored database.
 - Production refuses missing/short independent `COOKIE_SECRET` and `BETTER_AUTH_SECRET` values,
   and requires canonical Better Auth URL and SMTP configuration.
+- Email verification is required in production by default and can be explicitly disabled with
+  `AUTH_REQUIRE_EMAIL_VERIFICATION=false` only for a trusted deployment.
 - Baseline CSP, anti-framing, nosniff, referrer, permissions, COOP, and CORP headers are applied application-wide.
 - Input is Zod-validated at the HTTP boundary. OpenAI provider modules are marked server-only; `OPENAI_API_KEY` takes precedence, while ignored `.api_keys` may be read only in local development and is excluded from Docker.
 - AI readiness reports only configured/unconfigured state. OpenAI review and image requests require trusted origin, active profile, literal confirmation, bounded source input, a four-action-per-profile ten-minute process limit, strict Structured Outputs, and an audit row containing only source digest/label, operation/model/status/timestamps, and local IDs. Selecting a scan and creating its local import operation never contacts the provider; a paid vision request begins only after the user presses the expressly labeled OpenAI review action. Raw source, provider URLs, and credentials are neither audited nor returned. Tests use deterministic doubles; no live paid request is made here.

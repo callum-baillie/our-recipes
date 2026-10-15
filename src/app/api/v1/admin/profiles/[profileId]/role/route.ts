@@ -2,11 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { roleSelectionSchema } from '@/lib/domain/permissions';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
-import {
-  adminAuthError,
-  requestId,
-  withRequestId,
-} from '@/app/api/v1/admin/api-keys/_shared';
+import { adminAuthError, requestId, withRequestId } from '@/app/api/v1/admin/api-keys/_shared';
 import {
   AuthorizationConflictError,
   changeProfileAccessRole,
@@ -16,10 +12,7 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function PATCH(
-  request: Request,
-  context: { params: Promise<{ profileId: string }> },
-) {
+export async function PATCH(request: Request, context: { params: Promise<{ profileId: string }> }) {
   const id = requestId(request);
   if (!hasTrustedMutationOrigin(request)) {
     return withRequestId(

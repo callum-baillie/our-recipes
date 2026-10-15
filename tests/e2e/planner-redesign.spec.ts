@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { onboardingEmail, TEST_PASSPHRASE, TEST_PROFILE_PIN } from './helpers/onboarding';
+import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
 
 const recipePayload = (title: string, category: string, item: string) => ({
   title,
@@ -44,9 +44,8 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await page.getByLabel('Display name').fill('Callum');
   await page.getByLabel('Email').fill(onboardingEmail('Planner test kitchen', 'Callum'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
@@ -63,9 +62,8 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await profileOnboarding.getByLabel('Display name').fill('Julia');
   await profileOnboarding.getByLabel('Email').fill('julia-planner@example.test');
   await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await profileOnboarding.getByLabel('Profile PIN').fill('593817');
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
   await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();

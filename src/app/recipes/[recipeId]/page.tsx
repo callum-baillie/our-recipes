@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/page-header';
 import { Settings2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
@@ -54,13 +55,13 @@ export default async function RecipeDetailPage({
   return (
     <main className="recipe-page recipe-detail">
       <article>
-        <p className="eyebrow">
-          {recipe.status === 'active' ? 'HOUSE RECIPE' : recipe.status.toUpperCase()}
-        </p>
-        <h1>{recipe.title}</h1>
-        {recipe.summary && <p className="recipe-summary">{recipe.summary}</p>}
-        <RecipeDetailToolbar recipeId={recipe.id} />
-        <RecipeNormalizedNutrition nutrition={normalizedNutrition} />
+        <PageHeader
+          title={recipe.title}
+          eyebrow={recipe.status === 'active' ? 'HOUSE RECIPE' : recipe.status.toUpperCase()}
+          description={recipe.summary}
+          toolbarLeft={<RecipeDetailToolbar recipeId={recipe.id} title={recipe.title} />}
+        />
+        <RecipeNormalizedNutrition recipeId={recipe.id} nutrition={normalizedNutrition} />
         <RecipeServingDetails
           key={recipe.currentRevision}
           servings={recipe.servings}

@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test';
 
 export const TEST_PASSPHRASE = 'correct horse battery table';
-export const TEST_PROFILE_PIN = '482951';
 
 export function onboardingEmail(kitchenName: string, displayName: string): string {
   const slug = `${kitchenName}-${displayName}`
@@ -25,9 +24,8 @@ export async function completeInitialOnboarding(
   await page.getByLabel('Display name').fill(displayName);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();

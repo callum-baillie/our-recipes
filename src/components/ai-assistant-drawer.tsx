@@ -1,4 +1,8 @@
 'use client';
+import { SuggestionCard } from '@/components/decision-assistance';
+import { AiAppActionCard } from '@/components/ai-app-action-card';
+import type { DecisionCard } from '@/lib/domain/decision-assistance';
+import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 
 import { Plus, Send, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type RefObject } from 'react';
@@ -160,6 +164,9 @@ export function AiAssistantDrawer({
   const [messages, setMessages] = useState<Message[]>([]);
   const [actions, setActions] = useState<AiDrawerAction[]>([]);
   const [jobs, setJobs] = useState<AiJob[]>([]);
+  const [suggestions, setSuggestions] = useState<DecisionCard[]>([]);
+  const [appActions, setAppActions] = useState<AppActionReview[]>([]);
+  const [allowPaidTools, setAllowPaidTools] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -187,6 +194,9 @@ export function AiAssistantDrawer({
       setThreadId(body.thread.id);
       setMessages([]);
       setActions([]);
+      setSuggestions([]);
+      setAppActions([]);
+      setAllowPaidTools(false);
       setJobs([]);
       setStatus('');
     } catch (error) {
@@ -195,6 +205,22 @@ export function AiAssistantDrawer({
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!open || !threadId) return;
+    let active = true;
+    void fetch(`/api/v1/ai/app-actions?threadId=${encodeURIComponent(threadId)}`, {
+      cache: 'no-store',
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (active && body) setAppActions(body.proposals);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [open, threadId]);
 
   useEffect(() => {
     if (!open || threadId) return;
@@ -304,7 +330,7 @@ export function AiAssistantDrawer({
       const response = await fetch(`/api/v1/ai/chat/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, allowPaidTools }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const reader = response.body?.getReader();
@@ -329,7 +355,19 @@ export function AiAssistantDrawer({
             kind?: string;
             preview?: unknown;
             job?: AiJob;
+            card?: DecisionCard;
+            proposal?: AppActionReview;
           };
+          if (event.type === 'suggestion' && event.card)
+            setSuggestions((current) => [
+              ...current.filter((c) => c.id !== event.card!.id),
+              event.card!,
+            ]);
+          if (event.type === 'app_action' && event.proposal)
+            setAppActions((current) => [
+              ...current.filter((p) => p.id !== event.proposal!.id),
+              event.proposal!,
+            ]);
           if (event.type === 'status') setStatus(event.message ?? 'Working…');
           if (event.type === 'text') assistantText += event.delta ?? '';
           if (event.type === 'action' && event.actionId) {
@@ -547,6 +585,20 @@ export function AiAssistantDrawer({
                 onDecide={(actionId, decision) => void decide(actionId, decision)}
               />
             ))}
+          {suggestions.map((card) => (
+            <SuggestionCard
+              key={`${card.id}:${card.evidenceHash}`}
+              card={card}
+              onChange={(id, patch) =>
+                setSuggestions((current) =>
+                  current.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+                )
+              }
+            />
+          ))}
+          {appActions.map((proposal) => (
+            <AiAppActionCard key={proposal.id} proposal={proposal} />
+          ))}
           {jobs.map((job) => (
             <AiJobCard
               busy={busy || pendingJobCommand === job.id}
@@ -589,6 +641,15 @@ export function AiAssistantDrawer({
               {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <Send />}
             </button>
           </form>
+          <label className={styles.keyboardHint}>
+            <input
+              type="checkbox"
+              checked={allowPaidTools}
+              disabled={busy}
+              onChange={(event) => setAllowPaidTools(event.target.checked)}
+            />{' '}
+            Allow additional paid requests for new kitchen suggestions
+          </label>
           <div className={styles.composerMeta}>
             <p className={styles.status} role="status">
               {status}

@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
 
-import { onboardingEmail, TEST_PASSPHRASE, TEST_PROFILE_PIN } from './helpers/onboarding';
+import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
 
 test('first-run setup and household organization have no automatically detectable accessibility violations', async ({
   page,
@@ -18,9 +18,8 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByLabel('Display name').fill('Callum');
   await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await page.getByLabel('Profile PIN').fill(TEST_PROFILE_PIN);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
@@ -44,9 +43,8 @@ test('first-run setup and household organization have no automatically detectabl
   await profileOnboarding.getByLabel('Display name').fill('Jon');
   await profileOnboarding.getByLabel('Email').fill('jon-a11y@example.test');
   await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
-  await profileOnboarding.getByLabel('Profile PIN').fill('593817');
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
+  await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
   await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();

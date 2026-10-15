@@ -1,0 +1,106 @@
+[
+  {
+    "input": {
+      "weightKilograms": 80,
+      "heightMeters": 1.8,
+      "age": 30,
+      "sex": "male",
+      "impedance": 500
+    },
+    "expected": {
+      "method": "qn-scale-ble-0.0.1",
+      "bmi": 24.69,
+      "metrics": {
+        "bodyFatPercent": 17.7,
+        "visceralFatIndex": 7,
+        "subcutaneousFatPercent": 15.5,
+        "metabolicAgeYears": 29,
+        "fatFreeWeightKilograms": 65.84,
+        "bodyWaterPercent": 59.4,
+        "skeletalMusclePercent": 53.2,
+        "boneMassKilograms": 3.29,
+        "proteinPercent": 18.8,
+        "muscleMassKilograms": 62.55,
+        "bmrKilocalories": 1792
+      }
+    }
+  },
+  {
+    "input": {
+      "weightKilograms": 60,
+      "heightMeters": 1.65,
+      "age": 40,
+      "sex": "female",
+      "impedance": 600
+    },
+    "expected": {
+      "method": "qn-scale-ble-0.0.1",
+      "bmi": 22.03,
+      "metrics": {
+        "bodyFatPercent": 24.3,
+        "visceralFatIndex": 4,
+        "subcutaneousFatPercent": 22.7,
+        "metabolicAgeYears": 38,
+        "fatFreeWeightKilograms": 45.42,
+        "bodyWaterPercent": 51.9,
+        "skeletalMusclePercent": 44.1,
+        "boneMassKilograms": 2.73,
+        "proteinPercent": 18.0,
+        "muscleMassKilograms": 42.69,
+        "bmrKilocalories": 1351
+      }
+    }
+  },
+  {
+    "input": {
+      "weightKilograms": 150,
+      "heightMeters": 1.6,
+      "age": 60,
+      "sex": "female",
+      "impedance": 700
+    },
+    "expected": {
+      "method": "qn-scale-ble-0.0.1",
+      "bmi": 58.59,
+      "metrics": {
+        "bodyFatPercent": 75,
+        "visceralFatIndex": 30,
+        "subcutaneousFatPercent": 64.6,
+        "metabolicAgeYears": 67,
+        "fatFreeWeightKilograms": 37.5,
+        "bodyWaterPercent": 17.2,
+        "skeletalMusclePercent": 14.6,
+        "boneMassKilograms": 2.25,
+        "proteinPercent": 5,
+        "muscleMassKilograms": 35.25,
+        "bmrKilocalories": 1180
+      }
+    }
+  },
+  {
+    "input": {
+      "weightKilograms": 45,
+      "heightMeters": 1.8,
+      "age": 18,
+      "sex": "male",
+      "impedance": 300
+    },
+    "expected": {
+      "method": "qn-scale-ble-0.0.1",
+      "bmi": 13.88,
+      "metrics": {
+        "bodyFatPercent": 5,
+        "visceralFatIndex": 1,
+        "subcutaneousFatPercent": 4.6,
+        "metabolicAgeYears": 26,
+        "fatFreeWeightKilograms": 42.75,
+        "bodyWaterPercent": 68.6,
+        "skeletalMusclePercent": 61.4,
+        "boneMassKilograms": 2.14,
+        "proteinPercent": 21.6,
+        "muscleMassKilograms": 40.61,
+        "bmrKilocalories": 1293
+      }
+    }
+  }
+]

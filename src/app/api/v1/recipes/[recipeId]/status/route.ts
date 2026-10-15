@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { authorizeApi, withApiRequestId } from '@/lib/api-auth';
+import { authorizeCoreApi, withApiRequestId } from '@/lib/api-auth';
 import { recipeStatusSchema } from '@/lib/domain/recipe';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import {
   RecipeConflictError,
   RecipeNotFoundError,
@@ -13,10 +13,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request: Request, context: { params: Promise<{ recipeId: string }> }) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const authorization = await authorizeApi(request, 'recipes', 'update');
+  const authorization = await authorizeCoreApi(request);
   if (authorization.response) return authorization.response;
   const parsed = recipeStatusSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_recipe_status', 'Check the recipe status.');

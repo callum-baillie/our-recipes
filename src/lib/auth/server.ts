@@ -40,9 +40,9 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     disableSignUp: true,
-    minPasswordLength: 15,
+    minPasswordLength: 8,
     maxPasswordLength: 128,
-    requireEmailVerification: true,
+    requireEmailVerification: config.auth.requireEmailVerification,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       void sendAuthEmail({

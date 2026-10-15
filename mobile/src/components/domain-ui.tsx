@@ -304,6 +304,7 @@ export function ShoppingListCard({ list }: { list: ShoppingList }) {
           <Text selectable style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
             {total - done} items · {done} in cart
           </Text>
+          {list.isNextShop ? <StatusPill>Next shop</StatusPill> : null}
           {list.supermarket ? (
             <Text
               numberOfLines={1}
@@ -340,6 +341,7 @@ export function ShoppingListCard({ list }: { list: ShoppingList }) {
 }
 export function ShoppingRow({ item, listId }: { item: ShoppingItem; listId: string }) {
   const actions = useServerActions();
+  const { state: bordState } = useBord();
   const state = item.shoppingState ?? (item.done ? 'in_cart' : 'to_buy');
   const inCart = state === 'in_cart' || state === 'sourced';
   const cantFind = state === 'cant_find';
@@ -351,6 +353,12 @@ export function ShoppingRow({ item, listId }: { item: ShoppingItem; listId: stri
           'Shopping item not changed',
           error instanceof Error ? error.message : 'Try again.',
         ),
+      );
+  const policyAction = (action: 'skip_policy' | 'assume_empty_for_trip') =>
+    void actions
+      .setShoppingPolicyControl(listId, item.id, action)
+      .catch((error) =>
+        Alert.alert('Policy not changed', error instanceof Error ? error.message : 'Try again.'),
       );
   return (
     <View
@@ -417,6 +425,75 @@ export function ShoppingRow({ item, listId }: { item: ShoppingItem; listId: stri
           {item.amount}
         </Text>
       </Pressable>
+      {item.policyBreakdown ? (
+        <View
+          accessibilityLabel={`Shopping policy breakdown for ${item.name}`}
+          style={{ gap: 4, paddingLeft: 40 }}
+        >
+          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+            {item.policyBreakdown.recipeRequirement > 0 ? <StatusPill>Meal plan</StatusPill> : null}
+            <StatusPill>
+              {item.policyBreakdown.mode === 'always_have' ? 'Always have' : 'Always buy'}
+            </StatusPill>
+            {item.policyBreakdown.needsReview ? (
+              <StatusPill tone="warning">Review</StatusPill>
+            ) : null}
+          </View>
+          <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
+            Meal plan {item.policyBreakdown.recipeRequirement} · policy{' '}
+            {item.policyBreakdown.policyContribution ?? 'review'} · Pantry{' '}
+            {item.policyBreakdown.usablePantry} · pending {item.policyBreakdown.pendingCoverage} ·
+            recorded {item.policyBreakdown.recordedCoverage} {item.policyBreakdown.unit}
+          </Text>
+          <Text style={[tokens.type.caption, { color: tokens.color.ink, fontWeight: '700' }]}>
+            {item.policyBreakdown.unroundedPurchaseGoal ?? 'Review'} before rounding ·{' '}
+            {item.policyBreakdown.finalBuyQuantity ?? 'Review'} {item.policyBreakdown.unit} final
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Skip recurring purchase for ${item.name}`}
+              disabled={bordState.offline}
+              onPress={() => policyAction('skip_policy')}
+              style={{
+                minHeight: 44,
+                justifyContent: 'center',
+                paddingHorizontal: 8,
+                opacity: bordState.offline ? 0.45 : 1,
+              }}
+            >
+              <Text style={[tokens.type.caption, { color: tokens.color.olive, fontWeight: '800' }]}>
+                Skip recurring
+              </Text>
+            </Pressable>
+            {item.policyBreakdown.needsReview ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Assume ${item.name} is empty for this trip`}
+                disabled={bordState.offline}
+                onPress={() => policyAction('assume_empty_for_trip')}
+                style={{
+                  minHeight: 44,
+                  justifyContent: 'center',
+                  paddingHorizontal: 8,
+                  opacity: bordState.offline ? 0.45 : 1,
+                }}
+              >
+                <Text
+                  style={[tokens.type.caption, { color: tokens.color.warning, fontWeight: '800' }]}
+                >
+                  Assume empty
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {bordState.offline ? (
+            <Text style={[tokens.type.caption, { color: tokens.color.inkTertiary }]}>
+              Connect to change policy actions.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {state !== 'sourced' ? (
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
           <Pressable

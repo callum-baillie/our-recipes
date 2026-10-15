@@ -1,3 +1,4 @@
+import { DecisionAssistance } from '@/components/decision-assistance';
 import styles from '@/components/recipe-normalized-nutrition.module.css';
 import { NutritionVisualMarker } from '@/components/nutrition-visual-marker';
 import type { RecipeNutritionPresentation } from '@/lib/domain/nutrition-recipe-presentation';
@@ -8,7 +9,9 @@ function number(value: number, precision = 1) {
 
 export function RecipeNormalizedNutrition({
   nutrition,
+  recipeId,
 }: {
+  recipeId?: string;
   nutrition: RecipeNutritionPresentation;
 }) {
   return (
@@ -76,6 +79,16 @@ export function RecipeNormalizedNutrition({
             {nutrition.methodLabel}.
           </p>
         </>
+      )}
+      {recipeId && (
+        <DecisionAssistance
+          embedded
+          recipeId={recipeId}
+          initialTask="ingredient_match"
+          tasks={['ingredient_match', 'cleanup', 'recipe_review', 'substitutions']}
+          title="Fill the gaps in this recipe"
+          description="Match ingredients to your products, review missing nutrition, or compare substitutions. Review each change before it updates the recipe."
+        />
       )}
     </section>
   );

@@ -1,5 +1,6 @@
 import {
   Activity,
+  Plug,
   CalendarDays,
   ChevronRight,
   ClipboardList,
@@ -20,6 +21,13 @@ import { getHouseholdState } from '@/lib/services/household-service';
 export const dynamic = 'force-dynamic';
 
 const categories = [
+  {
+    href: '/settings/integrations',
+    eyebrow: 'INTEGRATIONS',
+    title: 'Connected apps and automatic sync',
+    description: 'Connect VeSync accounts, assign scale profiles, and choose how often to sync.',
+    icon: Plug,
+  },
   {
     href: '/settings/api',
     eyebrow: 'API & SECURITY',

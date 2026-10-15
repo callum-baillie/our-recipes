@@ -1,0 +1,386 @@
+.flow {
+  max-width: 44rem;
+  margin: 0 auto;
+  color: var(--ink);
+}
+.progress {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 1.6rem;
+}
+.progress progress {
+  width: 100%;
+  height: 0.35rem;
+  border: 0;
+  border-radius: 1rem;
+  accent-color: var(--leaf);
+}
+.progress progress::-webkit-progress-bar {
+  background: var(--line);
+  border-radius: 1rem;
+}
+.progress progress::-webkit-progress-value {
+  background: var(--leaf);
+  border-radius: 1rem;
+}
+.title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 4vw, 2.55rem);
+  line-height: 1.1;
+  margin: 0 0 0.75rem;
+  font-weight: 500;
+  outline: none;
+}
+.lead {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 1.75rem;
+  max-width: 60ch;
+}
+.stack,
+.startOptions {
+  display: grid;
+  gap: 1.2rem;
+}
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.field {
+  display: grid;
+  gap: 0.5rem;
+  font-weight: 650;
+  align-content: start;
+}
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--ink);
+  background: var(--surface, #fffefb);
+  font: inherit;
+  font-weight: 400;
+}
+.field small,
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  font-weight: 400;
+  margin: 0;
+}
+.numberField {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.numberField span {
+  min-width: 2rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.question {
+  padding: 0;
+  border: 0;
+  margin: 0;
+  min-width: 0;
+}
+.question legend {
+  font-weight: 700;
+  margin-bottom: 0.7rem;
+}
+.question > p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 0.8rem;
+}
+.cards {
+  display: grid;
+  gap: 0.65rem;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--surface, #fffefb);
+  cursor: pointer;
+}
+.choice:has(input:checked) {
+  border-color: var(--leaf);
+  background: color-mix(in srgb, var(--leaf) 8%, var(--surface, #fffefb));
+}
+.choice:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.choice input {
+  margin-top: 0.2rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  accent-color: var(--leaf);
+}
+.choice span {
+  display: grid;
+  gap: 0.3rem;
+}
+.choice strong {
+  font-size: 0.95rem;
+}
+.choice b {
+  font-size: 0.85rem;
+  color: var(--leaf);
+}
+.choice small {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.paces {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.paces .choice {
+  padding: 0.9rem 0.7rem;
+  gap: 0.5rem;
+}
+.units,
+.inlineChoices,
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.units button,
+.inlineChoices button {
+  border: 1px solid var(--line);
+  background: var(--surface, #fffefb);
+  color: var(--ink);
+  padding: 0.7rem 1rem;
+  border-radius: 0.6rem;
+  min-height: 2.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+.units button[aria-pressed='true'],
+.inlineChoices button[aria-pressed='true'] {
+  border-color: var(--leaf);
+  background: var(--leaf);
+  color: #fff;
+}
+.inlineActions {
+  margin-top: 1.1rem;
+}
+.primary,
+.secondary,
+.textButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.6rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary {
+  border: 1px solid var(--leaf);
+  background: var(--leaf);
+  color: #fff;
+}
+.secondary {
+  border: 1px solid var(--line);
+  background: var(--surface, #fffefb);
+  color: var(--ink);
+}
+.textButton {
+  border: 0;
+  background: none;
+  color: var(--leaf);
+  padding: 0.5rem;
+}
+.linkCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  padding: 1.2rem;
+  background: var(--surface, #fffefb);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.linkCard span {
+  display: grid;
+  gap: 0.35rem;
+}
+.linkCard small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.insight {
+  margin: 1.2rem 0;
+  padding: 1.1rem 1.2rem;
+  border-left: 3px solid var(--leaf);
+  border-radius: 0 0.7rem 0.7rem 0;
+  background: color-mix(in srgb, var(--leaf) 8%, var(--surface, #fffefb));
+  line-height: 1.6;
+}
+.insight p {
+  margin: 0.45rem 0;
+  font-size: 0.9rem;
+}
+.insight small,
+.insight a {
+  font-size: 0.8rem;
+}
+.insight a {
+  color: var(--leaf);
+  text-decoration: underline;
+}
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--line);
+}
+.notice {
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.error {
+  color: var(--danger, #a43c28);
+  background: color-mix(in srgb, var(--danger, #a43c28) 7%, var(--surface, #fff));
+  padding: 0.9rem;
+  border-radius: 0.6rem;
+  line-height: 1.5;
+}
+.review {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+.review dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+.review dd {
+  margin: 0;
+  font-weight: 600;
+}
+.dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  overflow-y: auto;
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: 90dvh;
+  padding: 1.5rem;
+  background: var(--surface, #fffefb);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: 0 20px 80px #0003;
+}
+.dialog::backdrop {
+  background: #17231ab3;
+  backdrop-filter: blur(3px);
+}
+.dialogHeading {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.dialogHeading h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+}
+.dialogHeading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.dialogHeading > button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.75rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.metricFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.25rem;
+}
+.flow button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.flow summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0.65rem 0;
+}
+.flow :focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .paces,
+  .fields,
+  .metricFields {
+    grid-template-columns: 1fr;
+  }
+  .dialog {
+    padding: 1rem;
+  }
+  .actions {
+    gap: 0.5rem;
+  }
+  .actions button {
+    font-size: 0.85rem;
+  }
+  .linkCard {
+    padding: 1rem;
+  }
+}

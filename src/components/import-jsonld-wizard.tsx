@@ -80,7 +80,7 @@ export function JsonLdImportWizard({
           <Braces size={21} aria-hidden="true" />
           <div>
             <p className="eyebrow">PORTABLE RECIPE REVIEW</p>
-            <h1>Check the imported fields.</h1>
+            <h2>Check the imported fields.</h2>
             <p>
               This Recipe node was parsed locally from pasted Schema.org JSON-LD. It has not been
               saved yet.

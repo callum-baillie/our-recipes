@@ -214,6 +214,7 @@ export const completedItemsBehaviorSchema = z.enum(['completed_section', 'hide',
 export const listSettingsInputSchema = z
   .object({
     defaultSupermarketProfileId: z.union([z.literal(''), z.string().uuid()]).default(''),
+    automaticRestockListId: z.union([z.literal(''), z.string().uuid()]).optional(),
     completedItemsBehavior: completedItemsBehaviorSchema,
     openPantryPurchaseOnCheck: z.boolean(),
     keepScreenAwake: z.boolean(),

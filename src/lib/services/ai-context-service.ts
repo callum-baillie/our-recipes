@@ -10,9 +10,33 @@ import { getAiDataPolicy } from '@/lib/services/ai-settings-service';
 import { getProfile } from '@/lib/services/household-service';
 import { listNutritionIntakeRevisions } from '@/lib/services/nutrition-intake-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
-import { listNutritionGoalVersions } from '@/lib/services/nutrition-profile-service';
-import { listPlannedMeals } from '@/lib/services/planning-service';
-import { listRecipes } from '@/lib/services/recipe-service';
+import { bodyMetricsSchema } from '@/lib/domain/body-metrics';
+import { completedAgeOn } from '@/lib/domain/nutrition-energy-estimate';
+import { getPantryDashboard } from '@/lib/services/pantry-service';
+import {
+  listBodyMeasurements,
+  listNutritionGoalVersions,
+} from '@/lib/services/nutrition-profile-service';
+import {
+  getShoppingList,
+  listShoppingLists,
+  listPlannedMeals,
+} from '@/lib/services/planning-service';
+import { getRecipe, listRecipeLibrary } from '@/lib/services/recipe-service';
+
+function sharedBodyMetrics(raw: string, shareWeight: boolean) {
+  try {
+    const parsed = bodyMetricsSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return {};
+    return Object.fromEntries(
+      Object.entries(parsed.data).filter(
+        ([key, value]) => value != null && (shareWeight || !key.endsWith('Kilograms')),
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
 
 export function aiSafetyIdentifier(profileId: string): string {
   return createHmac('sha256', getRuntimeConfig().cookieSecret)
@@ -61,6 +85,18 @@ export function buildAiProfileContext(actorProfileId: string) {
     }
     if (policy.sharePersonalMetrics) {
       context.activityLevel = profile.activityLevel;
+      if (profile.dateOfBirth) {
+        const effectiveOn = localIsoDate(new Date(), profile.dailyResetTimezone);
+        try {
+          context.ageYears = completedAgeOn(profile.dateOfBirth, effectiveOn);
+        } catch {
+          context.ageUnavailable = true;
+        }
+      }
+      context.enteredBodyMetrics = sharedBodyMetrics(
+        profile.advancedBodyMetrics,
+        policy.shareWeight,
+      );
       context.heightCentimeters = profile.heightCentimeters;
       context.referenceSexCategory = profile.referenceSexCategory;
       context.explicitlyEnteredLifeStage = profile.explicitlyEnteredLifeStage;
@@ -68,8 +104,30 @@ export function buildAiProfileContext(actorProfileId: string) {
     if (policy.shareWeight) {
       context.currentWeightKilograms = profile.currentWeightKilograms;
       context.targetWeightKilograms = profile.targetWeightKilograms;
+      context.weightTargetDate = profile.targetDate;
+    }
+    if (policy.sharePersonalMetrics || policy.shareWeight) {
+      try {
+        const latest = listBodyMeasurements(profile.id, household.compatibilityPrincipalId)[0];
+        if (latest)
+          context.latestRecordedMeasurement = {
+            measuredAt: latest.measuredAt,
+            source: latest.sourceType,
+            approximate: latest.approximate,
+            ...(policy.shareWeight ? { weightKilograms: latest.weightKilograms } : {}),
+            ...(policy.sharePersonalMetrics
+              ? {
+                  bodyMetrics: sharedBodyMetrics(latest.advancedBodyMetrics, policy.shareWeight),
+                }
+              : {}),
+          };
+      } catch {
+        context.measurementsUnavailable = true;
+      }
     }
     if (policy.shareNutritionGoals) {
+      context.nutritionGoalType = profile.nutritionGoalType;
+      context.weightGoalPace = profile.weightGoalPace;
       try {
         context.nutritionGoals = listNutritionGoalVersions(
           profile.id,
@@ -134,24 +192,83 @@ export function buildAiSharedContext(
   });
   const today = localIsoDate(new Date(), household.activeNutritionProfile.dailyResetTimezone);
   const resolvedRange = range ?? { start: today, end: addLocalDateDays(today, 13) };
+  const recipeLibrary = policy.shareSharedRecipes
+    ? listRecipeLibrary(
+        { q: '', status: 'active', sort: 'recently-updated', page: 1 },
+        policy.shareRecipePreferences ? actorProfileId : null,
+        100,
+      )
+    : null;
+  const pantry = policy.sharePantry ? getPantryDashboard().batches : [];
+  const lists = policy.shareShoppingLists ? listShoppingLists() : [];
   return {
+    capturedAt: new Date().toISOString(),
+    mealPlanRange: resolvedRange,
+    coverage: {
+      recipeTotal: recipeLibrary?.total ?? 0,
+      recipeLimit: 100,
+      pantryTotal: pantry.length,
+      pantryLimit: 100,
+      shoppingListTotal: lists.length,
+      shoppingListLimit: 10,
+    },
+    pantry: pantry.slice(0, 100).map((batch) => ({
+      id: batch.id,
+      product: batch.product.displayName,
+      brand: batch.product.brand,
+      variant: batch.product.variant,
+      quantity: batch.quantityRemaining,
+      unit: batch.unit,
+      quantityLabel: batch.quantityLabel,
+      status: batch.status,
+      expiry: batch.expiry,
+    })),
+    shoppingLists: lists.slice(0, 10).map((list) => {
+      const detail = getShoppingList(list.id);
+      const items = detail?.items ?? [];
+      return {
+        id: list.id,
+        name: list.name,
+        totalItems: items.length,
+        itemLimit: 50,
+        items: items.slice(0, 50).map((item) => ({
+          id: item.id,
+          item: item.item,
+          quantity: item.quantity,
+          unit: item.unit,
+          note: item.note,
+          checked: item.checked,
+          shoppingState: item.shoppingState,
+        })),
+      };
+    }),
     profiles: buildAiProfileContext(actorProfileId),
     recipes: policy.shareSharedRecipes
-      ? listRecipes('')
-          .slice(0, 100)
-          .map((recipe) => ({
-            id: recipe.id,
-            title: recipe.title,
-            summary: recipe.summary,
-            servings: recipe.servings,
-            category: recipe.category,
-            cuisine: recipe.cuisine,
-            tags: recipe.tags,
-            personalRating: policy.shareRecipePreferences ? recipe.personalRating : null,
-          }))
+      ? (recipeLibrary?.recipes ?? []).map((recipe) => ({
+          id: recipe.id,
+          title: recipe.title,
+          summary: recipe.summary,
+          servings: recipe.servings,
+          category: recipe.category,
+          cuisine: recipe.cuisine,
+          tags: recipe.tags,
+          prepMinutes: recipe.prepMinutes,
+          cookMinutes: recipe.cookMinutes,
+          ingredients: getRecipe(recipe.id)
+            ?.ingredientGroups.flatMap((group) => group.ingredients)
+            .map(({ quantity, unit, item, note }) => ({
+              quantity,
+              unit,
+              item,
+              note,
+            })),
+          personalRating: policy.shareRecipePreferences ? recipe.personalRating : null,
+        }))
       : [],
     mealPlan: policy.shareMealPlans ? listPlannedMeals(resolvedRange.start, resolvedRange.end) : [],
     sharedCategories: {
+      pantry: policy.sharePantry,
+      shoppingLists: policy.shareShoppingLists,
       recipes: policy.shareSharedRecipes,
       mealPlans: policy.shareMealPlans,
     },

@@ -1,3 +1,4 @@
+import { bodyMetricsSchema } from '@/lib/domain/body-metrics';
 import { cookies } from 'next/headers';
 
 import {
@@ -30,6 +31,7 @@ function settingsValue(
   return {
     id: profile.id,
     version: profile.version,
+    advancedMetrics: bodyMetricsSchema.parse(JSON.parse(profile.advancedBodyMetrics)),
     dateOfBirth: profile.dateOfBirth,
     heightCentimeters: profile.heightCentimeters,
     currentWeightKilograms: profile.currentWeightKilograms,

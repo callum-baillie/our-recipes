@@ -82,8 +82,8 @@ async function rasterizeTransparent(svg, outputPath, width, height) {
     .toFile(outputPath);
 }
 
-async function markLayer(markSvg, size, coverage) {
-  const source = await sharp(Buffer.from(markSvg.replaceAll('currentColor', MARK_COLOR)))
+async function markLayer(markSvg, size, coverage, color = MARK_COLOR) {
+  const source = await sharp(Buffer.from(markSvg.replaceAll('currentColor', color)))
     .resize(1024, 1024, { fit: 'fill' })
     .png()
     .toBuffer();
@@ -114,6 +114,30 @@ async function createInstallIcon(markSvg, outputPath, size, coverage = 0.72) {
     ])
     .png({ compressionLevel: 9 })
     .toFile(outputPath);
+}
+
+async function createAdaptiveForeground(markSvg, outputPath, size, coverage = 0.46) {
+  const mark = await markLayer(markSvg, size, coverage);
+  const metadata = await sharp(mark).metadata();
+  const width = metadata.width ?? size;
+  const height = metadata.height ?? size;
+  await sharp({
+    create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([
+      {
+        input: mark,
+        left: Math.round((size - width) / 2),
+        top: Math.round((size - height) / 2),
+      },
+    ])
+    .png({ compressionLevel: 9 })
+    .toFile(outputPath);
+}
+
+async function createSplashMark(markSvg, outputPath, size = 1024) {
+  const mark = await markLayer(markSvg, size, 0.9, BRAND_BACKGROUND);
+  await sharp(mark).png({ compressionLevel: 9 }).toFile(outputPath);
 }
 
 async function main() {
@@ -150,6 +174,13 @@ async function main() {
       1600,
       312,
     ),
+    createInstallIcon(markSvg, resolve(mobileBrandDirectory, 'bord-app-icon.png'), 1024),
+    createAdaptiveForeground(
+      markSvg,
+      resolve(mobileBrandDirectory, 'bord-adaptive-foreground.png'),
+      1024,
+    ),
+    createSplashMark(markSvg, resolve(mobileBrandDirectory, 'bord-splash-mark.png')),
   ]);
 
   const iconTargets = [

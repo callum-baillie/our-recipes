@@ -1,5 +1,7 @@
 'use client';
 
+import { NutritionScaleSettings } from './nutrition-scale-settings';
+import type { BodyMetrics } from '@/lib/domain/body-metrics';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 
@@ -12,6 +14,7 @@ const KILOGRAMS_PER_POUND = 0.45359237;
 
 export type NutritionProfileSettingsValue = {
   id: string;
+  advancedMetrics?: BodyMetrics;
   version: number;
   dateOfBirth: string | null;
   heightCentimeters: number | null;
@@ -252,6 +255,7 @@ export function NutritionProfileSettings({
       title="Nutrition preferences"
       description="These choices apply to the household profile selected in the app header. Identity details stay in Profiles & roles."
     >
+      <NutritionScaleSettings profileId={profile.id} metrics={profile.advancedMetrics ?? {}} />
       <form className={styles.form} onSubmit={save}>
         <details
           className={styles.disclosure}

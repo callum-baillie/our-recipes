@@ -254,7 +254,7 @@ describe('AI readiness boundary', () => {
     ).resolves.toMatchObject({ altText: 'AI-generated serving image for Tomato soup' });
 
     expect(reviewRequests).toHaveLength(4);
-    expect(reviewRequests[0]).toMatchObject({ model: 'gpt-5.4-mini', text: { format: {} } });
+    expect(reviewRequests[0]).toMatchObject({ model: 'gpt-6-luna', text: { format: {} } });
     expect(reviewRequests[0]).toMatchObject({
       instructions: expect.stringContaining('infer a practical numeric serving yield'),
     });
@@ -272,7 +272,7 @@ describe('AI readiness boundary', () => {
       ],
     });
     expect(reviewRequests[2]).toMatchObject({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-6-luna',
       instructions: expect.stringContaining('nutrition per serving'),
       input: [
         {

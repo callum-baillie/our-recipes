@@ -389,7 +389,7 @@
   margin-top: 0.35rem;
 }
 
-.aisleGroup > h3 {
+.aisleGroup > h2 {
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -402,7 +402,7 @@
   text-transform: uppercase;
 }
 
-.aisleGroup > h3 small {
+.aisleGroup > h2 small {
   display: inline-grid;
   place-items: center;
   min-width: 1.25rem;
@@ -1912,4 +1912,131 @@
   .mobileDock {
     padding-inline: 0.8rem;
   }
+}
+
+.shoppingTaskbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.shoppingTaskbar > div:first-child {
+  display: grid;
+  gap: 0.3rem;
+}
+.shoppingTaskbar strong {
+  font-size: 1.2rem;
+}
+.shoppingTaskbar span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.shoppingModeSwitch {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.65rem;
+  padding: 0.2rem;
+  background: var(--surface, #fffefb);
+}
+.shoppingModeSwitch button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.8rem;
+  background: none;
+  border: 0;
+  border-radius: 0.4rem;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.shoppingModeSwitch button[aria-pressed='true'] {
+  background: var(--leaf);
+  color: white;
+}
+.undoNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1rem;
+  margin-bottom: 0.8rem;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+}
+.undoNotice button {
+  background: none;
+  border: 0;
+  color: var(--leaf);
+  font-weight: 700;
+  min-height: 2.5rem;
+  cursor: pointer;
+}
+.focusedShopping .contentGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.focusedShopping .sideRail,
+.focusedShopping .itemThumb,
+.focusedShopping .quantityCalculation,
+.focusedShopping .itemIdentity > span:has(.aisleBadge),
+.focusedShopping .inCartButton {
+  display: none;
+}
+.focusedShopping .item {
+  min-height: 4.5rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto auto;
+  gap: 0.65rem;
+}
+.focusedShopping .itemIdentity > strong {
+  font-size: 1rem;
+}
+.focusedShopping .sourceToggle {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+.focusedShopping .sourcedItem {
+  opacity: 0.7;
+}
+.focusedShopping .intake {
+  grid-column: 1/-1;
+}
+@media (max-width: 650px) {
+  .shoppingTaskbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .shoppingModeSwitch {
+    align-self: flex-start;
+  }
+  .focusedShopping .item {
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  }
+  .focusedShopping .cantFindButton {
+    display: none;
+  }
+  .shoppingTaskbar > div:first-child {
+    display: none;
+  }
+}
+
+.page {
+  padding-top: var(--workspace-top-space);
+  padding-inline: var(--page-gutter);
+}
+.hero {
+  padding-top: 0;
+  padding-bottom: var(--workspace-section-gap);
+}
+
+.listPageHeader {
+  width: min(100%, 82rem);
+  margin-inline: auto;
+}
+.listPageHeader .heroMeta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }

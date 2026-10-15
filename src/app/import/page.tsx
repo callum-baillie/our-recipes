@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/page-header';
 import { ImportWizard } from '@/components/import-wizard';
 import { RecipebookNav } from '@/components/recipebook-nav';
 
@@ -12,7 +13,13 @@ export default async function ImportPage({
   const { mode } = await searchParams;
   return (
     <main className="recipe-page import-page">
-      <RecipebookNav current="import" />
+      <PageHeader
+        className="import-page-heading"
+        title="Import recipes"
+        eyebrow="GROW YOUR COOKBOOK"
+        description="Bring recipes into your library, then review the details before saving."
+        toolbarRight={<RecipebookNav current="import" />}
+      />
       <ImportWizard initialMode={mode === 'jsonld' ? 'jsonld' : 'files'} />
     </main>
   );

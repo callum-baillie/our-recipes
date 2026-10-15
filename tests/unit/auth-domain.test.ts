@@ -5,20 +5,20 @@ import {
   idempotencyKeySchema,
   normalizedEmailSchema,
   passphraseSchema,
-  profilePinSchema,
+  profilePasswordSwitchSchema,
 } from '@/lib/domain/auth';
 
 describe('authentication domain contracts', () => {
   it('normalizes email addresses and requires strong passphrases', () => {
     expect(normalizedEmailSchema.parse('  Cook@Example.COM  ')).toBe('cook@example.com');
-    expect(passphraseSchema.safeParse('too short').success).toBe(false);
+    expect(passphraseSchema.safeParse('short').success).toBe(false);
     expect(passphraseSchema.safeParse('a household passphrase').success).toBe(true);
   });
 
-  it('requires an exact non-trivial six-digit profile PIN', () => {
-    expect(profilePinSchema.safeParse('123456').success).toBe(false);
-    expect(profilePinSchema.safeParse('111111').success).toBe(false);
-    expect(profilePinSchema.safeParse('739204').success).toBe(true);
+  it('requires a password payload for switching profiles', () => {
+    expect(profilePasswordSwitchSchema.safeParse({ pin: '739204' }).success).toBe(false);
+    expect(profilePasswordSwitchSchema.safeParse({ password: '' }).success).toBe(false);
+    expect(profilePasswordSwitchSchema.safeParse({ password: 'eight888' }).success).toBe(true);
   });
 
   it('deduplicates scoped API permissions and rejects unknown resources', () => {

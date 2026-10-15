@@ -43,13 +43,7 @@ function addDays(isoDate: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
-const VIEWS = new Set<NutritionView>([
-  'overview',
-  'diary',
-  'nutrients',
-  'trends',
-  'household',
-]);
+const VIEWS = new Set<NutritionView>(['overview', 'diary', 'nutrients', 'trends', 'household']);
 
 export default async function NutritionPage({
   searchParams,
@@ -219,72 +213,74 @@ export default async function NutritionPage({
     : null;
 
   return (
-    <NutritionDashboard
-      principalId={principalId}
-      profiles={profiles}
-      activeProfile={activeProfile}
-      view={view}
-      summary={{
-        currentEntries: summary.currentEntries.map((entry) => {
-          const full = revisions.find((revision) => revision.id === entry.id)!;
-          return {
-            id: full.id,
-            revision: full.revision,
-            occurredAt: full.occurredAt.toISOString(),
-            state: full.state,
-            sourceNameSnapshot: full.sourceNameSnapshot,
-            mealSlot: full.mealSlot,
-            sourceType: full.sourceType,
-            recipeId: full.recipeId,
-            productId: full.productId,
-            recipeCalculationId: full.recipeCalculationId,
-            quantity: full.quantity,
-            unit: full.unit,
-            servingCount: full.servingCount,
-            values: full.values.map((value) => ({
-              nutrientCode: value.nutrientCode,
-              amount: value.amount,
-              confidence: value.confidence,
-              completeness: value.completeness,
-              estimated: value.estimated,
-            })),
-          };
-        }),
-        todayTotals: summary.todayTotals,
-        sevenDayTotals: summary.sevenDayTotals,
-        trend: summary.trend,
-        averageCompleteness: summary.averageCompleteness,
-        averageConfidence: summary.averageConfidence,
-        hasEstimatedValues: summary.hasEstimatedValues,
-      }}
-      definitions={definitions}
-      goals={goals}
-      goalSetup={
-        goalSetup
-          ? {
-              nutritionGoalType: goalSetup.nutritionGoalType,
-              currentWeightKilograms: goalSetup.currentWeightKilograms,
-              targetWeightKilograms: goalSetup.targetWeightKilograms,
-              targetDate: goalSetup.targetDate,
-              profileVersion: goalSetup.version,
-            }
-          : null
-      }
-      allocationCounts={allocationCounts}
-      mealProjection={mealProjection}
-      today={today}
-      insights={insights}
-      recommendations={recommendations}
-      shoppingLists={shoppingLists}
-      householdComparison={householdComparison}
-      chartDatasets={chartDatasets}
-      advancedCharts={advancedCharts}
-      weightTrend={weightTrend}
-      dataWorkspace={dataWorkspace}
-      preparedWorkspace={preparedWorkspace}
-      initialAiSummary={
-        aiSummary ? { ...aiSummary, createdAt: aiSummary.createdAt.toISOString() } : null
-      }
-    />
+    <>
+      <NutritionDashboard
+        principalId={principalId}
+        profiles={profiles}
+        activeProfile={activeProfile}
+        view={view}
+        summary={{
+          currentEntries: summary.currentEntries.map((entry) => {
+            const full = revisions.find((revision) => revision.id === entry.id)!;
+            return {
+              id: full.id,
+              revision: full.revision,
+              occurredAt: full.occurredAt.toISOString(),
+              state: full.state,
+              sourceNameSnapshot: full.sourceNameSnapshot,
+              mealSlot: full.mealSlot,
+              sourceType: full.sourceType,
+              recipeId: full.recipeId,
+              productId: full.productId,
+              recipeCalculationId: full.recipeCalculationId,
+              quantity: full.quantity,
+              unit: full.unit,
+              servingCount: full.servingCount,
+              values: full.values.map((value) => ({
+                nutrientCode: value.nutrientCode,
+                amount: value.amount,
+                confidence: value.confidence,
+                completeness: value.completeness,
+                estimated: value.estimated,
+              })),
+            };
+          }),
+          todayTotals: summary.todayTotals,
+          sevenDayTotals: summary.sevenDayTotals,
+          trend: summary.trend,
+          averageCompleteness: summary.averageCompleteness,
+          averageConfidence: summary.averageConfidence,
+          hasEstimatedValues: summary.hasEstimatedValues,
+        }}
+        definitions={definitions}
+        goals={goals}
+        goalSetup={
+          goalSetup
+            ? {
+                nutritionGoalType: goalSetup.nutritionGoalType,
+                currentWeightKilograms: goalSetup.currentWeightKilograms,
+                targetWeightKilograms: goalSetup.targetWeightKilograms,
+                targetDate: goalSetup.targetDate,
+                profileVersion: goalSetup.version,
+              }
+            : null
+        }
+        allocationCounts={allocationCounts}
+        mealProjection={mealProjection}
+        today={today}
+        insights={insights}
+        recommendations={recommendations}
+        shoppingLists={shoppingLists}
+        householdComparison={householdComparison}
+        chartDatasets={chartDatasets}
+        advancedCharts={advancedCharts}
+        weightTrend={weightTrend}
+        dataWorkspace={dataWorkspace}
+        preparedWorkspace={preparedWorkspace}
+        initialAiSummary={
+          aiSummary ? { ...aiSummary, createdAt: aiSummary.createdAt.toISOString() } : null
+        }
+      />
+    </>
   );
 }

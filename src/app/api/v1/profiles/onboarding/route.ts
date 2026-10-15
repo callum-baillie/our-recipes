@@ -1,3 +1,5 @@
+import { cookies } from 'next/headers';
+import { SCALE_ONBOARDING_COOKIE } from '@/lib/services/nutrition-scale-service';
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/lib/auth/server';
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
     return jsonError(
       400,
       'profile_credentials_required',
-      'Add an email, strong passphrase, and six-digit PIN.',
+      'Add an email and a password of at least 8 characters.',
     );
   }
   try {
@@ -43,8 +45,13 @@ export async function POST(request: Request) {
       parsed.data.credentials,
       parsed.data.role,
     );
-    const result = onboardProfileWithEnrollment(parsed.data, enrollment);
-    if (getRuntimeConfig().isProduction) {
+    const result = onboardProfileWithEnrollment(
+      parsed.data,
+      enrollment,
+      (await cookies()).get(SCALE_ONBOARDING_COOKIE)?.value ?? '',
+    );
+    const requireEmailVerification = getRuntimeConfig().auth.requireEmailVerification;
+    if (requireEmailVerification) {
       void auth.api
         .sendVerificationEmail({
           body: {
@@ -56,7 +63,7 @@ export async function POST(request: Request) {
         .catch((error) => console.error('Could not queue the verification email.', error));
     }
     return NextResponse.json(
-      { ...result, requiresEmailVerification: getRuntimeConfig().isProduction },
+      { ...result, requiresEmailVerification: requireEmailVerification },
       { status: 201 },
     );
   } catch (error) {

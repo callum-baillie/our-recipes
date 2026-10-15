@@ -48,7 +48,7 @@ export function ProfileSwitcher({
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-  const [pin, setPin] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? profiles[0];
@@ -57,7 +57,7 @@ export function ProfileSwitcher({
   function requestProfileSwitch(profileId: string) {
     if (profileId === activeProfileId) return;
     setSelectedProfileId(profileId);
-    setPin('');
+    setPassword('');
     setError(null);
     window.requestAnimationFrame(() => dialogRef.current?.showModal());
   }
@@ -66,7 +66,7 @@ export function ProfileSwitcher({
     if (pending) return;
     dialogRef.current?.close();
     setSelectedProfileId(null);
-    setPin('');
+    setPassword('');
     setError(null);
   }
 
@@ -79,13 +79,13 @@ export function ProfileSwitcher({
       const response = await fetch(`/api/v1/profiles/${selectedProfileId}/active`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ password }),
       });
       const body = (await response.json().catch(() => null)) as {
         error?: { message?: string };
       } | null;
       if (!response.ok) {
-        throw new Error(body?.error?.message ?? 'The profile PIN could not be verified.');
+        throw new Error(body?.error?.message ?? 'The profile password could not be verified.');
       }
       showToast(
         `Now cooking as ${selectedProfile?.displayName ?? 'the selected profile'}.`,
@@ -93,7 +93,7 @@ export function ProfileSwitcher({
       );
       dialogRef.current?.close();
       setSelectedProfileId(null);
-      setPin('');
+      setPassword('');
       router.refresh();
     } catch (caught) {
       const message =
@@ -103,6 +103,7 @@ export function ProfileSwitcher({
       setError(message);
       showToast(message, 'error');
     } finally {
+      setPassword('');
       setPending(false);
     }
   }
@@ -185,6 +186,9 @@ export function ProfileSwitcher({
               Manage profiles
             </Link>
           ) : null}
+          <Link className="manage-profiles-link" href="/settings/integrations" data-menu-close>
+            My integrations
+          </Link>
           <Link className="manage-profiles-link" href="/account/security" data-menu-close>
             Account security
           </Link>
@@ -201,56 +205,60 @@ export function ProfileSwitcher({
         </div>
       </DismissibleDetails>
       <dialog
-        className="profile-pin-dialog"
+        className="profile-password-dialog"
         ref={dialogRef}
+        onCancel={(event) => {
+          if (pending) event.preventDefault();
+        }}
         onClose={() => {
           setSelectedProfileId(null);
-          setPin('');
+          setPassword('');
           setError(null);
         }}
-        aria-labelledby="profile-pin-title"
-        aria-describedby="profile-pin-description"
+        aria-labelledby="profile-password-title"
+        aria-describedby="profile-password-description"
       >
         <form onSubmit={switchProfile}>
           <button
-            className="profile-pin-dialog-close"
+            className="profile-password-dialog-close"
             type="button"
-            aria-label="Close profile PIN dialog"
+            aria-label="Close profile password dialog"
             onClick={closeDialog}
             disabled={pending}
           >
             <X size={18} aria-hidden="true" />
           </button>
-          <div className="profile-pin-dialog-heading">
+          <div className="profile-password-dialog-heading">
             <span aria-hidden="true">
               <KeyRound size={20} />
             </span>
             <div>
               <p className="eyebrow">SWITCH PROFILE</p>
-              <h2 id="profile-pin-title">{selectedProfile?.displayName ?? 'Profile'} PIN</h2>
-              <p id="profile-pin-description">
-                Enter this profile&apos;s six-digit PIN. This prevents accidental switching on a
-                signed-in household device.
+              <h2 id="profile-password-title">
+                {selectedProfile?.displayName ?? 'Profile'} password
+              </h2>
+              <p id="profile-password-description">
+                Enter the account password for this profile to switch on this device.
               </p>
             </div>
           </div>
           <label>
-            <span>Six-digit PIN</span>
+            <span>Password</span>
             <input
               autoFocus
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              minLength={6}
-              maxLength={6}
-              value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/gu, '').slice(0, 6))}
+              type="password"
+              autoComplete="current-password"
+              required
+              maxLength={128}
+              disabled={pending}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               aria-invalid={Boolean(error)}
-              aria-describedby={error ? 'profile-pin-error' : undefined}
+              aria-describedby={error ? 'profile-password-error' : undefined}
             />
           </label>
           {error ? (
-            <p className="form-error" id="profile-pin-error" role="alert">
+            <p className="form-error" id="profile-password-error" role="alert">
               {error}
             </p>
           ) : null}
@@ -263,7 +271,7 @@ export function ProfileSwitcher({
             >
               Cancel
             </button>
-            <button className="primary-button" type="submit" disabled={pending || pin.length !== 6}>
+            <button className="primary-button" type="submit" disabled={pending || !password.length}>
               {pending ? 'Checking…' : 'Switch profile'}
             </button>
           </div>

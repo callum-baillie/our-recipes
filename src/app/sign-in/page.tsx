@@ -9,6 +9,7 @@ type SearchParams = {
   setup?: string;
   upgrade?: string;
   verified?: string;
+  reauth?: string;
 };
 
 export default async function SignInPage({
@@ -17,13 +18,16 @@ export default async function SignInPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const notice = params.verified
-    ? 'Email verified. You can sign in now.'
-    : params.reset
-      ? 'Passphrase updated. Sign in with the new passphrase.'
-      : params.setup || params.upgrade
-        ? 'Security setup is complete. Sign in with a profile email and passphrase.'
-        : undefined;
+  const notice =
+    params.reauth === '1'
+      ? 'Confirm your identity to continue with security settings.'
+      : params.verified
+        ? 'Email verified. You can sign in now.'
+        : params.reset
+          ? 'Passphrase updated. Sign in with the new passphrase.'
+          : params.setup || params.upgrade
+            ? 'Security setup is complete. Sign in with a profile email and passphrase.'
+            : undefined;
   return (
     <main className="auth-page">
       <BordLockup className="auth-brand-lockup" />

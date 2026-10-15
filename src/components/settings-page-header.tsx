@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/page-header';
 import type { ReactNode } from 'react';
 
 export function SettingsPageHeader({
@@ -16,17 +17,17 @@ export function SettingsPageHeader({
   meta?: ReactNode;
 }) {
   return (
-    <section className={aside ? 'settings-page-intro has-aside' : 'settings-page-intro'}>
-      <div>
-        <p className="eyebrow">
+    <PageHeader
+      eyebrow={
+        <>
           {icon}
           {eyebrow}
-        </p>
-        <h1>{title}</h1>
-        <p className="settings-page-description">{description}</p>
-        {meta ? <div className="settings-page-meta">{meta}</div> : null}
-      </div>
-      {aside ? <div className="settings-page-aside">{aside}</div> : null}
-    </section>
+        </>
+      }
+      title={title}
+      description={description}
+      meta={meta}
+      actions={aside ? <div className="settings-page-aside">{aside}</div> : undefined}
+    />
   );
 }

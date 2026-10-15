@@ -68,7 +68,8 @@ describe('Pantry recipe and planner presentation', () => {
     );
 
     expect(markup).toContain('aria-label="Week plan at a glance"');
-    expect(markup).toContain('Week summary');
+    expect(markup).toContain('Plan overview');
+    expect(markup).not.toContain('This week at the table');
     expect(markup).toContain('Total servings');
     expect(markup).not.toContain('Your plan at a glance');
     expect(markup).toContain('aria-label="Mobile planner controls"');

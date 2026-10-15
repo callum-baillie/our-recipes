@@ -1,39 +1,45 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { mealPlanBatchSchema } from '@/lib/domain/planning';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import { addMealPlanEntriesWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
 import { PlanningNotFoundError } from '@/lib/services/planning-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const actor = actorFromPrincipal(access.principal);
   if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before planning meals.',
+    return withApiRequestId(
+      jsonError(
+        409,
+        'profile_selection_required',
+        'Choose a household profile before planning meals.',
+      ),
+      access.requestId,
     );
   }
   const parsed = mealPlanBatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return jsonError(400, 'invalid_planned_meals', 'Check the meal plan details and try again.');
+    return withApiRequestId(
+      jsonError(400, 'invalid_planned_meals', 'Check the meal plan details and try again.'),
+      access.requestId,
+    );
   }
   try {
-    return NextResponse.json(
-      { meals: addMealPlanEntriesWithNutrition(parsed.data, actor.profileId) },
-      { status: 201 },
-    );
+    const meals = addMealPlanEntriesWithNutrition(parsed.data, actor.profileId);
+    reconcileAutomaticRestockPolicies(actor.profileId);
+    return withApiRequestId(NextResponse.json({ meals }, { status: 201 }), access.requestId);
   } catch (error) {
     if (error instanceof PlanningNotFoundError) {
-      return jsonError(404, 'recipe_not_found', error.message);
+      return withApiRequestId(jsonError(404, 'recipe_not_found', error.message), access.requestId);
     }
     throw error;
   }

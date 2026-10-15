@@ -11,6 +11,7 @@ export default defineConfig({
         resolve: { alias: { '@': sourceDirectory, 'server-only': serverOnlyStub } },
         test: {
           name: 'unit',
+          env: { DATABASE_URL: ':memory:', DATA_DIR: '.test-data/unit', OPENAI_API_KEY: '' },
           include: ['tests/unit/**/*.test.ts'],
           environment: 'node',
         },
@@ -19,6 +20,11 @@ export default defineConfig({
         resolve: { alias: { '@': sourceDirectory, 'server-only': serverOnlyStub } },
         test: {
           name: 'integration',
+          env: {
+            DATABASE_URL: ':memory:',
+            DATA_DIR: '.test-data/integration-default',
+            OPENAI_API_KEY: '',
+          },
           include: ['tests/integration/**/*.test.ts'],
           environment: 'node',
           sequence: { concurrent: false },

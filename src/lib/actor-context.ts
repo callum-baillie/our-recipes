@@ -12,11 +12,22 @@ export const LEGACY_ACTIVE_PROFILE_COOKIE = 'our_recipes_active_profile';
 export type ActorContext = {
   profileId: string | null;
   source:
-    'auth-session' | 'profile-pin' | 'api-key' | 'profile-cookie' | 'profile-default' | 'anonymous';
+    | 'auth-session'
+    | 'profile-password'
+    | 'api-key'
+    | 'profile-cookie'
+    | 'profile-default'
+    | 'anonymous';
 };
 
 function sign(payload: string): string {
   return createHmac('sha256', getRuntimeConfig().cookieSecret).update(payload).digest('base64url');
+}
+
+function signatureMatches(signature: string, expected: string): boolean {
+  const actualBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
 export function createSignedProfileValue(profileId: string, sessionId?: string): string {
@@ -35,10 +46,7 @@ export function parseSignedProfileValue(value: string | undefined): string | nul
     const [, payload, signature] = parts;
     if (!payload || !signature) return null;
     const expected = sign(`v2.${payload}`);
-    if (
-      signature.length !== expected.length ||
-      !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
-    ) {
+    if (!signatureMatches(signature, expected)) {
       return null;
     }
     try {
@@ -55,8 +63,7 @@ export function parseSignedProfileValue(value: string | undefined): string | nul
   const profileId = value.slice(0, separator);
   const signature = value.slice(separator + 1);
   const expected = sign(profileId);
-  if (signature.length !== expected.length) return null;
-  return timingSafeEqual(Buffer.from(signature), Buffer.from(expected)) ? profileId : null;
+  return signatureMatches(signature, expected) ? profileId : null;
 }
 
 export function parseSessionBoundProfileValue(

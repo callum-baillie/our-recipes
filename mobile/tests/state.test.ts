@@ -15,6 +15,7 @@ const initialState: BordState = {
       icon: 'leaf',
     },
   ],
+  pantryPolicies: [],
   mealPlan: [],
   lists: [
     {
@@ -128,6 +129,7 @@ describe('Bòrd persistent state transitions', () => {
         recipes: [],
         favorites: [],
         pantry: [],
+        pantryPolicies: [],
         mealPlan: [],
         lists: [],
         nutrition: { profiles: [{ id: 'profile-1' }], household: {}, profileDetails: {} },

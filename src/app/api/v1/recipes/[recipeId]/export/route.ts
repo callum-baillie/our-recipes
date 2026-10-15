@@ -1,3 +1,4 @@
+import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 
 import { exportRecipeAsJsonLd } from '@/lib/services/jsonld-service';
@@ -15,20 +16,29 @@ function downloadName(title: string): string {
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ recipeId: string }> }) {
+  const access = await authorizeCoreApi(_request);
+  if (access.response) return access.response;
+
   const { recipeId } = await context.params;
   const document = exportRecipeAsJsonLd(recipeId);
   if (!document) {
-    return NextResponse.json(
-      { error: { code: 'recipe_not_found', message: 'That recipe no longer exists.' } },
-      { status: 404 },
+    return withApiRequestId(
+      NextResponse.json(
+        { error: { code: 'recipe_not_found', message: 'That recipe no longer exists.' } },
+        { status: 404 },
+      ),
+      access.requestId,
     );
   }
-  return new NextResponse(`${JSON.stringify(document, null, 2)}\n`, {
-    headers: {
-      'Cache-Control': 'no-store',
-      'Content-Disposition': `attachment; filename="${downloadName(String(document.name))}"`,
-      'Content-Type': 'application/ld+json; charset=utf-8',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
+  return withApiRequestId(
+    new NextResponse(`${JSON.stringify(document, null, 2)}\n`, {
+      headers: {
+        'Cache-Control': 'no-store',
+        'Content-Disposition': `attachment; filename="${downloadName(String(document.name))}"`,
+        'Content-Type': 'application/ld+json; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    }),
+    access.requestId,
+  );
 }

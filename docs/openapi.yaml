@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.2
+  version: 1.0.0-rc.3
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
-    Lists, Collections, and Pantry integration resources and are checked against per-resource
+    Lists, Collections, Pantry, and workflow settings integration resources and are checked against per-resource
     read/create/update/delete scopes. Household profiles remain convenience identity inside an
     authenticated account and are not an authorization boundary.
   license:
@@ -16,6 +16,112 @@ servers:
 security:
   - SessionCookie: []
 paths:
+  /exports/recipes/pdf:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
+      operationId: exportRecipePdfs
+      summary: Export up to 100 recipe cards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [recipeIds]
+              properties:
+                paper: { type: string, enum: [A4, Letter], default: A4 }
+                format: { type: string, enum: [pdf, zip], default: pdf }
+                includeNutrition: { type: boolean, default: true }
+                includeNotes: { type: boolean, default: true }
+                recipeIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { type: string, format: uuid }
+                servings: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+      responses:
+        '200':
+          description: Printable PDF or ZIP containing separate recipe PDFs
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: A recipe no longer exists }
+        '409': { description: A planned recipe revision is unavailable }
+        '413': { description: 'Export exceeds the meal, recipe, or archive size limit' }
+        '429': { description: Print queue is busy; retry after ten seconds }
+  /meal-plan/export/pdf:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:read', 'recipes:read']
+      operationId: exportMealPlanPdf
+      summary: Export a daily schedule and optional recipe cards for 1 to 56 days
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [start, end]
+              properties:
+                paper: { type: string, enum: [A4, Letter], default: A4 }
+                format: { type: string, enum: [pdf, zip], default: pdf }
+                includeNutrition: { type: boolean, default: true }
+                includeNotes: { type: boolean, default: true }
+                start: { type: string, format: date }
+                end: { type: string, format: date }
+                includeRecipes: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Printable PDF or ZIP containing separate recipe PDFs
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: A recipe no longer exists }
+        '409': { description: A planned recipe revision is unavailable }
+        '413': { description: 'Export exceeds the meal, recipe, or archive size limit' }
+        '429': { description: Print queue is busy; retry after ten seconds }
+  /recipes/{recipeId}/export/pdf:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
+      operationId: exportSingleRecipePdf
+      summary: Download a printable recipe card
+      parameters:
+        - in: path
+          name: recipeId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: paper
+          schema: { type: string, enum: [A4, Letter], default: A4 }
+        - in: query
+          name: servings
+          schema: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+      responses:
+        '200':
+          description: Printable PDF or ZIP containing separate recipe PDFs
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: A recipe no longer exists }
+        '409': { description: A planned recipe revision is unavailable }
+        '413': { description: 'Export exceeds the meal, recipe, or archive size limit' }
+        '429': { description: Print queue is busy; retry after ten seconds }
   /health:
     get:
       security: []
@@ -31,7 +137,7 @@ paths:
                 required: [status, version, schemaVersion, migrationStatus, setupComplete]
                 properties:
                   status: { type: string, enum: [ok, error] }
-                  version: { type: string, example: 1.0.0-rc.2 }
+                  version: { type: string, example: 1.0.0-rc.3 }
                   schemaVersion: { type: string, example: 0038_meal_plan_ingredient_snapshots }
                   migrationStatus: { type: string, enum: [current, incomplete] }
                   setupComplete: { type: boolean }
@@ -39,6 +145,8 @@ paths:
         '503': { description: Storage is unavailable }
   /food-data/status:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: getFoodDataStatus
       summary: Report non-secret food provider capabilities and quota state
       responses:
@@ -47,6 +155,8 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
   /food-data/barcode-lookups:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: lookupFoodBarcode
       summary: Resolve a validated GTIN through local, Open Food Facts, and optional USDA sources
       requestBody:
@@ -72,6 +182,8 @@ paths:
         '503': { description: Configured providers are unavailable }
   /food-data/searches:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: searchFoodData
       summary: Search local products and USDA FoodData Central on explicit submission
       requestBody:
@@ -95,6 +207,8 @@ paths:
         '409': { description: Active profile selection required }
   /food-data/details:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: getFoodDataDetails
       summary: Resolve a selected provider record to the normalized review model
       requestBody:
@@ -117,6 +231,8 @@ paths:
         '409': { description: Active profile selection required }
   /food-data/imports:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
       operationId: importReviewedFoodData
       summary: Create or reuse a catalog product from a reviewed provider record without stock or intake
       responses:
@@ -129,6 +245,8 @@ paths:
         '409': { description: 'Identity, review, or idempotency conflict' }
   /pantry/catalog-imports:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
       operationId: importReviewedFoodDataToPantry
       summary: Atomically import reviewed food data and add one or more physical Pantry batches
       responses:
@@ -207,7 +325,7 @@ paths:
       summary: Complete the one-time credential upgrade for an existing household
       description: >-
         Available only while a household exists without authentication. Every active profile must
-        receive a unique email, a passphrase of at least 15 characters, and a six-digit PIN.
+        receive a unique email, a password of at least 8 characters.
         Recovery codes are returned once.
       responses:
         '201': { description: All active profiles enrolled and one-time recovery codes returned }
@@ -262,19 +380,29 @@ paths:
   /profiles/{profileId}/active:
     patch:
       operationId: setActiveProfile
-      summary: Switch the active household profile after verifying its six-digit PIN
+      summary: Switch the active household profile after verifying its account password
       parameters:
         - name: profileId
           in: path
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
       responses:
         '200': { description: Active profile cookie set }
         '400': { $ref: '#/components/responses/InvalidRequest' }
-        '401': { description: Authentication or profile PIN is invalid }
+        '401': { description: Authentication or profile password is invalid }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Profile not found }
-        '429': { description: PIN attempts are temporarily locked }
+        '429': { description: Password attempts are temporarily locked }
   /profiles/{profileId}:
     parameters:
       - name: profileId
@@ -310,6 +438,8 @@ paths:
         '409': { description: Profile archive is unsafe or active }
   /tags:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: listTags
       summary: List canonical household tags with usage counts
       responses:
@@ -317,6 +447,8 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Tag storage is unavailable }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: createTag
       summary: Create a canonical household tag
       requestBody:
@@ -336,6 +468,8 @@ paths:
         required: true
         schema: { type: string, maxLength: 40 }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: updateTag
       summary: Rename or recolor a tag while preserving recipe associations
       requestBody:
@@ -350,6 +484,8 @@ paths:
         '404': { description: Tag not found }
         '409': { description: Target tag exists; use merge }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:delete']
       operationId: deleteTag
       summary: Remove a tag association from every recipe
       responses:
@@ -358,6 +494,8 @@ paths:
         '404': { description: Tag not found }
   /tags/{tagName}/merge:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: mergeTag
       summary: Merge a source tag into a target tag
       parameters:
@@ -378,6 +516,7 @@ paths:
   /collections:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:read']
       x-api-key-scope: collections.read
       operationId: listCollections
       summary: List manually ordered household collections with optional local-photo covers
@@ -387,6 +526,7 @@ paths:
         '503': { description: Collection storage is unavailable }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:create']
       x-api-key-scope: collections.create
       operationId: createCollection
       summary: Create a curated household collection
@@ -404,6 +544,8 @@ paths:
         '409': { description: Active profile is missing or collection name conflicts }
   /collections/order:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:update']
       operationId: reorderCollections
       summary: Replace the manual order of all household collections
       requestBody:
@@ -424,6 +566,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:read']
       x-api-key-scope: collections.read
       operationId: getCollection
       summary: Read one collection with its ordered recipes and selectable saved-photo covers
@@ -432,6 +575,7 @@ paths:
         '404': { description: Collection not found }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:update']
       x-api-key-scope: collections.update
       operationId: updateCollection
       summary: Update collection details or choose a cover from one of its saved recipe photos
@@ -448,6 +592,7 @@ paths:
         '409': { description: Active profile is missing or collection name conflicts }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:delete']
       x-api-key-scope: collections.delete
       operationId: deleteCollection
       summary: Remove a collection without deleting any recipe or photo
@@ -458,6 +603,7 @@ paths:
   /collections/{collectionId}/recipes:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:create']
       x-api-key-scope: collections.create
       operationId: addRecipeToCollection
       summary: Add one recipe to the end of a collection if it is not already present
@@ -480,6 +626,7 @@ paths:
         '409': { description: Active profile is missing }
     put:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:update']
       x-api-key-scope: collections.update
       operationId: replaceCollectionRecipes
       summary: Replace a collection’s ordered recipe membership
@@ -502,6 +649,7 @@ paths:
   /collections/bulk:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['collections:read']
       x-api-key-scope: collections.read
       operationId: exportCollectionsBulk
       summary: Stream a bounded snapshot of all collections and their recipe memberships
@@ -518,6 +666,7 @@ paths:
   /recipes:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       x-api-key-scope: recipes.read
       operationId: listRecipes
       summary: Search a paginated, lifecycle-aware shared recipe library
@@ -574,6 +723,7 @@ paths:
         '400': { description: Invalid search query }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       x-api-key-scope: recipes.create
       operationId: createRecipe
       summary: Create a structured recipe and first revision
@@ -597,6 +747,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       x-api-key-scope: recipes.read
       operationId: getRecipe
       summary: Read a structured recipe card and revision metadata
@@ -605,6 +756,7 @@ paths:
         '404': { description: Recipe not found }
     put:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       x-api-key-scope: recipes.update
       operationId: updateRecipe
       summary: Replace the current recipe card and append a revision when its expected revision matches
@@ -621,6 +773,7 @@ paths:
         '409': { description: Profile selection required or recipe revision conflict }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:delete']
       x-api-key-scope: recipes.delete
       operationId: trashRecipe
       summary: Move a recipe to trash while preserving its revision history
@@ -637,6 +790,7 @@ paths:
   /recipes/bulk:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       x-api-key-scope: recipes.read
       operationId: exportRecipesBulk
       summary: Stream a bounded snapshot of complete recipes
@@ -658,6 +812,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: updateRecipeTags
       summary: Replace a recipe's tags and append a revision when its expected revision matches
       requestBody:
@@ -678,6 +834,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: estimateRecipeNutrition
       summary: Ask OpenAI to estimate per-serving nutrition and save it as a new recipe revision
       requestBody:
@@ -701,6 +859,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: improveRecipe
       summary: Ask OpenAI for a review-only recipe improvement while preserving ingredients
       requestBody:
@@ -724,6 +884,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: exportRecipeJsonLd
       summary: Download a deterministic Schema.org Recipe JSON-LD document
       responses:
@@ -740,6 +902,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: exportRecipeMarkdown
       summary: Download a deterministic portable Markdown recipe without profile-private preferences
       responses:
@@ -756,6 +920,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     put:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: setRecipePreference
       summary: Save the active profile’s private rating and note without changing the shared recipe revision
       requestBody:
@@ -770,6 +936,8 @@ paths:
         '404': { description: Recipe not found }
         '409': { description: Profile selection required }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: setRecipeReaction
       summary: Set or clear the active profile’s dislike, like, or staple score while preserving its note
       requestBody:
@@ -794,6 +962,8 @@ paths:
         required: true
         schema: { type: integer, minimum: 1 }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: restoreRecipeRevision
       summary: Restore a saved shared recipe snapshot by appending a new revision
       requestBody:
@@ -814,6 +984,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: duplicateRecipe
       summary: Create an active editable copy of a current recipe
       responses:
@@ -828,6 +1000,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: updateRecipeStatus
       summary: Update a recipe lifecycle state with revision protection
       requestBody:
@@ -848,6 +1022,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: createRecipeImage
       summary: Add a bounded local recipe photo and return normalized media metadata
       requestBody:
@@ -883,6 +1059,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: getRecipeImage
       summary: Read a normalized local WebP recipe photo
       responses:
@@ -893,6 +1071,8 @@ paths:
               schema: { type: string, format: binary }
         '404': { description: Recipe photo not found }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:delete']
       operationId: deleteRecipeImage
       summary: Remove a local recipe photo and its media metadata
       responses:
@@ -907,6 +1087,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
       operationId: generateRecipeImage
       summary: Explicitly generate and locally store one recipe serving image
       requestBody:
@@ -926,6 +1108,7 @@ paths:
   /meal-plan:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:read']
       x-api-key-scope: mealPlans.read
       operationId: listMealPlan
       summary: Read planned meals for an inclusive date range
@@ -934,6 +1117,7 @@ paths:
         '400': { description: Invalid week range }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:create']
       x-api-key-scope: mealPlans.create
       operationId: addMealPlanEntry
       summary: Add an existing recipe to a date and meal
@@ -951,6 +1135,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:read']
       x-api-key-scope: mealPlans.read
       operationId: getMealPlanEntry
       summary: Read one planned meal
@@ -959,6 +1144,7 @@ paths:
         '404': { description: Planned meal not found }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:delete']
       x-api-key-scope: mealPlans.delete
       operationId: deleteMealPlanEntry
       summary: Remove one planned recipe or free-form meal
@@ -968,6 +1154,7 @@ paths:
         '404': { description: Planned meal not found }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:update']
       x-api-key-scope: mealPlans.update
       operationId: updateMealPlanEntry
       summary: Update a planned meal or mark it planned, skipped, or cancelled
@@ -990,6 +1177,7 @@ paths:
   /meal-plan/bulk:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:read']
       x-api-key-scope: mealPlans.read
       operationId: exportMealPlanBulk
       summary: Stream a bounded snapshot of all planned meals
@@ -1005,6 +1193,8 @@ paths:
         '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /meal-plan/swap:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:update']
       operationId: swapMealPlanEntries
       summary: Atomically swap two current planned-meal slots
       responses:
@@ -1014,6 +1204,8 @@ paths:
         '409': { description: Profile selection required or a planned meal changed }
   /meal-plan/duplicate:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:create']
       operationId: duplicateMealPlanWeek
       summary: Copy one planned week into a destination week
       responses:
@@ -1023,6 +1215,8 @@ paths:
         '409': { description: Profile selection required }
   /meal-plan/export:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:read']
       operationId: exportMealPlanCalendar
       summary: Download a deterministic local ICS calendar for an inclusive date range
       parameters:
@@ -1044,6 +1238,7 @@ paths:
   /shopping-lists:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
       x-api-key-scope: shoppingLists.read
       operationId: listShoppingLists
       summary: List previously generated editable shopping lists
@@ -1052,6 +1247,7 @@ paths:
         '400': { description: Invalid request }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create']
       x-api-key-scope: shoppingLists.create
       operationId: createOrGenerateShoppingList
       summary: Create a manual list or generate a Pantry-aware list from a plan week
@@ -1069,6 +1265,7 @@ paths:
                   properties:
                     kind: { type: string, const: manual }
                     name: { type: string, minLength: 1, maxLength: 120 }
+                    makeAutomaticRestockTarget: { type: boolean, default: false }
                 - type: object
                   additionalProperties: false
                   required: [kind, weekStart, weekEnd]
@@ -1078,6 +1275,7 @@ paths:
                     weekEnd: { type: string, format: date }
                     sourceMode:
                       { type: string, enum: [pantry_missing, pantry_all], default: pantry_all }
+                    makeAutomaticRestockTarget: { type: boolean, default: false }
                 - type: object
                   description: Backward-compatible untagged manual request
                   additionalProperties: false
@@ -1097,12 +1295,16 @@ paths:
         '409': { description: Plan contains no meals }
   /settings/lists:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['settings:read']
       operationId: getListSettings
       summary: Read household list behavior and all supermarket profiles
       responses:
         '200': { description: List settings and supermarket profiles }
         '400': { description: List settings request could not be read }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['settings:update']
       operationId: updateListSettings
       summary: Replace household list behavior and the default supermarket
       requestBody:
@@ -1122,6 +1324,8 @@ paths:
               properties:
                 defaultSupermarketProfileId:
                   oneOf: [{ type: string, const: '' }, { type: string, format: uuid }]
+                automaticRestockListId:
+                  oneOf: [{ type: string, const: '' }, { type: string, format: uuid }]
                 completedItemsBehavior:
                   type: string
                   enum: [completed_section, hide, in_place]
@@ -1134,12 +1338,16 @@ paths:
         '409': { description: Active profile or household setup required }
   /supermarket-profiles:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
       operationId: listSupermarketProfiles
       summary: Read active and archived supermarket profiles with ordered route sections
       responses:
         '200': { description: List settings and supermarket profiles }
         '400': { description: Supermarket profile request could not be read }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: createSupermarketProfile
       summary: Create a supermarket profile and ordered in-store route
       responses:
@@ -1154,6 +1362,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: updateSupermarketProfile
       summary: Replace, archive, or restore a supermarket and its ordered route
       responses:
@@ -1169,6 +1379,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create']
       operationId: duplicateSupermarketProfile
       summary: Copy one supermarket route and its learned item assignments
       responses:
@@ -1178,6 +1390,8 @@ paths:
         '409': { description: Active profile required }
   /shopping-lists/pantry-shortages:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create']
       operationId: generatePantryShortageList
       summary: Create or regenerate Pantry shortages without overwriting manual edits
       requestBody:
@@ -1207,17 +1421,58 @@ paths:
         schema: { type: string, format: uuid }
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
       x-api-key-scope: shoppingLists.read
       operationId: getShoppingList
       summary: Read an editable list with household aisle definitions in saved order
       responses:
-        '200': { description: Shopping list and aisle catalog }
+        '200':
+          description: Shopping list, target state, structured policy reviews, and item breakdowns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  list:
+                    type: object
+                    properties:
+                      isAutomaticRestockTarget: { type: boolean }
+                      policyReviews:
+                        type: array
+                        items: { $ref: '#/components/schemas/ShoppingPolicyReview' }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            policyBreakdown:
+                              oneOf:
+                                - { $ref: '#/components/schemas/ShoppingPolicyBreakdown' }
+                                - { type: 'null' }
         '404': { description: Shopping list not found }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       x-api-key-scope: shoppingLists.update
       operationId: reorderShoppingListItems
-      summary: Replace the complete explicit order for the current list items
+      summary: Reorder, rename, archive, complete, restore, or designate a shopping list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [itemIds]
+                  properties:
+                    itemIds: { type: array, items: { type: string, format: uuid } }
+                - type: object
+                  required: [action]
+                  properties:
+                    action:
+                      type: string
+                      enum: [rename, archive, restore, duplicate, set_restock_target, complete]
+                    name: { type: string, minLength: 1, maxLength: 120 }
       responses:
         '200': { description: List order saved }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -1225,6 +1480,7 @@ paths:
         '409': { description: List changed since it was read }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:delete']
       x-api-key-scope: shoppingLists.delete
       operationId: deleteShoppingList
       summary: Delete a shopping list unless Pantry history requires retaining it
@@ -1239,6 +1495,7 @@ paths:
         schema: { type: string, format: uuid }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create']
       x-api-key-scope: shoppingLists.create
       operationId: addShoppingListItem
       summary: Add a bounded manual item with an optional household aisle assignment
@@ -1254,6 +1511,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: setShoppingListSupermarket
       summary: Switch a list's supermarket and deterministically reclassify every item
       responses:
@@ -1269,6 +1528,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: retryShoppingListAtStore
       summary: Create a new list for unavailable items using another supermarket route
       responses:
@@ -1288,6 +1549,7 @@ paths:
         schema: { type: string, format: uuid }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       x-api-key-scope: shoppingLists.update
       operationId: updateShoppingListItem
       summary: Edit, check, or reassign one shopping-list item
@@ -1298,6 +1560,7 @@ paths:
         '404': { description: Shopping item not found }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:delete']
       x-api-key-scope: shoppingLists.delete
       operationId: deleteShoppingListItem
       summary: Remove one shopping-list item
@@ -1308,6 +1571,7 @@ paths:
   /shopping-lists/bulk:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
       x-api-key-scope: shoppingLists.read
       operationId: exportShoppingListsBulk
       summary: Stream a bounded snapshot of shopping lists with their items
@@ -1333,6 +1597,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update', 'pantry:update']
       operationId: intakePurchasedShoppingItem
       summary: Add one retry-stable purchase operation to an explicit Pantry location
       requestBody:
@@ -1388,8 +1654,10 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: updateShoppingItemPantryControl
-      summary: Mark coverage, ignore Pantry stock, flag inaccurate inventory, add extra demand, or reset
+      summary: Control Pantry coverage or the recurring policy for this shopping trip
       requestBody:
         required: true
         content:
@@ -1399,7 +1667,19 @@ paths:
               additionalProperties: false
               required: [action]
               properties:
-                action: { type: string, enum: [covered, ignore, inaccurate, reset, extra] }
+                action:
+                  type: string
+                  enum:
+                    [
+                      covered,
+                      ignore,
+                      inaccurate,
+                      reset,
+                      extra,
+                      skip_policy,
+                      restore_policy,
+                      assume_empty_for_trip,
+                    ]
                 quantity: { type: number, minimum: 0, maximum: 1000000 }
                 unit: { type: string, maxLength: 30 }
                 note: { type: string, maxLength: 500 }
@@ -1419,6 +1699,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: matchShoppingItemToPantryProduct
       summary: Persist a generated shopping item match to an existing Pantry product
       requestBody:
@@ -1438,14 +1720,60 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Generated shopping item or Pantry product not found }
         '409': { description: Profile selection required }
+  /shopping-lists/{listId}/policies/{productId}:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: productId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update', 'pantry:update']
+      x-api-key-scope: shoppingLists.update
+      operationId: updateShoppingPolicyForTrip
+      summary: Skip, restore, or resolve one recurring product policy for this trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [skip_policy, restore_policy, assume_empty_for_trip]
+      responses:
+        '200':
+          description: Updated per-trip policy review states
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShoppingPolicyReview' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Policy instance not found }
   /shopping-lists/aisles:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
       operationId: listShoppingAisles
       summary: List household store aisles in durable display order
       responses:
         '200': { description: Ordered shopping aisles }
         '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create']
       operationId: createShoppingAisle
       summary: Create a bounded unique household store aisle
       responses:
@@ -1454,6 +1782,8 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Profile selection required or aisle already exists }
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
       operationId: reorderShoppingAisles
       summary: Replace the complete current household aisle order
       responses:
@@ -1468,6 +1798,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:delete']
       operationId: deleteShoppingAisle
       summary: Remove an aisle and leave its shopping items unassigned
       responses:
@@ -1477,6 +1809,8 @@ paths:
         '409': { description: Profile selection required }
   /cook-sessions:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: startCookSession
       summary: Start a per-profile cooking session
       responses:
@@ -1485,6 +1819,8 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
   /capture-drafts:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: createCaptureDraft
       summary: Create a non-persistent text draft or list/select deterministic Recipe candidates from a hardened public URL
       requestBody:
@@ -1500,6 +1836,8 @@ paths:
         '422': { description: URL source rejected by capture safety controls }
   /jsonld-drafts:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: createJsonLdDraft
       summary: Find or select a locally parsed Schema.org Recipe candidate from pasted JSON-LD
       requestBody:
@@ -1519,6 +1857,8 @@ paths:
           }
   /jsonld-drafts/confirm:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: confirmJsonLdDraft
       summary: Create a recipe only after explicit review of a JSON-LD candidate
       requestBody:
@@ -1533,6 +1873,8 @@ paths:
         '409': { description: Active profile selection required }
   /imports:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: createDocumentImport
       summary: Create a review-only local one-PDF or ordered scan-set import operation
       requestBody:
@@ -1581,6 +1923,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: getDocumentImport
       summary: Read local import provenance and its reproducible review draft
       responses:
@@ -1593,6 +1937,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: getDocumentImportArtifact
       summary: Read a normalized scan or download the accepted PDF artifact
       responses:
@@ -1615,6 +1961,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: getDocumentImportArtifactById
       summary: Read one import-scoped normalized scan artifact
       responses:
@@ -1631,6 +1979,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:create']
       operationId: confirmDocumentImport
       summary: Create a recipe only after explicit review of one import operation
       requestBody:
@@ -1712,6 +2062,8 @@ paths:
         '422': { description: Backup archive or manifest failed validation }
   /exports/recipes:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: exportPortableRecipeArchive
       summary: Download a server-generated portable full-recipe archive
       description: >-
@@ -1729,6 +2081,8 @@ paths:
         '422': { description: The bounded generated export could not be created safely }
   /cook-sessions/{sessionId}/complete:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update', 'pantry:update']
       operationId: completeCookSession
       summary: Explicitly confirm adjusted Pantry deductions and complete cooking atomically
       parameters:
@@ -1749,6 +2103,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: getCookSessionPantryPreview
       summary: Refresh the planned-meal identity and server-derived FEFO Pantry review
       responses:
@@ -1757,6 +2113,8 @@ paths:
         '404': { description: Cooking session not found }
         '409': { description: Profile selection required }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
       operationId: previewCookSessionPantryAllocation
       summary: Recalculate an adjusted one-cook product and quantity using server FEFO rules
       responses:
@@ -1767,6 +2125,8 @@ paths:
         '409': { description: Profile selection required }
   /cook-sessions/{sessionId}/pantry/undo:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update', 'pantry:update']
       operationId: undoCookSessionPantry
       summary: Undo unchanged cooking deductions with compensating events
       parameters:
@@ -1781,6 +2141,8 @@ paths:
         '409': { description: Stock or linked leftovers changed and require review }
   /pantry/summary:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: getPantrySummary
       summary: Read filtered Pantry inventory and summary totals
       parameters:
@@ -1805,6 +2167,7 @@ paths:
   /pantry/products:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       x-api-key-scope: pantry.read
       operationId: listPantryProducts
       summary: List canonical Pantry products
@@ -1813,6 +2176,7 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
       x-api-key-scope: pantry.create
       operationId: createPantryProduct
       summary: Create a canonical Pantry product
@@ -1831,6 +2195,7 @@ paths:
   /pantry/products/{productId}:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       x-api-key-scope: pantry.read
       operationId: getPantryProduct
       summary: Read one canonical Pantry product
@@ -1841,6 +2206,7 @@ paths:
         '404': { description: Product not found }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:update']
       x-api-key-scope: pantry.update
       operationId: updatePantryProduct
       summary: Replace one canonical Pantry product definition
@@ -1859,6 +2225,7 @@ paths:
         '409': { description: Product conflict or active profile required }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:delete']
       x-api-key-scope: pantry.delete
       operationId: archivePantryProduct
       summary: Archive a Pantry product after all active stock is resolved
@@ -1870,12 +2237,16 @@ paths:
         '409': { description: Product still has active stock }
   /pantry/locations:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: listPantryLocations
       summary: List the nested Pantry storage tree
       responses:
         '200': { description: Active storage locations with paths }
         '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
       operationId: createPantryLocation
       summary: Create a Pantry storage location
       requestBody:
@@ -1890,6 +2261,8 @@ paths:
         '409': { description: Active profile required or duplicate sibling location }
   /pantry/locations/{locationId}:
     patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:update']
       operationId: updatePantryLocation
       summary: Rename, move, archive, or restore a storage location
       parameters:
@@ -1908,6 +2281,7 @@ paths:
   /pantry/batches:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       x-api-key-scope: pantry.read
       operationId: listPantryBatches
       summary: List filtered physical Pantry batches
@@ -1917,6 +2291,7 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
       x-api-key-scope: pantry.create
       operationId: createPantryBatch
       summary: Add a physical Pantry batch
@@ -1935,6 +2310,7 @@ paths:
   /pantry/batches/{batchId}:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       x-api-key-scope: pantry.read
       operationId: getPantryBatch
       summary: Read one physical Pantry batch with product, location, and expiry state
@@ -1945,6 +2321,7 @@ paths:
         '404': { description: Batch not found }
     patch:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:update']
       x-api-key-scope: pantry.update
       operationId: updatePantryBatch
       summary: Replace version-protected physical batch details
@@ -1969,6 +2346,7 @@ paths:
         '409': { description: Stale version or active profile required }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:delete']
       x-api-key-scope: pantry.delete
       operationId: discardPantryBatch
       summary: Resolve a Pantry batch as discarded while preserving immutable inventory history
@@ -1986,6 +2364,7 @@ paths:
   /pantry/batches/bulk:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       x-api-key-scope: pantry.read
       operationId: exportPantryBatchesBulk
       summary: Stream a bounded snapshot of physical Pantry batches
@@ -2002,6 +2381,8 @@ paths:
         '413': { description: Snapshot exceeds 50000 items or 100 MB }
   /pantry/batches/{batchId}/actions:
     post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:update']
       operationId: applyPantryBatchAction
       summary: Apply and record one version-protected stock action
       parameters:
@@ -2055,6 +2436,8 @@ paths:
           }
   /pantry/events:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: listPantryEvents
       summary: Read bounded immutable Pantry history
       parameters:
@@ -2074,6 +2457,8 @@ paths:
         required: true
         schema: { type: string, format: uuid }
     put:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:update']
       operationId: setRecipeIngredientPantryMapping
       summary: Save an actor-attributed manual Pantry mapping without changing recipe text
       requestBody:
@@ -2095,6 +2480,8 @@ paths:
         '404': { description: 'Ingredient or active Pantry product not found' }
         '409': { description: 'Active profile selection required' }
     delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:delete']
       operationId: removeRecipeIngredientPantryMapping
       summary: Remove a manual Pantry mapping without changing recipe text
       responses:
@@ -2104,6 +2491,8 @@ paths:
         '409': { description: 'Active profile selection required' }
   /pantry/recipes/{recipeId}/availability:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: getRecipePantryAvailability
       summary: Calculate serving-scaled recipe availability from compatible exact stock
       parameters:
@@ -2123,6 +2512,8 @@ paths:
         '404': { description: 'Recipe not found' }
   /pantry/demand:
     get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
       operationId: getProjectedPantryDemand
       summary: Allocate non-mutating Pantry demand chronologically across active planned meals
       parameters:
@@ -2233,6 +2624,346 @@ paths:
               schema: { $ref: '#/components/schemas/HomepageSummary' }
         '401':
           description: Missing, invalid, or unconfigured integration credentials
+  /meal-plan/{entryId}/refresh-recipe:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:update']
+      operationId: refreshPlannedRecipe
+      summary: Refresh the recipe snapshot used by a planned meal
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - meal
+                properties:
+                  meal:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+  /meal-plan/batch:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['mealPlans:create']
+      operationId: createMealPlanBatch
+      summary: Add up to 280 planned meals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPlanBatchInput'
+      responses:
+        '201':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - meals
+                properties:
+                  meals:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+  /recipes/{recipeId}/favorite:
+    put:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
+      operationId: setRecipeFavorite
+      summary: Set the API key owner’s recipe favorite
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - favorite
+              properties:
+                favorite:
+                  type: boolean
+      responses:
+        '200':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - favorite
+                properties:
+                  favorite:
+                    type: boolean
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+  /settings/preferences:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['settings:read']
+      operationId: getWorkflowPreferences
+      summary: Read recipe, meal-plan, and pantry defaults
+      responses:
+        '200':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - preferences
+                properties:
+                  preferences:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+    patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['settings:update']
+      operationId: updateWorkflowPreferences
+      summary: Update one category of workflow defaults
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowPreferencesInput'
+      responses:
+        '200':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - preferences
+                properties:
+                  preferences:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+  /nutrition/recipes/{recipeId}/calculations:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
+      operationId: getRecipeNutritionCalculations
+      summary: Read shared recipe nutrition calculation history
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - calculations
+                properties:
+                  calculations:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
+      operationId: calculateSharedRecipeNutrition
+      summary: Calculate recipe nutrition from ingredient records
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeCalculationInput'
+      responses:
+        '201':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - calculation
+                properties:
+                  calculation:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+  /nutrition/products/{productId}/records:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
+      operationId: getProductNutritionRecords
+      summary: Read shared product nutrition history
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - records
+                properties:
+                  records:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:update']
+      operationId: appendProductNutritionRecord
+      summary: Append a manual product nutrition record
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualFoodNutritionInput'
+      responses:
+        '201':
+          description: Operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - record
+                properties:
+                  record:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: Insufficient permission or untrusted browser origin
+        '404':
+          description: Resource not found
+        '409':
+          description: The requested change conflicts with current state
 components:
   securitySchemes:
     SessionCookie:
@@ -2257,7 +2988,7 @@ components:
       in: header
       required: false
       description: >-
-        Required for API-key create requests. Reusing a key with the same body replays the stored
+        Required for the documented core resource creation endpoints that reference this parameter. Reusing a key with the same body replays the stored
         response for 24 hours; reusing it with another body returns 409.
       schema: { type: string, minLength: 1, maxLength: 128 }
     UpdatedSince:
@@ -2281,6 +3012,11 @@ components:
         shoppingLists: { $ref: '#/components/schemas/ApiActions' }
         collections: { $ref: '#/components/schemas/ApiActions' }
         pantry: { $ref: '#/components/schemas/ApiActions' }
+        settings:
+          type: array
+          uniqueItems: true
+          maxItems: 2
+          items: { type: string, enum: [read, update] }
     ApiActions:
       type: array
       uniqueItems: true
@@ -2315,8 +3051,56 @@ components:
         defaultInventoryUnit: { type: string, maxLength: 30, default: each }
         defaultStorageType: { type: string, enum: [pantry, refrigerator, freezer, counter, other] }
         isStaple: { type: boolean, default: false }
+        restockMode: { type: string, enum: [none, always_have, always_buy], default: none }
+        restockTrigger:
+          { type: string, enum: [below_target, reorder_point, empty], default: below_target }
+        targetStock: { type: [number, 'null'], exclusiveMinimum: 0 }
         reorderThreshold: { type: [number, 'null'], minimum: 0 }
+        preferredPurchaseQuantity: { type: [number, 'null'], exclusiveMinimum: 0 }
         stockUnit: { type: string, maxLength: 30 }
+    ShoppingPolicyBreakdown:
+      type: object
+      required:
+        [
+          mode,
+          trigger,
+          recipeRequirement,
+          usablePantry,
+          pendingCoverage,
+          recordedCoverage,
+          unit,
+          needsReview,
+        ]
+      properties:
+        mode: { type: string, enum: [always_have, always_buy] }
+        trigger: { type: string, enum: [below_target, reorder_point, empty] }
+        recipeRequirement: { type: number, minimum: 0 }
+        targetStock: { type: [number, 'null'], minimum: 0 }
+        purchaseIncrement: { type: [number, 'null'], minimum: 0 }
+        policyContribution: { type: [number, 'null'], minimum: 0 }
+        usablePantry: { type: number, minimum: 0 }
+        pendingCoverage: { type: number, minimum: 0 }
+        recordedCoverage: { type: number, minimum: 0 }
+        unroundedPurchaseGoal: { type: [number, 'null'], minimum: 0 }
+        roundedPurchaseGoal: { type: [number, 'null'], minimum: 0 }
+        finalBuyQuantity: { type: [number, 'null'], minimum: 0 }
+        unit: { type: string }
+        needsReview: { type: boolean }
+        reviewReason: { type: [string, 'null'] }
+    ShoppingPolicyReview:
+      type: object
+      required: [productId, productName, mode, trigger, state, assumedEmpty, unit]
+      properties:
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        shoppingListItemId: { type: [string, 'null'], format: uuid }
+        mode: { type: string, enum: [always_have, always_buy] }
+        trigger: { type: string, enum: [below_target, reorder_point, empty] }
+        state: { type: string, enum: [active, needs_review, satisfied, dismissed, moved] }
+        reviewReason: { type: [string, 'null'] }
+        assumedEmpty: { type: boolean }
+        policyQuantity: { type: [number, 'null'], minimum: 0 }
+        unit: { type: string }
     PantryLocationInput:
       type: object
       required: [name, storageType]
@@ -2652,6 +3436,423 @@ components:
       required: [confirmation]
       properties:
         confirmation: { type: string, const: RESTORE }
+    WorkflowPreferencesInput:
+      oneOf:
+        - type: object
+          properties:
+            category:
+              type: string
+              const: recipes
+            values:
+              type: object
+              properties:
+                defaultSort:
+                  type: string
+                  enum:
+                    - recently-added
+                    - recently-updated
+                    - alphabetical
+                    - most-recently-cooked
+                    - shortest-time
+                    - highest-rated
+                defaultServings:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+              required:
+                - defaultSort
+                - defaultServings
+              additionalProperties: false
+          required:
+            - category
+            - values
+          additionalProperties: false
+        - type: object
+          properties:
+            category:
+              type: string
+              const: mealPlan
+            values:
+              type: object
+              properties:
+                weekStartsOn:
+                  anyOf:
+                    - type: number
+                      const: 0
+                    - type: number
+                      const: 1
+                defaultDuration:
+                  anyOf:
+                    - type: number
+                      const: 3
+                    - type: number
+                      const: 5
+                    - type: number
+                      const: 7
+                    - type: number
+                      const: 14
+                defaultMealTypes:
+                  minItems: 1
+                  maxItems: 20
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 48
+                    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                visibleMealTypes:
+                  default:
+                    - breakfast
+                    - lunch
+                    - dinner
+                    - dessert
+                    - snack
+                  minItems: 1
+                  maxItems: 20
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 48
+                    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                customMealTypes:
+                  default: []
+                  maxItems: 10
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        minLength: 1
+                        maxLength: 48
+                        pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                      label:
+                        type: string
+                        minLength: 1
+                        maxLength: 48
+                    required:
+                      - value
+                      - label
+                    additionalProperties: false
+              required:
+                - weekStartsOn
+                - defaultDuration
+                - defaultMealTypes
+              additionalProperties: false
+          required:
+            - category
+            - values
+          additionalProperties: false
+        - type: object
+          properties:
+            category:
+              type: string
+              const: pantry
+            values:
+              type: object
+              properties:
+                defaultView:
+                  type: string
+                  enum:
+                    - all
+                    - pantry
+                    - refrigerator
+                    - freezer
+                    - low_stock
+                    - opened
+                    - unopened
+                    - frozen
+                    - recent
+                defaultSort:
+                  type: string
+                  enum:
+                    - expiry
+                    - name
+                    - quantity
+                    - location
+                    - updated
+                    - added
+                defaultGroup:
+                  type: string
+                  enum:
+                    - none
+                    - location
+                    - category
+                    - expiry
+              required:
+                - defaultView
+                - defaultSort
+                - defaultGroup
+              additionalProperties: false
+          required:
+            - category
+            - values
+          additionalProperties: false
+    MealPlanBatchInput:
+      type: object
+      properties:
+        entries:
+          minItems: 1
+          maxItems: 280
+          type: array
+          items:
+            type: object
+            properties:
+              plannedFor:
+                type: string
+                pattern: ^\d{4}-\d{2}-\d{2}$
+              meal:
+                type: string
+                minLength: 1
+                maxLength: 48
+                pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+              recipeId:
+                default: ''
+                anyOf:
+                  - type: string
+                    const: ''
+                  - type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              title:
+                default: ''
+                type: string
+                maxLength: 160
+              servings:
+                type: integer
+                minimum: 1
+                maximum: 100
+              note:
+                type: string
+                maxLength: 240
+            required:
+              - plannedFor
+              - meal
+              - servings
+              - note
+      required:
+        - entries
+    RecipeCalculationInput:
+      type: object
+      properties:
+        includedOptionalIngredientIds:
+          default: []
+          maxItems: 500
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        excludedIngredientIds:
+          default: []
+          maxItems: 500
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        substitutions:
+          default: []
+          maxItems: 500
+          type: array
+          items:
+            type: object
+            properties:
+              recipeIngredientId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              productId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            required:
+              - recipeIngredientId
+              - productId
+            additionalProperties: false
+        preparationFactors:
+          default: []
+          maxItems: 500
+          type: array
+          items:
+            type: object
+            properties:
+              recipeIngredientId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              ediblePortion:
+                default: 1
+                type: number
+                exclusiveMinimum: 0
+                maximum: 1
+              drainedYield:
+                default: 1
+                type: number
+                exclusiveMinimum: 0
+                maximum: 1
+              evidenceNote:
+                type: string
+                minLength: 1
+                maxLength: 500
+            required:
+              - recipeIngredientId
+              - evidenceNote
+            additionalProperties: false
+        finalWeightGrams:
+          default: null
+          anyOf:
+            - type: number
+              exclusiveMinimum: 0
+              maximum: 1000000
+            - type: 'null'
+      additionalProperties: false
+    ManualFoodNutritionInput:
+      type: object
+      properties:
+        sourceRecordKey:
+          default: ''
+          type: string
+          maxLength: 300
+        basisType:
+          type: string
+          enum:
+            - per_100g
+            - per_100ml
+            - per_serving
+            - per_unit
+        basisAmount:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 1000000
+        basisUnit:
+          type: string
+          minLength: 1
+          maxLength: 30
+        servingWeightGrams:
+          default: null
+          anyOf:
+            - type: number
+              exclusiveMinimum: 0
+              maximum: 1000000
+            - type: 'null'
+        densityGramsPerMilliliter:
+          default: null
+          anyOf:
+            - type: number
+              exclusiveMinimum: 0
+              maximum: 1000000
+            - type: 'null'
+        pieceWeightGrams:
+          default: null
+          anyOf:
+            - type: number
+              exclusiveMinimum: 0
+              maximum: 1000000
+            - type: 'null'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        completeness:
+          type: number
+          minimum: 0
+          maximum: 1
+        supersedesRecordId:
+          default: null
+          anyOf:
+            - type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            - type: 'null'
+        notes:
+          default: ''
+          type: string
+          maxLength: 2000
+        values:
+          minItems: 1
+          maxItems: 46
+          type: array
+          items:
+            type: object
+            properties:
+              nutrientCode:
+                type: string
+                enum:
+                  - energy_kcal
+                  - energy_kj
+                  - protein
+                  - carbohydrate
+                  - fiber
+                  - total_sugars
+                  - added_sugars
+                  - sugar_alcohols
+                  - total_fat
+                  - saturated_fat
+                  - monounsaturated_fat
+                  - polyunsaturated_fat
+                  - trans_fat
+                  - omega_3
+                  - omega_6
+                  - cholesterol
+                  - alcohol
+                  - sodium
+                  - potassium
+                  - calcium
+                  - iron
+                  - magnesium
+                  - phosphorus
+                  - zinc
+                  - copper
+                  - manganese
+                  - selenium
+                  - iodine
+                  - vitamin_a
+                  - vitamin_c
+                  - vitamin_d
+                  - vitamin_e
+                  - vitamin_k
+                  - thiamin
+                  - riboflavin
+                  - niacin
+                  - pantothenic_acid
+                  - vitamin_b6
+                  - biotin
+                  - folate
+                  - vitamin_b12
+                  - choline
+                  - water
+                  - caffeine
+                  - serving_weight
+                  - edible_portion_weight
+              amount:
+                type: number
+                minimum: 0
+                maximum: 1000000000
+              confidence:
+                default: null
+                anyOf:
+                  - type: number
+                    minimum: 0
+                    maximum: 1
+                  - type: 'null'
+              sourceNote:
+                default: ''
+                type: string
+                maxLength: 500
+            required:
+              - nutrientCode
+              - amount
+            additionalProperties: false
+      required:
+        - basisType
+        - basisAmount
+        - basisUnit
+        - confidence
+        - completeness
+        - values
+      additionalProperties: false
   responses:
     InvalidRequest: { description: Input did not meet the contract }
     UntrustedOrigin: { description: The browser origin was not explicitly trusted }

@@ -21,12 +21,12 @@ export default async function ApiSettingsPage() {
         eyebrow="API & SECURITY"
         title={
           <>
-            Private integrations,
+            Connect your kitchen,
             <br />
-            with an explicit boundary.
+            on your terms.
           </>
         }
-        description="Admin-owned API keys give trusted systems access to your data—within a boundary you set."
+        description="Connect scripts and other apps to recipes, pantry stock, meal plans, and grocery lists. Choose exactly what each key can do."
         meta={
           <div className="api-trust-points">
             <span>
@@ -48,7 +48,10 @@ export default async function ApiSettingsPage() {
           />
         }
       />
-      <ApiKeyManager initialKeys={listAdminApiKeys(authSession.user.id)} />
+      <ApiKeyManager
+        initialKeys={listAdminApiKeys(authSession.user.id)}
+        accountEmail={authSession.user.email}
+      />
     </main>
   );
 }

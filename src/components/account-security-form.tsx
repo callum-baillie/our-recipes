@@ -38,7 +38,9 @@ export function AccountSecurityForm() {
         error?: { message?: string };
       } | null;
       if (!response.ok) {
-        throw new Error(body?.error?.message ?? body?.message ?? 'The passphrase could not be changed.');
+        throw new Error(
+          body?.error?.message ?? body?.message ?? 'The passphrase could not be changed.',
+        );
       }
       setCurrentPassword('');
       setNewPassword('');
@@ -72,10 +74,12 @@ export function AccountSecurityForm() {
     <div className="account-security-grid">
       <form className="settings-card account-password-card" onSubmit={changePassword}>
         <div className="settings-section-heading">
-          <span aria-hidden="true"><LockKeyhole size={20} /></span>
+          <span aria-hidden="true">
+            <LockKeyhole size={20} />
+          </span>
           <div>
             <h2>Change passphrase</h2>
-            <p>Use at least 15 characters. Other signed-in devices will be signed out.</p>
+            <p>Use at least 8 characters. Other signed-in devices will be signed out.</p>
           </div>
         </div>
         <label>
@@ -95,7 +99,7 @@ export function AccountSecurityForm() {
               required
               type="password"
               autoComplete="new-password"
-              minLength={15}
+              minLength={8}
               maxLength={128}
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
@@ -107,14 +111,18 @@ export function AccountSecurityForm() {
               required
               type="password"
               autoComplete="new-password"
-              minLength={15}
+              minLength={8}
               maxLength={128}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
             />
           </label>
         </div>
-        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
         <button className="primary-button" disabled={pending !== null} type="submit">
           <ShieldCheck size={16} aria-hidden="true" />
           {pending === 'password' ? 'Changing…' : 'Change passphrase'}
@@ -123,7 +131,9 @@ export function AccountSecurityForm() {
 
       <section className="settings-card" aria-labelledby="account-passkey-heading">
         <div className="settings-section-heading">
-          <span aria-hidden="true"><KeyRound size={20} /></span>
+          <span aria-hidden="true">
+            <KeyRound size={20} />
+          </span>
           <div>
             <h2 id="account-passkey-heading">Passwordless sign-in</h2>
             <p>Add a passkey to the account currently signed in on this device.</p>

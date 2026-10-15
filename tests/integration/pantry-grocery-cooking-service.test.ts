@@ -18,6 +18,7 @@ import {
   recipeIngredients,
   recipes,
   shoppingListItems,
+  shoppingPolicyInstances,
   shoppingLists,
 } from '@/lib/db/schema';
 import { pantryBatchInputSchema, pantryProductInputSchema } from '@/lib/domain/pantry';
@@ -29,6 +30,8 @@ import {
   getCookSessionPantryPreview,
   intakePurchasedShoppingItem,
   matchShoppingItemToPantryProduct,
+  reconcileAutomaticRestockPolicies,
+  switchAutomaticRestockTarget,
   updateShoppingItemPantryControl,
   undoCookSessionPantry,
 } from '@/lib/services/pantry-grocery-cooking-service';
@@ -44,10 +47,12 @@ import {
 } from '@/lib/services/pantry-service';
 import {
   getShoppingList,
+  createManualShoppingList,
   listShoppingLists,
   manageShoppingList,
   updateShoppingListItem,
 } from '@/lib/services/planning-service';
+import { getListSettings } from '@/lib/services/list-settings-service';
 import { startCookSession } from '@/lib/services/cooking-service';
 
 describe('Pantry grocery and cooking service', () => {
@@ -375,7 +380,7 @@ describe('Pantry grocery and cooking service', () => {
     });
   });
 
-  it('uses max recipe-or-staple plus extra without double-counting stock or purchases', () => {
+  it('adds an Always-have reserve to recipe demand without double-counting stock or purchases', () => {
     getDatabase()
       .update(pantryProducts)
       .set({
@@ -384,6 +389,8 @@ describe('Pantry grocery and cooking service', () => {
         reorderThreshold: 300,
         targetStock: 500,
         stockUnit: 'g',
+        restockMode: 'always_have',
+        restockTrigger: 'reorder_point',
       })
       .where(sql`${pantryProducts.id} = ${productId}`)
       .run();
@@ -414,15 +421,16 @@ describe('Pantry grocery and cooking service', () => {
       { weekStart: '2027-04-01', weekEnd: '2027-04-07', mode: 'all' },
       profileId,
     );
+    switchAutomaticRestockTarget(generated.listId, profileId);
     let item = getShoppingList(generated.listId)!.items[0]!;
-    expect(item.quantity).toBe(400);
+    expect(item.quantity).toBe(600);
     expect(JSON.parse(item.pantry!.formulaInputs)).toMatchObject({
       recipeRequirement: 200,
-      stapleTarget: 500,
+      targetStock: 500,
       manualExtra: 0,
       usablePantry: 100,
       purchased: 0,
-      shortageQuantity: 400,
+      shortageQuantity: 600,
     });
 
     updateShoppingItemPantryControl(
@@ -441,7 +449,7 @@ describe('Pantry grocery and cooking service', () => {
       profileId,
     );
     item = getShoppingList(generated.listId)!.items[0]!;
-    expect(item.quantity).toBe(450);
+    expect(item.quantity).toBe(650);
 
     const intake = {
       operationKey: 'formula-intake-1',
@@ -479,11 +487,11 @@ describe('Pantry grocery and cooking service', () => {
       profileId,
     );
     item = getShoppingList(generated.listId)!.items[0]!;
-    expect(item.quantity).toBe(350);
+    expect(item.quantity).toBe(550);
     expect(JSON.parse(item.pantry!.formulaInputs)).toMatchObject({
       usablePantry: 100,
       purchased: 100,
-      shortageQuantity: 350,
+      shortageQuantity: 550,
     });
     expect(
       getDatabase()
@@ -518,7 +526,7 @@ describe('Pantry grocery and cooking service', () => {
       profileId,
     );
     item = getShoppingList(generated.listId)!.items[0]!;
-    expect(item.quantity).toBe(450);
+    expect(item.quantity).toBe(650);
     expect(JSON.parse(item.pantry!.formulaInputs).usablePantry).toBe(0);
 
     updateShoppingItemPantryControl(
@@ -1010,5 +1018,87 @@ describe('Pantry grocery and cooking service', () => {
       actorProfileId: profileId,
     });
     expect(getDatabase().select().from(cookSessions).all()[0]!.completedAt).not.toBeNull();
+  });
+  it('creates one Next shop for an exact Always-have trigger and reconciles idempotently', () => {
+    getDatabase()
+      .update(pantryProducts)
+      .set({
+        restockMode: 'always_have',
+        restockTrigger: 'empty',
+        targetStock: 12,
+        stockUnit: 'each',
+      })
+      .where(sql`${pantryProducts.id} = ${productId}`)
+      .run();
+
+    const listId = reconcileAutomaticRestockPolicies(profileId);
+    expect(listId).toBeTruthy();
+    expect(getListSettings().automaticRestockListId).toBe(listId);
+    expect(getShoppingList(listId!)?.items).toHaveLength(1);
+    expect(getShoppingList(listId!)?.items[0]).toMatchObject({ quantity: 12, unit: 'each' });
+
+    reconcileAutomaticRestockPolicies(profileId);
+    expect(
+      getDatabase()
+        .select()
+        .from(shoppingPolicyInstances)
+        .all()
+        .filter((row) => row.listId === listId),
+    ).toHaveLength(1);
+    expect(getShoppingList(listId!)?.items).toHaveLength(1);
+  });
+
+  it('does not let Always buy create a trip, then adds one baseline to the designated trip', () => {
+    getDatabase()
+      .update(pantryProducts)
+      .set({
+        restockMode: 'always_buy',
+        restockTrigger: 'below_target',
+        preferredPurchaseQuantity: 2,
+        stockUnit: 'each',
+      })
+      .where(sql`${pantryProducts.id} = ${productId}`)
+      .run();
+
+    expect(reconcileAutomaticRestockPolicies(profileId)).toBeNull();
+    expect(getListSettings().automaticRestockListId).toBeNull();
+    const list = createManualShoppingList('Saturday shop', profileId);
+    switchAutomaticRestockTarget(list.id, profileId);
+    expect(getShoppingList(list.id)?.items[0]).toMatchObject({ quantity: 2, unit: 'each' });
+  });
+
+  it('keeps sourced Always-have coverage on the old list when Next shop changes', () => {
+    getDatabase()
+      .update(pantryProducts)
+      .set({
+        restockMode: 'always_have',
+        restockTrigger: 'empty',
+        targetStock: 12,
+        stockUnit: 'each',
+      })
+      .where(sql`${pantryProducts.id} = ${productId}`)
+      .run();
+    const first = createManualShoppingList('First shop', profileId);
+    switchAutomaticRestockTarget(first.id, profileId);
+    const firstItem = getShoppingList(first.id)!.items[0]!;
+    updateShoppingListItem(
+      first.id,
+      firstItem.id,
+      {
+        quantity: firstItem.quantity ?? '',
+        unit: firstItem.unit,
+        item: firstItem.item,
+        note: firstItem.note,
+        aisleId: firstItem.aisleId ?? '',
+        checked: true,
+        shoppingState: 'sourced',
+      },
+      profileId,
+    );
+
+    const second = createManualShoppingList('Second shop', profileId);
+    switchAutomaticRestockTarget(second.id, profileId);
+    expect(getShoppingList(first.id)?.items).toHaveLength(1);
+    expect(getShoppingList(second.id)?.items).toHaveLength(0);
   });
 });

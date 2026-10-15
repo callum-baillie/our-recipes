@@ -28,8 +28,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { NutritionOnboardingFlow } from './nutrition-onboarding-flow';
 import { BrandIconPicker } from '@/components/brand-icon-picker';
-import { MultiValueCombobox } from '@/components/multi-value-combobox';
 import { InlineSkeleton } from '@/components/skeleton';
 import { AppearanceSettings } from '@/components/theme-toggle';
 import { useToast } from '@/components/toast-provider';
@@ -58,11 +58,6 @@ import {
   type OnboardingNutritionInput,
   type ProfileInput,
 } from '@/lib/domain/setup';
-import {
-  weightGoalPaces,
-  weightTargetTimeline,
-  type WeightGoalPace,
-} from '@/lib/domain/weight-target-guidance';
 import {
   SCOTTISH_STOVIES_IMAGE_ALT,
   SCOTTISH_STOVIES_IMAGE_PATH,
@@ -96,183 +91,6 @@ function GoalFocusIcon({ focus }: { focus: ProfileGoalFocus }) {
     case 'support-dietary-needs':
       return <ShieldCheck {...props} />;
   }
-}
-
-const activityOptions = [
-  { value: '', label: 'Not set', description: 'Skip this unless you want estimated targets.' },
-  {
-    value: 'sedentary',
-    label: 'Sedentary',
-    description: 'Mostly seated with little intentional weekly activity.',
-  },
-  {
-    value: 'light',
-    label: 'Lightly active',
-    description: 'Light activity or exercise around 1–3 days each week.',
-  },
-  {
-    value: 'moderate',
-    label: 'Moderately active',
-    description: 'Moderate activity or exercise around 3–5 days each week.',
-  },
-  {
-    value: 'active',
-    label: 'Active',
-    description: 'Hard activity or exercise on most days of the week.',
-  },
-  {
-    value: 'very_active',
-    label: 'Very active',
-    description: 'Very hard training or a highly physical daily routine.',
-  },
-] as const;
-
-const nutritionGoalOptions = [
-  {
-    value: 'none',
-    label: 'No goal',
-    description: 'Keep Nutrition available without a weight goal.',
-  },
-  {
-    value: 'maintain',
-    label: 'Maintain',
-    description: 'Use current weight as the planning direction.',
-  },
-  { value: 'gain', label: 'Gain weight', description: 'Set a gradual weight-gain direction.' },
-  { value: 'loss', label: 'Lose weight', description: 'Set a gradual weight-loss direction.' },
-  {
-    value: 'custom',
-    label: 'Custom',
-    description: 'Configure detailed goals later in Nutrition settings.',
-  },
-] as const;
-
-const formulaCategoryOptions = [
-  { value: '', label: 'Not set', description: 'Leave blank when estimates are not needed.' },
-  {
-    value: 'female',
-    label: 'Female reference',
-    description: 'Uses the female category in the reference energy formula.',
-  },
-  {
-    value: 'male',
-    label: 'Male reference',
-    description: 'Uses the male category in the reference energy formula.',
-  },
-] as const;
-
-const dietaryPreferenceOptions = [
-  'Vegetarian',
-  'Vegan',
-  'Pescatarian',
-  'Mediterranean',
-  'Low carbohydrate',
-  'High protein',
-  'Gluten-free',
-  'Dairy-free',
-  'Halal',
-  'Kosher',
-] as const;
-
-const foodAllergyOptions = [
-  'Peanuts',
-  'Tree nuts',
-  'Milk',
-  'Eggs',
-  'Wheat',
-  'Soy',
-  'Fish',
-  'Shellfish',
-  'Sesame',
-] as const;
-
-const dietaryExclusionOptions = [
-  'Alcohol',
-  'Pork',
-  'Beef',
-  'Mushrooms',
-  'Olives',
-  'Cilantro',
-  'Spicy food',
-  'Artificial sweeteners',
-] as const;
-
-type RichChoice = { value: string; label: string; description: string };
-
-function RichChoiceField({
-  legend,
-  helper,
-  name,
-  value,
-  options,
-  onChange,
-}: {
-  legend: string;
-  helper: string;
-  name: string;
-  value: string;
-  options: readonly RichChoice[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <fieldset className="onboarding-rich-choice-fieldset">
-      <legend>{legend}</legend>
-      <p>{helper}</p>
-      <div className="onboarding-rich-choice-options">
-        {options.map((option) => (
-          <label
-            className={
-              value === option.value ? 'onboarding-rich-choice selected' : 'onboarding-rich-choice'
-            }
-            key={option.value || 'not-set'}
-          >
-            <input
-              type="radio"
-              name={name}
-              value={option.value}
-              checked={value === option.value}
-              onChange={() => onChange(option.value)}
-            />
-            <span>
-              <strong>{option.label}</strong>
-              <small>{option.description}</small>
-            </span>
-            {value === option.value ? <Check size={15} strokeWidth={3} aria-hidden="true" /> : null}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-function OnboardingSwitch({
-  checked,
-  title,
-  description,
-  onChange,
-}: {
-  checked: boolean;
-  title: string;
-  description: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      className={checked ? 'onboarding-switch checked' : 'onboarding-switch'}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="onboarding-switch-track" aria-hidden="true">
-        <span />
-      </span>
-      <span className="onboarding-switch-copy">
-        <strong>{title}</strong>
-        <small>{description}</small>
-      </span>
-    </button>
-  );
 }
 
 const profileTypeOptions = [
@@ -563,7 +381,6 @@ type ProfileDraft = {
   weightPrimary: string;
   weightSecondary: string;
   targetWeight: string;
-  weightGoalPace: WeightGoalPace;
   dietaryPreferences: string[];
   foodAllergies: string[];
   dietaryExclusions: string[];
@@ -588,7 +405,7 @@ function createProfileDraft(
         focusAreas: [...defaultProfileGoalContext.focusAreas],
       },
     },
-    credentials: { email: '', passphrase: '', pin: '' },
+    credentials: { email: '', passphrase: '' },
     nutrition: { ...defaultOnboardingNutrition },
     heightUnit: defaultProfileInput.units,
     heightPrimary: '',
@@ -597,7 +414,6 @@ function createProfileDraft(
     weightPrimary: '',
     weightSecondary: '',
     targetWeight: '',
-    weightGoalPace: 'steady',
     dietaryPreferences: [],
     foodAllergies: [],
     dietaryExclusions: [],
@@ -674,23 +490,7 @@ export function OnboardingWizard({
   const [recoveryCodesSaved, setRecoveryCodesSaved] = useState(false);
   const currentStep = steps[stepIndex]!;
   const activeDraft = profileDrafts[activeProfileIndex]!;
-  const {
-    role,
-    profile,
-    credentials,
-    nutrition,
-    heightUnit,
-    heightPrimary,
-    heightSecondary,
-    weightUnit,
-    weightPrimary,
-    weightSecondary,
-    targetWeight,
-    weightGoalPace,
-    dietaryPreferences,
-    foodAllergies,
-    dietaryExclusions,
-  } = activeDraft;
+  const { role, profile, credentials, nutrition } = activeDraft;
   const activeProfileType =
     profileTypeOptions.find((option) => option.value === nutrition.profileType) ??
     profileTypeOptions[0];
@@ -739,148 +539,7 @@ export function OnboardingWizard({
     updateActiveDraft((draft) => ({ ...draft, nutrition: value }));
   }
 
-  function setHeightSegment(segment: 'primary' | 'secondary', value: string) {
-    updateActiveDraft((draft) => ({
-      ...draft,
-      [segment === 'primary' ? 'heightPrimary' : 'heightSecondary']: value,
-    }));
-  }
-
-  function setWeightSegment(segment: 'primary' | 'secondary', value: string) {
-    updateActiveDraft((draft) => ({
-      ...draft,
-      [segment === 'primary' ? 'weightPrimary' : 'weightSecondary']: value,
-    }));
-  }
-
-  function setWeightGoalPace(value: WeightGoalPace) {
-    updateActiveDraft((draft) => ({ ...draft, weightGoalPace: value }));
-  }
-
-  function setTargetWeight(value: string) {
-    updateActiveDraft((draft) => ({ ...draft, targetWeight: value }));
-  }
-
-  function setHeightUnit(unit: OnboardingMeasurementUnit) {
-    updateActiveDraft((draft) => {
-      const centimeters = onboardingHeightCentimeters(
-        draft.heightUnit,
-        draft.heightPrimary,
-        draft.heightSecondary,
-      );
-      if (centimeters === null) {
-        return { ...draft, heightUnit: unit, heightPrimary: '', heightSecondary: '' };
-      }
-      if (unit === 'metric') {
-        return {
-          ...draft,
-          heightUnit: unit,
-          heightPrimary: String(Math.round(centimeters * 10) / 10),
-          heightSecondary: '',
-        };
-      }
-      const totalInches = centimeters / 2.54;
-      const feet = Math.floor(totalInches / 12);
-      const inches = Math.round((totalInches - feet * 12) * 10) / 10;
-      return {
-        ...draft,
-        heightUnit: unit,
-        heightPrimary: String(feet),
-        heightSecondary: String(inches),
-      };
-    });
-  }
-
-  function setWeightUnit(unit: OnboardingMeasurementUnit) {
-    updateActiveDraft((draft) => {
-      const kilograms = onboardingWeightKilograms(
-        draft.weightUnit,
-        draft.weightPrimary,
-        draft.weightSecondary,
-      );
-      const targetWeightKilograms = onboardingWeightKilograms(draft.weightUnit, draft.targetWeight);
-      if (kilograms === null) {
-        return {
-          ...draft,
-          weightUnit: unit,
-          weightPrimary: '',
-          weightSecondary: '',
-          targetWeight:
-            targetWeightKilograms === null
-              ? ''
-              : String(
-                  Math.round(
-                    (unit === 'metric'
-                      ? targetWeightKilograms
-                      : targetWeightKilograms * 2.2046226218) * 10,
-                  ) / 10,
-                ),
-        };
-      }
-      if (unit === 'metric') {
-        const wholeKilograms = Math.floor(kilograms);
-        return {
-          ...draft,
-          weightUnit: unit,
-          weightPrimary: String(wholeKilograms),
-          weightSecondary: String(Math.round((kilograms - wholeKilograms) * 1_000)),
-          targetWeight:
-            targetWeightKilograms === null
-              ? ''
-              : String(Math.round(targetWeightKilograms * 10) / 10),
-        };
-      }
-      const totalPounds = kilograms * 2.2046226218;
-      const pounds = Math.floor(totalPounds);
-      return {
-        ...draft,
-        weightUnit: unit,
-        weightPrimary: String(pounds),
-        weightSecondary: String(Math.round((totalPounds - pounds) * 160) / 10),
-        targetWeight:
-          targetWeightKilograms === null
-            ? ''
-            : String(Math.round(targetWeightKilograms * 2.2046226218 * 10) / 10),
-      };
-    });
-  }
-
-  function setDietaryPreferences(value: string[]) {
-    updateActiveDraft((draft) => ({ ...draft, dietaryPreferences: value }));
-  }
-
-  function setFoodAllergies(value: string[]) {
-    updateActiveDraft((draft) => ({ ...draft, foodAllergies: value }));
-  }
-
-  function setDietaryExclusions(value: string[]) {
-    updateActiveDraft((draft) => ({ ...draft, dietaryExclusions: value }));
-  }
-
   const canonicalNutrition = canonicalNutritionForDraft(activeDraft);
-  const weightGoalType = nutrition.nutritionGoalType;
-  const isWeightChangeGoal = weightGoalType === 'gain' || weightGoalType === 'loss';
-  const weightTargetTimelineEstimate =
-    weightGoalType === 'gain' || weightGoalType === 'loss'
-      ? weightTargetTimeline({
-          goalType: weightGoalType,
-          currentWeightKilograms: canonicalNutrition.currentWeightKilograms,
-          targetWeightKilograms: canonicalNutrition.targetWeightKilograms,
-          pace: weightGoalPace,
-          startsOn: new Date().toISOString().slice(0, 10),
-        })
-      : null;
-  const targetWeightDirectionMismatch =
-    canonicalNutrition.currentWeightKilograms !== null &&
-    canonicalNutrition.targetWeightKilograms !== null &&
-    ((nutrition.nutritionGoalType === 'loss' &&
-      canonicalNutrition.targetWeightKilograms >= canonicalNutrition.currentWeightKilograms) ||
-      (nutrition.nutritionGoalType === 'gain' &&
-      canonicalNutrition.targetWeightKilograms <= canonicalNutrition.currentWeightKilograms));
-  const targetDateIsEarlierThanSuggested =
-    Boolean(nutrition.targetDate) &&
-    Boolean(weightTargetTimelineEstimate?.targetDate) &&
-    nutrition.targetDate < weightTargetTimelineEstimate!.targetDate;
   const goalContext = profile.goalContext ?? defaultProfileGoalContext;
 
   function setGoalContext(changes: Partial<ProfileGoalContext>) {
@@ -928,7 +587,11 @@ export function OnboardingWizard({
       return;
     }
     setError(null);
-    if (currentStep === 'goals') setProfileReviewMode(null);
+    if (currentStep === 'goals' && profileReviewMode) {
+      setProfileReviewMode(null);
+      setStepIndex(steps.indexOf('review'));
+      return;
+    }
     setStepIndex((current) => Math.min(current + 1, steps.length - 1));
   }
 
@@ -1225,7 +888,7 @@ export function OnboardingWizard({
                 </h2>
                 <p>
                   Profiles personalize units, history, planning, and Nutrition. Each profile has its
-                  own sign-in and a quick-switch PIN.
+                  own sign-in and a password for profile switching.
                 </p>
               </div>
             </div>
@@ -1299,34 +962,16 @@ export function OnboardingWizard({
                   <input
                     type="password"
                     autoComplete="new-password"
-                    minLength={15}
+                    minLength={8}
                     maxLength={128}
                     value={credentials.passphrase}
                     onChange={(event) =>
                       setCredentials({ ...credentials, passphrase: event.target.value })
                     }
                   />
-                  <small>Use at least 15 characters. A passphrase protects remote sign-in.</small>
+                  <small>Use at least 8 characters. A passphrase protects remote sign-in.</small>
                 </label>
-                <label>
-                  <span>Profile PIN</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
-                    minLength={6}
-                    maxLength={6}
-                    value={credentials.pin}
-                    onChange={(event) =>
-                      setCredentials({
-                        ...credentials,
-                        pin: event.target.value.replace(/\D/gu, '').slice(0, 6),
-                      })
-                    }
-                  />
-                  <small>Six digits used only when switching profiles on a signed-in device.</small>
-                </label>
+
                 <label>
                   <span>Access role</span>
                   <select
@@ -1372,8 +1017,8 @@ export function OnboardingWizard({
                 </div>
                 <p className="onboarding-profile-type-note">
                   Access role controls permissions. Profile type only changes planning and Nutrition
-                  context. A PIN can switch to an equal or lower role; moving up requires a full
-                  sign-in.
+                  context. A password can switch to an equal or lower role; moving up requires a
+                  full sign-in.
                 </p>
               </div>
             </section>
@@ -1420,350 +1065,36 @@ export function OnboardingWizard({
         ) : null}
 
         {currentStep === 'nutrition' ? (
-          <>
-            <div className="onboarding-heading">
-              <ShieldCheck size={25} aria-hidden="true" />
-              <div>
-                <h2>Setup your Nutrition profile</h2>
-                <p>Everything here is optional unless you ask the app to estimate targets.</p>
-              </div>
-            </div>
-            <section className="onboarding-nutrition-section" aria-labelledby="body-basics-title">
-              <div className="onboarding-section-heading">
-                <h3 id="body-basics-title">Body basics</h3>
-                <p>Used only for your profile and only when a Nutrition feature needs them.</p>
-              </div>
-              <div className="onboarding-measurement-grid">
-                <label className="onboarding-date-field">
-                  <span>Birthday</span>
-                  <input
-                    type="date"
-                    value={nutrition.dateOfBirth}
-                    onChange={(event) =>
-                      setNutrition({ ...nutrition, dateOfBirth: event.target.value })
-                    }
-                  />
-                  <small>
-                    Used to calculate age for optional estimates. It is not shown publicly.
-                  </small>
-                </label>
-                <fieldset className="onboarding-measurement-fieldset">
-                  <legend>Height</legend>
-                  <div className="measurement-unit-toggle" aria-label="Height unit">
-                    <button
-                      type="button"
-                      aria-pressed={heightUnit === 'imperial'}
-                      onClick={() => setHeightUnit('imperial')}
-                    >
-                      ft
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={heightUnit === 'metric'}
-                      onClick={() => setHeightUnit('metric')}
-                    >
-                      cm
-                    </button>
-                  </div>
-                  <div className="measurement-segments">
-                    <label>
-                      <input
-                        aria-label={
-                          heightUnit === 'imperial' ? 'Height feet' : 'Height centimeters'
-                        }
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        max={heightUnit === 'metric' ? 300 : 9}
-                        step={heightUnit === 'metric' ? '0.1' : '1'}
-                        value={heightPrimary}
-                        onChange={(event) => setHeightSegment('primary', event.target.value)}
-                      />
-                      <span>{heightUnit === 'imperial' ? 'ft' : 'cm'}</span>
-                    </label>
-                    {heightUnit === 'imperial' ? (
-                      <label>
-                        <input
-                          aria-label="Height inches"
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          max="11.9"
-                          step="0.1"
-                          value={heightSecondary}
-                          onChange={(event) => setHeightSegment('secondary', event.target.value)}
-                        />
-                        <span>in</span>
-                      </label>
-                    ) : null}
-                  </div>
-                  <small>Switch units at any time; the entered value is converted for you.</small>
-                </fieldset>
-                <fieldset className="onboarding-measurement-fieldset">
-                  <legend>Current weight</legend>
-                  <div className="measurement-unit-toggle" aria-label="Weight unit">
-                    <button
-                      type="button"
-                      aria-pressed={weightUnit === 'imperial'}
-                      onClick={() => setWeightUnit('imperial')}
-                    >
-                      lb
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={weightUnit === 'metric'}
-                      onClick={() => setWeightUnit('metric')}
-                    >
-                      kg
-                    </button>
-                  </div>
-                  <div className="measurement-segments">
-                    <label>
-                      <input
-                        aria-label={
-                          weightUnit === 'imperial' ? 'Weight pounds' : 'Weight kilograms'
-                        }
-                        type="number"
-                        inputMode="numeric"
-                        min="0"
-                        max={weightUnit === 'imperial' ? 2_200 : 1_000}
-                        step="1"
-                        value={weightPrimary}
-                        onChange={(event) => setWeightSegment('primary', event.target.value)}
-                      />
-                      <span>{weightUnit === 'imperial' ? 'lb' : 'kg'}</span>
-                    </label>
-                    <label>
-                      <input
-                        aria-label={weightUnit === 'imperial' ? 'Weight ounces' : 'Weight grams'}
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        max={weightUnit === 'imperial' ? 15.9 : 999}
-                        step={weightUnit === 'imperial' ? '0.1' : '1'}
-                        value={weightSecondary}
-                        onChange={(event) => setWeightSegment('secondary', event.target.value)}
-                      />
-                      <span>{weightUnit === 'imperial' ? 'oz' : 'g'}</span>
-                    </label>
-                  </div>
-                  <small>
-                    The smaller segment is optional and helps record a more precise value.
-                  </small>
-                </fieldset>
-              </div>
-            </section>
-            <section
-              className="onboarding-nutrition-section"
-              aria-labelledby="planning-context-title"
-            >
-              <div className="onboarding-section-heading">
-                <h3 id="planning-context-title">Planning context</h3>
-                <p>Select the description that best fits. You can revise these later.</p>
-              </div>
-              <RichChoiceField
-                legend="Activity level"
-                helper="Only used when you explicitly enable estimated Nutrition targets."
-                name={`activity-level-${activeDraft.localId}`}
-                value={nutrition.activityLevel ?? ''}
-                options={activityOptions}
-                onChange={(value) =>
-                  setNutrition({
-                    ...nutrition,
-                    activityLevel: (value || null) as OnboardingNutritionInput['activityLevel'],
-                  })
-                }
-              />
-              <RichChoiceField
-                legend="Nutrition goal"
-                helper="This saves a body-weight direction. Daily calorie and nutrient goals are a separate, optional step."
-                name={`nutrition-goal-${activeDraft.localId}`}
-                value={nutrition.nutritionGoalType}
-                options={nutritionGoalOptions}
-                onChange={(value) =>
-                  setNutrition({
-                    ...nutrition,
-                    nutritionGoalType: value as OnboardingNutritionInput['nutritionGoalType'],
-                  })
-                }
-              />
-              {isWeightChangeGoal ? (
-                <section className="onboarding-weight-target" aria-labelledby="weight-target-title">
-                  <div>
-                    <h4 id="weight-target-title">
-                      Choose a workable {nutrition.nutritionGoalType === 'loss' ? 'loss' : 'gain'}{' '}
-                      target
-                    </h4>
-                    <p>
-                      Start with a target weight and a pace you can revisit. This is a planning
-                      estimate, not medical advice or a calorie prescription.
-                    </p>
-                  </div>
-                  <div className="onboarding-weight-target-grid">
-                    <label>
-                      <span>Target weight ({weightUnit === 'imperial' ? 'lb' : 'kg'})</span>
-                      <input
-                        aria-label="Target weight"
-                        type="number"
-                        inputMode="decimal"
-                        min="0.1"
-                        max={weightUnit === 'imperial' ? 2_200 : 1_000}
-                        step="0.1"
-                        value={targetWeight}
-                        onChange={(event) => setTargetWeight(event.target.value)}
-                      />
-                    </label>
-                    <fieldset>
-                      <legend>Planning pace</legend>
-                      <div className="onboarding-weight-pace-options">
-                        {(
-                          Object.entries(weightGoalPaces) as Array<
-                            [WeightGoalPace, (typeof weightGoalPaces)[WeightGoalPace]]
-                          >
-                        ).map(([pace, option]) => (
-                          <label key={pace}>
-                            <input
-                              type="radio"
-                              name={`weight-goal-pace-${activeDraft.localId}`}
-                              checked={weightGoalPace === pace}
-                              onChange={() => setWeightGoalPace(pace)}
-                            />
-                            <span>
-                              <strong>{option.label}</strong>
-                              <small>{option.description}</small>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                    <label>
-                      <span>Target date</span>
-                      <input
-                        type="date"
-                        value={nutrition.targetDate}
-                        onChange={(event) =>
-                          setNutrition({ ...nutrition, targetDate: event.target.value })
-                        }
-                      />
-                    </label>
-                  </div>
-                  {targetWeightDirectionMismatch ? (
-                    <p className="onboarding-weight-target-warning" role="status">
-                      {nutrition.nutritionGoalType === 'loss'
-                        ? 'For a loss goal, choose a target below the current weight.'
-                        : 'For a gain goal, choose a target above the current weight.'}
-                    </p>
-                  ) : targetDateIsEarlierThanSuggested ? (
-                    <p className="onboarding-weight-target-warning" role="status">
-                      That date is faster than the selected pace. Choose the suggested date or a
-                      later one for a more gradual plan.
-                    </p>
-                  ) : weightTargetTimelineEstimate ? (
-                    <div className="onboarding-weight-target-estimate" role="status">
-                      <span>
-                        At this pace, the{' '}
-                        {Math.round(weightTargetTimelineEstimate.changeKilograms * 10) / 10} kg
-                        change is roughly {weightTargetTimelineEstimate.weeks} weeks.
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setNutrition({
-                            ...nutrition,
-                            targetDate: weightTargetTimelineEstimate.targetDate,
-                          })
-                        }
-                      >
-                        Use suggested date
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="onboarding-weight-target-hint">
-                      Add a current and target weight to see a suggested timeframe.
-                    </p>
-                  )}
-                </section>
-              ) : null}
-              <RichChoiceField
-                legend="Formula category"
-                helper="Reference formulas use one of two categories. Choose the category you want used for estimates; it does not define your identity."
-                name={`formula-category-${activeDraft.localId}`}
-                value={nutrition.referenceSexCategory ?? ''}
-                options={formulaCategoryOptions}
-                onChange={(value) =>
-                  setNutrition({
-                    ...nutrition,
-                    referenceSexCategory: (value ||
-                      null) as OnboardingNutritionInput['referenceSexCategory'],
-                  })
-                }
-              />
-            </section>
-            <section className="onboarding-nutrition-section" aria-labelledby="food-context-title">
-              <div className="onboarding-section-heading">
-                <h3 id="food-context-title">Food preferences</h3>
-                <p>Add common values from the suggestions or type anything specific to you.</p>
-              </div>
-              <div className="onboarding-food-context-grid">
-                <MultiValueCombobox
-                  label="Dietary preferences"
-                  helper="Add eating styles you prefer. Press Enter or comma after each item."
-                  placeholder="Try Vegetarian"
-                  options={dietaryPreferenceOptions}
-                  value={dietaryPreferences}
-                  onChange={setDietaryPreferences}
-                />
-                <MultiValueCombobox
-                  label="Food allergies"
-                  helper="Add known allergies for planning context; always verify ingredients yourself."
-                  placeholder="Try Peanuts"
-                  options={foodAllergyOptions}
-                  value={foodAllergies}
-                  onChange={setFoodAllergies}
-                />
-                <MultiValueCombobox
-                  label="Foods to exclude"
-                  helper="Add ingredients or foods you want recipes and plans to avoid."
-                  placeholder="Try Mushrooms"
-                  options={dietaryExclusionOptions}
-                  value={dietaryExclusions}
-                  onChange={setDietaryExclusions}
-                />
-              </div>
-            </section>
-            <div className="onboarding-toggles">
-              <OnboardingSwitch
-                checked={nutrition.weightTrackingEnabled}
-                title="Enable weight tracking"
-                description="Allow this profile to record weight measurements over time."
-                onChange={(checked) =>
-                  setNutrition({ ...nutrition, weightTrackingEnabled: checked })
-                }
-              />
-              <OnboardingSwitch
-                checked={nutrition.estimatedTargetsEnabled}
-                title="Estimate Nutrition targets"
-                description="Uses birthday, body measurements, formula category, and activity level."
-                onChange={(checked) =>
-                  setNutrition({
-                    ...nutrition,
-                    estimatedTargetsEnabled: checked,
-                    estimatedTargetConsent: checked ? nutrition.estimatedTargetConsent : false,
-                  })
-                }
-              />
-              {nutrition.estimatedTargetsEnabled ? (
-                <OnboardingSwitch
-                  checked={nutrition.estimatedTargetConsent}
-                  title="I consent to this calculation"
-                  description="Estimates are informational and can be changed or disabled later."
-                  onChange={(checked) =>
-                    setNutrition({ ...nutrition, estimatedTargetConsent: checked })
-                  }
-                />
-              ) : null}
-            </div>
-          </>
+          <NutritionOnboardingFlow
+            key={activeDraft.localId}
+            value={canonicalNutrition}
+            units={profile.units}
+            timeZone={profile.timezone}
+            onBack={() => {
+              setError(null);
+              setStepIndex((current) => current - 1);
+            }}
+            onComplete={next}
+            onChange={(value) =>
+              updateActiveDraft((draft) => ({
+                ...draft,
+                nutrition: value,
+                heightUnit: 'metric',
+                heightPrimary:
+                  value.heightCentimeters === null ? '' : String(value.heightCentimeters),
+                heightSecondary: '',
+                weightUnit: 'metric',
+                weightPrimary:
+                  value.currentWeightKilograms === null ? '' : String(value.currentWeightKilograms),
+                weightSecondary: '',
+                targetWeight:
+                  value.targetWeightKilograms === null ? '' : String(value.targetWeightKilograms),
+                dietaryPreferences: value.dietaryPreferences,
+                foodAllergies: value.foodAllergies,
+                dietaryExclusions: value.dietaryExclusions,
+              }))
+            }
+          />
         ) : null}
 
         {currentStep === 'goals' ? (
@@ -2189,57 +1520,59 @@ export function OnboardingWizard({
           {error}
         </p>
       ) : null}
-      <footer className="onboarding-actions">
-        {stepIndex > 0 ? (
-          <button
-            className="text-button"
-            type="button"
-            disabled={submitting}
-            onClick={() => {
-              if (currentStep === 'profile' && profileReviewMode) {
-                returnToReview();
-              } else {
-                setError(null);
-                setStepIndex((current) => current - 1);
-              }
-            }}
-          >
-            <ArrowLeft size={16} />
-            {currentStep === 'profile' && profileReviewMode ? 'Back to review' : 'Back'}
-          </button>
-        ) : onCancel ? (
-          <button className="text-button" type="button" onClick={onCancel}>
-            Cancel
-          </button>
-        ) : (
-          <span />
-        )}
-        {currentStep === 'review' ? (
-          <button
-            className="primary-button"
-            type="button"
-            disabled={submitting}
-            onClick={() => void submit()}
-          >
-            {submitting ? (
-              <InlineSkeleton label="Completing onboarding" width="1rem" />
-            ) : (
-              <Check size={17} />
-            )}
-            {submitting
-              ? 'Saving…'
-              : mode === 'initial'
-                ? firstRecipeChoice === 'example'
-                  ? 'Add Stovies & open recipe'
-                  : 'Create kitchen & continue'
-                : 'Create profile'}
-          </button>
-        ) : (
-          <button className="primary-button" type="button" onClick={next}>
-            Continue <ChevronRight size={17} />
-          </button>
-        )}
-      </footer>
+      {currentStep !== 'nutrition' ? (
+        <footer className="onboarding-actions">
+          {stepIndex > 0 ? (
+            <button
+              className="text-button"
+              type="button"
+              disabled={submitting}
+              onClick={() => {
+                if (currentStep === 'profile' && profileReviewMode) {
+                  returnToReview();
+                } else {
+                  setError(null);
+                  setStepIndex((current) => current - 1);
+                }
+              }}
+            >
+              <ArrowLeft size={16} />
+              {currentStep === 'profile' && profileReviewMode ? 'Back to review' : 'Back'}
+            </button>
+          ) : onCancel ? (
+            <button className="text-button" type="button" onClick={onCancel}>
+              Cancel
+            </button>
+          ) : (
+            <span />
+          )}
+          {currentStep === 'review' ? (
+            <button
+              className="primary-button"
+              type="button"
+              disabled={submitting}
+              onClick={() => void submit()}
+            >
+              {submitting ? (
+                <InlineSkeleton label="Completing onboarding" width="1rem" />
+              ) : (
+                <Check size={17} />
+              )}
+              {submitting
+                ? 'Saving…'
+                : mode === 'initial'
+                  ? firstRecipeChoice === 'example'
+                    ? 'Add Stovies & open recipe'
+                    : 'Create kitchen & continue'
+                  : 'Create profile'}
+            </button>
+          ) : (
+            <button className="primary-button" type="button" onClick={next}>
+              Continue <ChevronRight size={17} />
+            </button>
+          )}
+        </footer>
+      ) : null}
     </section>
   );
 }

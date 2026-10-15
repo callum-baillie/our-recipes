@@ -1,4 +1,5 @@
 'use client';
+import { PageHeader } from '@/components/page-header';
 
 import { ChevronDown, ChevronUp, FolderPlus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
@@ -111,17 +112,12 @@ export function CollectionManager({
   return (
     <main className="recipe-page collection-page">
       <div className="collection-page-shell">
-        <RecipebookNav current="collections" />
-        <header className="collection-page-intro">
-          <p className="eyebrow">CURATED COOKBOOKS</p>
-          <div className="collection-intro-layout">
-            <h1>A shelf for the recipes that belong together.</h1>
-            <p>
-              Collections are deliberate household cookbooks. A recipe can sit in more than one, and
-              their order stays exactly the way you arrange it.
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Collections"
+          eyebrow="CURATED COOKBOOKS"
+          description="Keep recipes together in household cookbooks, arranged in the order you choose."
+          toolbarRight={<RecipebookNav current="collections" />}
+        />
 
         <section className="collection-create-panel" aria-labelledby="create-collection-title">
           <div className="collection-create-heading">

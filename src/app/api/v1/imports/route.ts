@@ -1,13 +1,13 @@
-import { cookies } from 'next/headers';
+import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
+
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import {
   importClientConversionsSchema,
   MAX_IMPORT_BYTES,
   ImportValidationError,
 } from '@/lib/domain/import';
-import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
+import { jsonError } from '@/lib/http';
 import { assertImportRateLimit, createImportOperation } from '@/lib/services/import-service';
 
 export const runtime = 'nodejs';
@@ -34,15 +34,18 @@ function profileRequired() {
 }
 
 export async function POST(request: Request) {
-  if (!hasTrustedMutationOrigin(request)) {
-    return jsonError(403, 'untrusted_origin', 'This import must come from a trusted app origin.');
-  }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) return profileRequired();
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
+  const actor = actorFromPrincipal(access.principal);
+  if (!actor.profileId) return withApiRequestId(profileRequired(), access.requestId);
 
   const declaredLength = Number(request.headers.get('content-length') ?? '0');
   if (declaredLength > MAX_IMPORT_BYTES + MAX_MULTIPART_OVERHEAD_BYTES) {
-    return jsonError(413, 'file_too_large', 'Choose a PDF or image no larger than 15 MB.');
+    return withApiRequestId(
+      jsonError(413, 'file_too_large', 'Choose a PDF or image no larger than 15 MB.'),
+      access.requestId,
+    );
   }
   try {
     assertImportRateLimit(actor.profileId);
@@ -52,10 +55,13 @@ export async function POST(request: Request) {
     const transcription = formData.get('transcription');
     if (files.length === 0 && legacyFile instanceof File) files.push(legacyFile);
     if (files.length === 0) {
-      return jsonError(
-        400,
-        'invalid_file',
-        'Choose one PDF or up to four recipe scan images to import.',
+      return withApiRequestId(
+        jsonError(
+          400,
+          'invalid_file',
+          'Choose one PDF or up to four recipe scan images to import.',
+        ),
+        access.requestId,
       );
     }
     const created = await createImportOperation({
@@ -70,14 +76,18 @@ export async function POST(request: Request) {
       clientConversions: parseClientConversions(formData.get('clientConversions')),
       autoOpenAiVision: formData.get('autoOpenAiVision') === 'true',
     });
-    return NextResponse.json(created, { status: 201 });
+    return withApiRequestId(NextResponse.json(created, { status: 201 }), access.requestId);
   } catch (error) {
-    if (error instanceof ImportValidationError) return jsonError(422, error.code, error.message);
+    if (error instanceof ImportValidationError)
+      return withApiRequestId(jsonError(422, error.code, error.message), access.requestId);
     console.error('Import processing failed before provider review.', error);
-    return jsonError(
-      500,
-      'import_processing_failed',
-      'The app could not process this upload. Your selected files were not saved; try again after checking the server logs.',
+    return withApiRequestId(
+      jsonError(
+        500,
+        'import_processing_failed',
+        'The app could not process this upload. Your selected files were not saved; try again after checking the server logs.',
+      ),
+      access.requestId,
     );
   }
 }

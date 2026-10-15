@@ -43,7 +43,8 @@ export async function POST(request: Request) {
   }
   try {
     const enrollments = await enrollExistingProfiles(parsed.data.profiles);
-    if (getRuntimeConfig().isProduction) {
+    const requireEmailVerification = getRuntimeConfig().auth.requireEmailVerification;
+    if (requireEmailVerification) {
       for (const entry of parsed.data.profiles) {
         void auth.api
           .sendVerificationEmail({
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       enrollments,
-      requiresEmailVerification: getRuntimeConfig().isProduction,
+      requiresEmailVerification: requireEmailVerification,
     });
   } catch (error) {
     return jsonError(

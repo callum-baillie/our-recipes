@@ -1,24 +1,21 @@
+import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
 import { foodDetailsInputSchema } from '@/lib/domain/food-data';
 import { getFoodDetails } from '@/lib/services/food-data-service';
-import {
-  foodDataApiError,
-  foodDataJson,
-  readFoodDataJson,
-  rejectUntrustedFoodDataRequest,
-  requireFoodDataActor,
-} from '../_shared';
+import { foodDataApiError, foodDataJson, readFoodDataJson } from '../_shared';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
-  const rejected = rejectUntrustedFoodDataRequest(request);
-  if (rejected) return rejected;
-  const actor = await requireFoodDataActor();
-  if (actor.response) return actor.response;
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+
   try {
     const input = foodDetailsInputSchema.parse(await readFoodDataJson(request));
-    return foodDataJson(await getFoodDetails(input.provider, input.recordId, input.language));
+    return withApiRequestId(
+      foodDataJson(await getFoodDetails(input.provider, input.recordId, input.language)),
+      access.requestId,
+    );
   } catch (error) {
-    return foodDataApiError(error);
+    return withApiRequestId(foodDataApiError(error), access.requestId);
   }
 }

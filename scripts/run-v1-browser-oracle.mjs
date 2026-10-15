@@ -23,11 +23,15 @@ for (const spec of specs) {
   });
   if (prepare.status !== 0) process.exit(prepare.status ?? 1);
 
-  const result = spawnSync(process.execPath, [playwrightCli, 'test', spec, '--workers=1'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    env: { ...process.env, V1_RELEASE_ORACLE: 'true' },
-    stdio: 'inherit',
-  });
+  const result = spawnSync(
+    process.execPath,
+    [playwrightCli, 'test', spec, '--workers=1', '--max-failures=1'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: { ...process.env, V1_RELEASE_ORACLE: 'true' },
+      stdio: 'inherit',
+    },
+  );
   if (result.status !== 0) process.exit(result.status ?? 1);
 }

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { AI_WORKLOAD_DEFAULTS, aiWorkloadSchema } from '@/lib/domain/ai-assistant';
+
 import { InlineSkeleton } from '@/components/skeleton';
 import { SettingsPane } from '@/components/settings-primitives';
 
@@ -45,9 +47,18 @@ const policyFields = [
   ['shareNutritionAggregates', 'Nutrition summaries', 'Daily and seven-day totals and trends.'],
   ['shareRawDiary', 'Raw nutrition diary', 'Individual logged foods and nutrient values.'],
   ['shareIdentity', 'Name and identity', 'Your household display name.'],
-  ['sharePersonalMetrics', 'Personal metrics', 'Height, activity, sex category, and life stage.'],
+  [
+    'sharePersonalMetrics',
+    'Personal metrics',
+    'Age, height, activity, sex category, life stage, and recorded body composition. Mass values also require Weight sharing.',
+  ],
   ['shareWeight', 'Weight', 'Current and target weight.'],
-  ['shareShoppingLists', 'Shopping lists', 'List names, sources, completion, and store names.'],
+  [
+    'sharePantry',
+    'Pantry stock',
+    'Available food, quantities, locations, and recorded expiry dates.',
+  ],
+  ['shareShoppingLists', 'Shopping lists', 'List names, items, quantities, notes, and completion.'],
 ] as const;
 
 const summaryFields = [
@@ -234,6 +245,22 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
         title="Models by task"
         description="Model choices are shared by the household. Compatible custom model IDs are supported."
       >
+        <button
+          type="button"
+          onClick={() =>
+            setSettings((current) => ({
+              ...current,
+              workloads: current.workloads.map((item) => {
+                const workload = aiWorkloadSchema.safeParse(item.workload);
+                return workload.success && workload.data !== 'image_generation'
+                  ? { ...item, ...AI_WORKLOAD_DEFAULTS[workload.data] }
+                  : item;
+              }),
+            }))
+          }
+        >
+          Use recommended Luna models
+        </button>
         <div className={styles.workloads}>
           {settings.workloads.map((item, index) => {
             const choices = settings.modelCatalog.filter((model) =>

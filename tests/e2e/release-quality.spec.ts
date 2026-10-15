@@ -258,7 +258,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   ).toBeVisible();
 
   await page.goto('/planner');
-  await expect(page.getByRole('heading', { name: 'This week at the table' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Meal planner', exact: true })).toBeVisible();
   await expect(page.locator('.app-footer')).toBeHidden();
   await expect(
     page.getByRole('banner').getByRole('link', { name: 'The Release Table home' }),
