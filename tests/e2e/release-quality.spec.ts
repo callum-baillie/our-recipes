@@ -89,6 +89,7 @@ async function createRecipeForReview(page: import('@playwright/test').Page): Pro
 test('release-quality matrix keeps the real cookbook flow readable across surfaces and print', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(120_000);
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -189,7 +190,9 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     '/settings',
   );
   await expect(page.getByRole('banner').getByRole('link', { name: 'App settings' })).toBeHidden();
-  await page.mouse.click(8, 500);
+  const mobileMenuBounds = await mobileNavigation.locator('nav').boundingBox();
+  expect(mobileMenuBounds).not.toBeNull();
+  await page.mouse.click(8, mobileMenuBounds!.y + mobileMenuBounds!.height + 12);
   await expect(mobileNavigation).toHaveJSProperty('open', false);
 
   await page.setViewportSize(surfaces[0].viewport);

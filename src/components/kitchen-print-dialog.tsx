@@ -1,11 +1,10 @@
-import Link from 'next/link';
 import { Printer } from 'lucide-react';
 type PrintProps =
   | { kind: 'recipes'; recipes: { id: string; title: string }[]; browse?: boolean }
   | { kind: 'meal-plan'; start: string; end: string }
   | { kind: 'shopping-list'; listId: string }
   | { kind: 'pantry' };
-/** Shared entry point retained for compatibility; options live in the print workspace. */
+/** Options live in the print workspace. A full navigation activates its PDF-specific CSP. */
 export function KitchenPrintDialog(props: PrintProps) {
   const query = new URLSearchParams({ kind: props.kind });
   if (props.kind === 'recipes' && !props.browse)
@@ -16,9 +15,9 @@ export function KitchenPrintDialog(props: PrintProps) {
   }
   if (props.kind === 'shopping-list') query.set('list', props.listId);
   return (
-    <Link className="text-button print-workspace-link" href={`/print?${query}`}>
+    <a className="text-button print-workspace-link" href={`/print?${query}`}>
       <Printer size={17} aria-hidden="true" />
       Export / print
-    </Link>
+    </a>
   );
 }
