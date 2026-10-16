@@ -9,7 +9,7 @@ export default function PantrySettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="PANTRY SETTINGS"
-        title="Open Pantry on the stock that matters."
+        title="Pantry"
         description="These shared display defaults apply at the start of each Pantry visit."
       />
       <PantryPreferencesForm initial={getAppPreferences().pantry} />

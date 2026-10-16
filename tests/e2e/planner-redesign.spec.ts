@@ -171,7 +171,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   ).toBeVisible();
   await expect(page.getByLabel('pasta quantity')).toHaveValue('200');
 
-  await page.goto('/settings/ai');
+  await page.goto('/account/ai');
   const globalImageGeneration = page.getByRole('switch', {
     name: /AI generate recipe images/u,
   });

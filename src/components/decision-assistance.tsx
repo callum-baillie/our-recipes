@@ -379,7 +379,7 @@ export function DecisionAssistance({
                 Review suggestions grounded in your saved information. Your corrections are
                 remembered and always take precedence.
               </p>
-              <Link href="/settings/ai">Data sharing and AI settings</Link>
+              <Link href="/account/ai">Data sharing and AI settings</Link>
             </header>
           )}
           <section className={styles.panel}>

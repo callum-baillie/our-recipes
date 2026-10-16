@@ -10,7 +10,7 @@ export default function ListSettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="LIST SETTINGS"
-        title="Shopping, in your order."
+        title="Shopping lists"
         description="Choose how lists behave, then map each supermarket in the order you walk it."
       />
       <ListSettingsManager initialWorkspace={workspace} />

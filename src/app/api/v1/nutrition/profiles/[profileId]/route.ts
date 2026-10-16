@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { nutritionProfileSettingsInputSchema } from '@/lib/domain/nutrition-profile';
 import {
   getSharedNutritionProfile,
   updateNutritionProfileSettings,
@@ -18,7 +17,7 @@ type Context = { params: Promise<{ profileId: string }> };
 const updateSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
-    settings: nutritionProfileSettingsInputSchema,
+    settings: z.record(z.string(), z.unknown()),
   })
   .strict();
 

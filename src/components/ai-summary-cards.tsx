@@ -156,7 +156,7 @@ export function AiSummaryCards({
             new Date(summary.createdAt),
           )}
         </span>
-        <Link href="/settings/ai">Summary settings</Link>
+        <Link href="/account/ai">Summary settings</Link>
       </footer>
     </section>
   );

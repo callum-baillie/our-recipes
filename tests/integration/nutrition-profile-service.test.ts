@@ -96,6 +96,42 @@ describe('private Nutrition profile persistence', () => {
     ).toBe(0);
   });
 
+  it('uses the latest dated weigh-in and preserves it when saving preferences', () => {
+    const owner = createNutritionIdentity('owner private secret', profileInput());
+    recordBodyMeasurement(owner.profile.id, owner.principal.id, {
+      measuredAt: '2026-10-10T08:00:00Z',
+      weightKilograms: 80,
+      advancedMetrics: { bodyFatPercent: 25, muscleMassKilograms: 55 },
+    });
+    recordBodyMeasurement(owner.profile.id, owner.principal.id, {
+      measuredAt: '2026-10-01T08:00:00Z',
+      weightKilograms: 82,
+      sourceType: 'imported',
+    });
+    const current = getPrivateNutritionProfile(owner.profile.id, owner.principal.id);
+    expect(current.currentWeightKilograms).toBe(80);
+    const saved = updateNutritionProfileSettings(
+      owner.profile.id,
+      owner.principal.id,
+      current.version,
+      {
+        dateOfBirth: '1990-01-01',
+        heightCentimeters: 180,
+        referenceSexCategory: 'male',
+        activityLevel: 'moderate',
+        estimatedTargetsEnabled: true,
+        estimatedTargetConsent: true,
+        weightTrackingEnabled: true,
+      },
+    );
+    expect(saved.currentWeightKilograms).toBe(80);
+    expect(
+      JSON.parse(
+        listBodyMeasurements(owner.profile.id, owner.principal.id)[0]!.advancedBodyMetrics,
+      ),
+    ).toEqual({ bodyFatPercent: 25, muscleMassKilograms: 55 });
+  });
+
   it('uses optimistic versions for sensitive current profile settings', () => {
     const owner = createNutritionIdentity('owner private secret', profileInput());
     const updated = updateNutritionProfileSettings(owner.profile.id, owner.principal.id, 1, {

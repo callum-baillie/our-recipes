@@ -118,8 +118,8 @@ test('a fresh household can complete the supported local release acceptance work
       })
     ).status(),
   ).toBe(403);
-  await page.goto('/settings/ai');
-  await expect(page).toHaveURL('/settings/ai');
+  await page.goto('/account/ai');
+  await expect(page).toHaveURL('/account/ai');
   await expect(
     page.getByRole('heading', { name: 'Control what the assistant uses.' }),
   ).toBeVisible();
@@ -138,9 +138,7 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'New recipe' })).toBeVisible();
   await expect(page.getByLabel('Recipe name')).toBeVisible();
   await page.goto('/settings/profiles');
-  await expect(
-    page.getByRole('heading', { name: 'Make the app feel right for each person.' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Household members & roles' })).toBeVisible();
   await page.getByRole('button', { name: 'Add another profile' }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await profileOnboarding.getByLabel('Display name').fill('Jon');

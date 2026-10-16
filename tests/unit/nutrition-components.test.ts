@@ -252,7 +252,7 @@ describe('Nutrition rendered boundary', () => {
     expect(markup).toContain('Nutrition profile saved');
     expect(markup).toContain('Set up daily nutrition goals');
     expect(markup).toContain('Set daily nutrition goal');
-    expect(markup).toContain('Weight tracking is off');
+    expect(markup).toContain('Enable weight tracking');
     expect(markup).toContain('What you will see after setup');
     expect(markup).toContain('Today at a glance');
     expect(markup).toContain('Calories consumed');
@@ -298,7 +298,7 @@ describe('Nutrition rendered boundary', () => {
     );
 
     expect(enabled).toContain('Weight check-in');
-    expect(enabled).toContain('Latest check-in');
+    expect(enabled).toContain('New weigh-in');
     expect(disabled).not.toContain('Weight check-in');
     expect(disabled).toContain('Enable weight tracking');
   });
@@ -423,8 +423,8 @@ describe('Nutrition rendered boundary', () => {
     const data = new FormData();
     const values: Record<string, string> = {
       measurementSystem: 'imperial',
-      height: '70',
-      currentWeight: '150',
+      heightFeet: '5',
+      heightInches: '10',
       nutritionGoalType: 'custom',
       targetWeight: '145',
       dietaryPreferences: 'Vegetarian\nHigh protein',
@@ -445,11 +445,13 @@ describe('Nutrition rendered boundary', () => {
     data.set('recipeCardNutrientCodes', 'energy_kcal');
     data.append('recipeCardNutrientCodes', 'protein');
     data.set('showMealPlanNutrition', 'on');
+    expect(nutritionProfileUpdateRequest(profileSettings, data).settings).not.toHaveProperty(
+      'currentWeightKilograms',
+    );
     expect(nutritionProfileUpdateRequest(profileSettings, data)).toMatchObject({
       expectedVersion: 1,
       settings: {
         heightCentimeters: 177.8,
-        currentWeightKilograms: 68.0389,
         targetWeightKilograms: 65.7709,
         dietaryPreferences: ['Vegetarian', 'High protein'],
         foodAllergies: ['Peanuts'],

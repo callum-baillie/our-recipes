@@ -18,8 +18,8 @@ export default async function ProfileSettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="PROFILE SETTINGS"
-        title="Make the app feel right for each person."
-        description="Manage names, avatars, colors, units, locale, time zone, and archived profiles."
+        title="Household members & roles"
+        description="Manage household members, account roles, guardian assignments, and archived profiles."
       />
       <ProfileSettings
         initialProfiles={state.profiles.map((profile) => ({

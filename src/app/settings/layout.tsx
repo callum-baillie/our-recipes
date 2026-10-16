@@ -10,22 +10,20 @@ import { auth } from '@/lib/auth/server';
 
 export const metadata: Metadata = {
   title: 'Settings',
-  description:
-    'Manage household, profile, recipe, Pantry, Nutrition, list, AI, and system settings.',
+  description: 'Manage shared kitchen defaults, household access, API keys, and system recovery.',
 };
 
 export default async function SettingsLayout({ children }: Readonly<{ children: ReactNode }>) {
   const requestHeaders = await headers();
   const session = await auth.api.getSession({ headers: requestHeaders });
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
-  if (!session || (!isAdmin && requestHeaders.get('x-bord-pathname') !== '/settings/integrations'))
-    notFound();
+  if (!session || !isAdmin) notFound();
 
   return (
     <div className="settings-workspace">
       <aside className="settings-sidebar" aria-label="Settings navigation">
         <h2>Settings</h2>
-        <SettingsNav personalOnly={!isAdmin} />
+        <SettingsNav />
         <div className="settings-security-note">
           <ShieldCheck size={17} aria-hidden="true" />
           <strong>Security at Bòrd</strong>

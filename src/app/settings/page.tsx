@@ -1,6 +1,4 @@
 import {
-  Activity,
-  Plug,
   CalendarDays,
   ChevronRight,
   ClipboardList,
@@ -8,52 +6,36 @@ import {
   KeyRound,
   PackageOpen,
   Settings2,
-  Sparkles,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { SettingsPageHeader } from '@/components/settings-page-header';
-import { getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { getHouseholdState } from '@/lib/services/household-service';
 
 export const dynamic = 'force-dynamic';
 
 const categories = [
   {
-    href: '/settings/integrations',
-    eyebrow: 'INTEGRATIONS',
-    title: 'Connected apps and automatic sync',
-    description: 'Connect VeSync accounts, assign scale profiles, and choose how often to sync.',
-    icon: Plug,
-  },
-  {
     href: '/settings/api',
     eyebrow: 'API & SECURITY',
-    title: 'Integration keys and passkeys',
-    description: 'Create scoped admin-owned API keys or add a passkey to your account.',
+    title: 'API keys',
+    description: 'Create and revoke scoped keys for scripts and external apps.',
     icon: KeyRound,
   },
   {
     href: '/settings/system',
     eyebrow: 'SYSTEM SETTINGS',
-    title: 'App identity, appearance, and recovery',
-    description: 'Rename the app, choose its icon and colors, manage backups, or start over.',
+    title: 'App identity and recovery',
+    description: 'Rename the kitchen, choose its icon, manage backups, or reset this installation.',
     icon: Settings2,
-  },
-  {
-    href: '/settings/ai',
-    eyebrow: 'AI SETTINGS',
-    title: 'Models, privacy, and summaries',
-    description: 'Choose models by task and control exactly which profile data AI may use.',
-    icon: Sparkles,
   },
   {
     href: '/settings/profiles',
     eyebrow: 'PROFILE SETTINGS',
-    title: 'People, units, and regional defaults',
-    description: 'Manage household profiles, avatars, colors, units, locale, and time zone.',
+    title: 'Members, roles, and guardians',
+    description: 'Manage household membership, account roles, and guardian assignments.',
     icon: Users,
   },
   {
@@ -84,25 +66,17 @@ const categories = [
     description: 'Choose the default Pantry filter, sort order, and grouping.',
     icon: PackageOpen,
   },
-  {
-    href: '/settings/nutrition',
-    eyebrow: 'NUTRITION SETTINGS',
-    title: 'Goals, tracking, and visibility',
-    description: 'Manage profile goals, diary behavior, nutrients, trends, and planner display.',
-    icon: Activity,
-  },
 ] as const;
 
 export default function SettingsPage() {
   const state = getHouseholdState();
   if (!state.household) notFound();
-  const ai = getAiReadiness();
   return (
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="SETTINGS"
-        title="Your kitchen, your way."
-        description="Choose a category to manage shared app behavior or profile-specific preferences."
+        title="Household settings"
+        description="Manage shared defaults, household access, and this installation. Personal preferences are in My profile."
       />
       <section className="settings-overview" aria-label="Settings categories">
         {categories.map(({ href, eyebrow, title, description, icon: Icon }) => (
@@ -113,7 +87,7 @@ export default function SettingsPage() {
             <div>
               <p className="eyebrow">{eyebrow}</p>
               <h2>{title}</h2>
-              <p>{href === '/settings/ai' ? `${ai.message} ${description}` : description}</p>
+              <p>{description}</p>
             </div>
             <ChevronRight size={20} aria-hidden="true" />
           </Link>

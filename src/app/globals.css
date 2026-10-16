@@ -10083,3 +10083,79 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   max-width: none;
   margin-inline: 0;
 }
+
+/* Shared settings and personal preferences use the same calm, responsive shell. */
+.settings-workspace {
+  grid-template-columns: 14rem minmax(0, 1fr);
+}
+.settings-content > .recipe-page {
+  max-width: none;
+  padding-block: 1.5rem 3rem;
+}
+.settings-hub {
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+}
+.settings-hub .settings-pane {
+  background: transparent;
+  border-inline: 0;
+  border-radius: 0;
+  border-bottom: 0;
+}
+.personal-profile-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.nutrition-measurements {
+  padding: 1.25rem 0;
+  margin-block: 0.5rem 1.5rem;
+  border-block: 1px solid var(--line);
+  display: grid;
+  gap: 1rem;
+}
+.nutrition-measurements > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.nutrition-measurements h2,
+.nutrition-measurements p {
+  margin: 0;
+}
+.nutrition-current-weight {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.nutrition-current-weight strong {
+  font-size: 2rem;
+}
+.nutrition-current-weight small {
+  font-size: 1rem;
+}
+@media (max-width: 800px) {
+  .settings-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-sidebar {
+    position: static;
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 1rem;
+  }
+  .settings-sidebar nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .settings-sidebar .settings-security-note {
+    display: none;
+  }
+}

@@ -1,4 +1,6 @@
 'use client';
+import { NutritionScaleSettings, type LatestWeighIn } from './nutrition-scale-settings';
+import { bodyMetricFields } from '@/lib/domain/body-metrics';
 import { PageHeader } from '@/components/page-header';
 import { DecisionAssistance } from '@/components/decision-assistance';
 
@@ -43,10 +45,7 @@ import {
   NutritionPreparedWorkspace,
   type PreparedServingWorkspace,
 } from '@/components/nutrition-prepared-workspace';
-import {
-  NutritionSetupOverview,
-  NutritionWeightTrackerCard,
-} from '@/components/nutrition-setup-overview';
+import { NutritionSetupOverview } from '@/components/nutrition-setup-overview';
 import { nutritionLocalDateKey } from '@/lib/domain/nutrition-view';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import type { NutritionChartDatasets } from '@/lib/domain/nutrition-chart-datasets';
@@ -237,6 +236,7 @@ export type NutritionDashboardProps = {
   chartDatasets: NutritionChartDatasets;
   advancedCharts?: AdvancedNutritionCharts | null;
   weightTrend?: NutritionWeightTrend | null;
+  latestWeighIn?: LatestWeighIn | null;
   dataWorkspace?: Parameters<typeof NutritionDataWorkspace>[0]['workspace'];
   preparedWorkspace?: PreparedServingWorkspace;
   initialAiSummary?: AiSummaryCardData | null;
@@ -308,6 +308,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const [showDiaryHistory, setShowDiaryHistory] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [logMode, setLogMode] = useState<LogMode>('choose');
+  const [weighInTime, setWeighInTime] = useState('');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [goalSetupDialogOpen, setGoalSetupDialogOpen] = useState(false);
@@ -446,6 +447,10 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   }
 
   function openLogDialog(mode: LogMode = 'choose') {
+    const now = new Date();
+    setWeighInTime(
+      new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16),
+    );
     setLogMode(mode);
     setLogDialogOpen(true);
   }
@@ -696,6 +701,20 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       await mutate(`/api/v1/nutrition/profiles/${activeProfile.id}/measurements`, {
         measuredAt: new Date(String(data.get('measuredAt'))).toISOString(),
         weightKilograms,
+        advancedMetrics: Object.fromEntries(
+          bodyMetricFields.flatMap((field) => {
+            const value = data.get(field.key);
+            return value === null || value === ''
+              ? []
+              : [
+                  [
+                    field.key,
+                    Number(value) /
+                      (unit === 'lb' && field.unit === 'kg' ? POUNDS_PER_KILOGRAM : 1),
+                  ],
+                ];
+          }),
+        ),
         sourceType: 'manual',
         approximate: data.get('approximate') === 'on',
         note: data.get('note'),
@@ -1196,13 +1215,6 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             </Link>
           </section>
 
-          <NutritionWeightTrackerCard
-            canManageProfile={activeProfile.canManageProfile}
-            weightTrend={props.weightTrend}
-            onRecordWeight={() => openLogDialog('weight')}
-            compact
-          />
-
           <section className={`${styles.panel} ${styles.householdSnapshot}`}>
             <header>
               <h2>Household snapshot</h2>
@@ -1349,7 +1361,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             </button>
             <Link
               className={styles.secondaryButton}
-              href={props.view === 'diary' ? '/settings/nutrition' : '/nutrition?view=diary'}
+              href={props.view === 'diary' ? '/account/nutrition' : '/nutrition?view=diary'}
             >
               {props.view === 'diary' ? (
                 <>
@@ -1413,6 +1425,16 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       />
 
       <p className={styles.viewDescription}>{VIEW_EXPLAINERS[props.view]}</p>
+      {(props.view === 'overview' || props.view === 'trends') && activeProfile.canManageProfile && (
+        <NutritionScaleSettings
+          key={activeProfile.id}
+          profileId={activeProfile.id}
+          latest={props.latestWeighIn ?? null}
+          imperial={activeProfile.measurementSystem === 'imperial'}
+          enabled={!!activeProfile.weightTrackingEnabled}
+          onRecord={() => openLogDialog('weight')}
+        />
+      )}
 
       <dialog
         ref={profileDialogRef}
@@ -1440,7 +1462,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
         </p>
         <div className={styles.profileDialogActions}>
           <Link href="/settings/profiles">Manage household profiles</Link>
-          <Link href="/settings/nutrition">Nutrition settings</Link>
+          <Link href="/account/nutrition">Nutrition settings</Link>
         </div>
       </dialog>
 
@@ -1605,7 +1627,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
             </div>
             <label>
               Measured at
-              <input name="measuredAt" type="datetime-local" required />
+              <input name="measuredAt" type="datetime-local" required defaultValue={weighInTime} />
             </label>
             <label>
               Note <span>Optional</span>
@@ -1616,6 +1638,21 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                 autoComplete="off"
               />
             </label>
+            <details>
+              <summary>Additional body measurements · optional</summary>
+              <p className={styles.formHint}>
+                Mass measurements use the weight unit selected above.
+              </p>
+              <div className={styles.dialogFieldRow}>
+                {bodyMetricFields.map((field) => (
+                  <label key={field.key}>
+                    {field.label} {field.unit === 'kg' ? '(weight unit)' : `(${field.unit})`}
+                    <input name={field.key} type="number" min="0" step="any" inputMode="decimal" />
+                    <small>{field.help}</small>
+                  </label>
+                ))}
+              </div>
+            </details>
             <label className={styles.dialogCheck}>
               <input name="approximate" type="checkbox" />
               This is an approximate observation

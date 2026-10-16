@@ -9,7 +9,7 @@ export default function MealPlanSettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="MEAL PLAN SETTINGS"
-        title="Start every plan with the right shape."
+        title="Meal plans"
         description="Choose the shared week, range, and meal defaults used when opening Planner."
       />
       <MealPlanPreferencesForm initial={getAppPreferences().mealPlan} />

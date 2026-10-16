@@ -5,7 +5,7 @@ import { accessSync, constants } from 'node:fs';
 import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
 import { ensureDatabase, getSqliteDatabase } from '@/lib/db/client';
 
-export const APPLICATION_VERSION = '1.0.0-rc.3';
+export const APPLICATION_VERSION = '1.0.0-rc.4';
 export const SCHEMA_VERSION = '0061_decision_assistance';
 export const EXPECTED_MIGRATION_COUNT = 63;
 

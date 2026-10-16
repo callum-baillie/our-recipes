@@ -74,19 +74,20 @@ describe('app preference contracts', () => {
     expect(source).toContain("window.location.replace('/')");
   });
 
-  it('exposes every requested settings category from the hub', () => {
+  it('exposes shared settings in the hub and personal settings in the account navigation', () => {
     const source = readFileSync('src/app/settings/page.tsx', 'utf8');
     for (const label of [
       'SYSTEM SETTINGS',
-      'AI SETTINGS',
       'PROFILE SETTINGS',
       'RECIPE SETTINGS',
       'MEAL PLAN SETTINGS',
       'LIST SETTINGS',
       'PANTRY SETTINGS',
-      'NUTRITION SETTINGS',
     ]) {
       expect(source).toContain(label);
     }
+    const accountNav = readFileSync('src/components/account-nav.tsx', 'utf8');
+    for (const path of ['/account/nutrition', '/account/ai', '/account/integrations'])
+      expect(accountNav).toContain(path);
   });
 });

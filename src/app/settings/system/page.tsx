@@ -7,7 +7,6 @@ import { FreshInstallPanel } from '@/components/fresh-install-panel';
 import { DiagnosticsExport } from '@/components/diagnostics-export';
 import { SettingsPageHeader } from '@/components/settings-page-header';
 import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
-import { AppearanceSettings } from '@/components/theme-toggle';
 import { getBackupStorageStatus, listBackups } from '@/lib/services/backup-service';
 import { getHouseholdState } from '@/lib/services/household-service';
 import { getReleaseStatus } from '@/lib/release';
@@ -29,14 +28,13 @@ export default async function SystemSettingsPage() {
     <main className="recipe-page settings-hub system-settings-page">
       <SettingsPageHeader
         eyebrow="SYSTEM SETTINGS"
-        title="Your kitchen, backed by Bòrd."
-        description="Kitchen identity, browser appearance, local recovery, and installation-level actions."
+        title="System"
+        description="Kitchen identity, installation status, backups, and recovery."
       />
       <AppSettingsForm
         initialKitchenName={state.household.kitchenName}
         initialKitchenIcon={state.household.kitchenIcon}
       />
-      <AppearanceSettings />
       <SettingsPane
         eyebrow="INSTALLATION"
         title="Release status"

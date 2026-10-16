@@ -1,4 +1,5 @@
 import 'server-only';
+import { refreshCurrentNutritionWeight } from './nutrition-profile-service';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, gt, isNull, lte, or } from 'drizzle-orm';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
@@ -542,6 +543,7 @@ export async function syncIntegration(id: string, principal?: Principal) {
             .run();
           imported++;
         }
+        refreshCurrentNutritionWeight(profile.id);
       }
       tx.update(integrationAccounts)
         .set({

@@ -186,8 +186,8 @@ export function ProfileSwitcher({
               Manage profiles
             </Link>
           ) : null}
-          <Link className="manage-profiles-link" href="/settings/integrations" data-menu-close>
-            My integrations
+          <Link className="manage-profiles-link" href="/account" data-menu-close>
+            My profile
           </Link>
           <Link className="manage-profiles-link" href="/account/security" data-menu-close>
             Account security

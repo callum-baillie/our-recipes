@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.0-rc.4
+
+- Moved personal preferences, appearance, nutrition settings, and integrations into My profile.
+- Kept household configuration and role management in admin-only Settings.
+- Added Nutrition weigh-ins, VeSync sync, and recorded/calculated body measurements.
+- Current weight follows the latest dated observation, including scheduled scale imports; saving preferences preserves it.
+- Refined settings layouts and added feet/inches height entry alongside centimetres.
+- No database migration is required.
+
 ## 1.0.0-rc.3
 
 - Refined nutrition onboarding, VeSync account/profile sync and optional body composition estimates.

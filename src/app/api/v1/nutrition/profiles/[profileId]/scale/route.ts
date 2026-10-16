@@ -7,6 +7,7 @@ import { nutritionScaleConnections, nutritionBodyMeasurements } from '@/lib/db/s
 import {
   authorizeNutritionProfileAction,
   recordBodyMeasurement,
+  refreshCurrentNutritionWeight,
 } from '@/lib/services/nutrition-profile-service';
 import { latestLinkedScaleReading } from '@/lib/services/nutrition-scale-service';
 import { VeSyncScaleError } from '@/lib/providers/vesync-scale';
@@ -147,6 +148,7 @@ export async function POST(request: Request, context: Context) {
         ? JSON.stringify(reading.compositionEstimate)
         : null;
       if (existing) {
+        refreshCurrentNutritionWeight(result.id);
         tx.update(nutritionBodyMeasurements)
           .set({ bodyCompositionEstimate: estimate })
           .where(eq(nutritionBodyMeasurements.id, existing.id))
@@ -165,7 +167,7 @@ export async function POST(request: Request, context: Context) {
           reading.bodyFatPercent !== undefined ? { bodyFatPercent: reading.bodyFatPercent } : {},
         note: 'VeSync ESF24',
       });
-      // Keep current profile inputs intentional; sync adds history, not an overwrite.
+      // Calculated composition remains separate from imported measurements.
       tx.update(nutritionBodyMeasurements)
         .set({ bodyCompositionEstimate: estimate })
         .where(eq(nutritionBodyMeasurements.id, measurement.id))

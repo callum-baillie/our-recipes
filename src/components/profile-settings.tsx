@@ -15,7 +15,7 @@ import {
 } from '@/lib/domain/profile-goals';
 import type { AppRole } from '@/lib/domain/permissions';
 
-type Profile = {
+export type Profile = {
   id: string;
   displayName: string;
   color: string;
@@ -296,14 +296,16 @@ function ProfileOnboardingDialog({
   );
 }
 
-function ProfileEditor({
+export function ProfileEditor({
   profile,
   active,
   onSave,
   onArchive,
   onRoleChange,
+  personal = false,
 }: {
   profile: Profile;
+  personal?: boolean;
   active: boolean;
   onSave: (profile: Profile, values: ProfileValues) => Promise<void>;
   onArchive: (profile: Profile, archived: boolean) => Promise<void>;
@@ -358,55 +360,61 @@ function ProfileEditor({
         </span>
       }
       description={
-        profile.isLastAdmin
-          ? 'This is the only active admin. Promote another admin before demoting or archiving it.'
-          : 'Identity, access role, regional preferences, and personal goals.'
+        personal
+          ? 'Your identity, regional preferences, and cooking goals.'
+          : profile.isLastAdmin
+            ? 'This is the only active admin. Promote another admin before demoting or archiving it.'
+            : 'Household identity and access role. Personal preferences are managed from My profile.'
       }
       actions={
-        <button
-          className="text-button"
-          type="button"
-          disabled={profile.isLastAdmin && !archived}
-          title={
-            profile.isLastAdmin && !archived
-              ? 'Promote another active profile to Admin before archiving this one.'
-              : undefined
-          }
-          onClick={() => onArchive(profile, !archived)}
-        >
-          {archived ? (
-            <>
-              <RotateCcw size={15} /> Restore
-            </>
-          ) : (
-            <>
-              <Archive size={15} /> Archive
-            </>
-          )}
-        </button>
+        !personal && (
+          <button
+            className="text-button"
+            type="button"
+            disabled={profile.isLastAdmin && !archived}
+            title={
+              profile.isLastAdmin && !archived
+                ? 'Promote another active profile to Admin before archiving this one.'
+                : undefined
+            }
+            onClick={() => onArchive(profile, !archived)}
+          >
+            {archived ? (
+              <>
+                <RotateCcw size={15} /> Restore
+              </>
+            ) : (
+              <>
+                <Archive size={15} /> Archive
+              </>
+            )}
+          </button>
+        )
       }
     >
       <div className="field-grid two-columns">
-        <label>
-          <span>Access role</span>
-          <select
-            value={role}
-            onChange={async (event) => {
-              const nextRole = event.target.value as AppRole;
-              setRole(nextRole);
-              if (!(await onRoleChange(profile, nextRole))) setRole(profile.role);
-            }}
-          >
-            <option value="admin">Admin</option>
-            <option value="parent">Parent</option>
-            <option value="child">Child</option>
-          </select>
-          <small>
-            {profile.isLastAdmin
-              ? 'This is the only active admin. Promote another admin before demoting it.'
-              : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
-          </small>
-        </label>
+        {!personal && (
+          <label>
+            <span>Access role</span>
+            <select
+              value={role}
+              onChange={async (event) => {
+                const nextRole = event.target.value as AppRole;
+                setRole(nextRole);
+                if (!(await onRoleChange(profile, nextRole))) setRole(profile.role);
+              }}
+            >
+              <option value="admin">Admin</option>
+              <option value="parent">Parent</option>
+              <option value="child">Child</option>
+            </select>
+            <small>
+              {profile.isLastAdmin
+                ? 'This is the only active admin. Promote another admin before demoting it.'
+                : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
+            </small>
+          </label>
+        )}
         <label>
           <span>Display name</span>
           <input
@@ -431,111 +439,115 @@ function ProfileEditor({
             onChange={(event) => setValues({ ...values, color: event.target.value })}
           />
         </label>
-        <label>
-          <span>Units</span>
-          <select
-            value={values.units}
-            onChange={(event) =>
-              setValues({ ...values, units: event.target.value as Profile['units'] })
-            }
-          >
-            <option value="metric">Metric</option>
-            <option value="imperial">US customary</option>
-          </select>
-        </label>
-        <label>
-          <span>Temperature</span>
-          <select
-            value={values.temperatureUnit}
-            onChange={(event) =>
-              setValues({
-                ...values,
-                temperatureUnit: event.target.value as Profile['temperatureUnit'],
-              })
-            }
-          >
-            <option value="C">Celsius</option>
-            <option value="F">Fahrenheit</option>
-          </select>
-        </label>
-        <label>
-          <span>Locale</span>
-          <input
-            value={values.locale}
-            onChange={(event) => setValues({ ...values, locale: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>Time zone</span>
-          <input
-            value={values.timezone}
-            onChange={(event) => setValues({ ...values, timezone: event.target.value })}
-          />
-        </label>
-        <section
-          className="full-width-field profile-goal-settings"
-          aria-labelledby={`goals-${profile.id}`}
-        >
-          <div>
-            <h3 id={`goals-${profile.id}`}>What this profile wants help with</h3>
-            <p>These reflections can be updated whenever priorities or routines change.</p>
-          </div>
-          <div className="profile-goal-settings-options">
-            {profileGoalFocusOptions.map((option) => {
-              const selected = values.goalContext.focusAreas.includes(option.value);
-              return (
-                <label className={selected ? 'selected' : ''} key={option.value}>
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    disabled={!selected && values.goalContext.focusAreas.length >= 8}
-                    onChange={() => toggleGoalFocus(option.value)}
+        {personal && (
+          <>
+            <label>
+              <span>Units</span>
+              <select
+                value={values.units}
+                onChange={(event) =>
+                  setValues({ ...values, units: event.target.value as Profile['units'] })
+                }
+              >
+                <option value="metric">Metric</option>
+                <option value="imperial">US customary</option>
+              </select>
+            </label>
+            <label>
+              <span>Temperature</span>
+              <select
+                value={values.temperatureUnit}
+                onChange={(event) =>
+                  setValues({
+                    ...values,
+                    temperatureUnit: event.target.value as Profile['temperatureUnit'],
+                  })
+                }
+              >
+                <option value="C">Celsius</option>
+                <option value="F">Fahrenheit</option>
+              </select>
+            </label>
+            <label>
+              <span>Locale</span>
+              <input
+                value={values.locale}
+                onChange={(event) => setValues({ ...values, locale: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>Time zone</span>
+              <input
+                value={values.timezone}
+                onChange={(event) => setValues({ ...values, timezone: event.target.value })}
+              />
+            </label>
+            <section
+              className="full-width-field profile-goal-settings"
+              aria-labelledby={`goals-${profile.id}`}
+            >
+              <div>
+                <h3 id={`goals-${profile.id}`}>What this profile wants help with</h3>
+                <p>These reflections can be updated whenever priorities or routines change.</p>
+              </div>
+              <div className="profile-goal-settings-options">
+                {profileGoalFocusOptions.map((option) => {
+                  const selected = values.goalContext.focusAreas.includes(option.value);
+                  return (
+                    <label className={selected ? 'selected' : ''} key={option.value}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={!selected && values.goalContext.focusAreas.length >= 8}
+                        onChange={() => toggleGoalFocus(option.value)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="field-grid two-columns">
+                <label>
+                  <span>Why it matters now</span>
+                  <textarea
+                    rows={3}
+                    maxLength={800}
+                    value={values.goalContext.motivation}
+                    onChange={(event) => updateGoalContext({ motivation: event.target.value })}
                   />
-                  <span>{option.label}</span>
                 </label>
-              );
-            })}
-          </div>
-          <div className="field-grid two-columns">
-            <label>
-              <span>Why it matters now</span>
-              <textarea
-                rows={3}
-                maxLength={800}
-                value={values.goalContext.motivation}
-                onChange={(event) => updateGoalContext({ motivation: event.target.value })}
-              />
-            </label>
-            <label>
-              <span>What gets in the way</span>
-              <textarea
-                rows={3}
-                maxLength={800}
-                value={values.goalContext.challenges}
-                onChange={(event) => updateGoalContext({ challenges: event.target.value })}
-              />
-            </label>
+                <label>
+                  <span>What gets in the way</span>
+                  <textarea
+                    rows={3}
+                    maxLength={800}
+                    value={values.goalContext.challenges}
+                    onChange={(event) => updateGoalContext({ challenges: event.target.value })}
+                  />
+                </label>
+                <label className="full-width-field">
+                  <span>What success feels like</span>
+                  <textarea
+                    rows={3}
+                    maxLength={800}
+                    value={values.goalContext.successVision}
+                    onChange={(event) => updateGoalContext({ successVision: event.target.value })}
+                  />
+                </label>
+              </div>
+            </section>
             <label className="full-width-field">
-              <span>What success feels like</span>
+              <span>
+                Anything else the app should remember <em>(optional)</em>
+              </span>
               <textarea
                 rows={3}
-                maxLength={800}
-                value={values.goalContext.successVision}
-                onChange={(event) => updateGoalContext({ successVision: event.target.value })}
+                value={values.mainGoals}
+                onChange={(event) => setValues({ ...values, mainGoals: event.target.value })}
               />
             </label>
-          </div>
-        </section>
-        <label className="full-width-field">
-          <span>
-            Anything else the app should remember <em>(optional)</em>
-          </span>
-          <textarea
-            rows={3}
-            value={values.mainGoals}
-            onChange={(event) => setValues({ ...values, mainGoals: event.target.value })}
-          />
-        </label>
+          </>
+        )}
       </div>
       <SettingsActionBar>
         <button

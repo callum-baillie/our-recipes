@@ -1,6 +1,5 @@
 'use client';
 
-import { NutritionScaleSettings } from './nutrition-scale-settings';
 import type { BodyMetrics } from '@/lib/domain/body-metrics';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
@@ -81,12 +80,6 @@ export function canonicalWeight(value: number | null, system: 'metric' | 'imperi
     : rounded(system === 'imperial' ? value * KILOGRAMS_PER_POUND : value);
 }
 
-function displayedHeight(value: number | null, system: 'metric' | 'imperial') {
-  return value === null
-    ? ''
-    : rounded(system === 'imperial' ? value / CENTIMETERS_PER_INCH : value);
-}
-
 function displayedWeight(value: number | null, system: 'metric' | 'imperial') {
   return value === null ? '' : rounded(system === 'imperial' ? value / KILOGRAMS_PER_POUND : value);
 }
@@ -124,15 +117,18 @@ export function nutritionProfileUpdateRequest(
   data: FormData,
 ) {
   const system = String(data.get('measurementSystem')) as 'metric' | 'imperial';
-  const height = optionalNumber(data.get('height'));
-  const currentWeight = optionalNumber(data.get('currentWeight'));
+  const height =
+    system === 'imperial' && data.has('heightFeet')
+      ? data.get('heightFeet') === '' && data.get('heightInches') === ''
+        ? null
+        : Number(data.get('heightFeet')) * 12 + Number(data.get('heightInches'))
+      : optionalNumber(data.get('height'));
   const targetWeight = optionalNumber(data.get('targetWeight'));
   return {
     expectedVersion: profile.version,
     settings: {
       dateOfBirth: optionalText(data.get('dateOfBirth')),
       heightCentimeters: canonicalHeight(height, system),
-      currentWeightKilograms: canonicalWeight(currentWeight, system),
       measurementSystem: system,
       referenceSexCategory: optionalText(data.get('referenceSexCategory')),
       activityLevel: optionalText(data.get('activityLevel')),
@@ -171,6 +167,7 @@ export function NutritionProfileSettings({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState('');
+  const [saving, setSaving] = useState(false);
   const [measurementSystem, setMeasurementSystem] = useState(profile.measurementSystem);
   const [energyEstimate, setEnergyEstimate] = useState<EnergyEstimateResponse | null>(null);
   const [optionalInputsOpen, setOptionalInputsOpen] = useState(
@@ -231,21 +228,27 @@ export function NutritionProfileSettings({
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const request = nutritionProfileUpdateRequest(profile, data);
-    setStatus('Saving Nutrition settings…');
-    const response = await fetch(`/api/v1/nutrition/profiles/${profile.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-    if (!response.ok) {
-      setStatus(await responseMessage(response));
-      return;
+    setSaving(true);
+    setStatus('Saving preferences…');
+    try {
+      const response = await fetch(`/api/v1/nutrition/profiles/${profile.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      if (!response.ok) {
+        setStatus(await responseMessage(response));
+        return;
+      }
+      setStatus('Nutrition preferences saved.');
+      router.refresh();
+    } catch {
+      setStatus('Unable to save. Check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
-    setStatus('Nutrition settings saved.');
-    router.refresh();
   }
 
-  const heightUnit = measurementSystem === 'imperial' ? 'in' : 'cm';
   const weightUnit = measurementSystem === 'imperial' ? 'lb' : 'kg';
 
   return (
@@ -253,9 +256,8 @@ export function NutritionProfileSettings({
       className={styles.panel}
       eyebrow="ACTIVE PROFILE"
       title="Nutrition preferences"
-      description="These choices apply to the household profile selected in the app header. Identity details stay in Profiles & roles."
+      description="These choices apply to the household profile selected in the app header. Identity and appearance are in My profile. Add weigh-ins and body measurements on the Nutrition page."
     >
-      <NutritionScaleSettings profileId={profile.id} metrics={profile.advancedMetrics ?? {}} />
       <form className={styles.form} onSubmit={save}>
         <details
           className={styles.disclosure}
@@ -289,28 +291,53 @@ export function NutritionProfileSettings({
                 Date of birth <span>Optional</span>
                 <input name="dateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ''} />
               </label>
-              <label>
-                Height ({heightUnit}) <span>Optional</span>
-                <input
-                  key={`height-${measurementSystem}`}
-                  name="height"
-                  type="number"
-                  min="0.0001"
-                  step="any"
-                  defaultValue={displayedHeight(profile.heightCentimeters, measurementSystem)}
-                />
-              </label>
-              <label>
-                Current weight ({weightUnit}) <span>Optional</span>
-                <input
-                  key={`current-weight-${measurementSystem}`}
-                  name="currentWeight"
-                  type="number"
-                  min="0.0001"
-                  step="any"
-                  defaultValue={displayedWeight(profile.currentWeightKilograms, measurementSystem)}
-                />
-              </label>
+              {measurementSystem === 'imperial' ? (
+                <fieldset className={styles.grid}>
+                  <legend>Height · optional</legend>
+                  <label>
+                    Feet
+                    <input
+                      name="heightFeet"
+                      type="number"
+                      min="0"
+                      max="9"
+                      step="1"
+                      defaultValue={
+                        profile.heightCentimeters == null
+                          ? ''
+                          : Math.floor(profile.heightCentimeters / 2.54 / 12)
+                      }
+                    />
+                  </label>
+                  <label>
+                    Inches
+                    <input
+                      name="heightInches"
+                      type="number"
+                      min="0"
+                      max="11.99"
+                      step="0.1"
+                      defaultValue={
+                        profile.heightCentimeters == null
+                          ? ''
+                          : Number(((profile.heightCentimeters / 2.54) % 12).toFixed(1))
+                      }
+                    />
+                  </label>
+                </fieldset>
+              ) : (
+                <label>
+                  Height (cm) <span>Optional</span>
+                  <input
+                    name="height"
+                    type="number"
+                    min="1"
+                    max="300"
+                    step="0.1"
+                    defaultValue={profile.heightCentimeters ?? ''}
+                  />
+                </label>
+              )}
               <label>
                 Reference source sex category <span>Optional</span>
                 <select
@@ -674,8 +701,8 @@ export function NutritionProfileSettings({
         </details>
 
         <SettingsActionBar status={status}>
-          <button className="primary-button compact" type="submit">
-            Save Nutrition settings
+          <button className="primary-button compact" type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Save preferences'}
           </button>
         </SettingsActionBar>
       </form>

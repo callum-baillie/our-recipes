@@ -252,7 +252,7 @@ function ModeOptions({
             {!imageGenerationEnabled ? (
               <p className={styles.imageSettingNote}>
                 Image generation is disabled for the household.{' '}
-                <Link href="/settings/ai">Enable it in AI settings</Link>.
+                <Link href="/account/ai">Enable it in AI settings</Link>.
               </p>
             ) : null}
           </>

@@ -153,6 +153,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(target);
   }
 
+  const personalSettingsRedirects: Record<string, string> = {
+    '/settings/nutrition': '/account/nutrition',
+    '/settings/integrations': '/account/integrations',
+    '/settings/ai': '/account/ai',
+  };
+  if (personalSettingsRedirects[pathname] && request.method === 'GET')
+    return redirectTo(request, personalSettingsRedirects[pathname]);
+
   const permission = authorizeAppRequest({
     role: principal.role,
     profileId: principal.profileId,

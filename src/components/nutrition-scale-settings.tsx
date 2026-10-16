@@ -6,54 +6,57 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { bodyMetricFields, type BodyMetrics } from '@/lib/domain/body-metrics';
 import styles from './nutrition-onboarding-flow.module.css';
+export type LatestWeighIn = {
+  weightKilograms: number;
+  measuredAt: string;
+  metrics: BodyMetrics;
+  estimate: CompositionEstimate | null;
+  sourceType: string;
+};
 export function NutritionScaleSettings({
   profileId,
-  metrics,
+  latest,
+  imperial,
+  onRecord,
+  enabled,
 }: {
   profileId: string;
-  metrics: BodyMetrics;
+  latest: LatestWeighIn | null;
+  imperial: boolean;
+  onRecord: () => void;
+  enabled: boolean;
 }) {
-  const [estimate, setEstimate] = useState<CompositionEstimate | null>(null);
-  const [measuredAt, setMeasuredAt] = useState<string>();
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const router = useRouter();
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/v1/nutrition/profiles/${profileId}/scale`, { signal: controller.signal })
+    fetch(`/api/v1/nutrition/profiles/${profileId}/scale`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
       .then(async (response) => {
-        if (response.ok) {
-          const data = await response.json();
-          setConnected(data.connected);
-          setEstimate(data.compositionEstimate);
-          setMeasuredAt(data.measuredAt);
-        }
+        if (response.ok) setConnected((await response.json()).connected);
       })
       .catch(() => {});
     return () => controller.abort();
   }, [profileId]);
-  async function action(method: 'POST' | 'DELETE') {
+  async function sync() {
     setBusy(true);
     setMessage('');
     try {
-      const response = await fetch(`/api/v1/nutrition/profiles/${profileId}/scale`, { method });
+      const response = await fetch(`/api/v1/nutrition/profiles/${profileId}/scale`, {
+        method: 'POST',
+      });
       const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error?.message ?? 'Unable to update the scale connection.');
-      if (method === 'DELETE') {
-        setConnected(false);
-        setMessage('VeSync disconnected. Saved measurements are retained.');
-      } else {
-        setEstimate(data.compositionEstimate);
-        setMeasuredAt(data.measurement?.measuredAt);
-        setMessage(
-          data.imported
-            ? 'Latest weigh-in added to your weight history.'
-            : 'This weigh-in is already in your weight history.',
-        );
-        router.refresh();
-      }
+      if (!response.ok) throw new Error(data.error?.message ?? 'Unable to sync your scale.');
+      setMessage(
+        data.imported
+          ? 'Latest weigh-in imported.'
+          : 'You’re up to date. This weigh-in is already saved.',
+      );
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to sync.');
     } finally {
@@ -61,53 +64,87 @@ export function NutritionScaleSettings({
     }
   }
   return (
-    <section className={styles.stack} aria-label="Scale and advanced measurements">
-      {Object.values(metrics).some((value) => value != null) ? (
-        <details>
-          <summary>View saved advanced measurements</summary>
-          <dl className={styles.review}>
-            {bodyMetricFields
-              .filter((field) => metrics[field.key] != null)
-              .map((field) => (
-                <div key={field.key}>
-                  <dt>{field.label}</dt>
-                  <dd>
-                    {metrics[field.key]} {field.unit}
-                  </dd>
-                </div>
-              ))}
-          </dl>
-        </details>
-      ) : null}
-      <BodyCompositionEstimatePanel estimate={estimate} measuredAt={measuredAt} />
-      <Link href="/settings/integrations">Manage connections and automatic sync</Link>
-      {connected ? (
+    <section className="nutrition-measurements" aria-label="Weight and body measurements">
+      <header>
         <div>
-          <h3>VeSync · Etekcity ESF24</h3>
-          <p className={styles.hint}>
-            Sync your scale in VeSync first, then import the latest available weigh-in here.
-          </p>
-          <div className={styles.inlineActions}>
-            <button
-              className={styles.secondary}
-              type="button"
-              disabled={busy}
-              onClick={() => void action('POST')}
-            >
-              {busy ? 'Please wait…' : 'Sync latest weigh-in'}
-            </button>
-            <button
-              className={styles.textButton}
-              type="button"
-              disabled={busy}
-              onClick={() => void action('DELETE')}
-            >
-              Disconnect
-            </button>
-          </div>
+          <p className="eyebrow">YOUR MEASUREMENTS</p>
+          <h2>Weight & body composition</h2>
         </div>
-      ) : null}
-      {message ? <p role="status">{message}</p> : null}
+        <div className={styles.inlineActions}>
+          {enabled ? (
+            <>
+              <button type="button" className="primary-button" onClick={onRecord}>
+                New weigh-in
+              </button>
+              {connected && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void sync()}
+                >
+                  {busy ? 'Syncing…' : 'Sync with VeSync'}
+                </button>
+              )}
+            </>
+          ) : (
+            <Link href="/account/nutrition#weight-tracking">Enable weight tracking</Link>
+          )}
+        </div>
+      </header>
+      {latest ? (
+        <>
+          <div className="nutrition-current-weight">
+            <strong>
+              {(latest.weightKilograms * (imperial ? 2.2046226218 : 1)).toFixed(1)}{' '}
+              <small>{imperial ? 'lb' : 'kg'}</small>
+            </strong>
+            <span>
+              Latest weigh-in ·{' '}
+              <time dateTime={latest.measuredAt}>
+                {new Date(latest.measuredAt).toLocaleDateString()}
+              </time>{' '}
+              · {latest.sourceType === 'imported' ? 'Imported' : 'Recorded'}
+            </span>
+          </div>
+          {Object.values(latest.metrics).some((v) => v != null) && (
+            <dl className={styles.review}>
+              {bodyMetricFields
+                .filter((f) => latest.metrics[f.key] != null)
+                .map((f) => (
+                  <div key={f.key}>
+                    <dt>{f.label}</dt>
+                    <dd>
+                      {Number(
+                        (
+                          latest.metrics[f.key]! * (imperial && f.unit === 'kg' ? 2.2046226218 : 1)
+                        ).toFixed(1),
+                      )}{' '}
+                      {imperial && f.unit === 'kg' ? 'lb' : f.unit}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          )}
+          <BodyCompositionEstimatePanel
+            estimate={latest.estimate}
+            measuredAt={latest.measuredAt}
+            imperial={imperial}
+          />
+          {!latest.estimate && !Object.values(latest.metrics).some((v) => v != null) && (
+            <p>No body composition measurements were included in this weigh-in.</p>
+          )}
+        </>
+      ) : (
+        <p>No weigh-ins yet. Add a measurement or connect your scale to start tracking.</p>
+      )}
+      <p className={styles.hint}>
+        {connected ? 'Sync your scale in the VeSync app first. ' : ''}
+        <Link href="/account/integrations">
+          {connected ? 'Manage connection and automatic sync' : 'Connect a scale'}
+        </Link>
+      </p>
+      {message && <p role="status">{message}</p>}
     </section>
   );
 }

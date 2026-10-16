@@ -1,6 +1,5 @@
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import { ShieldCheck } from 'lucide-react';
 
 import { ApiKeyManager } from '@/components/api-key-manager';
@@ -19,13 +18,7 @@ export default async function ApiSettingsPage() {
     <main className="recipe-page settings-hub api-settings-page">
       <SettingsPageHeader
         eyebrow="API & SECURITY"
-        title={
-          <>
-            Connect your kitchen,
-            <br />
-            on your terms.
-          </>
-        }
+        title="API keys"
         description="Connect scripts and other apps to recipes, pantry stock, meal plans, and grocery lists. Choose exactly what each key can do."
         meta={
           <div className="api-trust-points">
@@ -36,16 +29,6 @@ export default async function ApiSettingsPage() {
               <ShieldCheck size={15} aria-hidden="true" /> New keys begin read-only
             </span>
           </div>
-        }
-        aside={
-          <Image
-            className="api-security-art"
-            src="/images/settings/api-security-boundary.png"
-            width={720}
-            height={330}
-            alt=""
-            priority
-          />
         }
       />
       <ApiKeyManager

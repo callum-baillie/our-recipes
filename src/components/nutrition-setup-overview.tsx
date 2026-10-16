@@ -76,7 +76,7 @@ export function NutritionWeightTrackerCard({
           <strong>Weight tracking is off</strong>
           <span>Enable it for {weightTrend?.profileLabel ?? 'this profile'} before recording.</span>
           {canManageProfile ? (
-            <Link href="/settings/nutrition#weight-tracking">
+            <Link href="/account/nutrition#weight-tracking">
               Enable weight tracking <ArrowRight size={15} aria-hidden="true" />
             </Link>
           ) : null}
@@ -123,9 +123,7 @@ export function NutritionSetupOverview({
   hasDiaryEntries,
   hasPlannedMeals,
   savedGoalDescription,
-  weightTrend,
   onRecordNutrition,
-  onRecordWeight,
   onConfigureGoals,
 }: NutritionSetupOverviewProps) {
   const completedSteps =
@@ -205,7 +203,7 @@ export function NutritionSetupOverview({
             {savedGoalDescription ? (
               <p className={styles.savedValue}>{savedGoalDescription}</p>
             ) : null}
-            <Link href="/settings/nutrition">
+            <Link href="/account/nutrition">
               Review Nutrition profile <ArrowRight size={15} aria-hidden="true" />
             </Link>
           </div>
@@ -270,12 +268,6 @@ export function NutritionSetupOverview({
           <SetupStatus complete={hasPlannedMeals} />
         </article>
       </section>
-
-      <NutritionWeightTrackerCard
-        canManageProfile={canManageProfile}
-        weightTrend={weightTrend}
-        onRecordWeight={onRecordWeight}
-      />
 
       <section className={styles.explainer} aria-labelledby="nutrition-setup-explainer">
         <h2 id="nutrition-setup-explainer">What you will see after setup</h2>

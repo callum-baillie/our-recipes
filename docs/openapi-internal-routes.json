@@ -338,5 +338,10 @@
     "method": "POST",
     "path": "/ai/app-actions",
     "reason": "Session-only, account-owned chat proposals. Mutations require explicit review, trusted origins and existing core API authorization."
+  },
+  {
+    "method": "PATCH",
+    "path": "/account/profile",
+    "reason": "Session-owned personal profile preferences; target derived from authenticated account."
   }
 ]

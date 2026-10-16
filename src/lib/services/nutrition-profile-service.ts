@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import {
@@ -742,7 +742,14 @@ export function rotateNutritionAccessSecret(
   throw new NutritionProfileForbiddenError('Nutrition credentials are retired.');
 }
 export function getPrivateNutritionProfile(profileId: string, requesterPrincipalId: string) {
-  return authorize(db(), profileId, requesterPrincipalId, 'manage_profile');
+  const profile = authorize(db(), profileId, requesterPrincipalId, 'manage_profile');
+  const latest = db()
+    .select()
+    .from(nutritionBodyMeasurements)
+    .where(eq(nutritionBodyMeasurements.nutritionProfileId, profileId))
+    .orderBy(desc(nutritionBodyMeasurements.measuredAt), desc(nutritionBodyMeasurements.createdAt))
+    .get();
+  return latest ? { ...profile, currentWeightKilograms: latest.weightKilograms } : profile;
 }
 export function getSharedNutritionProfile(profileId: string, requesterPrincipalId: string) {
   return authorizeSharedRead(db(), profileId, requesterPrincipalId, 'view_comparison');
@@ -753,9 +760,14 @@ export function updateNutritionProfileSettings(
   expectedVersion: number,
   rawProfile: unknown,
 ) {
-  const input = nutritionProfileSettingsInputSchema.parse(rawProfile);
   const database = db();
-  const current = authorize(database, profileId, requesterPrincipalId, 'manage_profile');
+  const current = getPrivateNutritionProfile(profileId, requesterPrincipalId);
+  // Resolve an omitted weight before validating estimated-target inputs.
+  const input = nutritionProfileSettingsInputSchema.parse(
+    typeof rawProfile === 'object' && rawProfile !== null && !Array.isArray(rawProfile)
+      ? { currentWeightKilograms: current.currentWeightKilograms, ...rawProfile }
+      : rawProfile,
+  );
   const now = new Date();
   if (current.version !== expectedVersion)
     throw new NutritionProfileConflictError('Nutrition profile changed concurrently.');
@@ -1053,6 +1065,32 @@ export function listNutritionGoalVersions(profileId: string, requesterPrincipalI
     .orderBy(nutritionGoalVersions.seriesId, nutritionGoalVersions.revision)
     .all();
 }
+// Refresh the cached current weight from dated observations, including backfilled imports.
+export function refreshCurrentNutritionWeight(profileId: string) {
+  const database = db();
+  const latest = database
+    .select()
+    .from(nutritionBodyMeasurements)
+    .where(eq(nutritionBodyMeasurements.nutritionProfileId, profileId))
+    .orderBy(desc(nutritionBodyMeasurements.measuredAt), desc(nutritionBodyMeasurements.createdAt))
+    .get();
+  if (!latest) return;
+  const profile = database
+    .select()
+    .from(nutritionProfiles)
+    .where(eq(nutritionProfiles.id, profileId))
+    .get();
+  if (!profile || profile.currentWeightKilograms === latest.weightKilograms) return;
+  database
+    .update(nutritionProfiles)
+    .set({
+      currentWeightKilograms: latest.weightKilograms,
+      version: sql`${nutritionProfiles.version} + 1`,
+    })
+    .where(eq(nutritionProfiles.id, profileId))
+    .run();
+}
+
 export function recordBodyMeasurement(
   profileId: string,
   actorInput: NutritionMutationActorInput,
@@ -1076,7 +1114,10 @@ export function recordBodyMeasurement(
     actorHouseholdProfileId: actor.householdProfileId,
     createdAt: new Date(),
   } satisfies typeof nutritionBodyMeasurements.$inferInsert;
-  database.insert(nutritionBodyMeasurements).values(row).run();
+  database.transaction(() => {
+    database.insert(nutritionBodyMeasurements).values(row).run();
+    refreshCurrentNutritionWeight(profileId);
+  });
   return row;
 }
 export function listBodyMeasurements(profileId: string, requesterPrincipalId: string) {

@@ -1,4 +1,4 @@
-import { bodyMetricsSchema } from './body-metrics';
+import { bodyMetricsSchema, bodyMetricsError } from './body-metrics';
 import { z } from 'zod';
 
 import { NUTRIENT_CODES } from '@/lib/domain/nutrition';
@@ -205,14 +205,19 @@ export const nutritionGoalVersionInputSchema = z
 
 export type NutritionGoalVersionInput = z.input<typeof nutritionGoalVersionInputSchema>;
 
-export const bodyMeasurementInputSchema = z.object({
-  advancedMetrics: bodyMetricsSchema.default({}),
-  measuredAt: z.string().datetime({ offset: true }),
-  weightKilograms: z.number().finite().positive().max(1_000),
-  sourceType: z.enum(['manual', 'imported']).default('manual'),
-  approximate: z.boolean().default(false),
-  note: boundedText(500).default(''),
-});
+export const bodyMeasurementInputSchema = z
+  .object({
+    advancedMetrics: bodyMetricsSchema.default({}),
+    measuredAt: z.string().datetime({ offset: true }),
+    weightKilograms: z.number().finite().positive().max(1_000),
+    sourceType: z.enum(['manual', 'imported']).default('manual'),
+    approximate: z.boolean().default(false),
+    note: boundedText(500).default(''),
+  })
+  .superRefine((value, context) => {
+    const message = bodyMetricsError(value.advancedMetrics, value.weightKilograms);
+    if (message) context.addIssue({ code: 'custom', path: ['advancedMetrics'], message });
+  });
 
 export type BodyMeasurementInput = z.input<typeof bodyMeasurementInputSchema>;
 

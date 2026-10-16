@@ -9,7 +9,7 @@ export default function RecipeSettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="RECIPE SETTINGS"
-        title="Set up the cookbook for everyday use."
+        title="Recipes"
         description="Shared defaults keep the library and new recipe editor predictable for everyone."
       />
       <RecipePreferencesForm initial={getAppPreferences().recipes} />

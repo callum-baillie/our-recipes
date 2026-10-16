@@ -1,3 +1,5 @@
+import { bodyMetricsSchema } from '@/lib/domain/body-metrics';
+import { parseCompositionEstimate } from '@/lib/domain/qn-body-composition';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -26,6 +28,7 @@ import {
 } from '@/lib/services/nutrition-intake-service';
 import {
   getPrivateNutritionProfile,
+  listBodyMeasurements,
   listAccessibleNutritionProfiles,
   listNutritionGoalVersions,
 } from '@/lib/services/nutrition-profile-service';
@@ -55,7 +58,7 @@ export default async function NutritionPage({
   const principalId = household.compatibilityPrincipalId;
   const profiles = listAccessibleNutritionProfiles(principalId);
   const requested = await searchParams;
-  if (requested.view === 'settings') redirect('/settings/nutrition');
+  if (requested.view === 'settings') redirect('/account/nutrition');
   if (requested.view === 'goals') redirect('/nutrition');
   const activeProfile = profiles.find(
     (profile) => profile.id === household.activeNutritionProfile.id,
@@ -208,6 +211,9 @@ export default async function NutritionPage({
           }),
         )
       : null;
+  const latestMeasurement = activeProfile.canViewMeasurements
+    ? listBodyMeasurements(activeProfile.id, principalId)[0]
+    : null;
   const aiSummary = actor.profileId
     ? listAiSummaries(actor.profileId).find((item) => item.domain === 'nutrition')
     : null;
@@ -215,6 +221,17 @@ export default async function NutritionPage({
   return (
     <>
       <NutritionDashboard
+        latestWeighIn={
+          latestMeasurement
+            ? {
+                weightKilograms: latestMeasurement.weightKilograms,
+                measuredAt: latestMeasurement.measuredAt.toISOString(),
+                metrics: bodyMetricsSchema.parse(JSON.parse(latestMeasurement.advancedBodyMetrics)),
+                estimate: parseCompositionEstimate(latestMeasurement.bodyCompositionEstimate),
+                sourceType: latestMeasurement.sourceType,
+              }
+            : null
+        }
         principalId={principalId}
         profiles={profiles}
         activeProfile={activeProfile}
