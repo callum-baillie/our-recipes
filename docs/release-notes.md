@@ -1,7 +1,8 @@
 # Release notes
 
-## 1.0.0-rc.8
+## 1.0.0-rc.9
 
+- Supersedes the unpublished rc.8 image candidate and synchronizes the service-worker version with release metadata.
 - Give kitchen chat an explicit, current household roster and authenticated admin/parent planning permissions, while preserving each member's AI sharing preferences.
 - Add focused, searchable and paginated reads for pantry inventory, shopping-list items, supermarket aisle routes, and relevant shopping/profile preferences.
 - Include store selections, units, time zones and sharing status in chat context; distinguish withheld data from missing records.

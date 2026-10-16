@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.8
+  version: 1.0.0-rc.9
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
@@ -277,7 +277,7 @@ paths:
                 required: [status, version, schemaVersion, migrationStatus, setupComplete]
                 properties:
                   status: { type: string, enum: [ok, error] }
-                  version: { type: string, example: 1.0.0-rc.8 }
+                  version: { type: string, example: 1.0.0-rc.9 }
                   schemaVersion: { type: string, example: 0038_meal_plan_ingredient_snapshots }
                   migrationStatus: { type: string, enum: [current, incomplete] }
                   setupComplete: { type: boolean }
