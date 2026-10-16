@@ -233,10 +233,12 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   };
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`/recipes/${recipe.id}`);
+  await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
   const pantryPanel = page.getByRole('region', { name: 'What you have on hand' });
   await pantryPanel.getByLabel('Pantry product').selectOption({ label: 'Red lentils' });
   await expect(pantryPanel.getByRole('status')).toHaveText('Pantry mapping saved.');
   await page.reload();
+  await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
   await expect(pantryPanel.getByText('Pantry ready', { exact: true }).first()).toBeVisible();
   await expect(pantryPanel.getByText(/Need 200 g · exact available 350 g/u)).toBeVisible();
   const calculationResponse = await page.request.post(
