@@ -257,6 +257,11 @@
   align-items: center;
 }
 
+.filters button {
+  /* Avoid low-contrast intermediate text/background colours when changing filters. */
+  transition: box-shadow 160ms ease;
+}
+
 .filters button,
 .desktopSort label {
   display: inline-flex;

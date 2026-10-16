@@ -8,7 +8,7 @@ Its optional OpenAI assistant can read permitted recipe, planning, and nutrition
 
 ## Release status
 
-**v1.0.0-rc.4** is a release candidate, not a public v1 tag. It is suitable for candidate testing by a trusted household that keeps regular backups, but it is not an authentication boundary and must not be exposed directly to the public internet. The canonical [capability matrix](docs/capabilities.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish implemented behavior from target-specific evidence still required. Please report issues through the [support and security guide](docs/support.md).
+**v1.0.0-rc.5** is a release candidate, not a public v1 tag. It is suitable for candidate testing by a trusted household that keeps regular backups, but it is not an authentication boundary and must not be exposed directly to the public internet. The canonical [capability matrix](docs/capabilities.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish implemented behavior from target-specific evidence still required. Please report issues through the [support and security guide](docs/support.md).
 
 ## Install with Docker
 

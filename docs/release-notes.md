@@ -1,13 +1,15 @@
 # Release notes
 
-## 1.0.0-rc.4
+## 1.0.0-rc.5
 
 - Moved personal preferences, appearance, nutrition settings, and integrations into My profile.
 - Kept household configuration and role management in admin-only Settings.
 - Added Nutrition weigh-ins, VeSync sync, and recorded/calculated body measurements.
 - Current weight follows the latest dated observation, including scheduled scale imports; saving preferences preserves it.
 - Refined settings layouts and added feet/inches height entry alongside centimetres.
-- No database migration is required.
+- Removed low-contrast intermediate colours when switching shopping filters.
+- Stabilized accessibility checks by waiting for rendered pages.
+- Supersedes the unpublished rc.4 candidate. No database migration is required.
 
 ## 1.0.0-rc.3
 
