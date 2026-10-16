@@ -98,6 +98,21 @@ const generatedRecipeBatchToolSchema = z
 export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
   {
     type: 'function',
+    name: 'prepare_recipe_images',
+    strict: true,
+    description:
+      'Prepare paid image generation or regeneration for existing saved recipes, only when the user explicitly asks for images. Search/read the recipes first. Nothing is generated until the user confirms the action card.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipeIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 10 },
+      },
+      required: ['recipeIds'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
     name: 'read_planned_recipe',
     strict: true,
     description:
@@ -592,6 +607,28 @@ async function executeTool(input: {
   request?: Request;
   allowPaidTools?: boolean;
 }) {
+  if (input.name === 'prepare_recipe_images') {
+    if (!input.principal || !input.request || input.principal.profileId !== input.profileId)
+      throw new AiChatToolError('Sign in again to prepare image generation.');
+    const args = z
+      .object({ recipeIds: z.array(z.string().uuid()).min(1).max(10) })
+      .strict()
+      .parse(input.args);
+    return prepareAppActions(input.principal, input.request, input.threadId, {
+      title:
+        args.recipeIds.length === 1
+          ? `Generate image for ${getRecipe(args.recipeIds[0], input.profileId)?.title ?? 'saved recipe'}`.slice(
+              0,
+              160,
+            )
+          : `Generate images for ${new Set(args.recipeIds).size} recipes`,
+      actions: [...new Set(args.recipeIds)].map((recipeId) => ({
+        operationId: 'generateRecipeImage',
+        parametersJson: JSON.stringify({ recipeId }),
+        bodyJson: JSON.stringify({ confirm: true }),
+      })),
+    });
+  }
   if (input.name === 'read_kitchen_context') {
     if (!input.principal || input.principal.profileId !== input.profileId)
       throw new AiChatToolError('Sign in again to read kitchen data.');
@@ -1018,6 +1055,8 @@ export async function runAiChatTurn(input: {
         safetyIdentifier: aiSafetyIdentifier(input.profileId),
         instructions: [
           'You are the Bòrd household assistant.',
+          'You can create and edit shopping lists. Discover shopping-lists actions with list_app_actions, read lists with read_kitchen_context, and prepare reviewed changes with prepare_app_actions. Use createOrGenerateShoppingList for a new manual list, addShoppingListItem or addShoppingListNamesBulk for additions, updateShoppingListItem for corrections, reorderShoppingListItems for rename/notes/order, and deleteShoppingListItem for removal. Never overwrite unrelated items. A new list gets its saved ID after confirmation: read it before adding items, and never invent its ID.',
+          'For requested images on existing recipes, use prepare_recipe_images. This is a paid action with an explicit confirmation card; never regenerate images merely because a recipe lacks one.',
           'For household planning, use read_household_profiles to resolve people by name and pass their keys as selectedProfileIds. If the user says for me, select only the active member; do not silently select everyone. Parents and admins may plan for all members, but each member’s own sharing settings still apply. Do not guess identity or dietary facts.',
           'The current householdPlanning evidence states the authenticated account’s planning access and roster. Use it over stale claims in chat history. Hidden display names or unavailable nutrition details do not mean a profile is absent or cannot receive meals. For everyone, use every roster key. For a named person whose name is withheld, explain the identity sharing restriction rather than claiming only the active profile exists. Do not require private metrics to edit a shared meal plan.',
           'Use read_kitchen_context to inspect pantry, shopping lists, supermarket routes and relevant preferences without requiring unrelated sharing categories. These kitchen resources are household-wide; do not claim other members have no pantry or lists merely because they use another profile. Use read_nutrition for the account-permitted profiles and respect every member’s separate sharing flags. Missing/withheld nutrition is unknown, never zero. Initial context is a limited snapshot: use search and pagination before claiming items are absent. Use read_meal_plan for dates outside the initial range. Follow the selected list’s supermarket and aisle order and the member’s actual units/timezone; do not invent settings, stock, dietary needs or nutrition. Expiry estimates are suggestions, not food safety guarantees.',

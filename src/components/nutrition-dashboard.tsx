@@ -1373,50 +1373,59 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           </div>
         }
         toolbarLeft={
-          <>
-            {/* View picker changes presentation on mobile. */}
-            <button
-              className={styles.mobileViewButton}
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => setViewDialogOpen(true)}
-            >
-              <span>
-                <small>Nutrition view</small>
-                {VIEW_LABELS[props.view]}
-              </span>
-              <ChevronDown size={18} aria-hidden="true" />
-            </button>
-
-            <nav className={styles.tabs} aria-label="Nutrition views">
-              {VIEWS.map((view) => (
-                <Link
-                  key={view}
-                  href={`/nutrition?view=${view}`}
-                  aria-current={props.view === view ? 'page' : undefined}
+          <div className={styles.nutritionControls}>
+            <label className={styles.viewControl}>
+              <span>View</span>
+              <select
+                aria-label="Nutrition view"
+                value={props.view}
+                onChange={(event) => router.push(`/nutrition?view=${event.target.value}`)}
+              >
+                {VIEWS.map((view) => (
+                  <option key={view} value={view}>
+                    {VIEW_LABELS[view]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className={styles.memberControl}>
+              <span>Profile</span>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setProfileDialogOpen(true)}
+              >
+                <UserCircle size={18} />
+                <span>{activeProfile.displayName}</span>
+                <ChevronDown size={16} />
+              </button>
+            </div>
+            <div className={styles.dayControl}>
+              <span>Date</span>
+              {props.view === 'diary' ? (
+                <label>
+                  <CalendarDays size={18} />
+                  <input
+                    type="date"
+                    aria-label="Nutrition diary date"
+                    value={diaryDate}
+                    max={today}
+                    onChange={(event) => {
+                      if (event.target.value) setDiaryDate(event.target.value);
+                    }}
+                  />
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  title="Open daily diary"
+                  onClick={() => router.push('/nutrition?view=diary')}
                 >
-                  {VIEW_LABELS[view]}
-                </Link>
-              ))}
-            </nav>
-          </>
-        }
-        toolbarRight={
-          <div className={styles.headerSelectors}>
-            <button
-              className={styles.profileSelector}
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => setProfileDialogOpen(true)}
-            >
-              <UserCircle size={18} aria-hidden="true" />
-              {activeProfile.displayName}
-              <ChevronDown size={15} aria-hidden="true" />
-            </button>
-            <span className={styles.dateSelector}>
-              <CalendarDays size={17} aria-hidden="true" />
-              {props.view === 'diary' ? diaryDate : today}
-            </span>
+                  <CalendarDays size={18} />
+                  <time dateTime={today}>{today}</time>
+                </button>
+              )}
+            </div>
           </div>
         }
       />

@@ -13,8 +13,9 @@ import {
   Store,
   Trash2,
 } from 'lucide-react';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition, useRef } from 'react';
 
+import { createClientUuid } from '@/lib/client/client-uuid';
 import { StoreMapUpload } from '@/components/store-map-upload';
 
 import { InlineSkeleton } from '@/components/skeleton';
@@ -78,7 +79,10 @@ function draftFor(profile?: Profile): ProfileDraft {
         locationLabel: profile.locationLabel,
         notes: profile.notes,
         archived: Boolean(profile.archivedAt),
-        sections: profile.sections.map((section) => ({ ...section })),
+        sections: profile.sections.map((section, index) => ({
+          ...section,
+          id: section.id ?? `draft-${index}`,
+        })),
       }
     : {
         id: null,
@@ -86,7 +90,7 @@ function draftFor(profile?: Profile): ProfileDraft {
         locationLabel: '',
         notes: '',
         archived: false,
-        sections: starterSections.map((section) => ({ ...section })),
+        sections: starterSections.map((section, index) => ({ ...section, id: `draft-${index}` })),
       };
 }
 
@@ -105,6 +109,16 @@ async function requestWorkspace(url: string, method: string, body?: unknown): Pr
 
 export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Workspace }) {
   const { showToast } = useToast();
+  const dragRef = useRef<{ index: number; sections: Section[] } | null>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [routeAnnouncement, setRouteAnnouncement] = useState('');
+  function finishDrag(cancelled = false) {
+    const original = dragRef.current?.sections;
+    if (cancelled && original) setDraft((current) => ({ ...current, sections: original }));
+    dragRef.current = null;
+    setDragging(null);
+  }
+
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const firstActive = initialWorkspace.profiles.find((profile) => !profile.archivedAt);
   const [selectedId, setSelectedId] = useState<string | null>(firstActive?.id ?? null);
@@ -433,7 +447,12 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
 
               <StoreMapUpload
                 key={draft.id ?? 'new-store'}
-                onUse={(sections) => setDraft((current) => ({ ...current, sections }))}
+                onUse={(sections) =>
+                  setDraft((current) => ({
+                    ...current,
+                    sections: sections.map((section) => ({ ...section, id: createClientUuid() })),
+                  }))
+                }
               />
               <div className={styles.routeHeader}>
                 <div>
@@ -444,10 +463,72 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                   </span>
                 </div>
               </div>
-              <ol className={styles.routeList}>
+              <p id="route-drag-help" className={styles.routeHelp}>
+                Drag a handle to change the route, or use the up and down buttons.
+              </p>
+              <p role="status" className="sr-only">
+                {routeAnnouncement}
+              </p>
+              <ol
+                className={styles.routeList}
+                onPointerMove={(event) => {
+                  const drag = dragRef.current;
+                  if (!drag) return;
+                  const target = document
+                    .elementFromPoint(event.clientX, event.clientY)
+                    ?.closest<HTMLElement>('[data-route-index]');
+                  if (!target || !event.currentTarget.contains(target)) return;
+                  const to = Number(target.dataset.routeIndex);
+                  if (to === drag.index || !Number.isInteger(to)) return;
+                  const from = drag.index;
+                  drag.index = to;
+                  setDraft((current) => {
+                    const sections = [...current.sections];
+                    const [moving] = sections.splice(from, 1);
+                    sections.splice(to, 0, moving);
+                    return { ...current, sections };
+                  });
+                  setDragging(to);
+                  setRouteAnnouncement(
+                    `Moved section to position ${to + 1}. Save changes to keep this route.`,
+                  );
+                  if (event.clientY > window.innerHeight - 90) window.scrollBy({ top: 14 });
+                  if (event.clientY < 90) window.scrollBy({ top: -14 });
+                }}
+                onPointerUp={() => finishDrag()}
+                onPointerCancel={() => finishDrag(true)}
+                onLostPointerCapture={() => finishDrag()}
+              >
                 {draft.sections.map((section, index) => (
-                  <li key={`${section.id ?? 'new'}-${index}`}>
-                    <GripVertical className={styles.grip} size={18} aria-hidden="true" />
+                  <li
+                    key={section.id ?? section.aisleId}
+                    data-route-index={index}
+                    data-dragging={dragging === index || undefined}
+                  >
+                    <button
+                      className={styles.dragHandle}
+                      type="button"
+                      aria-label={`Drag ${section.name || 'section'} to reorder`}
+                      aria-describedby="route-drag-help"
+                      onPointerDown={(event) => {
+                        if (event.button !== 0) return;
+                        event.preventDefault();
+                        dragRef.current = { index, sections: [...draft.sections] };
+                        setDragging(index);
+                        event.currentTarget.closest('ol')?.setPointerCapture(event.pointerId);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                          event.preventDefault();
+                          moveSection(index, event.key === 'ArrowUp' ? -1 : 1);
+                          setRouteAnnouncement(
+                            `Moved ${section.name}. Save changes to keep this route.`,
+                          );
+                        }
+                      }}
+                    >
+                      <GripVertical size={18} aria-hidden="true" />
+                    </button>
                     <span className={styles.routeNumber}>{index + 1}</span>
                     <div className={styles.routeInputs}>
                       <input
@@ -509,7 +590,10 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                 onClick={() =>
                   setDraft({
                     ...draft,
-                    sections: [...draft.sections, { aisleId: '', name: '', matchTerms: [] }],
+                    sections: [
+                      ...draft.sections,
+                      { id: createClientUuid(), aisleId: '', name: '', matchTerms: [] },
+                    ],
                   })
                 }
                 type="button"

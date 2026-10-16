@@ -1,10 +1,8 @@
 import { PageHeader } from '@/components/page-header';
-import { DecisionAssistance } from '@/components/decision-assistance';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
-import { KitchenPrintDialog } from '@/components/kitchen-print-dialog';
-import { RecipebookInsights } from '@/components/recipebook-insights';
+import { RecipeLibraryResults } from '@/components/recipe-library-results';
 import { RecipeLibraryFilters } from '@/components/recipe-library-filters';
 import { RecipebookNav } from '@/components/recipebook-nav';
 import { RecipeSummaryCard } from '@/components/recipe-summary-card';
@@ -19,7 +17,7 @@ import { listAccessibleNutritionProfiles } from '@/lib/services/nutrition-profil
 import { getAppPreferences } from '@/lib/services/app-preferences-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
 import {
-  getRecipebookInsightData,
+  getRecipeLibraryFacets,
   listRecipeLibrary,
   listRecipeTags,
 } from '@/lib/services/recipe-service';
@@ -80,6 +78,7 @@ export default async function RecipeLibraryPage({
   const showRecipeCardNutrition = activeNutritionProfile?.showRecipeCardNutrition ?? true;
   const { profiles } = getHouseholdState();
   const tags = listRecipeTags();
+  const facetData = getRecipeLibraryFacets(query.status);
   const collections = listCollections();
   const pageSize = 24;
   const firstLibraryPage = listRecipeLibrary(
@@ -133,46 +132,10 @@ export default async function RecipeLibraryPage({
               ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
               : 'A place for every recipe your household returns to.'
           }
-          actions={
-            <KitchenPrintDialog
-              kind="recipes"
-              browse
-              recipes={library.recipes.map(({ id, title }) => ({ id, title }))}
-            />
-          }
-          toolbarLeft={
-            <nav className="kitchen-quick-views" aria-label="Recipe shortcuts">
-              <Link
-                href="/recipes"
-                aria-current={
-                  !query.favorite && !query.pantry && !query.maxTotalMinutes ? 'page' : undefined
-                }
-              >
-                All recipes
-              </Link>
-              <Link
-                href="/recipes?favorite=true"
-                aria-current={query.favorite ? 'page' : undefined}
-              >
-                Favourites
-              </Link>
-              <Link
-                href="/recipes?pantry=ready"
-                aria-current={query.pantry === 'ready' ? 'page' : undefined}
-              >
-                Ready to cook
-              </Link>
-              <Link
-                href="/recipes?maxTotalMinutes=30"
-                aria-current={query.maxTotalMinutes === 30 ? 'page' : undefined}
-              >
-                30 minutes or less
-              </Link>
-            </nav>
-          }
           toolbarRight={<RecipebookNav current="library" />}
         >
           <RecipeLibraryFilters
+            facets={facetData.facets}
             filters={{
               q: query.q,
               sort: query.sort,
@@ -205,13 +168,6 @@ export default async function RecipeLibraryPage({
             }))}
           />
         </PageHeader>
-        <DecisionAssistance
-          embedded
-          initialTask="cleanup"
-          tasks={['cleanup', 'recipe_review']}
-          title="Library maintenance"
-          description="Review saved recipes in batches for missing nutrition and unclear details. Open a recipe for ingredient matching and individual changes."
-        />
         {activeNutritionProfile && !showRecipeCardNutrition ? (
           <p className="muted">
             Compact Nutrition facts are hidden in {activeNutritionProfile.displayName}&apos;s
@@ -219,12 +175,22 @@ export default async function RecipeLibraryPage({
           </p>
         ) : null}
       </div>
-      <RecipebookInsights recipes={getRecipebookInsightData()} />
+      {!library.recipes.length ? (
+        <RecipeLibraryResults recipes={[]} total={0} overall={facetData.total} sort={query.sort}>
+          {[]}
+        </RecipeLibraryResults>
+      ) : null}
       {library.recipes.length ? (
         <>
-          <section
-            className="home-recipe-grid all-recipes-grid library-recipe-grid"
-            aria-label="Recipe results"
+          <RecipeLibraryResults
+            recipes={library.recipes.map(({ id, title, currentRevision }) => ({
+              id,
+              title,
+              currentRevision,
+            }))}
+            total={library.total}
+            overall={facetData.total}
+            sort={query.sort}
           >
             {library.recipes.map((recipe) => (
               <RecipeSummaryCard
@@ -257,7 +223,7 @@ export default async function RecipeLibraryPage({
                 key={recipe.id}
               />
             ))}
-          </section>
+          </RecipeLibraryResults>
           {library.totalPages > 1 && (
             <nav className="pagination" aria-label="Recipe library pages">
               {library.page > 1 ? (

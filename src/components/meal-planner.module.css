@@ -4867,3 +4867,123 @@ input:checked ~ .checkMark {
 .dialogShell.dialogShellWithOptions {
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
 }
+
+/* A calendar meal has a clear title, one metric rail and a contained action trigger. */
+.refinedPlanner .plannedMeal {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 0;
+  border-radius: 0.8rem;
+  border: 1px solid var(--line);
+  background: var(--field);
+  overflow: visible;
+}
+.refinedPlanner .mealThumb {
+  border-radius: 0.75rem 0.75rem 0 0;
+  overflow: hidden;
+}
+.refinedPlanner .plannedMealCopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.65rem;
+}
+.refinedPlanner .mealTitleRow {
+  min-width: 0;
+  padding-right: 1.65rem;
+}
+.refinedPlanner .plannedMealCopy strong {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.refinedPlanner .mealMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.73rem !important;
+  line-height: 1.2;
+  flex-wrap: wrap;
+}
+.refinedPlanner .mealMeta svg {
+  display: block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.refinedPlanner .servingEditor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: inherit;
+  line-height: inherit;
+}
+.refinedPlanner .servingEditor input {
+  width: 2.5rem;
+  min-height: 30px;
+  padding: 0.2rem;
+  font: inherit;
+  text-align: center;
+}
+.refinedPlanner .mealActions {
+  top: 0.35rem;
+  right: 0.35rem;
+  margin: 0;
+}
+.refinedPlanner .mealActions summary {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border-radius: 0.5rem;
+  line-height: 1;
+  background: var(--field);
+  border: 1px solid var(--line);
+}
+.refinedPlanner .mealActions summary svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.refinedPlanner .mealActions[open] {
+  z-index: 12;
+}
+.viewModeControl button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: 0.55rem;
+  line-height: 1.15;
+  min-height: 40px;
+}
+.mealHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.mealHeading > svg {
+  flex: 0 0 18px;
+}
+@media (max-width: 700px) {
+  .refinedPlanner .mealActions summary {
+    width: 44px;
+    height: 44px;
+  }
+  .refinedPlanner .mealTitleRow {
+    padding-right: 2rem;
+  }
+  .refinedPlanner .plannedMealCopy strong {
+    font-size: 0.92rem;
+  }
+  .refinedPlanner .mobileSchedule .plannedMeal {
+    grid-template-columns: 5rem minmax(0, 1fr);
+  }
+  .refinedPlanner .mobileSchedule .mealThumb {
+    border-radius: 0.75rem 0 0 0.75rem;
+  }
+}

@@ -1753,3 +1753,49 @@
 .dashboardHeader {
   margin-bottom: var(--workspace-section-gap);
 }
+
+.mobileToolbar {
+  display: block;
+  min-width: 0;
+}
+.addDialogShell {
+  border-radius: 1.1rem;
+}
+.addDialogHeader {
+  align-items: center;
+}
+.addDialogHeader h2 {
+  font-size: 1.3rem;
+  line-height: 1.3;
+}
+.addDialogClose {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.addDialogClose svg {
+  display: block;
+  margin: 0;
+}
+@media (max-width: 650px) {
+  .addDialog {
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+  }
+  .addDialogShell {
+    max-height: calc(100dvh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  .addDialogHeader {
+    padding: 1rem;
+  }
+  .addDialog input,
+  .addDialog select,
+  .addDialog textarea {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+}

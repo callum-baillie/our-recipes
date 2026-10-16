@@ -450,6 +450,8 @@ export async function generateAiMealPlanProposal(input: {
     kind: 'meal_plan_generate',
     payload: {
       candidate,
+      startDate: request.startDate,
+      endDate: request.endDate,
       occupiedSlotMode: request.occupiedSlotMode,
       selectedProfileIds,
       conflicts,

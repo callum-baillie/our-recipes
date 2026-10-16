@@ -22,6 +22,7 @@ import {
 } from '@/lib/db/schema';
 import {
   recipeInputSchema,
+  parseRecipeTaxonomyValues,
   type RecipeInput,
   type RecipeLibraryQuery,
   type RecipePayload,
@@ -741,7 +742,7 @@ export function listRecipeLibrary(
             orderedRows.map((recipe) => recipe.id),
           ),
         )
-        .orderBy(asc(recipeImages.createdAt), asc(recipeImages.id))
+        .orderBy(desc(recipeImages.createdAt), desc(recipeImages.id))
         .all()
     : [];
   const profileRows = orderedRows.length
@@ -1418,4 +1419,35 @@ export function getRecipebookInsightData() {
     .from(recipes)
     .where(eq(recipes.status, 'active'))
     .all();
+}
+
+export function getRecipeLibraryFacets(status: RecipeRecord['status'] | 'all' = 'active') {
+  ensureDatabase();
+  const rows = getDatabase()
+    .select({ id: recipes.id, category: recipes.category, cuisine: recipes.cuisine })
+    .from(recipes)
+    .where(status === 'all' ? undefined : eq(recipes.status, status))
+    .all();
+  const ids = new Set(rows.map((row) => row.id));
+  const counts = new Map<
+    string,
+    { key: string; field: string; value: string; label: string; count: number }
+  >();
+  const add = (field: string, value: string) => {
+    const key = `${field}:${value}`;
+    const entry = counts.get(key) ?? { key, field, value, label: value, count: 0 };
+    entry.count++;
+    counts.set(key, entry);
+  };
+  for (const row of rows)
+    for (const field of ['category', 'cuisine'] as const)
+      for (const value of new Set(parseRecipeTaxonomyValues(row[field]))) add(field, value);
+  for (const row of getDatabase().select().from(recipeTags).all())
+    if (ids.has(row.recipeId)) add('tag', row.tag);
+  return {
+    total: rows.length,
+    facets: [...counts.values()].sort(
+      (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+    ),
+  };
 }

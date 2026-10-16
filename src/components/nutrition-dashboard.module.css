@@ -1217,7 +1217,7 @@
   font-size: 0.78rem;
 }
 
-.plannedMetrics article span {
+.plannedMetrics article > div span {
   color: var(--muted);
   display: flex;
   justify-content: space-between;
@@ -2585,5 +2585,83 @@
   }
   .panel {
     padding: 1rem;
+  }
+}
+
+.nutritionControls {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.4fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
+  align-items: stretch;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+.nutritionControls > label,
+.nutritionControls > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+}
+.nutritionControls > label > span,
+.nutritionControls > div > span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.nutritionControls select,
+.nutritionControls button,
+.dayControl > label {
+  min-width: 0;
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+.nutritionControls svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: block;
+  margin: 0;
+}
+.memberControl button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberControl button > svg:last-child {
+  margin-left: auto;
+}
+.dayControl input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+@media (max-width: 650px) {
+  .nutritionControls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+  .dayControl {
+    grid-column: 1 / -1;
+  }
+  .dayControl > label,
+  .dayControl > button {
+    min-height: 44px;
   }
 }

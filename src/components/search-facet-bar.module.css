@@ -1,0 +1,206 @@
+.surface {
+  position: relative;
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  width: 100%;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 1rem;
+  background: var(--field);
+  transition: border-color 0.15s;
+}
+.search:focus-within {
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 12%, transparent);
+}
+.search input {
+  min-width: 0;
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  padding: 0.65rem 0.5rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.search input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.search button,
+.more {
+  flex: 0 0 44px;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.search button:hover,
+.search button[data-active],
+.more:hover {
+  color: var(--leaf);
+  background: var(--leaf-pale);
+}
+.search button svg,
+.more svg,
+.chip svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+  flex-shrink: 0;
+}
+.shelf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.chip {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.chip[aria-pressed='true'] {
+  color: var(--leaf);
+  border-color: var(--leaf);
+  background: var(--leaf-pale);
+}
+.chip:hover {
+  border-color: var(--leaf);
+}
+.count {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  gap: 8px;
+  width: max-content;
+  max-width: none;
+  height: 0;
+  overflow: hidden;
+}
+.results {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.1rem;
+}
+.summary {
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.summary strong {
+  color: var(--ink);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.actions > button,
+.actions > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.actions > button:hover,
+.actions > a:hover {
+  background: var(--surface-hover);
+}
+.actions svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.sort {
+  margin-left: auto;
+  min-width: 0;
+}
+.sort select {
+  max-width: 15rem;
+  min-height: 44px;
+  width: 100%;
+  padding: 0.5rem 1.75rem 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background-color: var(--field);
+  color: var(--ink);
+}
+@media (max-width: 650px) {
+  .chip {
+    min-height: 44px;
+  }
+  .results {
+    gap: 0.25rem;
+  }
+  .summary {
+    font-size: 0.75rem;
+  }
+  .actions {
+    gap: 0;
+  }
+  .actions :global(.action-label) {
+    display: none;
+  }
+  .sort select {
+    max-width: 8.5rem;
+    font-size: 0.78rem;
+    padding-left: 0.5rem;
+  }
+}

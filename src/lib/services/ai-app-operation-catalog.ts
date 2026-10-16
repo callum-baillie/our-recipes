@@ -68,6 +68,16 @@ export type AppOperation = {
 };
 export const APP_OPERATIONS: AppOperation[] = [
   {
+    id: 'generateRecipeImage',
+    path: '/recipes/{recipeId}/images/generate',
+    method: 'POST',
+    summary:
+      'Generate a fresh image for an existing recipe. Paid OpenAI action: only prepare when explicitly requested; confirmation is required.',
+    parameters: [],
+    body: null,
+    validator: z.object({ confirm: z.literal(true) }).strict(),
+  },
+  {
     id: 'listRecentShoppingItems',
     path: '/shopping-lists/recent-items',
     method: 'GET',
@@ -1777,6 +1787,7 @@ export const APP_OPERATIONS: AppOperation[] = [
   },
 ];
 export const APP_ROUTE_LOADERS = {
+  generateRecipeImage: () => import('@/app/api/v1/recipes/[recipeId]/images/generate/route'),
   listRecentShoppingItems: () => import('@/app/api/v1/shopping-lists/recent-items/route'),
   addShoppingListNamesBulk: () => import('@/app/api/v1/shopping-lists/[listId]/items/bulk/route'),
   listTags: () => import('@/app/api/v1/tags/route'),

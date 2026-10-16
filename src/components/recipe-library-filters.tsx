@@ -1,8 +1,10 @@
 'use client';
 
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { SearchFacetBar } from './search-facet-bar';
 import Link from 'next/link';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type FilterOption = {
   value: string;
@@ -36,63 +38,43 @@ type RecipeLibraryFiltersProps = {
   profiles: FilterOption[];
   tags: string[];
   collections: FilterOption[];
+  facets: Array<{ key: string; label: string; field: string; value: string; count: number }>;
 };
-
-function PreservedAdvancedFilters({ filters }: { filters: RecipeLibraryFiltersValue }) {
-  return (
-    <>
-      {filters.creator ? <input type="hidden" name="creator" value={filters.creator} /> : null}
-      {filters.collection ? (
-        <input type="hidden" name="collection" value={filters.collection} />
-      ) : null}
-      {filters.status !== 'active' ? (
-        <input type="hidden" name="status" value={filters.status} />
-      ) : null}
-      {filters.category ? <input type="hidden" name="category" value={filters.category} /> : null}
-      {filters.cuisine ? <input type="hidden" name="cuisine" value={filters.cuisine} /> : null}
-      {filters.maxTotalMinutes ? (
-        <input type="hidden" name="maxTotalMinutes" value={filters.maxTotalMinutes} />
-      ) : null}
-      {filters.favorite ? <input type="hidden" name="favorite" value="true" /> : null}
-      {filters.cooked ? <input type="hidden" name="cooked" value="true" /> : null}
-      {filters.pantry ? <input type="hidden" name="pantry" value={filters.pantry} /> : null}
-      {filters.maxCaloriesPerServing !== '' ? (
-        <input type="hidden" name="maxCaloriesPerServing" value={filters.maxCaloriesPerServing} />
-      ) : null}
-      {filters.minProteinPerServing !== '' ? (
-        <input type="hidden" name="minProteinPerServing" value={filters.minProteinPerServing} />
-      ) : null}
-      {filters.minFiberPerServing !== '' ? (
-        <input type="hidden" name="minFiberPerServing" value={filters.minFiberPerServing} />
-      ) : null}
-      {filters.maxSodiumPerServing !== '' ? (
-        <input type="hidden" name="maxSodiumPerServing" value={filters.maxSodiumPerServing} />
-      ) : null}
-      {filters.minNutritionCompleteness !== '' ? (
-        <input
-          type="hidden"
-          name="minNutritionCompleteness"
-          value={filters.minNutritionCompleteness}
-        />
-      ) : null}
-      {filters.supportsNutrient ? (
-        <input type="hidden" name="supportsNutrient" value={filters.supportsNutrient} />
-      ) : null}
-      {filters.nutritionFields.map((field) => (
-        <input key={field} type="hidden" name="nutritionFields" value={field} />
-      ))}
-    </>
-  );
-}
 
 export function RecipeLibraryFilters({
   filters,
   profiles,
   tags,
   collections,
+  facets,
 }: RecipeLibraryFiltersProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const quickFormRef = useRef<HTMLFormElement>(null);
+  const router = useRouter();
+  const search = useSearchParams();
+  const [draft, setDraft] = useState(filters.q);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const sync = () => setDraft(new URLSearchParams(window.location.search).get('q') ?? '');
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  function navigate(patch: Record<string, string | null>) {
+    if (timer.current) clearTimeout(timer.current);
+    const params = new URLSearchParams(search.toString());
+    params.delete('page');
+    params.set('q', draft);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    router.replace(`/recipes?${params}`, { scroll: false });
+  }
   const hasActiveFilters = Boolean(
     filters.q ||
     filters.tag ||
@@ -117,75 +99,44 @@ export function RecipeLibraryFilters({
 
   return (
     <>
-      <div className="library-toolbar">
-        <form
-          ref={quickFormRef}
-          className="library-quick-filters"
-          action="/recipes"
-          method="get"
-          role="search"
-        >
-          <PreservedAdvancedFilters filters={filters} />
-          <label className="library-search-field">
-            <Search size={18} aria-hidden="true" />
-            <span className="sr-only">Search recipes</span>
-            <input name="q" defaultValue={filters.q} placeholder="Search recipes or ingredients" />
-          </label>
-          <label className="library-quick-select">
-            <span className="sr-only">Tag</span>
-            <select
-              name="tag"
-              defaultValue={filters.tag}
-              onChange={() => quickFormRef.current?.requestSubmit()}
-            >
-              <option value="">Any tag</option>
-              {tags.map((tag) => (
-                <option value={tag} key={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="library-quick-select library-sort-select">
-            <span className="sr-only">Sort</span>
-            <select
-              name="sort"
-              defaultValue={filters.sort}
-              onChange={() => quickFormRef.current?.requestSubmit()}
-            >
-              <option value="recently-updated">Recently updated</option>
-              <option value="recently-added">Recently added</option>
-              <option value="alphabetical">Alphabetical</option>
-              <option value="highest-rated">Your highest rated</option>
-              <option value="most-recently-cooked">Recently cooked</option>
-              <option value="shortest-time">Shortest time</option>
-              <option value="lowest-calories">Lowest calories per serving</option>
-              <option value="highest-protein">Highest protein per serving</option>
-              <option value="highest-fiber">Highest fiber per serving</option>
-              <option value="lowest-sodium">Lowest sodium per serving</option>
-              <option value="highest-nutrition-completeness">Highest Nutrition coverage</option>
-            </select>
-          </label>
-          <button className="library-search-submit" type="submit" aria-label="Search recipes">
-            <Search size={18} aria-hidden="true" />
-          </button>
-        </form>
-
-        <button
-          className="library-advanced-trigger"
-          type="button"
-          aria-haspopup="dialog"
-          onClick={() => dialogRef.current?.showModal()}
-        >
-          <SlidersHorizontal size={17} aria-hidden="true" />
-          Advanced search
-        </button>
-        {hasActiveFilters ? (
-          <Link className="library-clear-filters" href="/recipes">
-            Clear
-          </Link>
-        ) : null}
-      </div>
+      <SearchFacetBar
+        label="Search recipes"
+        placeholder="Search recipes or ingredients"
+        query={draft}
+        onQueryChange={(value) => {
+          setDraft(value);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => navigate({ q: value }), 350);
+        }}
+        onSearch={() => navigate({ q: draft })}
+        onAdvanced={() => dialogRef.current?.showModal()}
+        advancedActive={hasActiveFilters}
+        facets={[
+          {
+            key: 'all',
+            label: 'All recipes',
+            active: !filters.category && !filters.cuisine && !filters.tag && !filters.favorite,
+          },
+          { key: 'favorite', label: 'Favorites', icon: 'heart', active: filters.favorite },
+          ...facets.map((facet) => ({
+            ...facet,
+            active: filters[facet.field as 'tag' | 'category' | 'cuisine'] === facet.value,
+          })),
+        ]}
+        onFacet={(key) => {
+          if (key === 'all')
+            return navigate({ category: null, cuisine: null, tag: null, favorite: null });
+          if (key === 'favorite') return navigate({ favorite: filters.favorite ? null : 'true' });
+          const facet = facets.find((item) => item.key === key);
+          if (facet)
+            navigate({
+              [facet.field]:
+                filters[facet.field as 'tag' | 'category' | 'cuisine'] === facet.value
+                  ? null
+                  : facet.value,
+            });
+        }}
+      />
 
       <dialog
         ref={dialogRef}
@@ -212,7 +163,8 @@ export function RecipeLibraryFilters({
             <span>Search recipes</span>
             <input
               name="q"
-              defaultValue={filters.q}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
               placeholder="Title, ingredient, or description"
             />
           </label>

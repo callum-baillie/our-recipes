@@ -15,6 +15,20 @@ import {
   enforceDecisionBudget,
 } from './decision-cache-service';
 import { DecisionError } from '@/lib/providers/decisions-provider';
+import { readAiKitchenContext } from './ai-kitchen-context-service';
+
+const focusedListOperations = new Set([
+  'listShoppingLists',
+  'getShoppingList',
+  'createOrGenerateShoppingList',
+  'reorderShoppingListItems',
+  'deleteShoppingList',
+  'addShoppingListItem',
+  'updateShoppingListItem',
+  'deleteShoppingListItem',
+  'addShoppingListNamesBulk',
+  'setShoppingListSupermarket',
+]);
 
 const actionSchema = z
   .object({
@@ -47,6 +61,16 @@ function operation(p: RequestPrincipal, id: string) {
   const op = APP_OPERATIONS.find((candidate) => candidate.id === id);
   if (!op) throw new DecisionError('This app operation is not available to chat.');
   const policy = getAiDataPolicy(p.profileId);
+  if (focusedListOperations.has(id)) {
+    if (!policy.shareShoppingLists)
+      throw new DecisionError('Enable shopping-list sharing to use this tool.', 403);
+    return op;
+  }
+  if (id === 'generateRecipeImage') {
+    if (!policy.shareSharedRecipes)
+      throw new DecisionError('Enable recipe sharing to generate an image.', 403);
+    return op;
+  }
   // Core API objects may contain linked recipes, stock, lists and plan references.
   if (
     !policy.shareSharedRecipes ||
@@ -67,6 +91,19 @@ function parseAction(p: RequestPrincipal, action: Action) {
     .record(z.string().max(80), z.string().max(500))
     .parse(JSON.parse(action.parametersJson));
   const body: unknown = action.bodyJson.trim() ? JSON.parse(action.bodyJson) : undefined;
+  if (
+    op.id === 'createOrGenerateShoppingList' &&
+    body &&
+    typeof body === 'object' &&
+    ('weekStart' in body || ('kind' in body && body.kind === 'planner'))
+  ) {
+    const policy = getAiDataPolicy(p.profileId);
+    if (!policy.shareMealPlans || !policy.sharePantry || !policy.shareSharedRecipes)
+      throw new DecisionError(
+        'Generating a list from meals requires meal-plan, pantry and recipe sharing.',
+        403,
+      );
+  }
   if (op.validator && body !== undefined) op.validator.parse(body);
   for (const match of op.path.matchAll(/\{([^}]+)\}/g)) {
     if (!parameters[match[1]] || !/^[a-zA-Z0-9_-]+$/.test(parameters[match[1]]))
@@ -79,21 +116,29 @@ export function listAppActions(p: RequestPrincipal, resource: string, operationI
     (op) =>
       (!resource || op.path.split('/')[1] === resource) && (!operationId || op.id === operationId),
   );
-  return candidates.map((candidate) => {
-    const op = operation(p, candidate.id);
+  return candidates.flatMap((candidate) => {
+    let op: AppOperation;
+    try {
+      op = operation(p, candidate.id);
+    } catch (error) {
+      if (!operationId && error instanceof DecisionError && error.status === 403) return [];
+      throw error;
+    }
     let schema = op.body;
     try {
       if (op.validator) schema = z.toJSONSchema(op.validator, { io: 'input' });
     } catch {
       /* The route still validates the submitted input. */
     }
-    return {
-      operationId: op.id,
-      summary: op.summary,
-      method: op.method,
-      parameters: op.parameters,
-      ...(operationId ? { bodySchema: schema } : {}),
-    };
+    return [
+      {
+        operationId: op.id,
+        summary: op.summary,
+        method: op.method,
+        parameters: op.parameters,
+        ...(operationId ? { bodySchema: schema } : {}),
+      },
+    ];
   });
 }
 async function invoke(
@@ -132,6 +177,14 @@ export async function readAppData(p: RequestPrincipal, request: Request, input: 
   const parsed = parseAction(p, action);
   if (parsed.op.method !== 'GET')
     throw new DecisionError('Use a reviewed proposal for this operation.');
+  if (parsed.op.id === 'listShoppingLists' || parsed.op.id === 'getShoppingList')
+    return readAiKitchenContext(p, {
+      resource: 'shopping_lists',
+      recordId: parsed.parameters.listId ?? null,
+      query: parsed.parameters.q ?? '',
+      offset: Number(parsed.parameters.offset ?? 0),
+      limit: Number(parsed.parameters.limit ?? 50),
+    });
   const response = await invoke(request, parsed.op, parsed.parameters, undefined);
   if (!response.headers.get('content-type')?.includes('application/json'))
     throw new DecisionError('Open this export in the app.');
@@ -151,6 +204,8 @@ async function snapshot(
   op: AppOperation,
   parameters: Record<string, string>,
 ): Promise<Snapshot | null> {
+  // Image generation reads the current recipe at execution; it does not edit recipe fields.
+  if (op.id === 'generateRecipeImage') return null;
   const reader = APP_OPERATIONS.filter(
     (candidate) =>
       candidate.method === 'GET' &&

@@ -145,6 +145,7 @@ export function readAiKitchenContext(principal: RequestPrincipal, input: unknown
       id: list.id,
       name: list.name,
       notes: list.notes,
+      notesVersion: list.notesVersion ?? 0,
       supermarketProfileId: list.supermarketProfileId,
       aisles: list.aisles,
     },

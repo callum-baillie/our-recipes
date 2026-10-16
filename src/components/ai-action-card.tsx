@@ -2,6 +2,7 @@
 
 import { Check, Clock3, ImageOff, Layers3, Sparkles, Users } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
@@ -320,6 +321,10 @@ function GenericProposalCard({
               : ''}
             Unlisted meals stay unchanged. Resolve any occupied slots below before saving.
           </p>
+          <p>
+            Confirming also creates or updates a shopping list for this plan, accounting for your
+            pantry stock.
+          </p>
         </div>
       ) : null}
       {conflicts.length ? (
@@ -357,6 +362,11 @@ function GenericProposalCard({
             </label>
           ))}
         </section>
+      ) : null}
+      {action.kind === 'meal_plan_generate' && text(object(action.result)?.shoppingListId) ? (
+        <Link href={`/lists/${encodeURIComponent(text(object(action.result)?.shoppingListId))}`}>
+          Open this plan’s shopping list
+        </Link>
       ) : null}
       {action.status === 'pending' ? (
         <div className={styles.actions}>

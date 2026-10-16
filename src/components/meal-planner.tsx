@@ -28,7 +28,15 @@ import {
   ShoppingBasket,
   Trash2,
   Undo2,
-  Utensils,
+  Coffee,
+  Sandwich,
+  Soup,
+  CakeSlice,
+  Apple,
+  Sunrise,
+  Moon,
+  UtensilsCrossed,
+  type LucideIcon,
   UsersRound,
   X,
 } from 'lucide-react';
@@ -140,6 +148,23 @@ type MealHistoryCommand =
 
 function profileInitial(name: string): string {
   return name.trim().charAt(0).toLocaleUpperCase() || '?';
+}
+
+const mealIcons: Record<string, LucideIcon> = {
+  breakfast: Coffee,
+  lunch: Sandwich,
+  dinner: Soup,
+  dessert: CakeSlice,
+  snack: Apple,
+  brunch: Sunrise,
+  supper: Soup,
+  tiffin: Sandwich,
+  suhoor: Sunrise,
+  iftar: Moon,
+};
+function MealTypeIcon({ meal }: { meal: string }) {
+  const Icon = mealIcons[meal] ?? UtensilsCrossed;
+  return <Icon size={18} aria-hidden="true" />;
 }
 
 function mealLabel(meal: string): string {
@@ -1850,7 +1875,7 @@ export function MealPlanner({
                   <div
                     className={`${styles.mealHeading} ${rowIndex % 2 ? styles.alternateCell : ''}`}
                   >
-                    {option.label}
+                    <MealTypeIcon meal={option.value} /> {option.label}
                   </div>
                   {dates.map((date) => {
                     const slotMeals = meals.filter(
@@ -1929,7 +1954,7 @@ export function MealPlanner({
                 >
                   <div className={styles.mobileMealLabel}>
                     <span aria-hidden="true">
-                      <Utensils size={24} />
+                      <MealTypeIcon meal={option.value} />
                     </span>
                     <strong>{option.label}</strong>
                   </div>

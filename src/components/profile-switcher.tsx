@@ -1,6 +1,15 @@
 'use client';
 
-import { ChevronDown, KeyRound, LogOut, X } from 'lucide-react';
+import {
+  ChevronDown,
+  KeyRound,
+  LogOut,
+  X,
+  UserRound,
+  UsersRound,
+  ShieldCheck,
+  CalendarClock,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -158,43 +167,54 @@ export function ProfileSwitcher({
           </>
         }
       >
-        <div className="profile-menu">
-          {profiles.map((profile) => (
-            <button
-              key={profile.id}
-              type="button"
-              data-menu-close
-              disabled={pending}
-              onClick={() => requestProfileSwitch(profile.id)}
-            >
-              <span
-                className="profile-dot"
-                style={{
-                  backgroundColor: profile.color,
-                  color: profileInitialColor(profile.color),
-                }}
-                aria-hidden="true"
+        <div className="profile-menu" aria-label="Your account">
+          <div className="profile-menu-heading">
+            <strong>{activeProfile.displayName}</strong>
+            <span>Your household profile</span>
+          </div>
+          <div className="profile-menu-group" aria-label="Switch household profile">
+            <p className="profile-menu-label">Switch profile</p>
+            {profiles.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                data-menu-close
+                disabled={pending}
+                onClick={() => requestProfileSwitch(profile.id)}
               >
-                {profileInitial(profile.displayName)}
-              </span>
-              <span>{profile.displayName}</span>
-              {profile.id === activeProfile.id && <span className="active-label">Active</span>}
-            </button>
-          ))}
-          {canManageProfiles ? (
-            <Link className="manage-profiles-link" href="/settings/profiles" data-menu-close>
-              Manage profiles
+                <span
+                  className="profile-dot"
+                  style={{
+                    backgroundColor: profile.color,
+                    color: profileInitialColor(profile.color),
+                  }}
+                  aria-hidden="true"
+                >
+                  {profileInitial(profile.displayName)}
+                </span>
+                <span>{profile.displayName}</span>
+                {profile.id === activeProfile.id && <span className="active-label">Active</span>}
+              </button>
+            ))}
+          </div>
+          <div role="separator" className="profile-menu-separator" />
+          <div className="profile-menu-group">
+            {canManageProfiles ? (
+              <Link className="manage-profiles-link" href="/settings/profiles" data-menu-close>
+                <UsersRound size={18} aria-hidden="true" /> Manage profiles
+              </Link>
+            ) : null}
+            <Link className="manage-profiles-link" href="/account" data-menu-close>
+              <UserRound size={18} aria-hidden="true" /> My profile
             </Link>
-          ) : null}
-          <Link className="manage-profiles-link" href="/account" data-menu-close>
-            My profile
-          </Link>
-          <Link className="manage-profiles-link" href="/account/automation" data-menu-close>
-            Schedules & tasks
-          </Link>
-          <Link className="manage-profiles-link" href="/account/security" data-menu-close>
-            Account security
-          </Link>
+            <Link className="manage-profiles-link" href="/account/automation" data-menu-close>
+              <CalendarClock size={18} aria-hidden="true" /> Schedules & tasks
+            </Link>
+            <Link className="manage-profiles-link" href="/account/security" data-menu-close>
+              <ShieldCheck size={18} aria-hidden="true" /> Account security
+            </Link>
+          </div>
+          <div role="separator" className="profile-menu-separator" />
           <button
             className="profile-sign-out"
             type="button"

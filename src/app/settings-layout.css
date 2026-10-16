@@ -20,15 +20,13 @@
 }
 .settings-content .settings-pane {
   border: 1px solid var(--line);
-  border-inline: 0;
-  border-bottom: 0;
-  border-radius: 0;
-  background: transparent;
-  overflow: visible;
+  border-radius: 1rem;
+  background: var(--field);
+  overflow: clip;
   padding: 0;
 }
 .settings-content .settings-pane-header {
-  padding: 1rem 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
   gap: 1rem;
   align-items: center;
 }
@@ -422,12 +420,14 @@
   margin: 0;
 }
 .settings-content .settings-pane > .settings-pane-body {
-  padding: 0;
+  padding: 0 clamp(1rem, 2.5vw, 1.5rem) clamp(1rem, 2.5vw, 1.5rem);
 }
 .settings-content .profile-editor > .settings-pane-body > .settings-fields {
   padding: 0;
 }
 .settings-content .settings-page {
+  width: 100%;
+  min-width: 0;
   display: grid;
   gap: 1.75rem;
   margin: 0;
@@ -522,4 +522,19 @@
 }
 .settings-content .appearance-mode-grid {
   grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+}
+
+.settings-content .settings-pane-icon {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  line-height: 1;
+}
+.settings-content .settings-pane-icon svg {
+  display: block;
+  margin: 0;
+}
+.settings-content .profile-settings-list {
+  width: 100%;
+  min-width: 0;
 }

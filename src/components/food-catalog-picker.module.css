@@ -450,3 +450,234 @@
     max-width: 100%;
   }
 }
+
+.tabs,
+.embedded .tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border-radius: 0.85rem;
+  background: var(--surface-hover);
+}
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0.6rem;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+}
+.tabs button[aria-selected='true'] {
+  color: var(--ink);
+  background: var(--field);
+  box-shadow: 0 1px 4px #0001;
+}
+.results {
+  display: grid;
+  gap: 0.65rem;
+}
+.result {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--field);
+  color: var(--ink);
+  text-align: left;
+  min-width: 0;
+}
+.result > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.result strong {
+  line-height: 1.35;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+.result small {
+  font-size: 0.73rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.result img,
+.result .placeholder {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 0.6rem;
+  background: white;
+}
+.result:hover,
+.result:focus-visible {
+  border-color: var(--leaf);
+}
+.cameraActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.rapidToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.65rem;
+  background: var(--surface-hover);
+  color: var(--ink);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.rapidToggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--leaf);
+}
+.rapidQueue {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 1rem;
+  margin-block: 1rem;
+}
+.rapidQueue > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.rapidQueue h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.rapidQueue header > span,
+.rapidQueue > p {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.rapidQueue ul {
+  padding: 0;
+  margin: 0.75rem 0;
+  list-style: none;
+  display: grid;
+}
+.rapidQueue li {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 56px 36px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+.rapidQueue li > img,
+.scanPlaceholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 0.5rem;
+  object-fit: contain;
+  display: grid;
+  place-items: center;
+  background: var(--surface-hover);
+}
+.rapidQueue li > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.rapidQueue strong {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.rapidQueue small {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.rapidQueue li > button {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+.rapidQueue li input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.4rem;
+  text-align: center;
+}
+.rapidSave {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.rapidSave label {
+  flex: 1;
+  min-width: 10rem;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+.rapidSave select {
+  min-height: 44px;
+  width: 100%;
+}
+.rapidSave > button {
+  min-height: 44px;
+}
+@media (max-width: 620px) {
+  .lookupForm input,
+  .reviewGrid input,
+  .reviewGrid select {
+    font-size: 16px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .result {
+    grid-template-columns: 56px minmax(0, 1fr);
+    padding: 0.7rem;
+  }
+  .result img,
+  .result .placeholder {
+    width: 56px;
+    height: 56px;
+  }
+  .rapidQueue {
+    padding: 0.75rem;
+  }
+  .rapidQueue li {
+    grid-template-columns: 40px minmax(0, 1fr) 48px 28px;
+    gap: 0.35rem;
+  }
+  .rapidQueue li > img,
+  .scanPlaceholder {
+    width: 40px;
+    height: 40px;
+  }
+  .rapidSave > button {
+    width: 100%;
+  }
+}
+.result .placeholder {
+  background: var(--surface-hover);
+  color: var(--muted);
+}

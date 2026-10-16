@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.0-rc.10
+
+- Refine the profile menu, AI chat composer, recipebook search and bulk actions, pantry intake, Nutrition controls, planner cards, and settings layouts for desktop and mobile.
+- Add confirmed AI actions for regenerating existing recipe images and creating or editing shopping lists.
+- Add rapid barcode scanning with counted quantities and image-backed product matches; support touch and mouse aisle reordering.
+- Create or update a pantry-aware shopping list when a generated meal plan is confirmed.
+- No database migration is required. In-progress mobile-app work remains excluded from this release.
+
 ## 1.0.0-rc.9
 
 - Supersedes the unpublished rc.8 image candidate and synchronizes the service-worker version with release metadata.

@@ -35,8 +35,16 @@ import {
   removeMealPlanEntryWithNutrition,
   updateMealPlanEntryWithNutrition,
 } from '@/lib/services/nutrition-planning-orchestration-service';
-import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
-import { insertMealPlanEntriesInTransaction } from '@/lib/services/planning-service';
+import {
+  reconcileAutomaticRestockPolicies,
+  generatePantryShortageList,
+  PantryGroceryCookingPrerequisiteError,
+} from '@/lib/services/pantry-grocery-cooking-service';
+import {
+  insertMealPlanEntriesInTransaction,
+  generateShoppingList,
+  listPlannedMeals,
+} from '@/lib/services/planning-service';
 import {
   createRecipeInTransaction,
   updateRecipeWithIntegrations,
@@ -73,6 +81,8 @@ const mealPlanChangePayloadSchema = z.discriminatedUnion('operation', [
 const generatedPlanPayloadSchema = z
   .object({
     candidate: aiMealPlanCandidateSchema,
+    startDate: z.iso.date().optional(),
+    endDate: z.iso.date().optional(),
     occupiedSlotMode: z.enum(['keep', 'replace', 'review']),
     selectedProfileIds: z.array(z.string().uuid()).max(20).default([]),
     generateRecipeImages: z.boolean().default(false),
@@ -506,7 +516,7 @@ function execute(
     }
     case 'meal_plan_generate': {
       const parsed = generatedPlanPayloadSchema.parse(payload);
-      return commitGeneratedPlan(
+      const saved = commitGeneratedPlan(
         parsed.candidate,
         parsed.occupiedSlotMode,
         parsed.selectedProfileIds,
@@ -514,6 +524,34 @@ function execute(
         conflictResolutions,
         row.profileId,
       );
+      const dates = parsed.candidate.entries.map((entry) => entry.plannedFor).sort();
+      const start = parsed.startDate ?? dates[0];
+      const end = parsed.endDate ?? dates[dates.length - 1];
+      let shoppingListId: string | null = null;
+      if (
+        start &&
+        end &&
+        listPlannedMeals(start, end).some(
+          (meal) => meal.status === 'planned' && meal.effectiveStatus !== 'cooked',
+        )
+      ) {
+        try {
+          // Reuse the durable plan list and preserve corrections when a plan is extended.
+          shoppingListId = generatePantryShortageList(
+            {
+              weekStart: start,
+              weekEnd: end,
+              mode: 'missing',
+            },
+            row.profileId,
+          ).listId;
+        } catch (error) {
+          if (!(error instanceof PantryGroceryCookingPrerequisiteError)) throw error;
+          // An all-takeout plan still gets an empty list for any extras the user needs.
+          shoppingListId = generateShoppingList(start, end, row.profileId).id;
+        }
+      }
+      return { ...saved, shoppingListId };
     }
     case 'nutrition_entry': {
       const parsed = nutritionEntryPayloadSchema.parse(payload);

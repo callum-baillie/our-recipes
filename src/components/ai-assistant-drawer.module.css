@@ -567,3 +567,105 @@
   font-size: 0.8rem;
   line-height: 1.5;
 }
+
+/* One text surface, with a stable touch-sized action rail below the draft. */
+.header {
+  background: var(--page);
+}
+.header h2 {
+  margin: 0;
+  line-height: 1.25;
+}
+.composer form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 44px;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.65rem;
+  border-radius: 1.4rem;
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+}
+.composer textarea {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.35rem 0.4rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: none;
+}
+.composer form button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  align-self: center;
+  line-height: 1;
+}
+.composer form button svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+.composer form .attachButton {
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: start;
+  border: 0;
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+.composer form button[type='submit'] {
+  grid-row: 2;
+  grid-column: 2;
+  justify-self: end;
+}
+.composer .paidTools {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0.65rem 0.35rem 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.paidTools input {
+  margin: 0.1rem 0 0;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 540px) {
+  .header {
+    padding-top: calc(0.8rem + env(safe-area-inset-top));
+  }
+  .composer {
+    background: var(--linen);
+  }
+  .composer textarea {
+    max-height: 25dvh;
+  }
+}
+.composer .paidTools input {
+  flex: 0 0 16px;
+  align-self: flex-start;
+  position: static;
+  transform: none;
+  margin: 0.1rem 0 0;
+  padding: 0;
+}
+.composer .paidTools > span {
+  flex: 1;
+  min-width: 0;
+}

@@ -6,6 +6,7 @@ import { Barcode, Camera, Database, Search, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 
 import styles from '@/components/food-catalog-picker.module.css';
+import { usePantryRapidScan } from './use-pantry-rapid-scan';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import type { FoodRecord, ProviderStatus } from '@/lib/domain/food-data';
 
@@ -41,10 +42,11 @@ export function FoodCatalogPicker({
   disabled = false,
   launchLabel = 'Scan or search food data',
   embedded = false,
-  initialTab = 'barcode',
+  initialTab = 'search',
   searchSuggestions = [],
   onManualRequest,
   onImported,
+  onSavingChange,
 }: {
   context: PickerContext;
   defaultQuery?: string;
@@ -55,7 +57,11 @@ export function FoodCatalogPicker({
   initialTab?: PickerTab;
   searchSuggestions?: string[];
   onManualRequest?: () => void;
-  onImported?: (product: { id: string; displayName: string }) => void;
+  onSavingChange?: (saving: boolean) => void;
+  onImported?: (
+    product: { id: string; displayName: string },
+    options?: { keepOpen?: boolean },
+  ) => void;
 }) {
   const titleId = useId();
   const searchSuggestionsId = useId();
@@ -63,8 +69,7 @@ export function FoodCatalogPicker({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<PickerTab>(initialTab);
-  const [barcode, setBarcode] = useState('');
+  const [tab, setTab] = useState<PickerTab>(initialTab === 'barcode' ? 'search' : initialTab);
   const [query, setQuery] = useState(defaultQuery);
   const [records, setRecords] = useState<FoodRecord[]>([]);
   const [localProducts, setLocalProducts] = useState<LocalProduct[]>([]);
@@ -72,7 +77,15 @@ export function FoodCatalogPicker({
   const [statuses, setStatuses] = useState<ProviderStatus[]>([]);
   const [selected, setSelected] = useState<FoodRecord | null>(null);
   const [busy, setBusy] = useState(false);
+  const [savingImport, setSavingImport] = useState(false);
   const [error, setError] = useState('');
+
+  const [rapid, setRapid] = useState(false);
+  const [rapidLocation, setRapidLocation] = useState(locations[0]?.id ?? '');
+  const rapidQueue = usePantryRapidScan(onImported);
+  useEffect(() => {
+    onSavingChange?.(savingImport || rapidQueue.busy);
+  }, [onSavingChange, savingImport, rapidQueue.busy]);
 
   useEffect(() => {
     if (embedded) return;
@@ -88,10 +101,9 @@ export function FoodCatalogPicker({
   }, [embedded, open]);
 
   function close() {
-    if (busy) return;
+    if (busy || rapidQueue.busy) return;
     setOpen(false);
-    setTab(initialTab);
-    setBarcode('');
+    setTab(initialTab === 'barcode' ? 'search' : initialTab);
     setRecords([]);
     setLocalProducts([]);
     setStatuses([]);
@@ -170,6 +182,11 @@ export function FoodCatalogPicker({
 
   async function search(event: FormEvent) {
     event.preventDefault();
+    const normalized = query.replace(/[\s-]/g, '');
+    if (/^\d{8,14}$/.test(normalized)) {
+      await lookup(normalized);
+      return;
+    }
     setBusy(true);
     setError('');
     setSelected(null);
@@ -216,6 +233,7 @@ export function FoodCatalogPicker({
     event.preventDefault();
     if (!selected) return;
     setBusy(true);
+    setSavingImport(true);
     setError('');
     const data = new FormData(event.currentTarget);
     const base = {
@@ -296,6 +314,7 @@ export function FoodCatalogPicker({
       setError(value instanceof Error ? value.message : 'The reviewed food could not be imported.');
     } finally {
       setBusy(false);
+      setSavingImport(false);
     }
   }
 
@@ -308,6 +327,7 @@ export function FoodCatalogPicker({
       return;
     }
     setBusy(true);
+    setSavingImport(true);
     setError('');
     const data = new FormData(event.currentTarget);
     try {
@@ -347,6 +367,7 @@ export function FoodCatalogPicker({
       setError(value instanceof Error ? value.message : 'The Pantry batch could not be added.');
     } finally {
       setBusy(false);
+      setSavingImport(false);
     }
   }
 
@@ -402,8 +423,7 @@ export function FoodCatalogPicker({
                   {(
                     [
                       ['scan', Camera, 'Scan'],
-                      ['barcode', Barcode, embedded ? 'Barcode' : 'Enter barcode'],
-                      ['search', Search, embedded ? 'Search/Manual' : 'Search'],
+                      ['search', Search, 'Search'],
                     ] as const
                   ).map(([value, Icon, label]) => (
                     <button
@@ -420,39 +440,24 @@ export function FoodCatalogPicker({
                 </div>
                 {tab === 'scan' ? (
                   <BarcodeScanner
+                    rapid={rapid}
+                    onRapidChange={context === 'pantry' ? setRapid : undefined}
+                    disabled={rapidQueue.busy}
                     onDetected={(value) => {
-                      setBarcode(value);
-                      setTab('barcode');
+                      if (rapid && context === 'pantry') {
+                        void rapidQueue.scan(value);
+                        return;
+                      }
+                      setQuery(value);
+                      setTab('search');
                       void lookup(value);
                     }}
                   />
                 ) : null}
-                {tab === 'barcode' ? (
-                  <form
-                    className={styles.lookupForm}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void lookup(barcode);
-                    }}
-                  >
-                    <label>
-                      Barcode
-                      <input
-                        value={barcode}
-                        onChange={(event) => setBarcode(event.target.value)}
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="UPC, EAN, or GTIN"
-                        required
-                      />
-                    </label>
-                    <button disabled={busy}>{busy ? 'Looking up…' : 'Look up'}</button>
-                  </form>
-                ) : null}
                 {tab === 'search' ? (
                   <form className={styles.lookupForm} onSubmit={search}>
                     <label>
-                      {embedded ? 'Product name' : 'Food or product name'}
+                      Product name / barcode
                       <input
                         type="search"
                         value={query}
@@ -461,7 +466,7 @@ export function FoodCatalogPicker({
                         list={searchSuggestions.length ? searchSuggestionsId : undefined}
                         minLength={2}
                         maxLength={120}
-                        placeholder={embedded ? 'Search by product name' : 'e.g. rolled oats'}
+                        placeholder="Bananas or 012345678905"
                         required
                       />
                       {searchSuggestions.length ? (
@@ -472,8 +477,111 @@ export function FoodCatalogPicker({
                         </datalist>
                       ) : null}
                     </label>
-                    <button disabled={busy}>{busy ? 'Searching…' : 'Search USDA'}</button>
+                    <button disabled={busy}>{busy ? 'Searching…' : 'Search'}</button>
                   </form>
+                ) : null}
+                {rapidQueue.entries.length ? (
+                  <section className={styles.rapidQueue} aria-label="Scanned items to review">
+                    <header>
+                      <h3>Scanned items</h3>
+                      <span>
+                        {rapidQueue.entries.reduce((sum, entry) => sum + entry.count, 0)} items
+                      </span>
+                    </header>
+                    <p>
+                      Review the matches below. Quantities count scanned items or packages; expiry
+                      dates remain unknown.
+                    </p>
+                    <ul>
+                      {rapidQueue.entries.map((entry) => (
+                        <li key={entry.barcode}>
+                          {entry.record?.images[0] ? (
+                            <Image src={entry.record.images[0].url} alt="" width={48} height={48} />
+                          ) : (
+                            <span className={styles.scanPlaceholder}>
+                              <Barcode />
+                            </span>
+                          )}
+                          <div>
+                            <strong>
+                              {entry.local?.displayName ??
+                                entry.record?.displayName ??
+                                entry.barcode}
+                            </strong>
+                            <small>
+                              {entry.status === 'loading'
+                                ? 'Looking up product…'
+                                : entry.status === 'unknown'
+                                  ? 'No match found — enter this item manually'
+                                  : (entry.error ??
+                                    entry.record?.brand ??
+                                    entry.local?.brand ??
+                                    entry.barcode)}
+                            </small>
+                            {entry.status === 'unknown' || entry.status === 'error' ? (
+                              <button type="button" onClick={onManualRequest}>
+                                Enter manually
+                              </button>
+                            ) : null}
+                          </div>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10000"
+                            aria-label={`Quantity for ${entry.local?.displayName ?? entry.record?.displayName ?? entry.barcode}`}
+                            value={entry.count}
+                            disabled={rapidQueue.busy || entry.saveAttempted}
+                            onChange={(event) =>
+                              rapidQueue.quantity(entry.barcode, Number(event.target.value))
+                            }
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Remove scan ${entry.barcode}`}
+                            disabled={rapidQueue.busy}
+                            onClick={() => rapidQueue.remove(entry.barcode)}
+                          >
+                            <X size={16} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className={styles.rapidSave}>
+                      <label>
+                        Pantry location
+                        <select
+                          value={rapidLocation}
+                          disabled={
+                            rapidQueue.busy ||
+                            rapidQueue.entries.some((entry) => entry.saveAttempted)
+                          }
+                          onChange={(event) => setRapidLocation(event.target.value)}
+                        >
+                          {locations.map((location) => (
+                            <option key={location.id} value={location.id}>
+                              {location.path}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={
+                          rapidQueue.busy ||
+                          !rapidLocation ||
+                          !rapidQueue.entries.some((entry) => entry.status === 'ready')
+                        }
+                        onClick={() => void rapidQueue.addAll(rapidLocation)}
+                      >
+                        {rapidQueue.busy ? 'Adding items…' : 'Add matched items'}
+                      </button>
+                    </div>
+                    {rapidQueue.message ? <p role="status">{rapidQueue.message}</p> : null}
+                  </section>
+                ) : rapidQueue.message ? (
+                  <p role="status" className={styles.providerNotice}>
+                    {rapidQueue.message}
+                  </p>
                 ) : null}
                 <ProviderNotice statuses={statuses} />
                 {localProducts.length ? (

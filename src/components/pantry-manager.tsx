@@ -2,10 +2,11 @@
 import { KitchenPrintDialog } from './kitchen-print-dialog';
 import { PageHeader } from '@/components/page-header';
 import { DecisionAssistance } from '@/components/decision-assistance';
+import { AssistedReviewButton } from './assisted-review-button';
+import { SearchFacetBar, ResultsToolbar } from './search-facet-bar';
 
 import {
   ArrowDownUp,
-  Bolt,
   Box,
   CalendarClock,
   ChevronDown,
@@ -18,7 +19,6 @@ import {
   PackageOpen,
   Plus,
   Search,
-  SlidersHorizontal,
   Snowflake,
   Thermometer,
   Undo2,
@@ -760,6 +760,7 @@ export function PantryManager({
   const [includeInactive, setIncludeInactive] = useState(false);
   const [addProductId, setAddProductId] = useState('');
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [catalogSaving, setCatalogSaving] = useState(false);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualProductName, setManualProductName] = useState('');
   const [manualBrand, setManualBrand] = useState('');
@@ -785,6 +786,11 @@ export function PantryManager({
   }
 
   function closeAddItemDialog() {
+    if (busy || catalogSaving) return;
+    resetAddItemDialog();
+  }
+  function resetAddItemDialog() {
+    setCatalogSaving(false);
     setManualEntryOpen(false);
     setAddItemOpen(false);
     setAddProductId('');
@@ -1157,41 +1163,6 @@ export function PantryManager({
     }
   }
 
-  async function quickAddItem(formData: FormData) {
-    const productName = String(formData.get('productName') ?? '').trim();
-    const existingProduct = productOptions.find(
-      (product) => product.displayName.toLocaleLowerCase() === productName.toLocaleLowerCase(),
-    );
-    if (existingProduct) formData.set('productId', existingProduct.id);
-    formData.set('category', '');
-    formData.set('originalQuantity', '');
-    formData.set('approximateState', 'unknown');
-    formData.set('batchCount', '1');
-    formData.set('expiryPrecision', formData.get('bestBeforeDate') ? 'exact' : 'unknown');
-    formData.set('status', 'unopened');
-    formData.set(
-      'storageType',
-      dashboard?.locations.find((location) => location.id === formData.get('locationId'))
-        ?.storageType ?? 'pantry',
-    );
-    for (const field of [
-      'packageUnit',
-      'sublocation',
-      'purchaseDate',
-      'useByDate',
-      'sellByDate',
-      'openedDate',
-      'frozenDate',
-      'thawedDate',
-      'preparedDate',
-      'source',
-      'notes',
-    ]) {
-      if (!formData.has(field)) formData.set(field, '');
-    }
-    await addItem(formData);
-  }
-
   async function editProduct(product: Product, formData: FormData) {
     await mutate(
       `/api/v1/pantry/products/${product.id}`,
@@ -1331,7 +1302,10 @@ export function PantryManager({
           ref={addItemDialogRef}
           className={styles.addDialog}
           aria-labelledby="add-pantry-item-title"
-          onCancel={closeAddItemDialog}
+          onCancel={(event) => {
+            if (busy || catalogSaving) event.preventDefault();
+            else closeAddItemDialog();
+          }}
           onClose={closeAddItemDialog}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeAddItemDialog();
@@ -1347,6 +1321,7 @@ export function PantryManager({
                 className={styles.addDialogClose}
                 type="button"
                 aria-label="Close add item dialog"
+                disabled={busy || catalogSaving}
                 onClick={closeAddItemDialog}
               >
                 <X size={20} aria-hidden="true" />
@@ -1355,15 +1330,16 @@ export function PantryManager({
             <div className={styles.addPanelBody}>
               <FoodCatalogPicker
                 context="pantry"
+                onSavingChange={setCatalogSaving}
                 locations={dashboard.locations.map(({ id, path }) => ({ id, path }))}
                 disabled={!canEdit || !defaultLocationId}
                 embedded
                 initialTab="scan"
                 searchSuggestions={productOptions.map((product) => product.displayName)}
                 onManualRequest={showManualEntry}
-                onImported={() => {
+                onImported={(_product, options) => {
                   showToast('Reviewed food data and Pantry batch added.', 'success');
-                  closeAddItemDialog();
+                  if (!options?.keepOpen) resetAddItemDialog();
                   void load();
                 }}
               />
@@ -1673,73 +1649,6 @@ export function PantryManager({
         </dialog>
       ) : null}
 
-      <details className={styles.quickAdd} aria-labelledby="quick-add-title">
-        <summary className={styles.quickAddIntro}>
-          <Bolt size={20} aria-hidden="true" />
-          <div>
-            <h2 id="quick-add-title">Quick add an item</h2>
-            <p>Add items in seconds.</p>
-          </div>
-        </summary>
-        <form action={quickAddItem} className={styles.quickAddForm}>
-          <label className={styles.quickName}>
-            <span>Item name</span>
-            <input
-              autoComplete="off"
-              list="pantry-product-options"
-              name="productName"
-              placeholder="e.g. Brown rice"
-              required
-            />
-            <datalist id="pantry-product-options">
-              {productOptions.map((product) => (
-                <option key={product.id} value={product.displayName} />
-              ))}
-            </datalist>
-          </label>
-          <div className={styles.quickQuantity}>
-            <label>
-              <span>Quantity</span>
-              <input
-                name="quantityRemaining"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="e.g. 1"
-                required
-              />
-            </label>
-            <label>
-              <span className={styles.srOnly}>Unit</span>
-              <select name="unit" defaultValue="each" aria-label="Unit">
-                {units.map((unit) => (
-                  <option key={unit} value={unit}>
-                    {unit}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label>
-            <span>Location</span>
-            <select name="locationId" defaultValue={defaultLocationId} required>
-              {dashboard.locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.path}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Expires</span>
-            <input name="bestBeforeDate" type="date" />
-          </label>
-          <button disabled={busy || !canEdit || !defaultLocationId} type="submit">
-            {busy ? 'Saving…' : 'Add item'}
-          </button>
-        </form>
-      </details>
-
       {!canEdit ? (
         <p className={styles.profilePrompt}>Choose a household profile to change Pantry stock.</p>
       ) : null}
@@ -1782,177 +1691,135 @@ export function PantryManager({
         <Link href="/lists">Open shopping lists</Link>
       </div>
       <div className={styles.mobileToolbar}>
-        <section className={styles.toolbar} aria-label="Pantry filters">
-          <label className={styles.search}>
-            <Search size={18} aria-hidden="true" />
-            <span className={styles.srOnly}>Search Pantry</span>
-            <input
-              value={q}
-              onChange={(event) => setQ(event.target.value)}
-              placeholder="Search your pantry"
-            />
-          </label>
-          <button
-            aria-haspopup="dialog"
-            className={styles.filterTrigger}
-            onClick={() => filterDialogRef.current?.showModal()}
-            type="button"
-          >
-            <SlidersHorizontal size={18} aria-hidden="true" />
-            <span className={styles.filterTriggerDesktop}>Advanced search</span>
-            <span className={styles.filterTriggerMobile}>Filters</span>
-          </button>
-          <dialog
-            aria-labelledby="pantry-filter-dialog-title"
-            className={styles.filterDialog}
-            ref={filterDialogRef}
-          >
-            <header className={styles.filterDialogHeader}>
-              <div>
-                <p className={styles.eyebrow}>PANTRY VIEW</p>
-                <h2 id="pantry-filter-dialog-title">Filters</h2>
-              </div>
-              <button
-                aria-label="Close filters"
-                className={styles.filterDialogClose}
-                onClick={() => filterDialogRef.current?.close()}
-                type="button"
-              >
-                <X size={20} aria-hidden="true" />
-              </button>
-            </header>
-            <div className={styles.advancedGrid}>
-              <label>
-                <span>Location</span>
-                <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-                  <option value="">Every location</option>
-                  {dashboard.locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.path}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Category</span>
-                <select value={category} onChange={(event) => setCategory(event.target.value)}>
-                  <option value="">Every category</option>
-                  {categories.map((value) => (
-                    <option key={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Status</span>
-                <select value={status} onChange={(event) => setStatus(event.target.value)}>
-                  <option value="">Every status</option>
-                  {[
-                    'unopened',
-                    'opened',
-                    'frozen',
-                    'thawed',
-                    'reserved',
-                    'depleted',
-                    'discarded',
-                    'donated',
-                  ].map((value) => (
-                    <option key={value} value={value}>
-                      {value.replaceAll('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Expiry</span>
-                <select value={expiry} onChange={(event) => setExpiry(event.target.value)}>
-                  <option value="">Every expiry state</option>
-                  <option value="soon">Expiring soon</option>
-                  <option value="expired">Recorded date passed</option>
-                  <option value="unknown">Unknown expiry</option>
-                </select>
-              </label>
-              <label>
-                <span>Group items</span>
-                <select
-                  value={group}
-                  onChange={(event) => setGroup(event.target.value as typeof group)}
-                >
-                  <option value="none">No grouping</option>
-                  <option value="location">Group by location</option>
-                  <option value="category">Group by category</option>
-                  <option value="expiry">Group by expiry</option>
-                </select>
-              </label>
-              <label className={styles.checkbox}>
-                <input
-                  checked={includeInactive}
-                  onChange={(event) => setIncludeInactive(event.target.checked)}
-                  type="checkbox"
-                />
-                Show inactive and archived
-              </label>
+        <SearchFacetBar
+          label="Search Pantry"
+          placeholder="Search products, brands or notes"
+          query={q}
+          onQueryChange={setQ}
+          onSearch={() => void load()}
+          onAdvanced={() => filterDialogRef.current?.showModal()}
+          advancedActive={hasActivePantryFilters}
+          facets={[
+            ...views.slice(0, 6).map(([value, label]) => ({
+              key: `view:${value}`,
+              label: label === 'Refrigerator' ? 'Fridge' : label,
+              active: view === value && !expiry,
+            })),
+            { key: 'soon', label: 'Expiring soon', active: expiry === 'soon' },
+            ...categories.map((value) => ({
+              key: `category:${value}`,
+              label: value,
+              active: category === value,
+            })),
+          ]}
+          onFacet={(key) => {
+            if (key === 'soon') {
+              setView('all');
+              setExpiry(expiry === 'soon' ? '' : 'soon');
+            } else if (key.startsWith('category:')) {
+              const value = key.slice(9);
+              setCategory(category === value ? '' : value);
+            } else {
+              const value = key.slice(5);
+              setView(value);
+              setExpiry('');
+              if (value === 'all') setCategory('');
+              if (['depleted', 'discarded', 'donated'].includes(value)) setIncludeInactive(true);
+            }
+          }}
+        />
+        <dialog
+          aria-labelledby="pantry-filter-dialog-title"
+          className={styles.filterDialog}
+          ref={filterDialogRef}
+        >
+          <header className={styles.filterDialogHeader}>
+            <div>
+              <p className={styles.eyebrow}>PANTRY VIEW</p>
+              <h2 id="pantry-filter-dialog-title">Filters</h2>
             </div>
-            <label className={`${styles.sortControl} ${styles.filterDialogSort}`}>
-              <span>Sort:</span>
-              <select value={sort} onChange={(event) => setSort(event.target.value)}>
-                {sortOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+            <button
+              aria-label="Close filters"
+              className={styles.filterDialogClose}
+              onClick={() => filterDialogRef.current?.close()}
+              type="button"
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          </header>
+          <div className={styles.advancedGrid}>
+            <label>
+              <span>Location</span>
+              <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+                <option value="">Every location</option>
+                {dashboard.locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.path}
                   </option>
                 ))}
               </select>
-              <ArrowDownUp size={17} aria-hidden="true" />
             </label>
-            <footer className={styles.filterDialogActions}>
-              {hasActivePantryFilters ? (
-                <button
-                  className={styles.filterClearButton}
-                  onClick={clearPantryFilters}
-                  type="button"
-                >
-                  Clear filters
-                </button>
-              ) : null}
-              <button
-                className={styles.filterDoneButton}
-                onClick={() => filterDialogRef.current?.close()}
-                type="button"
+            <label>
+              <span>Category</span>
+              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="">Every category</option>
+                {categories.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                <option value="">Every status</option>
+                {[
+                  'unopened',
+                  'opened',
+                  'frozen',
+                  'thawed',
+                  'reserved',
+                  'depleted',
+                  'discarded',
+                  'donated',
+                ].map((value) => (
+                  <option key={value} value={value}>
+                    {value.replaceAll('_', ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Expiry</span>
+              <select value={expiry} onChange={(event) => setExpiry(event.target.value)}>
+                <option value="">Every expiry state</option>
+                <option value="soon">Expiring soon</option>
+                <option value="expired">Recorded date passed</option>
+                <option value="unknown">Unknown expiry</option>
+              </select>
+            </label>
+            <label>
+              <span>Group items</span>
+              <select
+                value={group}
+                onChange={(event) => setGroup(event.target.value as typeof group)}
               >
-                Done
-              </button>
-            </footer>
-          </dialog>
-        </section>
-        <div className={styles.filterRow}>
-          <nav className={styles.views} aria-label="Pantry views">
-            {views.slice(0, 6).map(([value, label]) => (
-              <button
-                aria-pressed={view === value && !expiry}
-                key={value}
-                onClick={() => {
-                  setView(value);
-                  setExpiry('');
-                  if (['depleted', 'discarded', 'donated'].includes(value))
-                    setIncludeInactive(true);
-                }}
-                type="button"
-              >
-                {label === 'Refrigerator' ? 'Fridge' : label}
-              </button>
-            ))}
-            <button
-              aria-pressed={expiry === 'soon'}
-              onClick={() => {
-                setView('all');
-                setExpiry('soon');
-              }}
-              type="button"
-            >
-              Expiring soon
-            </button>
-          </nav>
-          <label className={styles.sortControl}>
-            <span>Sort by:</span>
+                <option value="none">No grouping</option>
+                <option value="location">Group by location</option>
+                <option value="category">Group by category</option>
+                <option value="expiry">Group by expiry</option>
+              </select>
+            </label>
+            <label className={styles.checkbox}>
+              <input
+                checked={includeInactive}
+                onChange={(event) => setIncludeInactive(event.target.checked)}
+                type="checkbox"
+              />
+              Show inactive and archived
+            </label>
+          </div>
+          <label className={`${styles.sortControl} ${styles.filterDialogSort}`}>
+            <span>Sort:</span>
             <select value={sort} onChange={(event) => setSort(event.target.value)}>
               {sortOptions.map(([value, label]) => (
                 <option key={value} value={value}>
@@ -1962,7 +1829,43 @@ export function PantryManager({
             </select>
             <ArrowDownUp size={17} aria-hidden="true" />
           </label>
-        </div>
+          <footer className={styles.filterDialogActions}>
+            {hasActivePantryFilters ? (
+              <button
+                className={styles.filterClearButton}
+                onClick={clearPantryFilters}
+                type="button"
+              >
+                Clear filters
+              </button>
+            ) : null}
+            <button
+              className={styles.filterDoneButton}
+              onClick={() => filterDialogRef.current?.close()}
+              type="button"
+            >
+              Done
+            </button>
+          </footer>
+        </dialog>
+        <ResultsToolbar
+          summary={
+            <>
+              <strong>{dashboard.batches.length}</strong> results
+            </>
+          }
+          sort={sort}
+          onSortChange={setSort}
+          options={sortOptions.map(([value, label]) => ({ value, label }))}
+          actions={
+            <AssistedReviewButton
+              task={view === 'essentials' ? 'restock' : 'pantry_review'}
+              tasks={['pantry_review', 'restock', 'pantry_input', 'clarification']}
+              title="Review pantry"
+              onApplied={() => void load()}
+            />
+          }
+        />
       </div>
 
       <div
@@ -1981,15 +1884,7 @@ export function PantryManager({
               </h2>
             </div>
           </div>
-          <DecisionAssistance
-            headingLevel={3}
-            embedded
-            key={view === 'essentials' ? 'restock' : 'stock'}
-            initialTask={view === 'essentials' ? 'restock' : 'pantry_review'}
-            tasks={['pantry_review', 'restock', 'pantry_input', 'clarification']}
-            title={view === 'essentials' ? 'Plan your next restock' : 'Stock checks worth making'}
-            description="Review household stock dates, storage and restocking evidence. Unknown freshness stays unknown; suggestions never discard food."
-          />
+
           {view === 'essentials' ? (
             essentialProducts.length ? (
               <div className={styles.grid}>

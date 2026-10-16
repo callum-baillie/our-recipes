@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 import styles from './decision-assistance.module.css';
+import { AsyncSkeleton } from './skeleton';
 function ReviewValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span>Not set</span>;
   if (Array.isArray(value))
@@ -32,6 +33,9 @@ function ReviewValue({ value }: { value: unknown }) {
 }
 export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
   const router = useRouter();
+  const generatesImages = proposal.actions.some((action) =>
+    action.path.endsWith('/images/generate'),
+  );
   const [status, setStatus] = useState(proposal.status);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -82,7 +86,9 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
         <div className={styles.actions}>
           <button className={styles.primary} disabled={pending} onClick={() => decide('apply')}>
             {pending
-              ? 'Saving…'
+              ? generatesImages
+                ? 'Generating images…'
+                : 'Saving…'
               : `Confirm ${proposal.actions.length === 1 ? 'change' : 'selected batch'}`}
           </button>
           <button disabled={pending} onClick={() => decide('dismiss')}>
@@ -90,6 +96,9 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
           </button>
         </div>
       )}
+      {pending && generatesImages ? (
+        <AsyncSkeleton variant="image" label="Generating recipe images" />
+      ) : null}
       {message && <p role="status">{message}</p>}
     </section>
   );

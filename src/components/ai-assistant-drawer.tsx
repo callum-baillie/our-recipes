@@ -4,7 +4,7 @@ import { AiAppActionCard } from '@/components/ai-app-action-card';
 import type { DecisionCard } from '@/lib/domain/decision-assistance';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 
-import { Plus, Send, Sparkles, X } from 'lucide-react';
+import { Plus, ArrowUp, Sparkles, SquarePen, X } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
@@ -593,7 +593,6 @@ export function AiAssistantDrawer({
           </span>
           <div className={styles.headerCopy}>
             <h2 id="ai-assistant-title">Kitchen assistant</h2>
-            <p>Reads directly; asks before it changes anything.</p>
           </div>
           <button
             type="button"
@@ -605,7 +604,7 @@ export function AiAssistantDrawer({
             {busy && status === 'Starting a new conversation…' ? (
               <InlineSkeleton label="Starting a new conversation" width="1rem" />
             ) : (
-              <Plus />
+              <SquarePen />
             )}
           </button>
           <button
@@ -727,8 +726,11 @@ export function AiAssistantDrawer({
               <p className={styles.workExplanation}>
                 <strong>{status || 'Working on your request'}</strong>
                 <br />
-                Still working. Creating several recipes or images can take a few minutes. Your
-                results will appear here as they become available.
+                {status.includes('conversation')
+                  ? 'Your saved messages and plans will appear here.'
+                  : pendingDecision
+                    ? 'Saving your confirmed changes.'
+                    : 'Your request is running. Larger recipe and image requests can take a few minutes.'}
               </p>
             </div>
           ) : null}
@@ -801,17 +803,17 @@ export function AiAssistantDrawer({
               title="Send message"
               disabled={busy || attaching || !threadId || (!draft.trim() && !attachments.length)}
             >
-              {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <Send />}
+              {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <ArrowUp />}
             </button>
           </form>
-          <label className={styles.keyboardHint}>
+          <label className={styles.paidTools}>
             <input
               type="checkbox"
               checked={allowPaidTools}
               disabled={busy}
               onChange={(event) => setAllowPaidTools(event.target.checked)}
-            />{' '}
-            Allow additional paid requests for new kitchen suggestions
+            />
+            <span>Allow additional paid suggestions</span>
           </label>
           <div className={styles.composerMeta}>
             <p className={styles.status} role="status">

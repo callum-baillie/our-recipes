@@ -207,6 +207,8 @@ type AssistanceProps = {
   embedded?: boolean;
   headingLevel?: 2 | 3;
   onApplied?: () => void;
+  initiallyExpanded?: boolean;
+  hideContextHeader?: boolean;
 };
 export function DecisionAssistance({
   initialTask = 'aisles',
@@ -221,10 +223,12 @@ export function DecisionAssistance({
   embedded = false,
   headingLevel = 2,
   onApplied,
+  initiallyExpanded,
+  hideContextHeader = false,
 }: AssistanceProps) {
   const ContextHeading = headingLevel === 3 ? 'h3' : 'h2';
   const router = useRouter();
-  const [expanded, setExpanded] = useState(!embedded);
+  const [expanded, setExpanded] = useState(initiallyExpanded ?? !embedded);
   const [selected, setSelected] = useState<string[]>([]);
   function applied() {
     router.refresh();
@@ -357,7 +361,7 @@ export function DecisionAssistance({
   const needsList = ['aisles', 'duplicates'].includes(task);
   return (
     <div className={embedded ? styles.embedded : styles.workspace}>
-      {embedded && (
+      {embedded && !hideContextHeader && (
         <div className={styles.contextHeader}>
           <div>
             <span className={styles.badge}>ASSISTED REVIEW</span>
