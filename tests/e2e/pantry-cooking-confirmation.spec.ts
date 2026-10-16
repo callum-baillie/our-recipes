@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
@@ -13,7 +13,7 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
 }
 
 test('planned cooking reviews exact FEFO stock and only deducts after literal confirmation', async ({

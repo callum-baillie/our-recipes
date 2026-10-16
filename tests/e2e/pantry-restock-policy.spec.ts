@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
@@ -166,7 +166,7 @@ test('Always-have and Always-buy policies merge into one accessible Next-shop ro
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
   expect(overflow).toBeLessThanOrEqual(1);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
   expect(browserErrors).toEqual([]);
 
   lists = (await (await page.request.get('/api/v1/shopping-lists')).json()) as typeof lists;

@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
@@ -130,7 +130,7 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
   ).toBeVisible();
   await expect(page.getByText(/1 covered · 0 short · 0 unknown/u)).toBeVisible();
   await expectContained(page);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-recipe-library-768');
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -146,7 +146,7 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
   await page.keyboard.press('Enter');
   await expect(panel.getByText(/recorded date 2027-04-02/u)).toBeVisible();
   await expectContained(page);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-recipe-detail-390');
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -167,7 +167,7 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
   await expect(page.getByText('100%', { exact: true })).toBeVisible();
   await expect(page.getByText('0 ingredients missing', { exact: true })).toBeVisible();
   await expectContained(page);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-planner-1280');
 
   const persisted = await page.request.get(

@@ -1,13 +1,8 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { appAxe as axe } from './helpers/accessibility';
+import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
 
 import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
-
-// The requested mobile viewport locks pinch zoom; retain all other axe checks.
-function axe(page: Page) {
-  return new AxeBuilder({ page }).disableRules(['meta-viewport']);
-}
 
 test('first-run setup and household organization have no automatically detectable accessibility violations', async ({
   page,

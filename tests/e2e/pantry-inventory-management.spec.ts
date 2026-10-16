@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
@@ -301,7 +301,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
     'title',
     'Best-before quality date · 2027-09-30 · estimated · recorded',
   );
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
   await capture(page, testInfo, 'pantry-management-desktop');
 
   for (const [width, height, name] of [
@@ -314,7 +314,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await appAxe(page).analyze()).violations).toEqual([]);
     await capture(page, testInfo, `pantry-management-${name}`);
   }
   expect(browserErrors).toEqual([]);

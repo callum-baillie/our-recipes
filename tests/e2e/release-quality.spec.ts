@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
 
@@ -131,9 +131,9 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   );
   expect(
     (
-      await new AxeBuilder({ page })
+      await appAxe(page)
         .include('.add-recipe-dialog-backdrop')
-        .disableRules(['meta-viewport'])
+
         .analyze()
     ).violations,
   ).toEqual([]);
@@ -298,6 +298,11 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
 
   await page.setViewportSize(surfaces[0].viewport);
   await page.goto('/recipes/new');
+  await expect(page.getByLabel('Recipe name')).toBeVisible();
+  await expect(page.locator('.editor-form-layout > .editor-card-column')).toHaveCSS(
+    'display',
+    'grid',
+  );
   const editorDesktop = await page.locator('.editor-form-layout').evaluate((form) => {
     const intro = form.querySelector(':scope > .editor-intro');
     const card = form.querySelector(':scope > .editor-card-column');
@@ -354,9 +359,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   expect(darkBackground).not.toBe(lightBackground);
   await expect(page.getByRole('heading', { name: 'Your recipe library' })).toBeVisible();
   // Product requirement: the installed touch UI intentionally locks pinch zoom.
-  expect(
-    (await new AxeBuilder({ page }).disableRules(['meta-viewport']).analyze()).violations,
-  ).toEqual([]);
+  expect((await appAxe(page).analyze()).violations).toEqual([]);
   const darkScreenshot = testInfo.outputPath('library-dark.png');
   await page.screenshot({ path: darkScreenshot, fullPage: false });
   await testInfo.attach('library-dark', { path: darkScreenshot, contentType: 'image/png' });

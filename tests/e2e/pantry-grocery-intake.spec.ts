@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
@@ -27,7 +27,7 @@ async function expectCleanResponsivePage(page: Page) {
       .slice(0, 12),
   );
   expect(overflow).toEqual([]);
-  expect(await new AxeBuilder({ page }).analyze()).toMatchObject({ violations: [] });
+  expect(await appAxe(page).analyze()).toMatchObject({ violations: [] });
 }
 
 test('Pantry grocery formula, controls, and explicit rich intake persist responsively', async ({

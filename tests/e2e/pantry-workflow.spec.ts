@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
@@ -211,7 +211,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   await expect(
     page.getByRole('status').filter({ hasText: 'Package opened.' }).last(),
   ).toBeVisible();
-  const mobileAxe = await new AxeBuilder({ page }).analyze();
+  const mobileAxe = await appAxe(page).analyze();
   expect(mobileAxe.violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-mobile-managed');
 
@@ -487,7 +487,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     'persisted mobile Pantry should not horizontally overflow',
   ).toBe(true);
-  const finalAxe = await new AxeBuilder({ page }).analyze();
+  const finalAxe = await appAxe(page).analyze();
   expect(finalAxe.violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-mobile-after-cooking');
   expect(browserErrors).toEqual([]);
