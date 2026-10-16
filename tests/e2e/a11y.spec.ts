@@ -9,6 +9,8 @@ test('first-run setup and household organization have no automatically detectabl
 }, testInfo) => {
   testInfo.setTimeout(180_000);
   await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByLabel('Kitchen name')).toBeVisible();
   const setupResults = await new AxeBuilder({ page }).analyze();
   expect(setupResults.violations).toEqual([]);
 
@@ -31,6 +33,7 @@ test('first-run setup and household organization have no automatically detectabl
   await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
 
   await page.goto('/settings/profiles');
+  await expect(page.getByRole('heading', { name: 'Household members & roles' })).toBeVisible();
   const profileResults = await new AxeBuilder({ page }).analyze();
   expect(profileResults.violations).toEqual([]);
   await page.getByRole('button', { name: 'Add another profile' }).click();
