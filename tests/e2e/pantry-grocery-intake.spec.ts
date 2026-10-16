@@ -162,6 +162,12 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/lists/${listId}`);
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Manage list', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Shopping mode', exact: true }).click();
   await page.getByText('Demand and policy breakdown', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('link', { name: 'Open Pantry' })).toBeVisible();
@@ -268,6 +274,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/lists/${listId}`);
+  await page.getByRole('button', { name: 'Done 1', exact: true }).click();
   await page.getByText('Demand and policy breakdown', { exact: true }).click();
   await expect(page.getByText(/Covered · no purchase currently needed/u)).toBeVisible();
   await expectCleanResponsivePage(page);

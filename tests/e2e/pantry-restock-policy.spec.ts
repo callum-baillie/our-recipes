@@ -151,9 +151,16 @@ test('Always-have and Always-buy policies merge into one accessible Next-shop ro
       .filter({ hasText: /^Next shop$/u })
       .first(),
   ).toBeVisible();
-  await page.getByText('Demand and policy breakdown').first().click();
-  await expect(page.getByText('Always have', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Always buy', { exact: true }).first()).toBeVisible();
+  const eggsRow = page.locator('article').filter({
+    has: page.getByText('Policy eggs', { exact: true }),
+  });
+  const milkRow = page.locator('article').filter({
+    has: page.getByText('Policy milk', { exact: true }),
+  });
+  await eggsRow.getByText('Demand and policy breakdown', { exact: true }).click();
+  await milkRow.getByText('Demand and policy breakdown', { exact: true }).click();
+  await expect(eggsRow.getByText('Always have reserve', { exact: true })).toBeVisible();
+  await expect(milkRow.getByText('Always buy baseline', { exact: true })).toBeVisible();
   await expect(page.getByText(/24 each/u).first()).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,

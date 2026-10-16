@@ -94,7 +94,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ profi
     {
       httpOnly: true,
       sameSite: 'lax',
-      secure: getRuntimeConfig().isProduction,
+      secure: new URL(getRuntimeConfig().auth.baseUrl).protocol === 'https:',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     },

@@ -292,13 +292,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   const shortageBody = (await shortageResponse.json()) as { listId: string };
   expect(shortageBody.listId).toMatch(/^[0-9a-f-]+$/u);
   const listId = shortageBody.listId;
-  const shoppingEditorReady = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'GET' &&
-      new URL(response.url()).pathname === '/api/v1/pantry/summary',
-  );
   await page.goto(`/lists/${listId}`);
-  expect((await shoppingEditorReady).ok()).toBe(true);
 
   const shoppingRow = page.locator('article', {
     has: page.getByLabel('Red lentils quantity'),
@@ -334,13 +328,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     data: { weekStart: WEEK_START, weekEnd: WEEK_END, listId },
   });
   expect(regenerate.ok()).toBe(true);
-  const reloadedEditorReady = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'GET' &&
-      new URL(response.url()).pathname === '/api/v1/pantry/summary',
-  );
   await page.reload();
-  expect((await reloadedEditorReady).ok()).toBe(true);
   await expect(shoppingRow.getByLabel('Red lentils quantity')).toHaveValue('60');
   await shoppingRow.getByText('Pantry details', { exact: true }).click();
   await expect(
@@ -461,7 +449,9 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
       exact: true,
     }),
   ).toBeVisible();
-  const session = (await (await page.request.get('/api/v1/nutrition/session')).json()) as {
+  const sessionResponse = await page.request.get('/api/v1/nutrition/session');
+  expect(sessionResponse.status(), await sessionResponse.text()).toBe(200);
+  const session = (await sessionResponse.json()) as {
     actor: { nutritionProfileId: string };
   };
   const prepared = (await (

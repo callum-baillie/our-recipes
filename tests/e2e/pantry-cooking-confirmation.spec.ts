@@ -6,6 +6,7 @@ import { completeInitialOnboarding } from './helpers/onboarding';
 const ORIGIN = 'http://127.0.0.1:3100';
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
+  await expect(page).toHaveTitle(/\S/u);
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, fullPage: true, caret: 'initial' });
   await testInfo.attach(name, { path, contentType: 'image/png' });

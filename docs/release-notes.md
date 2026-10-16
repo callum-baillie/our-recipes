@@ -9,6 +9,8 @@
 - Replaced household profile PINs with account password confirmation and expanded core API access.
 - Fixed shopping-preference saves when the automatic restock target is unset, dark-mode control contrast, and contextual review heading order.
 - Shopping rows show the calculated purchase amount and distinguish unknown amounts from recipe demand.
+- Fixed competing redirects after password sign-in and kept completed purchase forms readable.
+- Profile cookies follow the configured authentication URL so local HTTP deployments retain their selected Nutrition profile.
 - Includes database migrations through `0061_decision_assistance`.
 
 ## 1.0.0-rc.2

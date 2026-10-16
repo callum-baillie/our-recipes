@@ -47,9 +47,8 @@ export function SignInForm({
         showToast(message, 'error');
         return;
       }
+      // Better Auth follows callbackURL; a second router navigation would race it.
       showToast('Signed in securely.', 'success');
-      router.push(destination);
-      router.refresh();
     } catch {
       setError('Unable to reach the sign-in service. Check your connection and try again.');
     } finally {

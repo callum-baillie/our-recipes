@@ -179,7 +179,7 @@ export async function proxy(request: NextRequest) {
         path: '/',
         httpOnly: true,
         sameSite: 'lax',
-        secure: getRuntimeConfig().isProduction,
+        secure: new URL(getRuntimeConfig().auth.baseUrl).protocol === 'https:',
         maxAge: 60 * 60 * 24 * 30,
       },
     );
