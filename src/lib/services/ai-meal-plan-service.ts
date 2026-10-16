@@ -9,7 +9,12 @@ import {
 } from '@/lib/domain/ai-assistant';
 import { getAiAssistantProvider } from '@/lib/providers/ai-assistant-provider';
 import { createAiActionProposal } from '@/lib/services/ai-action-service';
-import { aiSafetyIdentifier, buildAiSharedContext } from '@/lib/services/ai-context-service';
+import {
+  aiSafetyIdentifier,
+  buildAiSharedContext,
+  canAiReadHouseholdProfiles,
+} from '@/lib/services/ai-context-service';
+import type { RequestPrincipal } from '@/lib/services/auth-service';
 import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { listProfiles } from '@/lib/services/household-service';
 import { listPlannedMeals } from '@/lib/services/planning-service';
@@ -211,11 +216,21 @@ function normalizeCandidate(
 
 export async function generateAiMealPlanProposal(input: {
   actorProfileId: string;
+  principal?: RequestPrincipal;
   threadId?: string | null;
   request: unknown;
 }) {
   const request = aiMealPlanGenerationRequestSchema.parse(input.request);
-  const availableProfileIds = new Set(listProfiles().map((profile) => profile.id));
+  const availableProfileIds = new Set(
+    listProfiles()
+      .filter(
+        (profile) =>
+          !input.principal ||
+          canAiReadHouseholdProfiles(input.actorProfileId, input.principal) ||
+          profile.id === input.actorProfileId,
+      )
+      .map((profile) => profile.id),
+  );
   const selectedProfileIds = (
     request.selectedProfileIds.length ? request.selectedProfileIds : [...availableProfileIds]
   ).filter((profileId) => availableProfileIds.has(profileId));
@@ -225,10 +240,14 @@ export async function generateAiMealPlanProposal(input: {
   if (request.selectedProfileIds.some((profileId) => !availableProfileIds.has(profileId))) {
     throw new AiMealPlanValidationError('A selected household member is no longer available.');
   }
-  const sharedContext = buildAiSharedContext(input.actorProfileId, {
-    start: request.startDate,
-    end: request.endDate,
-  });
+  const sharedContext = buildAiSharedContext(
+    input.actorProfileId,
+    {
+      start: request.startDate,
+      end: request.endDate,
+    },
+    input.principal,
+  );
   const context = {
     ...sharedContext,
     mealPlan: sharedContext.mealPlan.filter(
