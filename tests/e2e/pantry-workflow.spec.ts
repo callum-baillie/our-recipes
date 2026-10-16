@@ -78,7 +78,7 @@ async function addPantryBatch(
   await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
   const panel = page.getByRole('dialog', { name: 'Add pantry item' });
   await expect(panel).toBeVisible();
-  await panel.getByRole('tab', { name: 'Search/Manual' }).click();
+  await panel.getByRole('tab', { name: 'Search' }).click();
   await panel.getByRole('button', { name: 'Enter details manually', exact: true }).click();
   if (input.existingProduct) {
     await panel.getByLabel('Existing product').selectOption({ label: input.existingProduct });

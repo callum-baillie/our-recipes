@@ -17,7 +17,7 @@ async function openAddItemDialog(page: Page) {
   await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Add pantry item' });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('tab', { name: 'Search/Manual' }).click();
+  await dialog.getByRole('tab', { name: 'Search' }).click();
   await dialog.getByRole('button', { name: 'Enter details manually', exact: true }).click();
   await expect(dialog.getByText('Enter details manually', { exact: true }).last()).toBeVisible();
   return dialog;
