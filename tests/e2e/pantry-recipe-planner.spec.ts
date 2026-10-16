@@ -135,7 +135,12 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/recipes/${recipe.recipe.id}`);
-  const panel = page.getByRole('region', { name: 'What you have on hand' });
+  await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
+  const pantryDialog = page.getByRole('dialog', {
+    name: 'Check recipe ingredients against your pantry',
+  });
+  await expect(pantryDialog).toBeVisible();
+  const panel = pantryDialog.getByRole('region', { name: 'What you have on hand' });
   await panel.getByRole('spinbutton', { name: 'Check servings' }).fill('8');
   await panel.getByRole('button', { name: 'Recalculate' }).click();
   await expect(panel.getByText(/Need 200 g · exact available 300 g/u)).toBeVisible();
