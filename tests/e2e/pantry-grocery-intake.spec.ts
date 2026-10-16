@@ -55,8 +55,8 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
       defaultInventoryUnit: 'g',
       stockUnit: 'g',
       defaultStorageType: 'pantry',
-      isStaple: true,
-      suggestGroceryRestock: true,
+      restockMode: 'always_have',
+      restockTrigger: 'reorder_point',
       reorderThreshold: 300,
       targetStock: 500,
     },
@@ -138,21 +138,31 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
   });
   expect(generatedResponse.status()).toBe(201);
   const listId = ((await generatedResponse.json()) as { listId: string }).listId;
+  const targetResponse = await page.request.patch('/api/v1/settings/lists', {
+    headers: { Origin: ORIGIN },
+    data: {
+      automaticRestockListId: listId,
+      completedItemsBehavior: 'completed_section',
+      openPantryPurchaseOnCheck: true,
+      keepScreenAwake: false,
+    },
+  });
+  expect(targetResponse.status()).toBe(200);
   let list = (await (await page.request.get(`/api/v1/shopping-lists/${listId}`)).json()) as {
     list: { items: Array<{ id: string; quantity: number; pantry: { formulaInputs: string } }> };
   };
-  expect(list.list.items[0]!.quantity).toBe(400);
+  expect(list.list.items[0]!.quantity).toBe(600);
   expect(JSON.parse(list.list.items[0]!.pantry.formulaInputs)).toMatchObject({
     recipeRequirement: 200,
-    stapleTarget: 500,
+    targetStock: 500,
     usablePantry: 100,
-    shortageQuantity: 400,
+    shortageQuantity: 600,
   });
   const itemId = list.list.items[0]!.id;
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/lists/${listId}`);
-  await page.getByText(/Generated Pantry shortage/u).focus();
+  await page.getByText('Demand and policy breakdown', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('link', { name: 'Open Pantry' })).toBeVisible();
   await expect(page.getByText(/Substitution is not available here/u)).toBeVisible();
@@ -174,11 +184,11 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
     data: { weekStart: '2027-04-01', weekEnd: '2027-04-07', mode: 'all', listId },
   });
   await page.reload();
-  await expect(page.getByLabel('Grocery lentils quantity')).toHaveValue('450');
+  await expect(page.getByLabel('Grocery lentils quantity')).toHaveValue('650');
   await expectCleanResponsivePage(page);
   await screenshot(page, testInfo, 'pantry-grocery-controls-390');
 
-  await page.getByText(/Generated Pantry shortage/u).focus();
+  await page.getByText('Demand and policy breakdown', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Ignore Pantry stock' }).click();
   await page.request.post('/api/v1/shopping-lists/pantry-shortages', {
@@ -186,17 +196,18 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
     data: { weekStart: '2027-04-01', weekEnd: '2027-04-07', mode: 'all', listId },
   });
   list = (await (await page.request.get(`/api/v1/shopping-lists/${listId}`)).json()) as typeof list;
-  expect(list.list.items[0]!.quantity).toBe(550);
+  expect(list.list.items[0]!.quantity).toBe(750);
 
   await page.setViewportSize({ width: 768, height: 900 });
   await page.goto(`/lists/${listId}`);
-  await page.getByText(/Pantry stock ignored/u).click();
+  await page.getByText('Demand and policy breakdown', { exact: true }).click();
   const checkedResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith(`/items/${itemId}`) && response.request().method() === 'PATCH',
   );
   await page.getByLabel('Mark Grocery lentils complete').check();
   expect((await checkedResponse).status()).toBe(200);
+  await page.getByRole('button', { name: 'Done 1', exact: true }).click();
   await expect(page.getByText('Record an actual Pantry purchase')).toBeVisible();
   await page.getByLabel('Purchased quantity for Grocery lentils').fill('100');
   await page.getByLabel('Purchased unit for Grocery lentils').fill('g');
@@ -257,6 +268,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/lists/${listId}`);
+  await page.getByText('Demand and policy breakdown', { exact: true }).click();
   await expect(page.getByText(/Covered · no purchase currently needed/u)).toBeVisible();
   await expectCleanResponsivePage(page);
   await screenshot(page, testInfo, 'pantry-covered-all-1280');

@@ -28,7 +28,7 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await page.waitForURL(/\/recipes\//u);
+  await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
 
   await page.goto('/settings/profiles');
   const profileResults = await new AxeBuilder({ page }).analyze();

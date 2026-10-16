@@ -104,11 +104,11 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   const product = products.locator('details', { hasText: 'Management beans' });
   await openDetails(product, 'Management beans');
   await product.getByLabel('Aliases (comma separated)').fill('beans, pantry beans');
-  await product.getByLabel('Minimum stock').fill('4');
-  await product.getByLabel('Target stock').fill('12');
-  await product.getByLabel('Reorder threshold').fill('5');
+  await product.getByRole('combobox', { name: 'Policy', exact: true }).selectOption('always_have');
+  await product.getByLabel('Keep after planned meals').fill('12');
+  await product.getByLabel('Reorder when').selectOption('reorder_point');
+  await product.getByLabel('Reorder point', { exact: true }).fill('5');
   await product.getByLabel('Preferred store').fill('Market');
-  await product.getByLabel('Suggest grocery restock').check();
   await product.getByRole('button', { name: 'Save product' }).click();
   await expectSaved(page, 'Product details saved.');
 
@@ -293,7 +293,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await clickCardAction(cards.first(), 'Undo');
   await expectSaved(page, 'Last action undone.');
 
-  await page.getByPlaceholder('Search products, brands, or locations').fill('pantry beans');
+  await page.getByRole('textbox', { name: 'Search Pantry', exact: true }).fill('pantry beans');
   await expect(cards.first()).toBeVisible();
   const estimatedBestBefore = page.locator('time[datetime="2027-09-30"]').first();
   await expect(estimatedBestBefore).toBeVisible();

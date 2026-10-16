@@ -411,21 +411,23 @@ export function shoppingQuantitySummary(
     typeof formula.unit === 'string' && formula.unit.trim()
       ? formula.unit
       : item.pantry.generatedUnit || item.unit;
-  const recipeRequirement = finiteQuantity(formula.recipeRequirement);
-  const stapleTarget = finiteQuantity(formula.stapleTarget) ?? 0;
-  const requiredQuantity = finiteQuantity(formula.requiredQuantity);
-  const manualExtra = finiteQuantity(formula.manualExtra) ?? 0;
   const planQuantity =
-    recipeRequirement === null
-      ? requiredQuantity
-      : Math.max(recipeRequirement, stapleTarget) + manualExtra;
+    finiteQuantity(formula.recipeRequirement) ?? finiteQuantity(formula.requiredQuantity);
 
   if (planQuantity !== null) {
     return {
-      primary: `${formatQuantity(planQuantity, unit)} to buy`,
+      primary:
+        item.quantity === null
+          ? `${formatQuantity(planQuantity, unit)} recipe demand`
+          : ordinaryAmount,
       secondary: '',
-      calculation: '',
-      isEstimate: false,
+      calculation:
+        item.quantity === null
+          ? 'Buy amount needs a Pantry match'
+          : planQuantity > 0
+            ? `${formatQuantity(planQuantity, unit)} needed for planned meals`
+            : '',
+      isEstimate: item.quantity === null,
     };
   }
 
@@ -1293,6 +1295,7 @@ export function ShoppingListEditor({
             <summary>
               {item.policyBreakdown ? 'Demand and policy breakdown' : 'Pantry details'}
             </summary>
+            <p>{pantryStateLabel(item)}</p>
             {item.policyBreakdown ? (
               <dl>
                 <div>

@@ -180,7 +180,7 @@ describe('Pantry grocery and cooking contracts', () => {
     ).toEqual([]);
   });
 
-  it('shows the exact combined meal-plan demand without an uncertainty qualifier', () => {
+  it('distinguishes recipe demand from an unknown buy amount', () => {
     expect(
       shoppingItemAmount({
         quantity: null,
@@ -203,14 +203,14 @@ describe('Pantry grocery and cooking contracts', () => {
         },
       }),
     ).toEqual({
-      primary: '4 medium to buy',
+      primary: '4 medium recipe demand',
       secondary: '',
-      calculation: '',
-      isEstimate: false,
+      calculation: 'Buy amount needs a Pantry match',
+      isEstimate: true,
     });
   });
 
-  it('keeps the full meal-plan demand visible when Pantry stock reduced the stored shortage', () => {
+  it('shows the actual buy amount alongside full meal-plan demand', () => {
     expect(
       shoppingQuantitySummary({
         quantity: 3,
@@ -230,9 +230,37 @@ describe('Pantry grocery and cooking contracts', () => {
         },
       }),
     ).toEqual({
-      primary: '5 each to buy',
+      primary: '3 each to buy',
       secondary: '',
-      calculation: '',
+      calculation: '5 each needed for planned meals',
+      isEstimate: false,
+    });
+  });
+
+  it.each([
+    { quantity: 600, manualQuantityOverride: false },
+    { quantity: 750, manualQuantityOverride: true },
+  ])('preserves the purchase amount $quantity with a reserve policy', (input) => {
+    expect(
+      shoppingQuantitySummary({
+        quantity: input.quantity,
+        unit: 'g',
+        pantry: {
+          demandState: 'shortage',
+          generatedUnit: 'g',
+          manualQuantityOverride: input.manualQuantityOverride,
+          formulaInputs: JSON.stringify({
+            recipeRequirement: 200,
+            restockMode: 'always_have',
+            targetStock: 500,
+            usablePantry: 100,
+            unit: 'g',
+          }),
+        },
+      }),
+    ).toMatchObject({
+      primary: `${input.quantity} g to buy`,
+      calculation: '200 g needed for planned meals',
       isEstimate: false,
     });
   });

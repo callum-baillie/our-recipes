@@ -54,7 +54,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await page.getByLabel('Email').fill(onboardingEmail('Planner test kitchen', 'Callum'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await page.waitForURL(/\/recipes\//u);
+  await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
 
   await page.goto('/settings/profiles');
   await page.getByRole('button', { name: 'Add another profile' }).click();

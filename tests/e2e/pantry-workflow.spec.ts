@@ -132,6 +132,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await completeInitialOnboarding(page, 'Pantry final kitchen', 'Maya');
+  await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Welcome to the kitchen, Maya.' })).toBeVisible();
 
   await page.goto('/pantry');
@@ -304,7 +305,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   });
   await expect(shoppingRow.getByLabel('Red lentils quantity')).toHaveValue('50');
   const generatedExplanation = shoppingRow.locator('details', {
-    hasText: 'Generated Pantry shortage',
+    hasText: 'Pantry details',
   });
   await generatedExplanation.locator('summary').click();
   await expect(
@@ -341,6 +342,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   await page.reload();
   expect((await reloadedEditorReady).ok()).toBe(true);
   await expect(shoppingRow.getByLabel('Red lentils quantity')).toHaveValue('60');
+  await shoppingRow.getByText('Pantry details', { exact: true }).click();
   await expect(
     shoppingRow.getByText('Obsolete generated demand · kept as a manual item'),
   ).toBeVisible();
@@ -385,6 +387,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   );
   await shoppingRow.getByLabel('Mark Red lentils complete').check();
   expect((await checkedSave).ok()).toBe(true);
+  await page.getByRole('button', { name: 'Done 1', exact: true }).click();
   const intakeLocation = shoppingRow.getByLabel('Pantry location for Red lentils');
   await expect(intakeLocation.locator('option', { hasText: 'Basement shelf' })).toHaveCount(1);
   await intakeLocation.selectOption({
@@ -394,7 +397,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     (response) =>
       response.request().method() === 'POST' && response.url().endsWith('/pantry-intake'),
   );
-  await shoppingRow.getByRole('button', { name: 'Add purchased to Pantry' }).click();
+  await shoppingRow.getByRole('button', { name: 'Confirm and add to Pantry' }).click();
   expect((await intakeResponse).status()).toBe(201);
   await expect(shoppingRow.getByRole('status')).toContainText('Added to Pantry.');
   const afterIntake = await pantryDashboard(page);

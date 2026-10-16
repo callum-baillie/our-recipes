@@ -94,7 +94,7 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await page.waitForURL(/\/recipes\//u);
+  await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
   await page.goto('/');
   await expect(
     page.getByRole('heading', { name: 'Welcome to the kitchen, Callum.' }),

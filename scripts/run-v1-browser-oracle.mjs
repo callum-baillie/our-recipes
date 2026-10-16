@@ -8,6 +8,7 @@ const specs = [
   'tests/e2e/pantry-inventory-management.spec.ts',
   'tests/e2e/pantry-recipe-planner.spec.ts',
   'tests/e2e/pantry-grocery-intake.spec.ts',
+  'tests/e2e/pantry-restock-policy.spec.ts',
   'tests/e2e/pantry-cooking-confirmation.spec.ts',
   'tests/e2e/pantry-workflow.spec.ts',
   'tests/e2e/planner-redesign.spec.ts',

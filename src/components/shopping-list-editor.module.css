@@ -1998,9 +1998,6 @@
   min-width: 2.75rem;
   min-height: 2.75rem;
 }
-.focusedShopping .sourcedItem {
-  opacity: 0.7;
-}
 .focusedShopping .intake {
   grid-column: 1/-1;
 }

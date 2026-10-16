@@ -34,5 +34,5 @@ export async function completeInitialOnboarding(
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await page.waitForURL(/\/recipes\//u);
+  await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
 }

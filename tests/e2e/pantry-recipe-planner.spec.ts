@@ -29,6 +29,7 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await completeInitialOnboarding(page, 'Pantry planning kitchen', 'Maya');
+  await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Welcome to the kitchen, Maya.' })).toBeVisible();
 
   const locationResponse = await page.request.post('/api/v1/pantry/locations', {
