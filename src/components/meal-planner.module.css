@@ -4862,3 +4862,8 @@ input:checked ~ .checkMark {
     min-width: 0;
   }
 }
+
+/* Meal-type shortcuts add a row above the filters. Keep only results flexible. */
+.dialogShell.dialogShellWithOptions {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+}

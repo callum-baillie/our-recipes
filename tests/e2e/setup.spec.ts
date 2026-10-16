@@ -120,9 +120,7 @@ test('a fresh household can complete the supported local release acceptance work
   ).toBe(403);
   await page.goto('/account/ai');
   await expect(page).toHaveURL('/account/ai');
-  await expect(
-    page.getByRole('heading', { name: 'Control what the assistant uses.' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'AI preferences', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save AI settings' })).toBeVisible();
   await page.goto('/settings/lists');
   await page.getByRole('button', { name: /Add supermarket.*Start with a useful route/u }).click();
@@ -621,7 +619,9 @@ test('a fresh household can complete the supported local release acceptance work
     .getByRole('button', { name: 'Mark this recipe as a staple (score 5)' })
     .click();
   await page.goto(recipeUrl);
-  await expect(page.getByLabel('Your rating')).toHaveValue('5');
+  await expect(
+    page.getByRole('button', { name: 'Rate 5 out of 5 stars', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await page.goto('/collections');
   await page.getByRole('link', { name: 'Open collection' }).click();
   await page.getByLabel('Cover photo').selectOption({ index: 1 });
@@ -649,11 +649,11 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'Finish' })).toBeVisible();
   await expect(page.getByText('Oven-Roasted', { exact: true })).toBeVisible();
   await expect(page.getByText('Sheet pan', { exact: true })).toBeVisible();
-  await page.getByText('Review source values', { exact: true }).click();
+  await page.getByText('Nutrition information', { exact: true }).click();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
-  await page.getByLabel('Your rating').selectOption('5');
+  await page.getByRole('button', { name: 'Rate 5 out of 5 stars', exact: true }).click();
   await page.getByLabel('Personal note').fill('Use extra basil next time.');
-  await page.getByRole('button', { name: 'Save personal preference' }).click();
+  await page.getByRole('button', { name: 'Save note' }).click();
   await expect(page.locator('.recipe-personal-preference [role="status"]')).toHaveText(
     'Saved for your profile.',
   );
@@ -685,16 +685,13 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Done' }).click();
   await page.getByRole('button', { name: 'Close plan settings' }).click();
   await page.locator(`[data-planner-slot="${weekStart}:dinner"]`).click();
-  const recipeSelector = page.getByRole('dialog', { name: 'Select recipes' });
+  const recipeSelector = page.getByRole('dialog', { name: 'Add meals' });
   await expect(recipeSelector).toBeVisible();
   await recipeSelector.getByRole('tab', { name: /Dinner/u }).click();
   await recipeSelector
     .getByPlaceholder('Search recipes, tags, categories, or collections')
     .fill('Weeknight tomato soup');
-  await recipeSelector
-    .locator('article', { hasText: 'Weeknight tomato soup' })
-    .getByRole('button', { name: 'Select' })
-    .click();
+  await recipeSelector.getByRole('button', { name: /Weeknight tomato soup.*Select/u }).click();
   await recipeSelector.getByRole('button', { name: 'Add 1 recipe to plan' }).click();
   await expect(
     page
@@ -766,11 +763,9 @@ test('a fresh household can complete the supported local release acceptance work
   ).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByRole('button', { name: 'Validate & restore' })).toBeVisible({
+  await expect(page.getByRole('button', { name: 'Review restore' })).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByRole('button', { name: 'Validate & restore' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Ready to restore, if you mean it.' }),
-  ).toBeVisible();
+  await page.getByRole('button', { name: 'Review restore' }).click();
+  await expect(page.getByRole('heading', { name: 'Restore this backup' })).toBeVisible();
 });

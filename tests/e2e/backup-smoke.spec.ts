@@ -14,10 +14,10 @@ test('an authenticated household can create and validate a local backup', async 
     timeout: 30_000,
   });
 
-  const validateButton = page.getByRole('button', { name: 'Validate & restore' });
+  const validateButton = page.getByRole('button', { name: 'Review restore' });
   await expect(validateButton).toBeVisible({ timeout: 30_000 });
   await validateButton.click();
-  await expect(
-    page.getByRole('heading', { name: 'Ready to restore, if you mean it.' }),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Restore this backup' })).toBeVisible({
+    timeout: 30_000,
+  });
 });

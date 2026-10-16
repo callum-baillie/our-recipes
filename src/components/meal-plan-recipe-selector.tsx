@@ -276,7 +276,9 @@ export function MealPlanRecipeSelector({
       }}
       onClose={onClose}
     >
-      <div className={styles.dialogShell}>
+      <div
+        className={`${styles.dialogShell}${onOtherKind ? ` ${styles.dialogShellWithOptions}` : ''}`}
+      >
         <header className={styles.dialogHeader}>
           <div>
             <h2 id="recipe-selector-title">Add meals</h2>

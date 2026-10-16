@@ -1,6 +1,10 @@
 # Release notes
 
-## 1.0.0-rc.6
+## 1.0.0-rc.7
+
+- Supersedes the unpublished rc.6 build candidate.
+- Fixed the planner recipe selector so meal-type shortcuts do not overlap the meal tabs or results.
+- Docker releases now build amd64 and arm64 on native GitHub runners and cache build layers.
 
 - Updated framework, PDF/image import, SMTP, and transitive dependencies to patched releases.
 

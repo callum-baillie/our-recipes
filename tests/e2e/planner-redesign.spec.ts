@@ -141,7 +141,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
     .first()
     .click();
 
-  const selector = page.getByRole('dialog', { name: 'Select recipes' });
+  const selector = page.getByRole('dialog', { name: 'Add meals' });
   await expect(selector).toBeVisible();
   const dinnerTab = selector.getByRole('tab', { name: 'Dinner 0 of 1' });
   await expect(dinnerTab).toBeVisible();
@@ -151,10 +151,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await selector
     .getByPlaceholder('Search recipes, tags, categories, or collections')
     .fill('Dinner pasta');
-  await selector
-    .locator('article', { hasText: 'Dinner pasta' })
-    .getByRole('button', { name: 'Select' })
-    .click();
+  await selector.getByRole('button', { name: /Dinner pasta.*Select/u }).click();
   await selector.getByRole('button', { name: 'Add 1 recipe to plan' }).click();
 
   await expect(selector).toBeHidden();
@@ -173,7 +170,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
 
   await page.goto('/account/ai');
   const globalImageGeneration = page.getByRole('switch', {
-    name: /AI generate recipe images/u,
+    name: /Offer AI image generation/u,
   });
   await expect(globalImageGeneration).toBeChecked();
   await globalImageGeneration.uncheck();
@@ -182,5 +179,5 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
     page.getByText('Saved. New privacy choices apply to future AI requests.'),
   ).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('switch', { name: /AI generate recipe images/u })).not.toBeChecked();
+  await expect(page.getByRole('switch', { name: /Offer AI image generation/u })).not.toBeChecked();
 });

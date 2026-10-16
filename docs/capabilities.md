@@ -2,7 +2,7 @@
 
 Review-first food discovery includes Open Food Facts exact barcode lookup, USDA name search/detail, branded GTIN fallback, and optional web-camera scanning over trusted HTTPS. See [food-data-integrations.md](food-data-integrations.md).
 
-This is the canonical product-status page for `1.0.0-rc.6`. Bòrd is a self-hosted app
+This is the canonical product-status page for `1.0.0-rc.7`. Bòrd is a self-hosted app
 for one household. Better Auth email/passphrase accounts control access; household profiles select
 preferences and preserve attribution inside a session and are not an independent authorization
 boundary.

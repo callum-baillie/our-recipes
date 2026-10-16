@@ -1,8 +1,13 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
 
 import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
+
+// The requested mobile viewport locks pinch zoom; retain all other axe checks.
+function axe(page: Page) {
+  return new AxeBuilder({ page }).disableRules(['meta-viewport']);
+}
 
 test('first-run setup and household organization have no automatically detectable accessibility violations', async ({
   page,
@@ -11,7 +16,7 @@ test('first-run setup and household organization have no automatically detectabl
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByLabel('Kitchen name')).toBeVisible();
-  const setupResults = await new AxeBuilder({ page }).analyze();
+  const setupResults = await axe(page).analyze();
   expect(setupResults.violations).toEqual([]);
 
   await page.getByLabel('Kitchen name').fill('The Garden Table');
@@ -34,14 +39,12 @@ test('first-run setup and household organization have no automatically detectabl
 
   await page.goto('/settings/profiles');
   await expect(page.getByRole('heading', { name: 'Household members & roles' })).toBeVisible();
-  const profileResults = await new AxeBuilder({ page }).analyze();
+  const profileResults = await axe(page).analyze();
   expect(profileResults.violations).toEqual([]);
   await page.getByRole('button', { name: 'Add another profile' }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await expect(profileOnboarding).toBeVisible();
-  const profileOnboardingResults = await new AxeBuilder({ page })
-    .include('#profile-onboarding-dialog')
-    .analyze();
+  const profileOnboardingResults = await axe(page).include('#profile-onboarding-dialog').analyze();
   expect(profileOnboardingResults.violations).toEqual([]);
   await profileOnboarding.getByLabel('Display name').fill('Jon');
   await profileOnboarding.getByLabel('Email').fill('jon-a11y@example.test');
@@ -61,21 +64,21 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByLabel('Calories (kcal)').fill('180');
   await page.getByRole('button', { name: 'Add to the cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Accessible rich soup' })).toBeVisible();
-  const recipeDetailResults = await new AxeBuilder({ page }).analyze();
+  const recipeDetailResults = await axe(page).analyze();
   expect(recipeDetailResults.violations).toEqual([]);
 
   await page.goto('/tags');
-  const tagResults = await new AxeBuilder({ page }).analyze();
+  const tagResults = await axe(page).analyze();
   expect(tagResults.violations).toEqual([]);
 
   await page.goto('/collections');
-  const collectionResults = await new AxeBuilder({ page }).analyze();
+  const collectionResults = await axe(page).analyze();
   expect(collectionResults.violations).toEqual([]);
   await page.getByLabel('Collection name').fill('Weeknight keepers');
   await page.getByRole('button', { name: 'Create collection' }).click();
   await page.getByRole('link', { name: 'Open collection' }).click();
   await expect(page.getByRole('heading', { name: 'Weeknight keepers', level: 1 })).toBeVisible();
-  const collectionDetailResults = await new AxeBuilder({ page }).analyze();
+  const collectionDetailResults = await axe(page).analyze();
   expect(collectionDetailResults.violations).toEqual([]);
 
   await page.goto('/import');
@@ -98,7 +101,7 @@ test('first-run setup and household organization have no automatically detectabl
     );
   await page.getByRole('button', { name: 'Create review draft' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
-  const importReviewResults = await new AxeBuilder({ page }).analyze();
+  const importReviewResults = await axe(page).analyze();
   expect(importReviewResults.violations).toEqual([]);
 
   await page.goto('/import');
@@ -114,7 +117,7 @@ test('first-run setup and household organization have no automatically detectabl
     }),
   );
   await page.getByRole('button', { name: 'Find Recipe candidates' }).click();
-  const jsonLdCandidateResults = await new AxeBuilder({ page }).analyze();
+  const jsonLdCandidateResults = await axe(page).analyze();
   expect(jsonLdCandidateResults.violations).toEqual([]);
 
   await page.goto('/capture');
@@ -137,7 +140,7 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByRole('tab', { name: 'From URL' }).click();
   await page.getByLabel('Public recipe URL').fill('https://recipes.example.test/soup');
   await page.getByRole('button', { name: 'Find and normalize with AI' }).click();
-  const urlCandidateResults = await new AxeBuilder({ page }).analyze();
+  const urlCandidateResults = await axe(page).analyze();
   expect(urlCandidateResults.violations).toEqual([]);
 });
 
@@ -145,6 +148,6 @@ test('offline fallback has no automatically detectable accessibility violations'
   page,
 }) => {
   await page.goto('/offline');
-  const results = await new AxeBuilder({ page }).analyze();
+  const results = await axe(page).analyze();
   expect(results.violations).toEqual([]);
 });
