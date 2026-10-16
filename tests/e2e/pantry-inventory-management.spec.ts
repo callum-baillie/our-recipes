@@ -293,7 +293,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await clickCardAction(cards.first(), 'Undo');
   await expectSaved(page, 'Last action undone.');
 
-  await page.getByRole('textbox', { name: 'Search Pantry', exact: true }).fill('pantry beans');
+  await page.getByRole('searchbox', { name: 'Search Pantry', exact: true }).fill('pantry beans');
   await expect(cards.first()).toBeVisible();
   const estimatedBestBefore = page.locator('time[datetime="2027-09-30"]').first();
   await expect(estimatedBestBefore).toBeVisible();
