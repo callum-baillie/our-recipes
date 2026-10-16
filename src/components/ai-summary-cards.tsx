@@ -59,7 +59,8 @@ export function AiSummaryCards({
   placement?: 'content' | 'rail' | 'nutrition';
   initialSummary?: AiSummaryCardData | null;
 }) {
-  const [summary, setSummary] = useState<AiSummaryCardData | null>(initialSummary ?? null);
+  const [fetchedSummary, setSummary] = useState<AiSummaryCardData | null>(initialSummary ?? null);
+  const summary = initialSummary !== undefined ? initialSummary : fetchedSummary;
   const [loading, setLoading] = useState(initialSummary === undefined);
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export function AiSummaryCards({
     };
   }, [domain, initialSummary]);
 
-  if (loading) {
+  if (loading && initialSummary === undefined) {
     return (
       <section
         className={styles.section}

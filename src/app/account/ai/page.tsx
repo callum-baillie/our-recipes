@@ -26,11 +26,16 @@ export default async function AiSettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="AI SETTINGS"
-        title="Control what the assistant uses."
+        title="AI preferences"
         description="Choose a model for each task and decide which data this profile may send to OpenAI."
         icon={<Sparkles size={16} aria-hidden="true" />}
+        aside={
+          <Link className="text-button" href="/assist">
+            Saved suggestions & corrections
+          </Link>
+        }
       />
-      <Link href="/assist">Open kitchen suggestions and saved corrections →</Link>
+
       <AiSettingsForm initialSettings={getAiSettings(actor.profileId)} />
     </main>
   );

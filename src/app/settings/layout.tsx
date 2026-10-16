@@ -26,8 +26,11 @@ export default async function SettingsLayout({ children }: Readonly<{ children: 
         <SettingsNav />
         <div className="settings-security-note">
           <ShieldCheck size={17} aria-hidden="true" />
-          <strong>Security at Bòrd</strong>
-          <p>Roles, keys, and passphrases are enforced on the server.</p>
+          <strong>Shared kitchen settings</strong>
+          <p>
+            App-wide settings are managed by administrators. Your sign-in methods are in Account
+            security.
+          </p>
           <Link href="/account/security">My account security</Link>
         </div>
       </aside>

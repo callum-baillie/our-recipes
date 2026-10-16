@@ -2,12 +2,19 @@ packages:
   - '.'
 
 overrides:
-  'next>postcss': 8.5.18
-  'next>sharp': 0.35.3
+  'postcss@^8': 8.5.23
+  'next>sharp': 0.35.5
+  'undici@^7': 7.29.1
+  'js-yaml@^4': 4.3.2
+  'nanoid@^3': 3.3.18
+  'browserslist@^4': 4.28.7
+  'baseline-browser-mapping@^2': 2.11.0
+  'source-map-js@^1': 1.2.2
 
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+  msgpackr-extract: false
   sharp: true
   # This package's only install hook is OpenCollective messaging; the shipped
   # OCR runtime/model need no build step, so keep clean installs non-interactive.

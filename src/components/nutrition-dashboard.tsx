@@ -1,4 +1,5 @@
 'use client';
+import { NutritionInsights } from './nutrition-insights';
 import { NutritionScaleSettings, type LatestWeighIn } from './nutrition-scale-settings';
 import { bodyMetricFields } from '@/lib/domain/body-metrics';
 import { PageHeader } from '@/components/page-header';
@@ -27,7 +28,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 
-import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
+import { type AiSummaryCardData } from '@/components/ai-summary-cards';
 import {
   NutritionAdvancedChartPanels,
   NutritionWeightTrendPanel,
@@ -1243,11 +1244,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
       {summary.currentEntries.length ||
       props.goals.length ||
       (props.weightTrend?.observations.length ?? 0) > 0 ? (
-        <AiSummaryCards
-          domain="nutrition"
-          placement="nutrition"
-          initialSummary={props.initialAiSummary}
-        />
+        <NutritionInsights key={activeProfile.id} initialSummary={props.initialAiSummary} />
       ) : null}
 
       <div className={styles.contextGrid}>

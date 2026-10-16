@@ -44,21 +44,29 @@ export function RecipePantryPanel({
   async function changeMapping(ingredientId: string, productId: string, isOptional: boolean) {
     setPendingIngredientId(ingredientId);
     setMessage('');
-    const response = await fetch(`/api/v1/pantry/mappings/${ingredientId}`, {
-      method: productId ? 'PUT' : 'DELETE',
-      headers: productId ? { 'Content-Type': 'application/json' } : undefined,
-      body: productId ? JSON.stringify({ productId, compatibleVariant: false, isOptional }) : null,
-    });
-    if (response.ok) {
-      setMessage('Pantry mapping saved.');
-      router.refresh();
-    } else {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setMessage(body?.error?.message ?? 'The Pantry mapping could not be saved.');
+    try {
+      const response = await fetch(`/api/v1/pantry/mappings/${ingredientId}`, {
+        method: productId ? 'PUT' : 'DELETE',
+        headers: productId ? { 'Content-Type': 'application/json' } : undefined,
+        body: productId
+          ? JSON.stringify({ productId, compatibleVariant: false, isOptional })
+          : null,
+      });
+      if (response.ok) {
+        setMessage('Pantry mapping saved.');
+        await refreshForServings();
+        router.refresh();
+      } else {
+        const body = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        setMessage(body?.error?.message ?? 'The Pantry mapping could not be saved.');
+      }
+    } catch {
+      setMessage('Could not save the pantry match. Please try again.');
+    } finally {
+      setPendingIngredientId(null);
     }
-    setPendingIngredientId(null);
   }
 
   return (
@@ -131,6 +139,22 @@ export function RecipePantryPanel({
               </details>
             )}
             <small>{ingredient.reason}</small>
+            {allowMapping && !ingredient.productId && (
+              <div className="pantry-match-suggestions">
+                {suggestProducts(ingredient.item, products).map((product) => (
+                  <button
+                    type="button"
+                    key={product.id}
+                    disabled={pendingIngredientId !== null}
+                    onClick={() =>
+                      void changeMapping(ingredient.id, product.id, ingredient.isOptional)
+                    }
+                  >
+                    Suggested: {product.displayName} · Use match
+                  </button>
+                ))}
+              </div>
+            )}
             {allowMapping && (
               <label className={styles.mapping}>
                 <span>Pantry product</span>
@@ -156,4 +180,27 @@ export function RecipePantryPanel({
       {message && <p role="status">{message}</p>}
     </section>
   );
+}
+
+function suggestProducts(item: string, products: PantryProductOption[]) {
+  const tokens = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]/g, ' ')
+        .split(/\s+/)
+        .filter((word) => word.length > 2)
+        .map((word) => word.replace(/s$/, '')),
+    );
+  const wanted = tokens(item);
+  return products
+    .map((product) => {
+      const actual = tokens(product.displayName);
+      const common = [...wanted].filter((word) => actual.has(word)).length;
+      return { product, score: common / Math.max(wanted.size, actual.size, 1) };
+    })
+    .filter((match) => match.score >= 0.5)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((match) => match.product);
 }

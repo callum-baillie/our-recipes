@@ -116,12 +116,16 @@ export function RecipeSummaryCard({
           ) : null}
         </span>
       </Link>
-      <RecipeReactionButtons
-        key={recipe.personalRating ?? 'no-reaction'}
-        recipeId={recipe.id}
-        initialScore={recipe.personalRating}
-      />
-      {compact ? null : <RecipeCollectionButton recipeId={recipe.id} recipeTitle={recipe.title} />}
+      <div className="recipe-card-actions">
+        <RecipeReactionButtons
+          key={recipe.personalRating ?? 'no-reaction'}
+          recipeId={recipe.id}
+          initialScore={recipe.personalRating}
+        />
+        {compact ? null : (
+          <RecipeCollectionButton recipeId={recipe.id} recipeTitle={recipe.title} />
+        )}
+      </div>
     </article>
   );
 }

@@ -21,7 +21,10 @@ import { recipeRevisionRestoreInputSchema as validator17 } from '@/lib/domain/re
 import { recipeStatusSchema as validator18 } from '@/lib/domain/recipe';
 import { isoDateSchema as validator19 } from '@/lib/domain/planning';
 import { mealPlanEntrySchema as validator20 } from '@/lib/domain/planning';
-import { mealPlanStatusUpdateSchema as validator21 } from '@/lib/domain/planning';
+import {
+  mealPlanEntryUpdateSchema,
+  mealPlanStatusUpdateSchema as validator21,
+} from '@/lib/domain/planning';
 import { bulkExportQuerySchema as validator22 } from '@/lib/domain/auth';
 import { swapMealPlanEntriesSchema as validator23 } from '@/lib/domain/planning';
 import { duplicateWeekSchema as validator24 } from '@/lib/domain/planning';
@@ -64,6 +67,36 @@ export type AppOperation = {
   validator?: z.ZodType;
 };
 export const APP_OPERATIONS: AppOperation[] = [
+  {
+    id: 'listRecentShoppingItems',
+    path: '/shopping-lists/recent-items',
+    method: 'GET',
+    summary: 'Read recent household purchases for buy-again suggestions',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'addShoppingListNamesBulk',
+    path: '/shopping-lists/{listId}/items/bulk',
+    method: 'POST',
+    summary: 'Add up to 100 shopping item names atomically, skipping existing active names',
+    parameters: [],
+    body: {
+      type: 'object',
+      required: ['items'],
+      properties: {
+        items: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 100,
+          items: { type: 'string', minLength: 1, maxLength: 160 },
+        },
+      },
+    },
+    validator: z
+      .object({ items: z.array(z.string().trim().min(1).max(160)).min(1).max(100) })
+      .strict(),
+  },
   {
     ...{
       id: 'listTags',
@@ -694,7 +727,7 @@ export const APP_OPERATIONS: AppOperation[] = [
         properties: { status: { type: 'string', enum: ['planned', 'skipped', 'cancelled'] } },
       },
     },
-    validator: validator21,
+    validator: z.union([mealPlanEntryUpdateSchema, validator21]),
   },
   {
     ...{
@@ -906,10 +939,17 @@ export const APP_OPERATIONS: AppOperation[] = [
                   'restore',
                   'duplicate',
                   'set_restock_target',
+                  'set_notes',
                   'complete',
                 ],
               },
               name: { type: 'string', minLength: 1, maxLength: 120 },
+              note: { type: 'string', maxLength: 2000 },
+              expectedVersion: {
+                type: 'integer',
+                minimum: 0,
+                description: 'Required with set_notes; read notesVersion from the list first.',
+              },
             },
           },
         ],
@@ -1737,6 +1777,8 @@ export const APP_OPERATIONS: AppOperation[] = [
   },
 ];
 export const APP_ROUTE_LOADERS = {
+  listRecentShoppingItems: () => import('@/app/api/v1/shopping-lists/recent-items/route'),
+  addShoppingListNamesBulk: () => import('@/app/api/v1/shopping-lists/[listId]/items/bulk/route'),
   listTags: () => import('@/app/api/v1/tags/route'),
   createTag: () => import('@/app/api/v1/tags/route'),
   updateTag: () => import('@/app/api/v1/tags/[tagName]/route'),

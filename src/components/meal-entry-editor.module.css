@@ -1,0 +1,138 @@
+.dialog {
+  width: min(700px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--linen);
+  color: var(--ink);
+  margin: auto;
+}
+.dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+.dialog form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem);
+}
+.dialog header,
+.dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+.dialog header {
+  border-bottom: 1px solid var(--line);
+}
+.dialog h2,
+.dialog p {
+  margin: 0;
+}
+.dialog p,
+.dialog small {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.content {
+  overflow-y: auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+.content label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.dialog input,
+.dialog select,
+.dialog textarea {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0.65rem;
+  background: var(--paper, white);
+  color: var(--ink);
+  font: inherit;
+}
+.dialog textarea {
+  resize: vertical;
+}
+.dialog button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dialog footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+}
+.dialog button[type='submit'] {
+  background: var(--leaf);
+  color: white;
+}
+.row {
+  display: flex;
+  gap: 0.8rem;
+}
+.row > * {
+  flex: 1;
+  min-width: 0;
+}
+.content .check {
+  display: flex;
+  align-items: center;
+}
+.check input {
+  width: auto;
+}
+.adaptation {
+  display: grid;
+  gap: 1rem;
+}
+.adaptation fieldset {
+  padding: 0.7rem;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.ingredient {
+  display: grid;
+  grid-template-columns: 4.5rem 4.5rem minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+@media (max-width: 540px) {
+  .dialog {
+    width: calc(100vw - 1rem);
+  }
+  .dialog input,
+  .dialog select,
+  .dialog textarea {
+    font-size: 16px;
+  }
+  .ingredient {
+    grid-template-columns: 4rem 4rem minmax(0, 1fr) auto;
+  }
+  .content {
+    padding: 0.8rem;
+  }
+}

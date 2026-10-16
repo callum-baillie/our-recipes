@@ -6,7 +6,12 @@ import { useState } from 'react';
 
 import { BrandIconPicker } from '@/components/brand-icon-picker';
 import { InlineSkeleton } from '@/components/skeleton';
-import { SettingsActionBar, SettingsPane, SettingsRow } from '@/components/settings-primitives';
+import {
+  SettingsActionBar,
+  SettingsPane,
+  SettingsRow,
+  SettingsField,
+} from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 import { parseBrandIcon, type BrandIconId } from '@/lib/appearance';
 
@@ -57,22 +62,18 @@ export function AppSettingsForm({
         title="Kitchen identity"
         description="Shared branding for everyone who uses this installation."
       >
-        <SettingsRow
+        <SettingsField
           title="Kitchen name"
           description="Appears in the app header. Bòrd remains visible in page titles and product information."
         >
-          <label className="settings-control">
-            <span>Kitchen name</span>
-            <input
-              value={kitchenName}
-              minLength={1}
-              maxLength={80}
-              onChange={(event) => setKitchenName(event.target.value)}
-              required
-            />
-            <small>Use Bòrd, a household name, or any name that feels like home.</small>
-          </label>
-        </SettingsRow>
+          <input
+            value={kitchenName}
+            minLength={1}
+            maxLength={80}
+            onChange={(event) => setKitchenName(event.target.value)}
+            required
+          />
+        </SettingsField>
         <SettingsRow
           title="Kitchen icon"
           description="Choose the mark used in the header and installed app icon."

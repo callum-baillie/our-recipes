@@ -5,6 +5,7 @@ import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import {
   cookSessions,
   mealPlanEntries,
+  mealPlanLeftoverLinks,
   recipeFavorites,
   recipeProfilePreferences,
   recipes,
@@ -124,6 +125,15 @@ export function startCookSession(
       .get();
     if (!meal || meal.recipeId !== recipeId)
       throw new CookingNotFoundError('Choose a planned meal for this recipe.');
+    const leftover = getDatabase()
+      .select()
+      .from(mealPlanLeftoverLinks)
+      .where(eq(mealPlanLeftoverLinks.destinationEntryId, mealPlanEntryId))
+      .get();
+    if (leftover)
+      throw new CookingNotFoundError(
+        'This meal uses leftovers. Record eating the prepared portions in Nutrition instead of cooking and deducting the ingredients again.',
+      );
   }
   const session: typeof cookSessions.$inferInsert = {
     id: randomUUID(),

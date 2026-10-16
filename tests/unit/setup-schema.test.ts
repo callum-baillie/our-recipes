@@ -110,8 +110,8 @@ describe('setupSchema', () => {
     expect(source).not.toContain('<span>Locale</span>');
     expect(source).not.toContain('<span>Time zone</span>');
     expect(settingsSource).toContain('Avatar URL');
-    expect(settingsSource).toContain('<span>Locale</span>');
-    expect(settingsSource).toContain('<span>Time zone</span>');
+    expect(settingsSource).toContain('title="Locale"');
+    expect(settingsSource).toContain('title="Time zone"');
   });
 
   it('accepts profile-only onboarding with personal goals and optional nutrition details', () => {

@@ -79,9 +79,7 @@ export default async function SystemSettingsPage() {
         </div>
       </SettingsPane>
       <DiagnosticsExport />
-      <section id="backups" className="embedded-backup-settings">
-        <BackupManager initialBackups={backups} storage={backupStorage} />
-      </section>
+      <BackupManager initialBackups={backups} storage={backupStorage} />
       <FreshInstallPanel />
     </main>
   );

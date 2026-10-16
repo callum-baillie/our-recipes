@@ -335,7 +335,7 @@ export function calculateRecipeAvailability(input: {
 export type PantryDemandRequirement = {
   mealPlanEntryId: string;
   plannedFor: string;
-  recipeId: string;
+  recipeId: string | null;
   recipeTitle: string;
   ingredientId: string;
   ingredientName: string;

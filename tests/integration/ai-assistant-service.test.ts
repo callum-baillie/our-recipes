@@ -181,6 +181,11 @@ describe('AI assistant services', () => {
   });
 
   it('passes validated image and file attachments to the current assistant turn', async () => {
+    const image = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: '#637a45' },
+    })
+      .jpeg()
+      .toBuffer();
     const profile = setupProfile();
     const thread = createAiChatThread(profile.id);
 
@@ -194,7 +199,7 @@ describe('AI assistant services', () => {
             kind: 'image',
             name: 'pantry.jpg',
             mimeType: 'image/jpeg',
-            dataBase64: Buffer.from('image').toString('base64'),
+            dataBase64: image.toString('base64'),
           },
           {
             kind: 'file',

@@ -2,6 +2,7 @@
 
 import {
   ChefHat,
+  Workflow,
   ClipboardList,
   KeyRound,
   ListChecks,
@@ -20,8 +21,9 @@ const links = [
   { href: '/settings/meal-plan', label: 'Meal plans', icon: ChefHat },
   { href: '/settings/lists', label: 'Lists', icon: ListChecks },
   { href: '/settings/pantry', label: 'Pantry', icon: PackageOpen },
+  { href: '/settings/automation', label: 'Background tasks', icon: Workflow },
   { href: '/settings/system', label: 'System', icon: ShieldCheck },
-  { href: '/settings/api', label: 'API & Security', icon: KeyRound },
+  { href: '/settings/api', label: 'API keys', icon: KeyRound },
 ] as const;
 
 export function SettingsNav() {

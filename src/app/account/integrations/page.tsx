@@ -11,7 +11,7 @@ export default async function IntegrationsPage() {
   );
   if (!principal) redirect('/sign-in');
   return (
-    <main className="recipe-page">
+    <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="INTEGRATIONS"
         title="Your connected apps"

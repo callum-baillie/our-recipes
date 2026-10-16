@@ -24,3 +24,15 @@
   width: 0.9rem;
   height: 0.9rem;
 }
+
+.marker {
+  line-height: 1;
+  padding: 0;
+  align-items: center;
+  justify-items: center;
+}
+.marker svg {
+  display: block;
+  margin: 0;
+  flex-shrink: 0;
+}

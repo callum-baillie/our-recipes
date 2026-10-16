@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { getRecipeForPlannedMeal, PlanningNotFoundError } from '@/lib/services/planning-service';
 import { NextResponse } from 'next/server';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
@@ -18,7 +20,21 @@ export async function GET(request: Request, context: { params: Promise<{ recipeI
   const authorization = await authorizeApi(request, 'recipes', 'read');
   if (authorization.response) return authorization.response;
   const { recipeId } = await context.params;
-  const recipe = getRecipe(recipeId, authorization.principal.profileId);
+  const plannedId = new URL(request.url).searchParams.get('mealPlanEntryId');
+  let recipe;
+  if (plannedId !== null) {
+    if (!z.string().uuid().safeParse(plannedId).success)
+      return jsonError(400, 'invalid_planned_meal', 'Choose a valid planned meal.');
+    const planAuthorization = await authorizeApi(request, 'mealPlans', 'read');
+    if (planAuthorization.response) return planAuthorization.response;
+    try {
+      recipe = getRecipeForPlannedMeal(recipeId, plannedId);
+    } catch (error) {
+      if (error instanceof PlanningNotFoundError)
+        return jsonError(404, 'planned_meal_not_found', error.message);
+      throw error;
+    }
+  } else recipe = getRecipe(recipeId, authorization.principal.profileId);
   return recipe
     ? withApiRequestId(NextResponse.json({ recipe }), authorization.requestId)
     : jsonError(404, 'recipe_not_found', 'That recipe no longer exists.');

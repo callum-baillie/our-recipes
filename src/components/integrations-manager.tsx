@@ -1,6 +1,15 @@
 'use client';
+import {
+  SettingsField,
+  SettingsPane,
+  SettingsRow,
+  SettingsSubsection,
+  SettingsItem,
+  SettingsEmpty,
+  SettingsActionBar,
+} from './settings-primitives';
 import { useEffect, useRef, useState } from 'react';
-import { Plug, Plus, RefreshCw, Settings2, X, Scale, Unplug } from 'lucide-react';
+import { Plus, RefreshCw, Settings2, X, Unplug } from 'lucide-react';
 import { syncIntervals, type IntegrationState } from '@/lib/domain/integration-settings';
 import styles from './integrations-manager.module.css';
 type Reading = { userId: string; userLabel?: string; weightKilograms: number; measuredAt: string };
@@ -114,152 +123,125 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
   }
   const occupied = new Set([...state.accounts.flatMap((a) => a.mappings.map((m) => m.profileId))]);
   return (
-    <div className={styles.root}>
-      <div className={styles.toolbar}>
-        <div>
-          <h2>Connected accounts</h2>
-          <p>Each account has its own profile assignments and sync schedule.</p>
-        </div>
-        <button className={styles.primary} onClick={connect} disabled={busy}>
-          <Plus size={17} /> Add integration
-        </button>
-      </div>
-      {!state.accounts.length ? (
-        <div className={styles.empty}>
-          <Plug size={30} />
-          <h3>Connect your first app</h3>
-          <p>
-            Start with VeSync to bring your Etekcity ESF24 weigh-ins and body composition into
-            Nutrition.
-          </p>
-          <button className={styles.primary} onClick={connect}>
-            Connect VeSync
+    <div className="settings-stack">
+      <SettingsPane
+        title="Connected apps"
+        description="Manage accounts, profile assignments, and sync schedules."
+      >
+        <SettingsRow
+          title="VeSync"
+          description="Connect an Etekcity ESF24 account to import weigh-ins and supported body metrics into Nutrition."
+        >
+          <button className="secondary-button" type="button" onClick={connect} disabled={busy}>
+            <Plus size={17} />
+            {state.accounts.length ? 'Add another account' : 'Connect VeSync'}
           </button>
-        </div>
-      ) : null}
-      <div className={styles.cards}>
-        {state.accounts.map((account) => (
-          <article key={account.id} className={styles.card}>
-            <div className={styles.cardHeading}>
-              <span className={styles.icon}>
-                <Scale size={24} />
-              </span>
-              <div>
-                <p className={styles.eyebrow}>VeSync · Etekcity ESF24</p>
-                <h3>{account.label}</h3>
-              </div>
-              <span className={styles.badge}>
-                {account.lastError
-                  ? 'Needs attention'
-                  : account.syncing
-                    ? 'Syncing'
-                    : account.syncIntervalMinutes
-                      ? 'Auto sync on'
-                      : 'Manual sync'}
-              </span>
-            </div>
-            <p>
-              {account.mappings.length
-                ? account.mappings.map((m) => m.profileName).join(' · ')
-                : 'No profiles assigned yet'}
-            </p>
-            <dl className={styles.facts}>
-              <div>
-                <dt>Schedule</dt>
-                <dd>
-                  {syncIntervals.find((i) => i.value === account.syncIntervalMinutes)?.label ??
-                    'Manual only'}
-                </dd>
-              </div>
-              <div>
-                <dt>Last successful sync</dt>
-                <dd>{date(account.lastSuccessAt)}</dd>
-              </div>
-              {account.nextSyncAt ? (
-                <div>
-                  <dt>Next check</dt>
-                  <dd>{date(account.nextSyncAt)}</dd>
-                </div>
-              ) : null}
-            </dl>
-            {account.lastError ? <p className={styles.error}>{account.lastError}</p> : null}
-            <div className={styles.actions}>
-              <button
-                className={styles.secondary}
-                disabled={busy || !account.mappings.length || account.syncing}
-                onClick={() => void sync(account)}
-              >
-                <RefreshCw size={16} /> Sync now
-              </button>
-              <button
-                className={styles.secondary}
-                disabled={busy}
-                onClick={() => settings(account)}
-              >
-                <Settings2 size={16} /> Settings
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-      {state.sharedMappings.length ? (
-        <section className={styles.card}>
-          <h3>Assigned through another account</h3>
-          <p>
-            These profiles receive measurements from an account managed by another user. You can
-            remove the assignment before connecting your own account.
-          </p>
-          {state.sharedMappings.map((mapping) => (
-            <div className={styles.assignment} key={mapping.id}>
-              <strong>{mapping.profileName} · VeSync</strong>
-              <button
-                disabled={busy}
-                className={styles.textButton}
-                onClick={() =>
-                  void run(async () => {
-                    await request({ action: 'unassign', id: mapping.id });
-                    await reload();
-                    setMessage('Assignment removed. Saved measurements are retained.');
-                  })
+        </SettingsRow>
+        <SettingsSubsection
+          title="Your connected accounts"
+          description="Each account has its own profile assignments and sync schedule."
+        >
+          {!state.accounts.length ? (
+            <SettingsEmpty>
+              No connected accounts yet. Connect VeSync above to get started.
+            </SettingsEmpty>
+          ) : (
+            state.accounts.map((account) => (
+              <SettingsItem
+                key={account.id}
+                title={account.label}
+                description={`VeSync · ${account.lastError ? 'Needs attention' : account.syncing ? 'Syncing' : account.syncIntervalMinutes ? 'Automatic sync' : 'Manual sync'}`}
+                actions={
+                  <>
+                    <button
+                      className="text-button"
+                      type="button"
+                      disabled={busy || !account.mappings.length || account.syncing}
+                      onClick={() => void sync(account)}
+                    >
+                      <RefreshCw size={16} />
+                      Sync now
+                    </button>
+                    <button
+                      className="text-button"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => settings(account)}
+                    >
+                      <Settings2 size={16} />
+                      Settings
+                    </button>
+                  </>
                 }
               >
-                Remove assignment
-              </button>
-            </div>
-          ))}
-        </section>
-      ) : null}
-      {message && !modalOpen ? (
-        <p role="status" className={styles.notice}>
+                <p>
+                  {account.mappings.length
+                    ? account.mappings.map((mapping) => mapping.profileName).join(' · ')
+                    : 'No profiles assigned yet'}
+                </p>
+                <p>
+                  {syncIntervals.find((interval) => interval.value === account.syncIntervalMinutes)
+                    ?.label ?? 'Manual only'}{' '}
+                  · Last successful sync: {date(account.lastSuccessAt)}
+                </p>
+                {account.nextSyncAt && <p>Next check: {date(account.nextSyncAt)}</p>}
+                {account.lastError && (
+                  <p role="alert" className={styles.error}>
+                    {account.lastError}
+                  </p>
+                )}
+              </SettingsItem>
+            ))
+          )}
+        </SettingsSubsection>
+        {state.sharedMappings.length > 0 && (
+          <SettingsSubsection
+            title="Assigned through another account"
+            description="These profiles receive measurements from an account managed by another user. Remove an assignment before connecting your own account."
+          >
+            {state.sharedMappings.map((mapping) => (
+              <SettingsItem
+                key={mapping.id}
+                title={mapping.profileName}
+                description="VeSync"
+                actions={
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="text-button"
+                    onClick={() =>
+                      void run(async () => {
+                        await request({ action: 'unassign', id: mapping.id });
+                        await reload();
+                        setMessage('Assignment removed. Saved measurements are retained.');
+                      })
+                    }
+                  >
+                    Remove assignment
+                  </button>
+                }
+              />
+            ))}
+          </SettingsSubsection>
+        )}
+        <SettingsSubsection
+          title="How syncing works"
+          description="Automatic sync runs while the Bòrd server is running. Your scale must first upload measurements through the VeSync app. If its session expires, reconnect the account; saved measurements are retained."
+        />
+      </SettingsPane>
+      {message && !modalOpen && (
+        <p role="status" className="settings-inline-status">
           {message}
         </p>
-      ) : null}
-      {error && !modalOpen ? (
-        <p role="alert" className={styles.error}>
+      )}
+      {error && !modalOpen && (
+        <p role="alert" className="form-error">
           {error}
         </p>
-      ) : null}
-      <section className={styles.available}>
-        <h2>Available integrations</h2>
-        <div>
-          <Scale size={24} />
-          <div>
-            <h3>VeSync</h3>
-            <p>Etekcity ESF24 · Weight, imported body fat, and calculated body composition.</p>
-          </div>
-          <button className={styles.secondary} disabled={busy} onClick={connect}>
-            {state.accounts.length ? 'Add another account' : 'Connect'}
-          </button>
-        </div>
-      </section>
-      <p className={styles.hint}>
-        Automatic sync runs while the Bòrd server is running. Your scale must first upload
-        measurements through the VeSync app. Sessions can expire; if that happens, remove and
-        reconnect the account. Saved measurements are retained.
-      </p>
+      )}
       <dialog
         ref={dialog}
-        className={styles.dialog}
+        className={`settings-dialog ${styles.dialog}`}
         onCancel={(event) => {
           if (busy) event.preventDefault();
         }}
@@ -291,7 +273,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
         </div>
         {mode === 'connect' ? (
           <form
-            className={styles.stack}
+            className="settings-fields"
             onSubmit={(event) => {
               event.preventDefault();
               void run(async () => {
@@ -321,8 +303,10 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               Use the same login as your VeSync app. Your password is used for sign-in and is not
               saved.
             </p>
-            <label className={styles.field}>
-              Connection name
+            <SettingsField
+              description="A label that helps you recognize this linked VeSync account."
+              title="Connection name"
+            >
               <input
                 disabled={busy}
                 required
@@ -331,9 +315,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="For example, family scale"
               />
-            </label>
-            <label className={styles.field}>
-              VeSync email
+            </SettingsField>
+            <SettingsField
+              description="The email address you use to sign in to VeSync."
+              title="VeSync email"
+            >
               <input
                 disabled={busy}
                 required
@@ -342,9 +328,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-            </label>
-            <label className={styles.field}>
-              VeSync password
+            </SettingsField>
+            <SettingsField
+              description="Used to connect to VeSync; your password is not saved."
+              title="VeSync password"
+            >
               <input
                 disabled={busy}
                 required
@@ -353,9 +341,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-            </label>
-            <label className={styles.field}>
-              Account country
+            </SettingsField>
+            <SettingsField
+              description="Choose the country registered to your VeSync account."
+              title="Account country"
+            >
               <select disabled={busy} value={country} onChange={(e) => setCountry(e.target.value)}>
                 <option value="US">United States</option>
                 <option value="CA">Canada</option>
@@ -364,15 +354,17 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 <option value="DE">Germany</option>
                 <option value="FR">France</option>
               </select>
-            </label>
-            <button className={styles.primary} disabled={busy}>
-              {busy ? 'Connecting…' : 'Sign in to VeSync'}
-            </button>
+            </SettingsField>
+            <SettingsActionBar>
+              <button className={styles.primary} disabled={busy}>
+                {busy ? 'Connecting…' : 'Sign in to VeSync'}
+              </button>
+            </SettingsActionBar>
           </form>
         ) : editing ? (
           <div className={styles.stack}>
             <form
-              className={styles.stack}
+              className="settings-fields"
               onSubmit={(event) => {
                 event.preventDefault();
                 void run(async () => {
@@ -387,8 +379,10 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 });
               }}
             >
-              <label className={styles.field}>
-                Connection name
+              <SettingsField
+                description="A label that helps you recognize this linked VeSync account."
+                title="Connection name"
+              >
                 <input
                   disabled={busy}
                   required
@@ -396,9 +390,18 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                 />
-              </label>
-              <label className={styles.field}>
-                How often should Bòrd check for measurements?
+              </SettingsField>
+              <SettingsField
+                title="How often should Bòrd check for measurements?"
+                description={
+                  <>
+                    <small>
+                      Only new weigh-ins are added. Your existing history and calorie targets are
+                      preserved.
+                    </small>
+                  </>
+                }
+              >
                 <select
                   disabled={busy}
                   value={interval}
@@ -410,23 +413,24 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     </option>
                   ))}
                 </select>
-                <small>
-                  Only new weigh-ins are added. Your existing history and calorie targets are
-                  preserved.
-                </small>
-              </label>
-              <button className={styles.primary} disabled={busy}>
-                {busy ? 'Please wait…' : 'Save settings'}
-              </button>
+              </SettingsField>
+              <SettingsActionBar>
+                <button className={styles.primary} disabled={busy}>
+                  {busy ? 'Please wait…' : 'Save settings'}
+                </button>
+              </SettingsActionBar>
             </form>
-            <section className={styles.section}>
-              <h3>Profile assignments</h3>
-              <p>
-                {state.canAssignHousehold
-                  ? 'Match each VeSync profile to the right person in your household.'
-                  : 'Match your VeSync profile to your own Bòrd profile.'}{' '}
-                A person can have one scale connection at a time.
-              </p>
+            <SettingsSubsection
+              title="Profile assignments"
+              description={
+                <>
+                  {state.canAssignHousehold
+                    ? 'Match each VeSync profile to the right person in your household.'
+                    : 'Match your VeSync profile to your own Bòrd profile.'}{' '}
+                  A person can have one scale connection at a time.
+                </>
+              }
+            >
               {editing.mappings.map((mapping) => (
                 <div className={styles.assignment} key={mapping.id}>
                   <div>
@@ -450,9 +454,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   </button>
                 </div>
               ))}
-              <div className={styles.stack}>
-                <label className={styles.field}>
-                  Scale
+              <div className="settings-fields">
+                <SettingsField
+                  description="Select which scale provides measurements for this connection."
+                  title="Scale"
+                >
                   <select
                     disabled={busy}
                     value={device}
@@ -469,7 +475,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                       </option>
                     ))}
                   </select>
-                </label>
+                </SettingsField>
                 <button
                   className={styles.secondary}
                   disabled={busy || !device}
@@ -493,8 +499,10 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 </button>
                 {readings.length ? (
                   <>
-                    <label className={styles.field}>
-                      VeSync profile
+                    <SettingsField
+                      description="Choose the person whose measurements should be imported."
+                      title="VeSync profile"
+                    >
                       <select
                         disabled={busy}
                         value={scaleUser}
@@ -510,9 +518,18 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                           </option>
                         ))}
                       </select>
-                    </label>
-                    <label className={styles.field}>
-                      Bòrd profile
+                    </SettingsField>
+                    <SettingsField
+                      title="Bòrd profile"
+                      description={
+                        <>
+                          <small>
+                            Weight tracking must be enabled in Nutrition before measurements can
+                            sync.
+                          </small>
+                        </>
+                      }
+                    >
                       <select
                         disabled={busy}
                         value={profileId}
@@ -527,10 +544,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                           </option>
                         ))}
                       </select>
-                      <small>
-                        Weight tracking must be enabled in Nutrition before measurements can sync.
-                      </small>
-                    </label>
+                    </SettingsField>
                     <button
                       className={styles.secondary}
                       disabled={busy || !profileId || !scaleUser}
@@ -555,8 +569,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   </>
                 ) : null}
               </div>
-            </section>
-            <div className={styles.actions}>
+            </SettingsSubsection>
+            <SettingsRow
+              title="Sync measurements"
+              description="Import the latest weigh-ins for the profiles assigned above."
+            >
               <button
                 className={styles.secondary}
                 disabled={busy || !editing.mappings.length}
@@ -564,13 +581,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               >
                 <RefreshCw size={16} /> Sync now
               </button>
-            </div>
-            <section className={styles.section}>
-              <h3>Remove connection</h3>
-              <p>
-                This stops automatic sync and removes all assignments for this connection. Saved
-                measurements stay in Nutrition.
-              </p>
+            </SettingsRow>
+            <SettingsRow
+              title="Remove connection"
+              description="Stop automatic sync and remove all assignments for this connection. Saved measurements stay in Nutrition."
+            >
               {confirmRemove ? (
                 <div className={styles.actions}>
                   <button
@@ -604,7 +619,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   <Unplug size={16} /> Remove connection
                 </button>
               )}
-            </section>
+            </SettingsRow>
           </div>
         ) : null}
         {message ? (

@@ -48,7 +48,11 @@ function RecipeProposalCard({
   action: AiDrawerAction;
   busy: boolean;
   pendingDecision: 'confirm' | 'cancel' | null;
-  onDecide: (actionId: string, decision: 'confirm' | 'cancel') => void;
+  onDecide: (
+    actionId: string,
+    decision: 'confirm' | 'cancel',
+    resolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+  ) => void;
 }) {
   const preview = object(action.preview) ?? {};
   const recipe = object(action.kind === 'recipe_update' ? preview.after : preview.recipe);
@@ -238,11 +242,25 @@ function GenericProposalCard({
   action: AiDrawerAction;
   busy: boolean;
   pendingDecision: 'confirm' | 'cancel' | null;
-  onDecide: (actionId: string, decision: 'confirm' | 'cancel') => void;
+  onDecide: (
+    actionId: string,
+    decision: 'confirm' | 'cancel',
+    resolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+  ) => void;
 }) {
+  const [resolutions, setResolutions] = useState<Record<string, 'keep' | 'replace'>>({});
   const preview = object(action.preview) ?? {};
   const candidate = object(preview.candidate);
-  const entries = Array.isArray(candidate?.entries) ? candidate.entries : [];
+  const entries = Array.isArray(candidate?.entries)
+    ? candidate.entries
+    : object(preview.entry)
+      ? [preview.entry]
+      : [];
+  const conflicts = Array.isArray(preview.conflicts)
+    ? preview.conflicts.map(object).filter((item): item is Record<string, unknown> => item !== null)
+    : [];
+  const needsChoices = object(preview.request)?.occupiedSlotMode === 'review';
+  const unresolved = needsChoices && conflicts.some((item) => !resolutions[text(item.entryId)]);
   const labels: Record<string, string> = {
     meal_plan_generate: 'Meal plan preview',
     meal_plan_change: 'Meal plan change',
@@ -261,13 +279,101 @@ function GenericProposalCard({
             : text(preview.operation) || 'This change is ready for your review.'}
         </p>
       </div>
+      {entries.length ? (
+        <div className={styles.planPreview} aria-label="Meal plan preview">
+          {[...new Set(entries.map((entry) => text(object(entry)?.plannedFor)))]
+            .sort()
+            .map((date) => (
+              <section key={date}>
+                <h4>
+                  {new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </h4>
+                <ul>
+                  {entries
+                    .filter((entry) => text(object(entry)?.plannedFor) === date)
+                    .map((entry, index) => {
+                      const meal = object(entry);
+                      return (
+                        <li key={index}>
+                          <span>{text(meal?.meal)}</span>
+                          <strong>{text(meal?.title) || 'Planned meal'}</strong>
+                          <small>
+                            {text(meal?.servings)} servings
+                            {text(meal?.note) ? ` · ${text(meal?.note)}` : ''}
+                          </small>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </section>
+            ))}
+          {Array.isArray(candidate?.warnings)
+            ? candidate.warnings.map((warning, index) => <p key={index}>{text(warning)}</p>)
+            : null}
+          <p>
+            {Array.isArray(preview.selectedProfileIds)
+              ? `For ${preview.selectedProfileIds.length} household member${preview.selectedProfileIds.length === 1 ? '' : 's'}. `
+              : ''}
+            Unlisted meals stay unchanged. Resolve any occupied slots below before saving.
+          </p>
+        </div>
+      ) : null}
+      {conflicts.length ? (
+        <section className={styles.planPreview} aria-label="Existing meal choices">
+          <h4>Already planned</h4>
+          {conflicts.map((conflict) => (
+            <label key={text(conflict.entryId)}>
+              <span>
+                {text(conflict.plannedFor)} · {text(conflict.meal)} · {text(conflict.title)}
+              </span>
+              {needsChoices && action.status === 'pending' ? (
+                <select
+                  aria-label={`Keep or replace ${text(conflict.title)}`}
+                  value={resolutions[text(conflict.entryId)] ?? ''}
+                  onChange={(event) =>
+                    setResolutions((current) => ({
+                      ...current,
+                      [text(conflict.entryId)]: event.target.value as 'keep' | 'replace',
+                    }))
+                  }
+                >
+                  <option value="" disabled>
+                    Choose what happens
+                  </option>
+                  <option value="keep">Keep existing meal</option>
+                  <option value="replace">Replace with proposed meal</option>
+                </select>
+              ) : (
+                <p>
+                  {object(preview.request)?.occupiedSlotMode === 'replace'
+                    ? 'Will be replaced'
+                    : 'Will be kept'}
+                </p>
+              )}
+            </label>
+          ))}
+        </section>
+      ) : null}
       {action.status === 'pending' ? (
         <div className={styles.actions}>
           <button
             className={styles.primaryAction}
             type="button"
-            onClick={() => onDecide(action.id, 'confirm')}
-            disabled={busy}
+            onClick={() =>
+              onDecide(
+                action.id,
+                'confirm',
+                Object.entries(resolutions).map(([entryId, resolution]) => ({
+                  entryId,
+                  resolution,
+                })),
+              )
+            }
+            disabled={busy || unresolved}
           >
             {pendingDecision === 'confirm' ? (
               <InlineSkeleton label="Saving changes" width="1rem" />
@@ -307,7 +413,11 @@ function RecipeBatchProposalCard({
   action: AiDrawerAction;
   busy: boolean;
   pendingDecision: 'confirm' | 'cancel' | null;
-  onDecide: (actionId: string, decision: 'confirm' | 'cancel') => void;
+  onDecide: (
+    actionId: string,
+    decision: 'confirm' | 'cancel',
+    resolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+  ) => void;
 }) {
   const preview = object(action.preview) ?? {};
   const recipes = Array.isArray(preview.recipes) ? preview.recipes.map(object).filter(Boolean) : [];
@@ -361,7 +471,11 @@ export function AiActionCard(props: {
   action: AiDrawerAction;
   busy: boolean;
   pendingDecision?: 'confirm' | 'cancel' | null;
-  onDecide: (actionId: string, decision: 'confirm' | 'cancel') => void;
+  onDecide: (
+    actionId: string,
+    decision: 'confirm' | 'cancel',
+    resolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+  ) => void;
 }) {
   const normalizedProps = { ...props, pendingDecision: props.pendingDecision ?? null };
   if (props.action.kind === 'recipe_create' || props.action.kind === 'recipe_update') {

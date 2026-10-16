@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
 import {
   mealPlanEntries,
+  mealPlanLeftoverLinks,
   pantryPurchaseIntakes,
   pantryShoppingItemDetails,
   cookSessions,
@@ -15,10 +16,12 @@ import {
   recipeIngredients,
   pantryProducts,
   recipes,
+  recipeRevisions,
   shoppingPolicyInstances,
   shoppingAisles,
   shoppingListItems,
   shoppingLists,
+  shoppingListNotes,
 } from '@/lib/db/schema';
 import type {
   DuplicateWeekInput,
@@ -69,7 +72,8 @@ import {
   type ListSettingsView,
   type SupermarketProfileView,
 } from '@/lib/services/list-settings-service';
-import { getRecipe } from '@/lib/services/recipe-service';
+import { recipeInputSchema } from '@/lib/domain/recipe';
+import { getRecipe, recipePayloadFromDetail } from '@/lib/services/recipe-service';
 
 export class PlanningNotFoundError extends Error {}
 
@@ -86,7 +90,11 @@ export type MealPlanEntryChanged = (
   next: typeof mealPlanEntries.$inferSelect | null,
 ) => void;
 
-export type PlannedMeal = typeof mealPlanEntries.$inferSelect & {
+export type PlannedMeal = Omit<typeof mealPlanEntries.$inferSelect, 'kind' | 'recipeOverride'> & {
+  kind?: string;
+  recipeOverride?: string | null;
+  leftoverSourceId?: string | null;
+  leftoverSourceTitle?: string | null;
   recipeTitle: string;
   recipeChangedSincePlanning: boolean;
   effectiveStatus: MealPlanStatus | 'cooked';
@@ -151,7 +159,349 @@ function recipePlanSnapshot(
     }),
   };
 }
+// A planned adaptation never writes to the recipe library or its revision history.
+function mealDetails(
+  tx: PlanningTransaction | ReturnType<typeof getDatabase>,
+  input: MealPlanEntryInput,
+  entryId: string,
+  previous?: typeof mealPlanEntries.$inferSelect,
+) {
+  const priorLink = previous
+    ? tx
+        .select()
+        .from(mealPlanLeftoverLinks)
+        .where(eq(mealPlanLeftoverLinks.destinationEntryId, entryId))
+        .get()
+    : null;
+  const kind =
+    input.kind ??
+    (priorLink
+      ? 'leftover'
+      : (input.recipeId || null) !== previous?.recipeId
+        ? input.recipeId
+          ? 'recipe'
+          : 'custom'
+        : previous?.kind) ??
+    (input.recipeId ? 'recipe' : 'custom');
+  const sourceId =
+    input.leftoverSourceId === undefined ? priorLink?.sourceEntryId : input.leftoverSourceId;
+  if (kind === 'recipe' && !input.recipeId) throw new PlanningNotFoundError('Choose a recipe.');
+  if (kind !== 'recipe' && kind !== 'leftover' && input.recipeId)
+    throw new PlanningNotFoundError('Only recipe or leftover meals can reference a recipe.');
+  if (kind !== 'leftover' && input.leftoverSourceId)
+    throw new PlanningNotFoundError('Choose the leftover meal type to link a source.');
+  if (previous && kind !== previous.kind && !['recipe', 'item'].includes(kind))
+    guardSourceChange(tx as PlanningTransaction, entryId);
+  let details = { kind, recipeOverride: previous?.recipeOverride ?? null } as Partial<
+    typeof mealPlanEntries.$inferSelect
+  >;
+  if (kind === 'leftover') {
+    const source = sourceId
+      ? tx.select().from(mealPlanEntries).where(eq(mealPlanEntries.id, sourceId)).get()
+      : null;
+    if (
+      !source ||
+      source.id === entryId ||
+      source.status !== 'planned' ||
+      comparePlannedMeals(source, input) > 0
+    )
+      throw new PlanningNotFoundError('Choose an earlier active meal for these leftovers.');
+    const sourceLink = tx
+      .select()
+      .from(mealPlanLeftoverLinks)
+      .where(eq(mealPlanLeftoverLinks.destinationEntryId, source.id))
+      .get();
+    if (sourceLink || source.kind === 'takeout' || (!source.recipeId && source.kind !== 'item'))
+      throw new PlanningNotFoundError(
+        'Choose the original cooked meal, not another leftover or takeout.',
+      );
+    details = {
+      ...details,
+      recipeId: source.recipeId,
+      recipeRevision: source.recipeRevision,
+      recipeCalculationId: source.recipeCalculationId,
+      recipeTitleSnapshot: source.recipeTitleSnapshot,
+      recipeIngredientsSnapshot: source.recipeIngredientsSnapshot,
+      recipeOverride: source.recipeOverride,
+      title: source.title || source.recipeTitleSnapshot,
+    };
+  } else if (kind === 'item') {
+    const item = input.foodItem;
+    const product = item?.pantryProductId
+      ? tx.select().from(pantryProducts).where(eq(pantryProducts.id, item.pantryProductId)).get()
+      : null;
+    if (item?.pantryProductId && !product)
+      throw new PlanningNotFoundError('Choose a pantry product that still exists.');
+    if (item)
+      details = {
+        ...details,
+        recipeId: null,
+        recipeCalculationId: null,
+        recipeOverride: null,
+        recipeTitleSnapshot: input.title || item.item,
+        recipeIngredientsSnapshot: serializeMealPlanIngredientSnapshot({
+          baseServings: '1',
+          ingredients: [
+            {
+              ingredientId: entryId,
+              item: item.item,
+              quantity: item.quantity === '' ? null : item.quantity,
+              unit: item.unit,
+              note: item.note,
+              shoppingCategory: item.shoppingCategory,
+              productId: item.pantryProductId || null,
+              productName: product?.displayName ?? null,
+              isOptional: false,
+            },
+          ],
+        }),
+      };
+    else if (previous?.kind === 'item')
+      details.recipeIngredientsSnapshot = previous.recipeIngredientsSnapshot;
+    else throw new PlanningNotFoundError('Add the food and quantity per serving.');
+  }
+  if (kind !== 'leftover') {
+    if (input.recipeOverride === null || input.recipeId !== previous?.recipeId)
+      details.recipeOverride = null;
+    if (input.recipeOverride) {
+      if (!input.recipeId || kind !== 'recipe')
+        throw new PlanningNotFoundError('Only recipe meals can have a recipe adaptation.');
+      const override = input.recipeOverride;
+      const oldSnapshot =
+        previous?.recipeId === input.recipeId
+          ? parseMealPlanIngredientSnapshot(previous.recipeIngredientsSnapshot)
+          : parseMealPlanIngredientSnapshot(
+              recipePlanSnapshot(tx, input.recipeId).recipeIngredientsSnapshot,
+            );
+      details = {
+        ...details,
+        recipeOverride: JSON.stringify(override),
+        recipeTitleSnapshot: override.title,
+        recipeCalculationId: null,
+        recipeIngredientsSnapshot: serializeMealPlanIngredientSnapshot({
+          baseServings: override.servings,
+          ingredients: override.ingredientGroups.flatMap((group) =>
+            group.ingredients.map((item) => {
+              const old = oldSnapshot?.ingredients.find(
+                (old) => old.item === item.item && old.unit === item.unit,
+              );
+              const productId =
+                item.pantryProductId === undefined
+                  ? (old?.productId ?? null)
+                  : item.pantryProductId || null;
+              const product = productId
+                ? tx.select().from(pantryProducts).where(eq(pantryProducts.id, productId)).get()
+                : null;
+              if (productId && !product)
+                throw new PlanningNotFoundError('Choose a pantry product that still exists.');
+              return {
+                ingredientId: old?.ingredientId ?? randomUUID(),
+                item: item.item,
+                quantity: item.quantity === '' ? null : item.quantity,
+                unit: item.unit,
+                note: item.note,
+                shoppingCategory: item.shoppingCategory,
+                productId,
+                productName: product?.displayName ?? null,
+                isOptional: old?.isOptional ?? false,
+              };
+            }),
+          ),
+        }),
+      };
+    } else if (input.recipeOverride === null && input.recipeId)
+      Object.assign(details, recipePlanSnapshot(tx, input.recipeId));
+  }
+  return { details, sourceId: kind === 'leftover' ? sourceId : null };
+}
+
+function saveLeftoverLink(
+  tx: PlanningTransaction,
+  entryId: string,
+  sourceId: string | null | undefined,
+  servings: number,
+  actor: string,
+) {
+  tx.delete(mealPlanLeftoverLinks)
+    .where(eq(mealPlanLeftoverLinks.destinationEntryId, entryId))
+    .run();
+  if (sourceId) {
+    const source = tx.select().from(mealPlanEntries).where(eq(mealPlanEntries.id, sourceId)).get();
+    const allocations = tx
+      .select({ servings: mealPlanLeftoverLinks.servings })
+      .from(mealPlanLeftoverLinks)
+      .innerJoin(mealPlanEntries, eq(mealPlanEntries.id, mealPlanLeftoverLinks.destinationEntryId))
+      .where(
+        and(
+          eq(mealPlanLeftoverLinks.sourceEntryId, sourceId),
+          eq(mealPlanEntries.status, 'planned'),
+        ),
+      )
+      .all();
+    if (
+      !source ||
+      servings + allocations.reduce((total, item) => total + item.servings, 0) > source.servings
+    )
+      throw new PlanningNotFoundError(
+        'Increase the original meal’s servings first so there are enough portions for these leftovers.',
+      );
+    tx.insert(mealPlanLeftoverLinks)
+      .values({
+        id: randomUUID(),
+        sourceEntryId: sourceId,
+        destinationEntryId: entryId,
+        servings,
+        createdByProfileId: actor,
+        createdAt: new Date(),
+      })
+      .run();
+  }
+}
+
+function guardSourceChange(
+  tx: PlanningTransaction,
+  entryId: string,
+  date?: string,
+  slot?: string,
+  servings?: number,
+) {
+  const dependents = tx
+    .select({
+      date: mealPlanEntries.plannedFor,
+      meal: mealPlanEntries.meal,
+      servings: mealPlanLeftoverLinks.servings,
+    })
+    .from(mealPlanLeftoverLinks)
+    .innerJoin(mealPlanEntries, eq(mealPlanEntries.id, mealPlanLeftoverLinks.destinationEntryId))
+    .where(
+      and(eq(mealPlanLeftoverLinks.sourceEntryId, entryId), eq(mealPlanEntries.status, 'planned')),
+    )
+    .all();
+  if (
+    dependents.some(
+      (item) =>
+        !date ||
+        (slot
+          ? comparePlannedMeals(
+              { plannedFor: item.date, meal: item.meal },
+              { plannedFor: date, meal: slot },
+            ) < 0
+          : item.date < date),
+    )
+  )
+    throw new PlanningNotFoundError(
+      'Update the linked leftovers before removing or moving their source meal after them.',
+    );
+  if (
+    servings !== undefined &&
+    dependents.reduce((total, item) => total + item.servings, 0) > servings
+  )
+    throw new PlanningNotFoundError(
+      'The original meal needs enough servings for its linked leftovers.',
+    );
+}
+
+export function getRecipeForPlannedMeal(recipeId: string, entryId?: string) {
+  const recipe = getRecipe(recipeId);
+  if (!recipe || !entryId) return recipe;
+  const meal = getPlannedMeal(entryId);
+  if (!meal || meal.recipeId !== recipeId)
+    throw new PlanningNotFoundError('That meal does not use this recipe.');
+  let baseline = recipePayloadFromDetail(recipe);
+  if (meal.recipeRevision && meal.recipeRevision !== recipe.currentRevision) {
+    const revision = getDatabase()
+      .select()
+      .from(recipeRevisions)
+      .where(
+        and(
+          eq(recipeRevisions.recipeId, recipeId),
+          eq(recipeRevisions.revision, meal.recipeRevision),
+        ),
+      )
+      .get();
+    if (!revision)
+      throw new PlanningNotFoundError(
+        'The planned recipe revision is unavailable. Refresh this meal before cooking.',
+      );
+    baseline = recipeInputSchema.parse(JSON.parse(revision.snapshot));
+  }
+  const override = meal.recipeOverride
+    ? recipeInputSchema
+        .pick({
+          title: true,
+          summary: true,
+          servings: true,
+          ingredientGroups: true,
+          instructionSections: true,
+        })
+        .parse(JSON.parse(meal.recipeOverride))
+    : baseline;
+  return {
+    ...recipe,
+    currentRevision: meal.recipeRevision ?? recipe.currentRevision,
+    title: override.title,
+    summary: override.summary,
+    servings: override.servings,
+    nutritionCalories: meal.recipeOverride
+      ? null
+      : baseline.nutritionCalories === ''
+        ? null
+        : baseline.nutritionCalories,
+    nutritionProteinGrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionProteinGrams === ''
+        ? null
+        : baseline.nutritionProteinGrams,
+    nutritionCarbohydrateGrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionCarbohydrateGrams === ''
+        ? null
+        : baseline.nutritionCarbohydrateGrams,
+    nutritionFatGrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionFatGrams === ''
+        ? null
+        : baseline.nutritionFatGrams,
+    nutritionSaturatedFatGrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionSaturatedFatGrams === ''
+        ? null
+        : baseline.nutritionSaturatedFatGrams,
+    nutritionFiberGrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionFiberGrams === ''
+        ? null
+        : baseline.nutritionFiberGrams,
+    nutritionSugarGrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionSugarGrams === ''
+        ? null
+        : baseline.nutritionSugarGrams,
+    nutritionSodiumMilligrams: meal.recipeOverride
+      ? null
+      : baseline.nutritionSodiumMilligrams === ''
+        ? null
+        : baseline.nutritionSodiumMilligrams,
+    ingredientGroups: override.ingredientGroups.map((group, g) => ({
+      id: `${entryId}-g${g}`,
+      name: group.name,
+      ingredients: group.ingredients.map((item, i) => ({
+        ...item,
+        id: `${entryId}-g${g}-i${i}`,
+        quantity: item.quantity === '' ? null : item.quantity,
+      })),
+    })),
+    instructionSections: override.instructionSections.map((section, i) => ({
+      id: `${entryId}-s${i}`,
+      title: section.title,
+      steps: section.steps.map((body, j) => ({ id: `${entryId}-s${i}-${j}`, body })),
+    })),
+  };
+}
+
 export type ShoppingListDetail = typeof shoppingLists.$inferSelect & {
+  notes?: string;
+  notesVersion?: number;
   items: Array<
     typeof shoppingListItems.$inferSelect & {
       pantry: ShoppingDetail | null;
@@ -222,6 +572,16 @@ export function listPlannedMeals(weekStart: string, weekEnd: string): PlannedMea
       .all()
       .flatMap(({ mealPlanEntryId }) => (mealPlanEntryId ? [mealPlanEntryId] : [])),
   );
+  const links = db
+    .select()
+    .from(mealPlanLeftoverLinks)
+    .where(
+      inArray(
+        mealPlanLeftoverLinks.destinationEntryId,
+        entries.map((e) => e.id),
+      ),
+    )
+    .all();
   return entries
     .map((entry) => {
       const currentRecipe = entry.recipeId
@@ -236,10 +596,14 @@ export function listPlannedMeals(weekStart: string, weekEnd: string): PlannedMea
         : null;
       return {
         ...entry,
+        kind: links.some((link) => link.destinationEntryId === entry.id) ? 'leftover' : entry.kind,
+        leftoverSourceId:
+          links.find((link) => link.destinationEntryId === entry.id)?.sourceEntryId ?? null,
         recipeTitle: entry.recipeId
           ? entry.recipeTitleSnapshot || currentRecipe?.title || 'Deleted recipe'
           : entry.title,
         recipeChangedSincePlanning: Boolean(
+          !entry.recipeOverride &&
           currentRecipe &&
           entry.recipeRevision !== null &&
           (currentRecipe.currentRevision !== entry.recipeRevision ||
@@ -268,30 +632,24 @@ export function refreshMealPlanRecipeSnapshot(
   entryId: string,
   actorProfileId: string,
 ): PlannedMeal {
-  ensureDatabase();
-  const database = getDatabase();
-  const plannedFor = database.transaction((transaction) => {
-    const existing = transaction
-      .select()
-      .from(mealPlanEntries)
-      .where(eq(mealPlanEntries.id, entryId))
-      .get();
-    if (!existing) throw new PlanningNotFoundError('That planned meal no longer exists.');
-    if (!existing.recipeId) {
-      throw new PlanningNotFoundError('A free-form meal has no recipe snapshot to refresh.');
-    }
-    transaction
-      .update(mealPlanEntries)
-      .set({
-        ...recipePlanSnapshot(transaction, existing.recipeId),
-        updatedByProfileId: actorProfileId,
-        updatedAt: new Date(),
-      })
-      .where(eq(mealPlanEntries.id, entryId))
-      .run();
-    return existing.plannedFor;
-  });
-  return listPlannedMeals(plannedFor, plannedFor).find((meal) => meal.id === entryId)!;
+  const existing = getPlannedMeal(entryId);
+  if (!existing?.recipeId) throw new PlanningNotFoundError('That meal has no recipe to refresh.');
+  if (existing.leftoverSourceId)
+    throw new PlanningNotFoundError('Refresh the original meal to update its linked leftovers.');
+  return updateMealPlanEntry(
+    entryId,
+    {
+      plannedFor: existing.plannedFor,
+      meal: existing.meal,
+      recipeId: existing.recipeId,
+      title: existing.title,
+      servings: existing.servings,
+      note: existing.note,
+      recipeOverride: null,
+      expectedUpdatedAt: existing.updatedAt.toISOString(),
+    },
+    actorProfileId,
+  );
 }
 
 export function updateMealPlanEntryStatus(
@@ -309,6 +667,7 @@ export function updateMealPlanEntryStatus(
       .where(eq(mealPlanEntries.id, entryId))
       .get();
     if (!previous) throw new PlanningNotFoundError('That planned meal no longer exists.');
+    if (status !== 'planned') guardSourceChange(transaction, entryId);
     const next = { ...previous, status, updatedByProfileId: actorProfileId, updatedAt: new Date() };
     transaction.update(mealPlanEntries).set(next).where(eq(mealPlanEntries.id, entryId)).run();
     onChanged?.(transaction, previous, next);
@@ -341,6 +700,8 @@ export function updateMealPlanEntry(
     if (existing.updatedAt.toISOString() !== input.expectedUpdatedAt) {
       throw new PlanningNotFoundError('That planned meal changed. Refresh before saving.');
     }
+    guardSourceChange(transaction, entryId, input.plannedFor, input.meal, input.servings);
+    const { details, sourceId } = mealDetails(transaction, input, entryId, existing);
     const next = {
       ...existing,
       plannedFor: input.plannedFor,
@@ -362,7 +723,30 @@ export function updateMealPlanEntry(
               recipeIngredientsSnapshot: EMPTY_MEAL_PLAN_INGREDIENT_SNAPSHOT,
             }),
     };
+    Object.assign(next, details);
     transaction.update(mealPlanEntries).set(next).where(eq(mealPlanEntries.id, entryId)).run();
+    saveLeftoverLink(transaction, entryId, sourceId, input.servings, actorProfileId);
+    // Keep linked meals aligned with their source adaptation.
+    const destinations = transaction
+      .select()
+      .from(mealPlanLeftoverLinks)
+      .where(eq(mealPlanLeftoverLinks.sourceEntryId, entryId))
+      .all();
+    for (const link of destinations)
+      transaction
+        .update(mealPlanEntries)
+        .set({
+          recipeId: next.recipeId,
+          recipeRevision: next.recipeRevision,
+          recipeCalculationId: next.recipeCalculationId,
+          recipeTitleSnapshot: next.recipeTitleSnapshot,
+          title: next.title,
+          recipeIngredientsSnapshot: next.recipeIngredientsSnapshot,
+          recipeOverride: next.recipeOverride,
+          updatedAt: next.updatedAt,
+        })
+        .where(eq(mealPlanEntries.id, link.destinationEntryId))
+        .run();
     onChanged?.(transaction, existing, next);
   });
   return listPlannedMeals(input.plannedFor, input.plannedFor).find((meal) => meal.id === entryId)!;
@@ -414,6 +798,31 @@ export function swapMealPlanEntries(
       })
       .where(eq(mealPlanEntries.id, target.id))
       .run();
+    guardSourceChange(transaction, source.id, target.plannedFor, target.meal);
+    guardSourceChange(transaction, target.id, source.plannedFor, source.meal);
+    for (const entry of [source, target]) {
+      const link = transaction
+        .select()
+        .from(mealPlanLeftoverLinks)
+        .where(eq(mealPlanLeftoverLinks.destinationEntryId, entry.id))
+        .get();
+      if (link) {
+        const original = transaction
+          .select()
+          .from(mealPlanEntries)
+          .where(eq(mealPlanEntries.id, link.sourceEntryId))
+          .get();
+        const date = entry.id === source.id ? target.plannedFor : source.plannedFor;
+        if (
+          !original ||
+          comparePlannedMeals(original, {
+            plannedFor: date,
+            meal: entry.id === source.id ? target.meal : source.meal,
+          }) > 0
+        )
+          throw new PlanningNotFoundError('Leftovers cannot be moved before their original meal.');
+      }
+    }
   });
   const range = [
     ...new Set(
@@ -468,7 +877,10 @@ export function addMealPlanEntry(
   };
   const database = getDatabase();
   database.transaction((transaction) => {
+    const { details, sourceId } = mealDetails(transaction, input, entry.id!);
+    Object.assign(entry, details);
     transaction.insert(mealPlanEntries).values(entry).run();
+    saveLeftoverLink(transaction, entry.id!, sourceId, input.servings, actorProfileId);
     onInserted?.(transaction, [entry]);
   });
   return listPlannedMeals(entry.plannedFor, entry.plannedFor).find((meal) => meal.id === entry.id)!;
@@ -533,7 +945,15 @@ export function insertMealPlanEntriesInTransaction(
     createdAt: now,
     updatedAt: now,
   }));
+  const sources = entries.map((entry, index) => {
+    const result = mealDetails(transaction, input.entries[index]!, entry.id!);
+    Object.assign(entry, result.details);
+    return result.sourceId;
+  });
   transaction.insert(mealPlanEntries).values(entries).run();
+  entries.forEach((entry, index) =>
+    saveLeftoverLink(transaction, entry.id!, sources[index], entry.servings, actorProfileId),
+  );
   onInserted?.(transaction, entries);
   return entries;
 }
@@ -563,6 +983,8 @@ export function duplicateWeek(
     plannedFor: addDays(entry.plannedFor, offsetDays),
     meal: entry.meal,
     recipeId: entry.recipeId,
+    kind: entry.kind,
+    recipeOverride: entry.recipeOverride,
     recipeRevision: entry.recipeRevision,
     recipeCalculationId: entry.recipeCalculationId,
     recipeTitleSnapshot: entry.recipeTitleSnapshot,
@@ -579,6 +1001,21 @@ export function duplicateWeek(
   if (entries.length) {
     getDatabase().transaction((transaction) => {
       transaction.insert(mealPlanEntries).values(entries).run();
+      copied.forEach((entry, index) => {
+        if (!entry.leftoverSourceId) return;
+        const sourceIndex = copied.findIndex((source) => source.id === entry.leftoverSourceId);
+        if (sourceIndex < 0)
+          throw new PlanningNotFoundError(
+            'Include the original meal when copying a week with leftovers.',
+          );
+        saveLeftoverLink(
+          transaction,
+          entries[index]!.id,
+          entries[sourceIndex]!.id,
+          entry.servings,
+          actorProfileId,
+        );
+      });
       onInserted?.(transaction, entries);
     });
   }
@@ -643,6 +1080,7 @@ export function removeMealPlanEntry(
       .where(eq(mealPlanEntries.id, entryId))
       .get();
     if (!existing) throw new PlanningNotFoundError('That planned meal no longer exists.');
+    guardSourceChange(transaction, entryId);
     onChanged?.(transaction, existing, null);
     const allocation = transaction
       .select({ id: nutritionMealAllocationVersions.id })
@@ -689,9 +1127,9 @@ export function generateShoppingList(
   const combined: GeneratedItem[] = [];
 
   plannedMeals.forEach((plannedMeal) => {
-    if (!plannedMeal.recipeId) return;
+    if (plannedMeal.kind === 'leftover' || plannedMeal.kind === 'takeout') return;
     const snapshot = parseMealPlanIngredientSnapshot(plannedMeal.recipeIngredientsSnapshot);
-    const recipe = snapshot ? null : getRecipe(plannedMeal.recipeId);
+    const recipe = snapshot || !plannedMeal.recipeId ? null : getRecipe(plannedMeal.recipeId);
     if (!snapshot && !recipe) return;
     const recipeServings = numericServings(snapshot?.baseServings ?? recipe!.servings);
     const multiplier = recipeServings ? plannedMeal.servings / recipeServings : 1;
@@ -718,7 +1156,7 @@ export function generateShoppingList(
               );
         existing.item = preferredShoppingItemLabel(existing.item, ingredient.item);
         existing.note = mergeShoppingItemNotes(existing.note, ingredient.note);
-        existing.sourceRecipeIds.add(plannedMeal.recipeId!);
+        if (plannedMeal.recipeId) existing.sourceRecipeIds.add(plannedMeal.recipeId);
         if (existing.shoppingCategory === 'Other' && ingredient.shoppingCategory !== 'Other') {
           existing.shoppingCategory = ingredient.shoppingCategory;
         }
@@ -730,7 +1168,7 @@ export function generateShoppingList(
           item: ingredient.item,
           note: ingredient.note,
           shoppingCategory: ingredient.shoppingCategory,
-          sourceRecipeIds: new Set([plannedMeal.recipeId!]),
+          sourceRecipeIds: new Set(plannedMeal.recipeId ? [plannedMeal.recipeId] : []),
         });
       }
     });
@@ -871,6 +1309,7 @@ export function manageShoppingList(
   listId: string,
   action:
     | { action: 'rename'; name: string }
+    | { action: 'set_notes'; note: string; expectedVersion: number }
     | {
         action: 'archive' | 'restore' | 'duplicate' | 'set_restock_target' | 'complete';
       },
@@ -880,6 +1319,31 @@ export function manageShoppingList(
   const database = getDatabase();
   const list = database.select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
   if (!list) throw new PlanningNotFoundError('That shopping list no longer exists.');
+  if (action.action === 'set_notes') {
+    database.transaction((transaction) => {
+      const current = transaction
+        .select()
+        .from(shoppingListNotes)
+        .where(eq(shoppingListNotes.listId, listId))
+        .get();
+      if ((current?.version ?? 0) !== action.expectedVersion)
+        throw new PlanningNotFoundError('These notes changed. Reload before saving your changes.');
+      transaction
+        .insert(shoppingListNotes)
+        .values({
+          listId,
+          note: action.note,
+          version: action.expectedVersion + 1,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: shoppingListNotes.listId,
+          set: { note: action.note, version: action.expectedVersion + 1, updatedAt: new Date() },
+        })
+        .run();
+    });
+    return getShoppingList(listId)!;
+  }
   if (action.action === 'rename') {
     database
       .update(shoppingLists)
@@ -957,6 +1421,16 @@ export function manageShoppingList(
         updatedAt: now,
       })
       .run();
+    const notes = transaction
+      .select()
+      .from(shoppingListNotes)
+      .where(eq(shoppingListNotes.listId, listId))
+      .get();
+    if (notes)
+      transaction
+        .insert(shoppingListNotes)
+        .values({ listId: duplicateId, note: notes.note, version: 1, updatedAt: now })
+        .run();
     const items = transaction
       .select()
       .from(shoppingListItems)
@@ -1035,8 +1509,15 @@ export function getShoppingList(listId: string): ShoppingListDetail | null {
     .orderBy(asc(shoppingListItems.position))
     .all();
   const pantryDetails = getShoppingItemPantryDetails(items.map((item) => item.id));
+  const notes = getDatabase()
+    .select()
+    .from(shoppingListNotes)
+    .where(eq(shoppingListNotes.listId, listId))
+    .get();
   return {
     ...list,
+    notes: notes?.note ?? '',
+    notesVersion: notes?.version ?? 0,
     aisles: list.supermarketProfileId
       ? listAislesForSupermarket(list.supermarketProfileId)
       : listShoppingAisles(),
@@ -1352,6 +1833,19 @@ export function updateShoppingListItem(
     if (!result.changes)
       throw new PlanningNotFoundError('That shopping-list item no longer exists.');
     recordShoppingItemManualOverrides(itemId, previous, next, transaction);
+    if (shoppingItemIdentity(previous.item) !== shoppingItemIdentity(next.item)) {
+      transaction
+        .update(pantryShoppingItemDetails)
+        .set({
+          productId: null,
+          demandState: 'uncertain',
+          uncertaintyReason:
+            'Food changed. Match the replacement to a pantry product before recording a purchase.',
+          updatedAt: new Date(),
+        })
+        .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
+        .run();
+    }
     const policyInstance = transaction
       .select()
       .from(shoppingPolicyInstances)

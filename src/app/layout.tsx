@@ -1,3 +1,4 @@
+import { DialogViewport } from '@/components/dialog-viewport';
 import type { Metadata, Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
 import Script from 'next/script';
@@ -23,6 +24,8 @@ import { brandedKitchenTitle, DEFAULT_KITCHEN_NAME, PRODUCT_NAME } from '@/lib/b
 
 import './globals.css';
 import './themes.css';
+import './refinements.css';
+import './settings-layout.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,14 +100,16 @@ export async function generateViewport(): Promise<Viewport> {
   return {
     width: 'device-width',
     initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
     viewportFit: 'cover',
     themeColor:
       mode === 'system'
         ? [
-            { media: '(prefers-color-scheme: light)', color: colors.light.primary },
+            { media: '(prefers-color-scheme: light)', color: colors.light.page },
             { media: '(prefers-color-scheme: dark)', color: colors.dark.page },
           ]
-        : colors[mode].primary,
+        : colors[mode].page,
   };
 }
 
@@ -149,6 +154,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       </head>
       <body>
         <ToastProvider>
+          <DialogViewport />
           {state.household && !isSecuritySurface && (!authConfigured || authSession) ? (
             <AppHeader
               kitchenName={state.household.kitchenName}

@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 
 import { KitchenPrintDialog } from '@/components/kitchen-print-dialog';
-import { AiSummaryCards } from '@/components/ai-summary-cards';
+import { RecipebookInsights } from '@/components/recipebook-insights';
 import { RecipeLibraryFilters } from '@/components/recipe-library-filters';
 import { RecipebookNav } from '@/components/recipebook-nav';
 import { RecipeSummaryCard } from '@/components/recipe-summary-card';
@@ -17,9 +17,12 @@ import { listRecipePantryAvailability } from '@/lib/services/pantry-availability
 import { listRecipeNutritionPresentations } from '@/lib/services/nutrition-recipe-calculation-service';
 import { listAccessibleNutritionProfiles } from '@/lib/services/nutrition-profile-service';
 import { getAppPreferences } from '@/lib/services/app-preferences-service';
-import { listAiSummaries } from '@/lib/services/ai-summary-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
-import { listRecipeLibrary, listRecipeTags } from '@/lib/services/recipe-service';
+import {
+  getRecipebookInsightData,
+  listRecipeLibrary,
+  listRecipeTags,
+} from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,9 +117,6 @@ export default async function RecipeLibraryPage({
         totalPages: filteredTotalPages,
       }
     : firstLibraryPage;
-  const aiSummary = actor.profileId
-    ? listAiSummaries(actor.profileId).find((item) => item.domain === 'recipes')
-    : null;
   const nutritionPresentations = showRecipeCardNutrition
     ? listRecipeNutritionPresentations(library.recipes.map((recipe) => recipe.id))
     : {};
@@ -219,14 +219,7 @@ export default async function RecipeLibraryPage({
           </p>
         ) : null}
       </div>
-      {library.total ? (
-        <AiSummaryCards
-          domain="recipes"
-          initialSummary={
-            aiSummary ? { ...aiSummary, createdAt: aiSummary.createdAt.toISOString() } : null
-          }
-        />
-      ) : null}
+      <RecipebookInsights recipes={getRecipebookInsightData()} />
       {library.recipes.length ? (
         <>
           <section

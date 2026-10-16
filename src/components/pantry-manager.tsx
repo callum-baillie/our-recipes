@@ -1,4 +1,5 @@
 'use client';
+import { KitchenPrintDialog } from './kitchen-print-dialog';
 import { PageHeader } from '@/components/page-header';
 import { DecisionAssistance } from '@/components/decision-assistance';
 
@@ -1314,9 +1315,15 @@ export function PantryManager({
         eyebrow="HOUSEHOLD INVENTORY"
         description="Know what is on hand, what needs using, and where every batch lives."
         actions={
-          <button className={styles.addPanel} type="button" onClick={openAddItemDialog}>
-            <Plus size={20} aria-hidden="true" /> Add item
-          </button>
+          <>
+            <KitchenPrintDialog kind="pantry" />
+            <Link className="text-button" href="/pantry/inventory">
+              Inventory mode
+            </Link>
+            <button className={styles.addPanel} type="button" onClick={openAddItemDialog}>
+              <Plus size={20} aria-hidden="true" /> Add item
+            </button>
+          </>
         }
       />
       {addItemOpen ? (

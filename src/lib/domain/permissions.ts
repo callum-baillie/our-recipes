@@ -126,6 +126,13 @@ export function authorizeAppRequest(input: {
         };
   }
 
+  if (
+    method === 'POST' &&
+    /^\/api\/v1\/(?:meal-plan|pantry|shopping-lists\/[^/]+)\/export\/pdf$/.test(pathname)
+  )
+    return { allowed: true };
+  if (method === 'POST' && pathname === '/api/v1/exports/recipes/pdf') return { allowed: true };
+
   if (role !== 'child') return { allowed: true };
 
   if (pathname === '/api/v1/nutrition/household') {

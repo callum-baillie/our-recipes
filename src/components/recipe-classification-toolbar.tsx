@@ -2,7 +2,7 @@
 
 import { Plus, Tag, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { CSSProperties, FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 
 import { InlineSkeleton } from '@/components/skeleton';
 
@@ -123,12 +123,8 @@ export function RecipeClassificationToolbar({
         </span>
         <div className="recipe-tag-list" aria-label="Attached tags">
           {tags.length === 0 && <span className="recipe-tag-empty">None yet</span>}
-          {tags.map((tag, index) => (
-            <span
-              className="recipe-tag-pill"
-              key={tag}
-              style={{ '--recipe-tag-hue': (78 + index * 47) % 360 } as CSSProperties}
-            >
+          {tags.map((tag) => (
+            <span className="recipe-tag-pill" key={tag}>
               {titleCase(tag)}
               <button
                 type="button"

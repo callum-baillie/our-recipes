@@ -4,7 +4,7 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { InlineSkeleton } from '@/components/skeleton';
-import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
+import { SettingsPane, SettingsRow, SettingsField } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 
 const CONFIRMATION = 'FRESH INSTALL';
@@ -62,7 +62,11 @@ export function FreshInstallPanel() {
           <RotateCcw size={17} /> Fresh install
         </button>
       </SettingsRow>
-      <dialog className="confirmation-dialog" ref={dialogRef} aria-labelledby="fresh-install-title">
+      <dialog
+        className="confirmation-dialog settings-dialog"
+        ref={dialogRef}
+        aria-labelledby="fresh-install-title"
+      >
         <form
           method="dialog"
           onSubmit={(event) => {
@@ -83,8 +87,7 @@ export function FreshInstallPanel() {
               Type <strong>{CONFIRMATION}</strong> to confirm.
             </p>
           </div>
-          <label>
-            <span>Confirmation</span>
+          <SettingsField title="Confirmation" description={`Enter ${CONFIRMATION} to continue.`}>
             <input
               autoFocus
               autoComplete="off"
@@ -92,7 +95,7 @@ export function FreshInstallPanel() {
               onChange={(event) => setConfirmation(event.target.value)}
               placeholder={CONFIRMATION}
             />
-          </label>
+          </SettingsField>
           <div className="dialog-actions">
             <button
               className="text-button"

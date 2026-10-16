@@ -220,10 +220,30 @@ export function removeRecipeIngredientPantryMapping(ingredientId: string): void 
 export function getRecipePantryAvailability(
   recipeId: string,
   targetServings?: number,
+  mealPlanEntryId?: string | null,
 ): PantryRecipeAvailability {
   ensureDatabase();
   const recipe = getRecipe(recipeId);
   if (!recipe) throw new PantryAvailabilityNotFoundError('That recipe no longer exists.');
+  if (mealPlanEntryId) {
+    const meal = getDatabase()
+      .select()
+      .from(mealPlanEntries)
+      .where(eq(mealPlanEntries.id, mealPlanEntryId))
+      .get();
+    if (!meal || meal.recipeId !== recipeId)
+      throw new PantryAvailabilityNotFoundError('That planned meal does not use this recipe.');
+    const snapshot = parseMealPlanIngredientSnapshot(meal.recipeIngredientsSnapshot);
+    if (snapshot)
+      return calculateRecipeAvailability({
+        recipeId,
+        recipeTitle: meal.recipeTitleSnapshot || recipe.title,
+        baseServings: parseServingCount(snapshot.baseServings),
+        targetServings: targetServings ?? meal.servings,
+        ingredients: snapshot.ingredients.map((item) => ({ ...item, id: item.ingredientId })),
+        stock: availableStock(),
+      });
+  }
   return calculateRecipeAvailability({
     recipeId: recipe.id,
     recipeTitle: recipe.title,
@@ -399,7 +419,7 @@ export function getProjectedPantryDemand(
   );
   const activeMeals = meals.filter(
     (meal) =>
-      meal.recipeId !== null &&
+      (meal.recipeId !== null || meal.kind === 'item') &&
       meal.status === 'planned' &&
       !leftoverDestinationIds.has(meal.id) &&
       !completedMealIds.has(meal.id),
@@ -464,8 +484,8 @@ export function getProjectedPantryDemand(
         return {
           mealPlanEntryId: meal.id,
           plannedFor: meal.plannedFor,
-          recipeId: meal.recipeId!,
-          recipeTitle: meal.recipeTitleSnapshot || recipe?.title || 'Deleted recipe',
+          recipeId: meal.recipeId,
+          recipeTitle: meal.recipeTitleSnapshot || recipe?.title || meal.title || 'Meal',
           ingredientId: 'ingredientId' in ingredient ? ingredient.ingredientId : ingredient.id,
           ingredientName: ingredient.item,
           productId: ingredient.productId,

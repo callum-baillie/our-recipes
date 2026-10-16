@@ -1,4 +1,8 @@
-import { decisionPrincipal, decisionErrorResponse } from '@/lib/services/decision-request-service';
+import {
+  decisionPrincipal,
+  decisionErrorResponse,
+  boundedDecisionJson,
+} from '@/lib/services/decision-request-service';
 import { DecisionError } from '@/lib/providers/decisions-provider';
 import { cookies } from 'next/headers';
 import { ZodError } from 'zod';
@@ -13,6 +17,7 @@ import {
   AiChatForbiddenError,
   AiChatNotFoundError,
   AiChatRateLimitError,
+  AiChatToolError,
   runAiChatTurn,
 } from '@/lib/services/ai-chat-service';
 
@@ -34,7 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ thread
       request,
       threadId: (await context.params).threadId,
       profileId,
-      message: await request.json().catch(() => null),
+      message: await boundedDecisionJson(request, 13_000_000),
     });
     const encoder = new TextEncoder();
     const events = [
@@ -71,6 +76,8 @@ export async function POST(request: Request, context: { params: Promise<{ thread
     if (error instanceof DecisionError) return decisionErrorResponse(error);
     if (error instanceof ZodError)
       return jsonError(400, 'invalid_message', 'Enter a valid message.');
+    if (error instanceof AiChatToolError)
+      return jsonError(400, 'invalid_attachment', error.message);
     if (error instanceof AiChatNotFoundError)
       return jsonError(404, 'thread_not_found', error.message);
     if (error instanceof AiChatForbiddenError)

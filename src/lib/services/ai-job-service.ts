@@ -1,15 +1,17 @@
 import 'server-only';
 
+import { taskExecutionMode } from './task-settings-service';
 import { AI_GROUNDING_INSTRUCTIONS } from '@/lib/domain/ai-grounding';
 
 import { createHash, randomUUID } from 'node:crypto';
 
-import { and, asc, eq, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, lte, isNull, or } from 'drizzle-orm';
 import OpenAI, { toFile } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
 import {
+  aiActionProposals,
   aiChatMessages,
   aiChatThreads,
   aiJobItems,
@@ -112,12 +114,12 @@ function parseJson(value: string): unknown {
   }
 }
 
-function batchMode(count: number): 'direct' | 'batch' {
-  return count >= AI_BATCH_MIN_ITEMS ? 'batch' : 'direct';
-}
-
 function titleFor(job: AiJobRow): string {
-  return job.kind === 'recipe_images' ? 'Recipe images' : 'Recipe set';
+  return job.kind === 'meal_plan_generation'
+    ? 'Scheduled meal-plan draft'
+    : job.kind === 'recipe_images'
+      ? 'Recipe images'
+      : 'Recipe set';
 }
 
 function itemCounts(items: AiJobItemRow[]) {
@@ -138,6 +140,7 @@ function publicJob(job: AiJobRow, items: AiJobItemRow[]) {
     executionMode: job.executionMode,
     model: job.model,
     actionId: job.actionId,
+    threadId: job.threadId,
     errorCode: job.errorCode,
     ...counts,
     createdAt: job.createdAt,
@@ -177,9 +180,10 @@ export function listAiJobs(input: { profileId: string; threadId?: string | null;
         ? and(eq(aiJobs.profileId, input.profileId), eq(aiJobs.threadId, input.threadId))
         : eq(aiJobs.profileId, input.profileId),
     )
-    .orderBy(asc(aiJobs.createdAt))
+    .orderBy(desc(aiJobs.createdAt))
+    .limit(Math.min(100, Math.max(1, input.limit ?? 25)))
     .all()
-    .slice(-(input.limit ?? 25));
+    .reverse();
   return rows.map((job) => {
     const items = getDatabase().select().from(aiJobItems).where(eq(aiJobItems.jobId, job.id)).all();
     return publicJob(job, items);
@@ -233,62 +237,64 @@ export function enqueueRecipeImageJob(input: {
   const now = new Date();
   const setting = getAiWorkloadSetting(input.profileId, 'image_generation');
   const id = randomUUID();
-  const mode = batchMode(input.images.length);
-  getDatabase()
-    .insert(aiJobs)
-    .values({
-      id,
-      profileId: input.profileId,
-      threadId: input.threadId ?? null,
-      actionId: input.actionId ?? null,
-      kind: 'recipe_images',
-      status: 'queued',
-      executionMode: mode,
-      model: setting.model,
-      payload: JSON.stringify({}),
-      result: null,
-      sourceDigest: digest(input.images),
-      providerBatchId: null,
-      providerInputFileId: null,
-      attempts: 0,
-      nextAttemptAt: now,
-      leaseToken: null,
-      leaseExpiresAt: null,
-      errorCode: null,
-      createdAt: now,
-      updatedAt: now,
-      completedAt: null,
-    })
-    .run();
-  input.images.forEach((image, position) => {
-    const auditId = randomUUID();
-    insertImageAudit({
-      id: auditId,
-      profileId: input.profileId,
-      threadId: input.threadId ?? null,
-      actionId: input.actionId ?? null,
-      model: setting.model,
-      image,
-      now,
-    });
+  const mode = taskExecutionMode(input.profileId, input.images.length);
+  getDatabase().transaction(() => {
     getDatabase()
-      .insert(aiJobItems)
+      .insert(aiJobs)
       .values({
-        id: randomUUID(),
-        jobId: id,
-        position,
-        customId: `${id}:${position}`,
-        status: 'pending',
-        payload: JSON.stringify(image),
+        id,
+        profileId: input.profileId,
+        threadId: input.threadId ?? null,
+        actionId: input.actionId ?? null,
+        kind: 'recipe_images',
+        status: 'queued',
+        executionMode: mode,
+        model: setting.model,
+        payload: JSON.stringify({}),
         result: null,
+        sourceDigest: digest(input.images),
+        providerBatchId: null,
+        providerInputFileId: null,
+        attempts: 0,
+        nextAttemptAt: now,
+        leaseToken: null,
+        leaseExpiresAt: null,
         errorCode: null,
-        recipeId: image.recipeId,
-        auditId,
         createdAt: now,
         updatedAt: now,
         completedAt: null,
       })
       .run();
+    input.images.forEach((image, position) => {
+      const auditId = randomUUID();
+      insertImageAudit({
+        id: auditId,
+        profileId: input.profileId,
+        threadId: input.threadId ?? null,
+        actionId: input.actionId ?? null,
+        model: setting.model,
+        image,
+        now,
+      });
+      getDatabase()
+        .insert(aiJobItems)
+        .values({
+          id: randomUUID(),
+          jobId: id,
+          position,
+          customId: `${id}:${position}`,
+          status: 'pending',
+          payload: JSON.stringify(image),
+          result: null,
+          errorCode: null,
+          recipeId: image.recipeId,
+          auditId,
+          createdAt: now,
+          updatedAt: now,
+          completedAt: null,
+        })
+        .run();
+    });
   });
   void wakeAiJobWorker();
   return getAiJob(id, input.profileId);
@@ -296,88 +302,89 @@ export function enqueueRecipeImageJob(input: {
 
 export function enqueueRecipeBatchGenerationJob(input: {
   profileId: string;
-  threadId: string;
+  threadId: string | null;
   model: string;
   recipes: RecipeGenerationJobInput[];
   generateRecipeImages: boolean;
 }) {
   ensureDatabase();
-  if (input.recipes.length < AI_BATCH_MIN_ITEMS) {
-    throw new AiJobStateError(`Batch jobs need at least ${AI_BATCH_MIN_ITEMS} recipe requests.`);
-  }
+  if (!input.recipes.length || input.recipes.length > 50)
+    throw new AiJobStateError('Choose 1 to 50 recipes for a background task.');
   const now = new Date();
   const id = randomUUID();
-  getDatabase()
-    .insert(aiJobs)
-    .values({
-      id,
-      profileId: input.profileId,
-      threadId: input.threadId,
-      actionId: null,
-      kind: 'recipe_batch_generation',
-      status: 'queued',
-      executionMode: 'batch',
-      model: input.model,
-      payload: JSON.stringify({ generateRecipeImages: input.generateRecipeImages }),
-      result: null,
-      sourceDigest: digest(input.recipes),
-      providerBatchId: null,
-      providerInputFileId: null,
-      attempts: 0,
-      nextAttemptAt: now,
-      leaseToken: null,
-      leaseExpiresAt: null,
-      errorCode: null,
-      createdAt: now,
-      updatedAt: now,
-      completedAt: null,
-    })
-    .run();
-  input.recipes.forEach((recipe, position) => {
-    const auditId = randomUUID();
+  getDatabase().transaction(() => {
     getDatabase()
-      .insert(aiOperationAudits)
+      .insert(aiJobs)
       .values({
-        id: auditId,
-        kind: 'recipe-generation',
-        status: 'requested',
-        sourceDigest: digest(recipe.context),
-        sourceLabel: `Queued recipe ${position + 1}`,
-        provider: 'OpenAI',
-        model: input.model,
-        reasoningEffort: recipe.reasoningEffort,
-        inputTokens: null,
-        outputTokens: null,
+        id,
+        profileId: input.profileId,
         threadId: input.threadId,
         actionId: null,
-        summaryId: null,
-        errorCode: null,
-        profileId: input.profileId,
-        recipeId: null,
-        importId: null,
-        generatedImageId: null,
-        createdAt: now,
-        completedAt: null,
-      })
-      .run();
-    getDatabase()
-      .insert(aiJobItems)
-      .values({
-        id: randomUUID(),
-        jobId: id,
-        position,
-        customId: `${id}:${position}`,
-        status: 'pending',
-        payload: JSON.stringify(recipe),
+        kind: 'recipe_batch_generation',
+        status: 'queued',
+        executionMode: taskExecutionMode(input.profileId, input.recipes.length),
+        model: input.model,
+        payload: JSON.stringify({ generateRecipeImages: input.generateRecipeImages }),
         result: null,
+        sourceDigest: digest(input.recipes),
+        providerBatchId: null,
+        providerInputFileId: null,
+        attempts: 0,
+        nextAttemptAt: now,
+        leaseToken: null,
+        leaseExpiresAt: null,
         errorCode: null,
-        recipeId: null,
-        auditId,
         createdAt: now,
         updatedAt: now,
         completedAt: null,
       })
       .run();
+    input.recipes.forEach((recipe, position) => {
+      const auditId = randomUUID();
+      getDatabase()
+        .insert(aiOperationAudits)
+        .values({
+          id: auditId,
+          kind: 'recipe-generation',
+          status: 'requested',
+          sourceDigest: digest(recipe.context),
+          sourceLabel: `Queued recipe ${position + 1}`,
+          provider: 'OpenAI',
+          model: input.model,
+          reasoningEffort: recipe.reasoningEffort,
+          inputTokens: null,
+          outputTokens: null,
+          threadId: input.threadId,
+          actionId: null,
+          summaryId: null,
+          errorCode: null,
+          profileId: input.profileId,
+          recipeId: null,
+          importId: null,
+          generatedImageId: null,
+          createdAt: now,
+          completedAt: null,
+        })
+        .run();
+      getDatabase()
+        .insert(aiJobItems)
+        .values({
+          id: randomUUID(),
+          jobId: id,
+          position,
+          customId: `${id}:${position}`,
+          status: 'pending',
+          payload: JSON.stringify(recipe),
+          result: null,
+          errorCode: null,
+          recipeId: null,
+          auditId,
+          createdAt: now,
+          updatedAt: now,
+          completedAt: null,
+        })
+        .run();
+    });
   });
   void wakeAiJobWorker();
   return getAiJob(id, input.profileId);
@@ -522,6 +529,19 @@ function endpointFor(job: AiJobRow): '/v1/images/generations' | '/v1/responses' 
   return job.kind === 'recipe_images' ? '/v1/images/generations' : '/v1/responses';
 }
 
+function ownsActiveLease(job: AiJobRow) {
+  const current = getDatabase()
+    .select({ status: aiJobs.status, leaseToken: aiJobs.leaseToken })
+    .from(aiJobs)
+    .where(eq(aiJobs.id, job.id))
+    .get();
+  return (
+    !!current &&
+    ['running', 'submitted'].includes(current.status) &&
+    current.leaseToken === job.leaseToken
+  );
+}
+
 function updateItemSuccess(item: AiJobItemRow, result: unknown) {
   const now = new Date();
   getDatabase()
@@ -564,11 +584,17 @@ async function attachRecipeImage(
   item: AiJobItemRow,
   image: RecipeImageJobInput,
   bytes: Buffer,
+  job: AiJobRow,
   altText = `AI-generated serving image for ${image.recipeTitle}`.slice(0, 180),
 ) {
+  if (!ownsActiveLease(job)) return;
   const imageId = randomUUID();
   const stored = await storeRecipeImage(imageId, bytes);
   try {
+    if (!ownsActiveLease(job)) {
+      await removeRecipeImage(stored.storageKey);
+      return;
+    }
     getDatabase().transaction((transaction) => {
       transaction
         .insert(recipeImages)
@@ -602,9 +628,9 @@ async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
   try {
     const image = imageItemSchema.parse(parseJson(item.payload));
     const generated = await getAiProvider().generateRecipeImage(image, { model: job.model });
-    await attachRecipeImage(item, image, generated.bytes, generated.altText);
+    await attachRecipeImage(item, image, generated.bytes, job, generated.altText);
   } catch {
-    updateItemFailure(item, 'image_generation_failed');
+    if (ownsActiveLease(job)) updateItemFailure(item, 'image_generation_failed');
   }
 }
 
@@ -620,9 +646,9 @@ async function processDirectRecipe(item: AiJobItemRow, job: AiJobRow) {
         context: request.context,
       }),
     );
-    updateItemSuccess(item, recipe);
+    if (ownsActiveLease(job)) updateItemSuccess(item, recipe);
   } catch {
-    updateItemFailure(item, 'recipe_generation_failed');
+    if (ownsActiveLease(job)) updateItemFailure(item, 'recipe_generation_failed');
   }
 }
 
@@ -641,6 +667,7 @@ async function finishRecipeProposal(job: AiJobRow) {
     .object({ generateRecipeImages: z.boolean().default(false) })
     .parse(parseJson(job.payload)).generateRecipeImages;
   const { createAiActionProposal } = await import('@/lib/services/ai-action-service');
+  if (!ownsActiveLease(job)) return null;
   const proposal = createAiActionProposal({
     threadId: job.threadId,
     profileId: job.profileId,
@@ -675,14 +702,16 @@ async function finishRecipeProposal(job: AiJobRow) {
 }
 
 async function finishJob(job: AiJobRow) {
-  const latest = jobWithItems(job.id).items;
+  const state = jobWithItems(job.id);
+  if (!ownsActiveLease(job)) return;
+  const latest = state.items;
   const counts = itemCounts(latest);
   const proposal = job.kind === 'recipe_batch_generation' ? await finishRecipeProposal(job) : null;
   const now = new Date();
-  getDatabase()
+  const finished = getDatabase()
     .update(aiJobs)
     .set({
-      status: counts.completedItems ? 'completed' : 'failed',
+      status: counts.failedItems || !counts.completedItems ? 'failed' : 'completed',
       actionId: proposal?.id ?? job.actionId,
       result: JSON.stringify({ ...counts, actionId: proposal?.id ?? job.actionId }),
       errorCode: counts.failedItems ? 'partial_failure' : null,
@@ -691,13 +720,26 @@ async function finishJob(job: AiJobRow) {
       updatedAt: now,
       completedAt: now,
     })
-    .where(and(eq(aiJobs.id, job.id), inArray(aiJobs.status, ['running', 'submitted'])))
+    .where(
+      and(
+        eq(aiJobs.id, job.id),
+        eq(aiJobs.leaseToken, job.leaseToken!),
+        inArray(aiJobs.status, ['running', 'submitted']),
+      ),
+    )
     .run();
+  if (!finished.changes && proposal)
+    getDatabase()
+      .update(aiActionProposals)
+      .set({ status: 'cancelled', decidedAt: now })
+      .where(and(eq(aiActionProposals.id, proposal.id), eq(aiActionProposals.status, 'pending')))
+      .run();
 }
 
 async function runDirectJob(job: AiJobRow, items: AiJobItemRow[]) {
   const pending = items.filter((item) => item.status === 'pending');
   for (let index = 0; index < pending.length; index += DIRECT_CONCURRENCY) {
+    if (!ownsActiveLease(job)) return;
     const group = pending.slice(index, index + DIRECT_CONCURRENCY);
     await Promise.all(
       group.map((item) =>
@@ -719,7 +761,7 @@ async function submitBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
     metadata: { bord_ai_job_id: job.id, bord_ai_job_kind: job.kind },
   });
   const now = new Date();
-  getDatabase()
+  const submittedState = getDatabase()
     .update(aiJobs)
     .set({
       status: 'submitted',
@@ -730,8 +772,22 @@ async function submitBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
       leaseExpiresAt: null,
       updatedAt: now,
     })
-    .where(eq(aiJobs.id, job.id))
+    .where(
+      and(
+        eq(aiJobs.id, job.id),
+        eq(aiJobs.status, 'running'),
+        eq(aiJobs.leaseToken, job.leaseToken!),
+      ),
+    )
     .run();
+  if (!submittedState.changes) {
+    await getAiBatchClient()
+      .cancel(submitted.batchId)
+      .catch(() => undefined);
+    await getAiBatchClient()
+      .deleteFile(submitted.inputFileId)
+      .catch(() => undefined);
+  }
 }
 
 function jsonlRows(value: string): Array<Record<string, unknown>> {
@@ -751,7 +807,7 @@ function jsonlRows(value: string): Array<Record<string, unknown>> {
 async function materializeBatchItem(job: AiJobRow, item: AiJobItemRow, body: unknown) {
   if (job.kind === 'recipe_images') {
     const image = imageItemSchema.parse(parseJson(item.payload));
-    await attachRecipeImage(item, image, responseImageBytes(body));
+    await attachRecipeImage(item, image, responseImageBytes(body), job);
     return;
   }
   const text = responseBodyText(body);
@@ -777,13 +833,14 @@ async function reconcileCompletedBatch(
     ),
   );
   for (const item of items.filter((candidate) => candidate.status === 'pending')) {
+    if (!ownsActiveLease(job)) return;
     const row = rows.get(item.customId);
     const response = row?.response as { status_code?: unknown; body?: unknown } | undefined;
     try {
       if (Number(response?.status_code) !== 200) throw new Error('Batch item failed.');
       await materializeBatchItem(job, item, response?.body);
     } catch {
-      updateItemFailure(item, 'batch_item_failed');
+      if (ownsActiveLease(job)) updateItemFailure(item, 'batch_item_failed');
     }
   }
   await Promise.all(
@@ -807,6 +864,7 @@ async function pollBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
     snapshot.status === 'expired' ||
     snapshot.status === 'cancelled'
   ) {
+    if (snapshot.outputFileId) return reconcileCompletedBatch(job, snapshot, items);
     const code = snapshot.status === 'expired' ? 'batch_expired' : 'batch_failed';
     items
       .filter((item) => item.status === 'pending')
@@ -831,7 +889,7 @@ async function pollBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
       leaseExpiresAt: null,
       updatedAt: now,
     })
-    .where(eq(aiJobs.id, job.id))
+    .where(and(eq(aiJobs.id, job.id), eq(aiJobs.leaseToken, job.leaseToken!)))
     .run();
 }
 
@@ -839,7 +897,9 @@ function recoverExpiredLeases(now: Date) {
   getDatabase()
     .update(aiJobs)
     .set({
-      status: 'queued',
+      status: 'failed',
+      errorCode: 'worker_interrupted_review_before_retry',
+      completedAt: now,
       leaseToken: null,
       leaseExpiresAt: null,
       nextAttemptAt: now,
@@ -861,7 +921,13 @@ function claim(job: AiJobRow): AiJobRow | null {
       leaseExpiresAt: new Date(now.getTime() + LEASE_MS),
       updatedAt: now,
     })
-    .where(and(eq(aiJobs.id, job.id), eq(aiJobs.status, job.status)))
+    .where(
+      and(
+        eq(aiJobs.id, job.id),
+        eq(aiJobs.status, job.status),
+        or(isNull(aiJobs.leaseExpiresAt), lte(aiJobs.leaseExpiresAt, now)),
+      ),
+    )
     .run();
   if (claimed.changes !== 1) return null;
   return getDatabase().select().from(aiJobs).where(eq(aiJobs.id, job.id)).get() ?? null;
@@ -871,8 +937,19 @@ async function runOneAiJob(candidate: AiJobRow) {
   const job = claim(candidate);
   if (!job) return;
   const items = jobWithItems(job.id).items;
+  const heartbeat = setInterval(() => {
+    getDatabase()
+      .update(aiJobs)
+      .set({ leaseExpiresAt: new Date(Date.now() + LEASE_MS) })
+      .where(and(eq(aiJobs.id, job.id), eq(aiJobs.leaseToken, job.leaseToken!)))
+      .run();
+  }, 60000);
+  heartbeat.unref?.();
   try {
-    if (job.status === 'submitted') await pollBatchJob(job, items);
+    if (job.kind === 'meal_plan_generation') {
+      const { runScheduledPlanJob } = await import('./task-scheduler-service');
+      await runScheduledPlanJob(job);
+    } else if (job.status === 'submitted') await pollBatchJob(job, items);
     else if (job.executionMode === 'batch') await submitBatchJob(job, items);
     else await runDirectJob(job, items);
   } catch {
@@ -880,15 +957,20 @@ async function runOneAiJob(candidate: AiJobRow) {
     getDatabase()
       .update(aiJobs)
       .set({
-        status: 'failed',
-        errorCode: 'worker_failed',
+        // Polling an existing batch is safe to repeat; never submit another paid batch
+        // merely because a status/output request temporarily failed.
+        status: job.status === 'submitted' ? 'submitted' : 'failed',
+        errorCode: job.status === 'submitted' ? 'provider_poll_retry_pending' : 'worker_failed',
+        nextAttemptAt: new Date(now.getTime() + Math.max(60_000, POLL_MS)),
         leaseToken: null,
         leaseExpiresAt: null,
         updatedAt: now,
-        completedAt: now,
+        completedAt: job.status === 'submitted' ? null : now,
       })
-      .where(eq(aiJobs.id, job.id))
+      .where(and(eq(aiJobs.id, job.id), eq(aiJobs.leaseToken, job.leaseToken!)))
       .run();
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -904,15 +986,16 @@ export async function runDueAiJobs(): Promise<void> {
     const due = getDatabase()
       .select()
       .from(aiJobs)
-      .where(inArray(aiJobs.status, ['queued', 'submitted']))
-      .orderBy(asc(aiJobs.nextAttemptAt), asc(aiJobs.createdAt))
-      .all()
-      .filter(
-        (job) =>
-          job.nextAttemptAt.getTime() <= now.getTime() &&
-          (!job.leaseExpiresAt || job.leaseExpiresAt.getTime() <= now.getTime()),
+      .where(
+        and(
+          inArray(aiJobs.status, ['queued', 'submitted']),
+          lte(aiJobs.nextAttemptAt, now),
+          or(isNull(aiJobs.leaseExpiresAt), lte(aiJobs.leaseExpiresAt, now)),
+        ),
       )
-      .slice(0, DIRECT_CONCURRENCY);
+      .orderBy(asc(aiJobs.nextAttemptAt), asc(aiJobs.createdAt))
+      .limit(DIRECT_CONCURRENCY)
+      .all();
     await Promise.all(due.map((job) => runOneAiJob(job)));
   } finally {
     aiJobWorkerRunning = false;
@@ -924,10 +1007,8 @@ export async function cancelAiJob(jobId: string, profileId: string) {
   if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
     throw new AiJobStateError('That background AI task has already finished.');
   }
-  if (job.status === 'submitted' && job.providerBatchId)
-    await getAiBatchClient().cancel(job.providerBatchId);
   const now = new Date();
-  getDatabase()
+  const cancelled = getDatabase()
     .update(aiJobs)
     .set({
       status: 'cancelled',
@@ -937,18 +1018,60 @@ export async function cancelAiJob(jobId: string, profileId: string) {
       updatedAt: now,
       completedAt: now,
     })
-    .where(eq(aiJobs.id, job.id))
+    .where(and(eq(aiJobs.id, job.id), inArray(aiJobs.status, ['queued', 'running', 'submitted'])))
     .run();
+  if (!cancelled.changes)
+    throw new AiJobStateError('This task finished before it could be cancelled.');
   items
     .filter((item) => item.status === 'pending')
     .forEach((item) => updateItemFailure(item, 'cancelled'));
+  if (job.providerBatchId)
+    await getAiBatchClient()
+      .cancel(job.providerBatchId)
+      .catch(() => {
+        getDatabase()
+          .update(aiJobs)
+          .set({ errorCode: 'cancelled_provider_confirmation_pending' })
+          .where(and(eq(aiJobs.id, job.id), eq(aiJobs.status, 'cancelled')))
+          .run();
+      });
   return getAiJob(job.id, profileId);
 }
 
 export function retryAiJob(jobId: string, profileId: string) {
+  ensureDatabase();
+  return getDatabase().transaction(() => retryJobTransaction(jobId, profileId));
+}
+
+function retryJobTransaction(jobId: string, profileId: string) {
   const { job, items } = jobWithItems(jobId, profileId);
   if (job.status !== 'failed' && job.status !== 'cancelled') {
     throw new AiJobStateError('Only failed or cancelled background tasks can be retried.');
+  }
+  const previousResult = job.result ? (parseJson(job.result) as { retryJobId?: string }) : null;
+  if (previousResult?.retryJobId) return getAiJob(previousResult.retryJobId, profileId);
+  // A partially completed recipe draft may already have been accepted. Retry only
+  // its failed requests in a new job so successful recipes are never proposed twice.
+  if (job.kind === 'recipe_batch_generation' && job.actionId) {
+    const unfinished = items
+      .filter((item) => item.status !== 'succeeded')
+      .map((item) => recipeItemSchema.parse(parseJson(item.payload)));
+    if (!unfinished.length) throw new AiJobStateError('There is no unfinished work to retry.');
+    const retry = enqueueRecipeBatchGenerationJob({
+      profileId,
+      threadId: job.threadId,
+      model: job.model,
+      recipes: unfinished,
+      generateRecipeImages: z
+        .object({ generateRecipeImages: z.boolean().default(false) })
+        .parse(parseJson(job.payload)).generateRecipeImages,
+    });
+    getDatabase()
+      .update(aiJobs)
+      .set({ result: JSON.stringify({ ...previousResult, retryJobId: retry.id }) })
+      .where(eq(aiJobs.id, job.id))
+      .run();
+    return retry;
   }
   const now = new Date();
   items
@@ -977,6 +1100,13 @@ export function retryAiJob(jobId: string, profileId: string) {
     .update(aiJobs)
     .set({
       status: 'queued',
+      executionMode:
+        job.kind === 'meal_plan_generation'
+          ? 'direct'
+          : taskExecutionMode(
+              profileId,
+              items.filter((item) => item.status !== 'succeeded').length,
+            ),
       providerBatchId: null,
       providerInputFileId: null,
       errorCode: null,
@@ -993,7 +1123,16 @@ export function retryAiJob(jobId: string, profileId: string) {
 }
 
 export async function wakeAiJobWorker(): Promise<void> {
+  // Enqueue callers may still be committing their transaction.
+  await Promise.resolve();
   if (process.env.NODE_ENV !== 'production' || process.env.AI_WORKER_ENABLED === 'false') return;
+  if (process.env.QUEUE_BACKEND === 'redis') {
+    const { wakeTaskQueue } = await import('./task-queue-service');
+    await wakeTaskQueue().catch(() =>
+      console.error('Task queued in SQLite, but Redis could not be reached.'),
+    );
+    return;
+  }
   await runDueAiJobs();
 }
 
@@ -1004,7 +1143,19 @@ declare global {
 export function startAiJobWorker(): void {
   if (process.env.NODE_ENV !== 'production' || process.env.AI_WORKER_ENABLED === 'false') return;
   if (globalThis.bordAiJobWorkerTimer) return;
-  const run = () => void runDueAiJobs().catch(() => undefined);
+  if (process.env.QUEUE_BACKEND === 'redis') {
+    void import('./task-queue-service')
+      .then((module) => module.startTaskQueue())
+      .catch(() => console.error('Redis task queue could not start. Check queue configuration.'));
+    return;
+  }
+  const run = () =>
+    void import('./task-scheduler-service')
+      .then(async (module) => {
+        module.enqueueScheduledPlans();
+        await runDueAiJobs();
+      })
+      .catch(() => console.error('Background task tick failed.'));
   globalThis.bordAiJobWorkerTimer = setInterval(run, POLL_MS);
   globalThis.bordAiJobWorkerTimer.unref?.();
   setTimeout(run, 1_000).unref?.();

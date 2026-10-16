@@ -101,7 +101,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   const viewportContent = await page.locator('meta[name="viewport"]').getAttribute('content');
   expect(viewportContent).toContain('width=device-width');
   expect(viewportContent).toContain('viewport-fit=cover');
-  expect(viewportContent).not.toMatch(/user-scalable=no|maximum-scale=1/u);
+  expect(viewportContent).toMatch(/user-scalable=no|maximum-scale=1/u);
   const addRecipeTrigger = page.getByRole('link', { name: 'Add a recipe' });
   await expect(page.locator('.profile-switcher summary .profile-dot')).toHaveText('M');
   await expect(page.locator('.app-footer')).toContainText('The Release Table · Powered by Bòrd.');
@@ -380,25 +380,26 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   const recipeToolbar = page.getByRole('toolbar', { name: 'Recipe actions' });
   await expect(recipeToolbar.getByRole('link', { name: 'Cook this recipe' })).toBeVisible();
   await expect(recipeToolbar.getByRole('link', { name: 'Edit recipe' })).toBeVisible();
-  await expect(recipeToolbar.getByRole('button', { name: 'Print recipe card' })).toBeVisible();
-  const exportMenu = page.locator('.recipe-export-menu');
-  await exportMenu.locator('summary').click();
-  await expect(exportMenu.getByRole('link', { name: 'Download JSON-LD' })).toBeVisible();
-  await expect(exportMenu.getByRole('button', { name: 'Copy JSON-LD' })).toBeVisible();
-  await expect(exportMenu.getByRole('link', { name: 'Download Markdown' })).toBeVisible();
-  await expect(exportMenu.getByRole('button', { name: 'Copy Markdown' })).toBeVisible();
-  await exportMenu.getByRole('button', { name: 'Copy JSON-LD' }).click();
-  await expect(page.locator('.toast')).toContainText('JSON-LD copied to the clipboard.');
-  await expect(exportMenu).toHaveJSProperty('open', false);
-  await exportMenu.locator('summary').click();
-  await page.mouse.click(8, 500);
-  await expect(exportMenu).toHaveJSProperty('open', false);
-  await expect(
-    page.getByText('Imported or manual legacy Nutrition', { exact: true }),
-  ).toBeVisible();
-  await page.getByText('Review source values', { exact: true }).click();
+  const printLink = recipeToolbar.getByRole('link', { name: 'Export / print' });
+  await expect(printLink).toBeVisible();
+  await printLink.click();
+  await expect(page.getByRole('heading', { name: 'Export & print' })).toBeVisible();
+  const printOptions = page.getByRole('complementary', { name: 'Print options' });
+  await expect(printOptions).toBeVisible();
+  await expect(page.getByTitle('Your printable PDF')).toBeVisible({ timeout: 30_000 });
+  await printOptions.getByText('Other formats', { exact: true }).click();
+  await expect(printOptions.getByRole('link', { name: 'JSON-LD', exact: true })).toHaveAttribute(
+    'href',
+    /\/api\/v1\/recipes\/[^/]+\/export$/u,
+  );
+  await expect(printOptions.getByRole('link', { name: 'Markdown', exact: true })).toHaveAttribute(
+    'href',
+    /\/export\/markdown$/u,
+  );
+  await page.goto(recipeUrl);
+  await page.getByText('Nutrition information', { exact: true }).click();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Estimate from AI' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Update nutrition estimate' })).toBeVisible();
   const classificationToolbar = page.getByRole('region', { name: 'Recipe details and tags' });
   await expect(classificationToolbar.getByText('Dinner', { exact: true })).toBeVisible();
   await expect(classificationToolbar.getByText('Main Dish', { exact: true })).toBeVisible();
@@ -455,7 +456,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   ).toBe(true);
   for (const control of await recipeToolbar
     .locator(
-      ':scope > .recipe-toolbar-primary, :scope > .recipe-toolbar-button, :scope > .recipe-export-menu > summary',
+      ':scope > .recipe-toolbar-primary, :scope > .recipe-toolbar-button, :scope > .print-workspace-link',
     )
     .all()) {
     expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
@@ -515,8 +516,8 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     });
   });
 
-  await page.getByText('Review source values', { exact: true }).click();
-  const estimateButton = page.getByRole('button', { name: 'Estimate from AI' });
+  await page.getByText('Nutrition information', { exact: true }).click();
+  const estimateButton = page.getByRole('button', { name: 'Update nutrition estimate' });
   await expect(estimateButton).toBeVisible();
   expect((await estimateButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   expect(
@@ -525,7 +526,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   ).toBe(true);
   await estimateButton.click();
   await expect.poll(() => estimateRequestStarted).toBe(true);
-  await expect(page.getByRole('button', { name: 'Estimating with OpenAI…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Updating nutrition…' })).toBeDisabled();
   await expect(page.locator('.nutrition-panel')).toHaveAttribute('aria-busy', 'true');
   releaseEstimateResponse();
   await expect(

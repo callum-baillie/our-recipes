@@ -1,4 +1,11 @@
 'use client';
+import {
+  SettingsField,
+  SettingsPane,
+  SettingsRow,
+  SettingsSubsection,
+  SettingsActionBar,
+} from './settings-primitives';
 
 import {
   BookOpen,
@@ -64,7 +71,6 @@ export function ApiKeyManager({
   } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [passkeyName, setPasskeyName] = useState('This device');
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -190,20 +196,6 @@ export function ApiKeyManager({
     }
   }
 
-  async function addPasskey() {
-    setPending(true);
-    setError(null);
-    try {
-      const result = await authClient.passkey.addPasskey({ name: passkeyName });
-      if (result.error) throw new Error(result.error.message ?? 'The passkey could not be added.');
-      showToast('Passkey added to the signed-in account.', 'success');
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The passkey could not be added.');
-    } finally {
-      setPending(false);
-    }
-  }
-
   return (
     <>
       {needsConfirmation ? (
@@ -250,204 +242,193 @@ export function ApiKeyManager({
         </section>
       ) : null}
 
-      <form className="settings-card api-key-create" onSubmit={createKey}>
-        <div className="settings-section-heading">
-          <span aria-hidden="true">
-            <KeyRound size={20} />
-          </span>
-          <div>
-            <h2>Create API key</h2>
-            <p>Define a name, expiry, and the exact permissions for this key.</p>
-          </div>
-        </div>
-        <div className="field-grid two-columns">
-          <label>
-            <span>Name</span>
-            <input
-              required
-              maxLength={64}
-              placeholder="Kitchen dashboard"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Expires after</span>
-            <select
-              value={expiresInDays}
-              onChange={(event) => setExpiresInDays(Number(event.target.value))}
-            >
-              <option value={30}>30 days</option>
-              <option value={90}>90 days</option>
-              <option value={180}>180 days</option>
-              <option value={365}>365 days</option>
-            </select>
-          </label>
-        </div>
-        <aside className="api-least-privilege">
-          <ShieldCheck size={18} aria-hidden="true" />
-          <span>
-            <strong>Start with least privilege.</strong> Grant only what this integration needs.
-          </span>
-        </aside>
-        <fieldset className="api-scope-grid">
-          <legend>Permissions</legend>
-          <div className="api-scope-header" aria-hidden="true">
-            <span>Resource</span>
-            {actions.map((action) => (
-              <span key={action.id}>{action.label}</span>
-            ))}
-          </div>
-          {resources.map((resource) => {
-            const ResourceIcon = resource.icon;
-            return (
-              <div className="api-scope-row" key={resource.id}>
-                <strong>
-                  <ResourceIcon size={15} aria-hidden="true" />
-                  {resource.label}
-                </strong>
-                {actions.map((action) => (
-                  <label key={action.id}>
-                    <span className="api-permission-label">{action.label}</span>
-                    {resource.id === 'settings' &&
-                    (action.id === 'create' || action.id === 'delete') ? (
-                      <span aria-label={`${action.label} is not available for workflow settings`}>
-                        —
-                      </span>
-                    ) : (
-                      <input
-                        type="checkbox"
-                        aria-label={`${action.label} ${resource.label}`}
-                        checked={(permissions[resource.id] ?? []).includes(action.id)}
-                        onChange={() => togglePermission(resource.id, action.id)}
-                      />
-                    )}
-                  </label>
-                ))}
-              </div>
-            );
-          })}
-        </fieldset>
-        {error ? (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <button
-          className="primary-button"
-          type="submit"
-          disabled={pending || needsConfirmation || Boolean(revealedSecret)}
+      <form className="settings-form" onSubmit={createKey}>
+        <SettingsPane
+          title="Create API key"
+          description="Choose a name, expiry, and the permissions this integration needs."
+          icon={<KeyRound size={20} />}
         >
-          <Plus size={16} aria-hidden="true" />
-          {pending ? 'Creating…' : 'Create key'}
-        </button>
+          <div className="settings-fields">
+            <SettingsField
+              description="Use a name that identifies the script or app using this key."
+              title="Name"
+            >
+              <input
+                required
+                maxLength={64}
+                placeholder="Kitchen dashboard"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </SettingsField>
+            <SettingsField
+              description="The key stops working after this period."
+              title="Expires after"
+            >
+              <select
+                value={expiresInDays}
+                onChange={(event) => setExpiresInDays(Number(event.target.value))}
+              >
+                <option value={30}>30 days</option>
+                <option value={90}>90 days</option>
+                <option value={180}>180 days</option>
+                <option value={365}>365 days</option>
+              </select>
+            </SettingsField>
+          </div>
+          <aside className="api-least-privilege">
+            <ShieldCheck size={18} aria-hidden="true" />
+            <span>
+              <strong>Start with least privilege.</strong> Grant only what this integration needs.
+            </span>
+          </aside>
+          <fieldset className="api-scope-grid">
+            <legend>Permissions</legend>
+            <div className="api-scope-header" aria-hidden="true">
+              <span>Resource</span>
+              {actions.map((action) => (
+                <span key={action.id}>{action.label}</span>
+              ))}
+            </div>
+            {resources.map((resource) => {
+              const ResourceIcon = resource.icon;
+              return (
+                <div className="api-scope-row" key={resource.id}>
+                  <strong>
+                    <ResourceIcon size={15} aria-hidden="true" />
+                    {resource.label}
+                  </strong>
+                  {actions.map((action) => (
+                    <label key={action.id}>
+                      <span className="api-permission-label">{action.label}</span>
+                      {resource.id === 'settings' &&
+                      (action.id === 'create' || action.id === 'delete') ? (
+                        <span aria-label={`${action.label} is not available for workflow settings`}>
+                          —
+                        </span>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          aria-label={`${action.label} ${resource.label}`}
+                          checked={(permissions[resource.id] ?? []).includes(action.id)}
+                          onChange={() => togglePermission(resource.id, action.id)}
+                        />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+          </fieldset>
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <SettingsActionBar>
+            {' '}
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={pending || needsConfirmation || Boolean(revealedSecret)}
+            >
+              <Plus size={16} aria-hidden="true" />
+              {pending ? 'Creating…' : 'Create key'}
+            </button>
+          </SettingsActionBar>
+        </SettingsPane>
       </form>
 
-      <section className="settings-card api-key-list" aria-labelledby="api-key-list-heading">
-        <div className="settings-section-heading">
-          <span aria-hidden="true">
-            <ShieldCheck size={20} />
-          </span>
-          <div>
-            <h2 id="api-key-list-heading">Your API keys</h2>
-            <p>Rotate or revoke keys without exposing their stored secret.</p>
-          </div>
-        </div>
-        {keys.length === 0 ? (
-          <div className="api-key-empty">
-            <KeyRound size={24} aria-hidden="true" />
-            <p>No API keys yet.</p>
-            <small>Create a key above to connect a dashboard, script, or another app.</small>
-          </div>
-        ) : (
-          <div className="api-key-rows">
-            {keys.map((apiKey) => (
-              <article key={apiKey.id}>
-                <div>
-                  <h3>{apiKey.name}</h3>
-                  <code>{apiKey.start}…</code>
-                  <p>
-                    {!apiKey.enabled
-                      ? 'Revoked'
-                      : apiKey.expiresAt && new Date(apiKey.expiresAt).getTime() <= now
-                        ? 'Expired'
-                        : 'Active'}{' '}
-                    · expires{' '}
-                    {apiKey.expiresAt
-                      ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
-                          new Date(apiKey.expiresAt),
-                        )
-                      : 'never'}
-                  </p>
-                  <small>
-                    {Object.entries(apiKey.permissions)
-                      .map(([resource, granted]) => `${resource}: ${granted.join(', ')}`)
-                      .join(' · ') || 'No permissions'}
-                  </small>
-                </div>
-                <div className="settings-inline-actions">
-                  {apiKey.enabled ? (
-                    <>
+      <SettingsPane
+        title="Existing API keys"
+        description="Review access and rotate or revoke keys without revealing their stored secrets."
+      >
+        <SettingsSubsection title="Issued keys">
+          {keys.length === 0 ? (
+            <div className="api-key-empty">
+              <KeyRound size={24} aria-hidden="true" />
+              <p>No API keys yet.</p>
+              <small>Create a key above to connect a dashboard, script, or another app.</small>
+            </div>
+          ) : (
+            <div className="api-key-rows">
+              {keys.map((apiKey) => (
+                <article key={apiKey.id}>
+                  <div>
+                    <h3>{apiKey.name}</h3>
+                    <code>{apiKey.start}…</code>
+                    <p>
+                      {!apiKey.enabled
+                        ? 'Revoked'
+                        : apiKey.expiresAt && new Date(apiKey.expiresAt).getTime() <= now
+                          ? 'Expired'
+                          : 'Active'}{' '}
+                      · expires{' '}
+                      {apiKey.expiresAt
+                        ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
+                            new Date(apiKey.expiresAt),
+                          )
+                        : 'never'}
+                    </p>
+                    <small>
+                      {Object.entries(apiKey.permissions)
+                        .map(([resource, granted]) => `${resource}: ${granted.join(', ')}`)
+                        .join(' · ') || 'No permissions'}
+                    </small>
+                  </div>
+                  <div className="settings-inline-actions">
+                    {apiKey.enabled ? (
+                      <>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={pending}
+                          onClick={() => rotateKey(apiKey)}
+                        >
+                          <RefreshCw size={15} aria-hidden="true" />
+                          Rotate
+                        </button>
+                        <button
+                          className="danger-button"
+                          type="button"
+                          disabled={pending}
+                          onClick={() => setEnabled(apiKey, false)}
+                        >
+                          <ShieldOff size={15} aria-hidden="true" />
+                          Revoke
+                        </button>
+                      </>
+                    ) : (
                       <button
                         className="secondary-button"
                         type="button"
                         disabled={pending}
-                        onClick={() => rotateKey(apiKey)}
+                        onClick={() => setEnabled(apiKey, true)}
                       >
-                        <RefreshCw size={15} aria-hidden="true" />
-                        Rotate
+                        Re-enable
                       </button>
-                      <button
-                        className="danger-button"
-                        type="button"
-                        disabled={pending}
-                        onClick={() => setEnabled(apiKey, false)}
-                      >
-                        <ShieldOff size={15} aria-hidden="true" />
-                        Revoke
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={pending}
-                      onClick={() => setEnabled(apiKey, true)}
-                    >
-                      Re-enable
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </SettingsSubsection>
+      </SettingsPane>
 
-      <section className="settings-card" aria-labelledby="passkey-heading">
-        <p className="eyebrow">PASSWORDLESS SIGN-IN</p>
-        <h2 id="passkey-heading">Add a passkey</h2>
-        <p>Passkeys are optional and belong to the currently signed-in account.</p>
-        <div className="field-grid two-columns">
-          <label>
-            <span>Passkey name</span>
-            <input
-              value={passkeyName}
-              maxLength={64}
-              onChange={(event) => setPasskeyName(event.target.value)}
-            />
-          </label>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={pending}
-            onClick={addPasskey}
-          >
-            <KeyRound size={16} aria-hidden="true" />
-            Add passkey
-          </button>
-        </div>
-      </section>
+      <SettingsPane
+        title="Account sign-in"
+        description="Passkeys and passwords belong to your personal account."
+      >
+        <SettingsRow
+          title="Sign-in methods"
+          description="Manage saved passkeys and change your password from Account security."
+        >
+          <Link className="text-button" href="/account/security">
+            Account security
+          </Link>
+        </SettingsRow>
+      </SettingsPane>
     </>
   );
 }
@@ -503,12 +484,13 @@ function ApiKeyConfirmation({
           </p>
         </div>
       </div>
-      <label>
-        <span>Account</span>
+      <SettingsField description="The account whose identity is being confirmed." title="Account">
         <input type="email" value={email} readOnly autoComplete="username" />
-      </label>
-      <label>
-        <span>Current passphrase</span>
+      </SettingsField>
+      <SettingsField
+        description="Confirm your identity before creating a key with access to the app."
+        title="Current passphrase"
+      >
         <input
           ref={input}
           type="password"
@@ -518,7 +500,7 @@ function ApiKeyConfirmation({
           value={passphrase}
           onChange={(event) => setPassphrase(event.target.value)}
         />
-      </label>
+      </SettingsField>
       {error ? (
         <p className="form-error" role="alert">
           {error}

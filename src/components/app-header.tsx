@@ -238,6 +238,7 @@ export function AppHeader({
       {assistantMounted ? (
         <div id="ai-assistant-drawer">
           <AiAssistantDrawer
+            key={activeProfileId}
             open={assistantOpen}
             onClose={() => setAssistantOpen(false)}
             returnFocusRef={assistantTriggerRef}

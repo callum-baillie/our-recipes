@@ -5,25 +5,30 @@ import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 
 export function DiagnosticsExport() {
   const [status, setStatus] = useState('');
+  const [pending, setPending] = useState(false);
 
   async function download() {
+    if (pending) return;
+    setPending(true);
     setStatus('Preparing redacted diagnostics…');
-    const response = await fetch('/api/v1/diagnostics', { method: 'POST' });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setStatus(body?.error?.message ?? 'Diagnostics could not be exported.');
-      return;
+    try {
+      const response = await fetch('/api/v1/diagnostics', { method: 'POST' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error?.message ?? 'Diagnostics could not be exported.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `bord-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus('Redacted diagnostics downloaded.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Check your connection and retry.');
+    } finally {
+      setPending(false);
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `bord-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setStatus('Redacted diagnostics downloaded.');
   }
 
   return (
@@ -36,8 +41,14 @@ export function DiagnosticsExport() {
         title="Diagnostic report"
         description="Includes build, migration, storage health, configuration presence, and redacted errors. Household content, paths, origins, and secrets are excluded."
       >
-        <button type="button" className="secondary-button compact" onClick={() => void download()}>
-          Download diagnostics
+        <button
+          type="button"
+          className="secondary-button compact"
+          disabled={pending}
+          aria-busy={pending}
+          onClick={() => void download()}
+        >
+          {pending ? 'Preparing…' : 'Download diagnostics'}
         </button>
       </SettingsRow>
       {status ? (

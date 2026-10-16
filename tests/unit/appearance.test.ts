@@ -53,8 +53,8 @@ describe('appearance system', () => {
   it('renders circular palette swatches before the light and dark selector', () => {
     const source = readFileSync('src/components/theme-toggle.tsx', 'utf8');
     const css = readFileSync('src/app/themes.css', 'utf8');
-    expect(source.indexOf('<legend>Color theme</legend>')).toBeLessThan(
-      source.indexOf('<legend>Light or dark</legend>'),
+    expect(source.indexOf('>Color theme</legend>')).toBeLessThan(
+      source.indexOf('>Light or dark</legend>'),
     );
     expect(source).toContain('className="appearance-palette-check"');
     expect(source).toContain("'--palette-primary': PALETTES[id].brandBackground");

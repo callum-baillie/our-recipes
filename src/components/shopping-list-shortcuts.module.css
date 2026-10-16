@@ -1,0 +1,89 @@
+.section {
+  margin: 0.75rem 0;
+}
+.toggle,
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  min-height: 44px;
+}
+.body {
+  border-block: 1px solid var(--line);
+  padding: 1rem 0;
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.8rem;
+}
+.body p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+.tabs button[aria-pressed='true'] {
+  background: var(--selection-surface);
+  color: var(--on-selection);
+}
+.recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.recent button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.4rem;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink);
+  border-radius: 0.7rem;
+  padding: 0.7rem;
+  min-height: 44px;
+}
+.recent small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.body textarea {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  color: var(--ink);
+  background: var(--field);
+  font: inherit;
+}
+.body > button {
+  justify-self: start;
+  padding: 0.75rem;
+  background: var(--leaf);
+  color: var(--on-primary);
+  border: 0;
+  border-radius: 0.6rem;
+  min-height: 44px;
+}
+@media (max-width: 600px) {
+  .body textarea {
+    font-size: 16px;
+  }
+  .recent {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .recent button {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

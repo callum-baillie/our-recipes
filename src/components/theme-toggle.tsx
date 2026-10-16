@@ -75,7 +75,13 @@ function applyAppearance(palette: PaletteId, mode: ColorMode) {
   window.dispatchEvent(new Event(APPEARANCE_EVENT));
 }
 
-function AppearanceChoices({ compact = false }: { compact?: boolean }) {
+function AppearanceChoices({
+  compact = false,
+  section,
+}: {
+  compact?: boolean;
+  section?: 'palette' | 'mode';
+}) {
   const router = useRouter();
   const snapshot = useSyncExternalStore(
     subscribeToAppearance,
@@ -100,62 +106,66 @@ function AppearanceChoices({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className={compact ? 'appearance-choices compact' : 'appearance-choices'}>
-      <fieldset>
-        <legend>Color theme</legend>
-        <div className="appearance-palette-grid" role="radiogroup" aria-label="Color theme">
-          {PALETTE_IDS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={palette === id}
-              className={palette === id ? 'appearance-palette selected' : 'appearance-palette'}
-              title={PALETTES[id].label}
-              onClick={() => changePalette(id)}
-            >
-              <span
-                className="appearance-palette-swatch"
-                style={
-                  {
-                    '--palette-primary': PALETTES[id].brandBackground,
-                  } as React.CSSProperties
-                }
-                aria-hidden="true"
-              >
-                {palette === id ? (
-                  <span className="appearance-palette-check">
-                    <Check size={13} strokeWidth={3} />
-                  </span>
-                ) : null}
-              </span>
-              <span>{PALETTES[id].label}</span>
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Light or dark</legend>
-        <div className="appearance-mode-grid" role="radiogroup" aria-label="Light or dark">
-          {COLOR_MODES.map((id) => {
-            const Icon = id === 'system' ? Monitor : id === 'dark' ? Moon : Sun;
-            return (
+      {section !== 'mode' && (
+        <fieldset>
+          <legend className={section ? 'sr-only' : undefined}>Color theme</legend>
+          <div className="appearance-palette-grid" role="radiogroup" aria-label="Color theme">
+            {PALETTE_IDS.map((id) => (
               <button
                 key={id}
                 type="button"
                 role="radio"
-                aria-checked={mode === id}
-                className={mode === id ? 'appearance-mode selected' : 'appearance-mode'}
-                onClick={() => changeMode(id)}
+                aria-checked={palette === id}
+                className={palette === id ? 'appearance-palette selected' : 'appearance-palette'}
+                title={PALETTES[id].label}
+                onClick={() => changePalette(id)}
               >
-                <Icon size={16} aria-hidden="true" />
-                {id === 'system'
-                  ? `System (${effectiveMode})`
-                  : `${id[0]!.toUpperCase()}${id.slice(1)}`}
+                <span
+                  className="appearance-palette-swatch"
+                  style={
+                    {
+                      '--palette-primary': PALETTES[id].brandBackground,
+                    } as React.CSSProperties
+                  }
+                  aria-hidden="true"
+                >
+                  {palette === id ? (
+                    <span className="appearance-palette-check">
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                  ) : null}
+                </span>
+                <span>{PALETTES[id].label}</span>
               </button>
-            );
-          })}
-        </div>
-      </fieldset>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      {section !== 'palette' && (
+        <fieldset>
+          <legend className={section ? 'sr-only' : undefined}>Light or dark</legend>
+          <div className="appearance-mode-grid" role="radiogroup" aria-label="Light or dark">
+            {COLOR_MODES.map((id) => {
+              const Icon = id === 'system' ? Monitor : id === 'dark' ? Moon : Sun;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === id}
+                  className={mode === id ? 'appearance-mode selected' : 'appearance-mode'}
+                  onClick={() => changeMode(id)}
+                >
+                  <Icon size={16} aria-hidden="true" />
+                  {id === 'system'
+                    ? `System (${effectiveMode})`
+                    : `${id[0]!.toUpperCase()}${id.slice(1)}`}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
     </div>
   );
 }
@@ -192,11 +202,18 @@ export function AppearanceSettings() {
       description="Personal display choices saved only in this browser."
     >
       <SettingsRow
-        title="Color and brightness"
-        description="Choose a palette and whether the interface follows the system, light, or dark appearance."
+        title="Color theme"
+        description="Choose the accent palette used throughout the app. Changes apply immediately."
         align="start"
       >
-        <AppearanceChoices />
+        <AppearanceChoices section="palette" />
+      </SettingsRow>
+      <SettingsRow
+        title="Light or dark"
+        description="Follow your device’s appearance or keep a fixed light or dark theme."
+        align="start"
+      >
+        <AppearanceChoices section="mode" />
       </SettingsRow>
     </SettingsPane>
   );

@@ -36,7 +36,7 @@
 .card,
 .empty {
   border: 1px solid var(--line);
-  background: var(--surface, #fffefb);
+  background: var(--field);
   border-radius: 1rem;
   padding: 1.35rem;
 }
@@ -112,7 +112,7 @@
   border: 1px solid var(--leaf);
 }
 .secondary {
-  background: var(--surface, #fffefb);
+  background: var(--field);
   color: var(--ink);
   border: 1px solid var(--line);
 }
@@ -177,7 +177,7 @@
   border: 1px solid var(--line);
   border-radius: 1.2rem;
   padding: 1.6rem;
-  background: var(--surface, #fffefb);
+  background: var(--field);
   color: var(--ink);
   box-shadow: 0 20px 70px #0003;
 }
@@ -222,7 +222,7 @@
   font: inherit;
   font-weight: 400;
   color: var(--ink);
-  background: var(--surface, #fffefb);
+  background: var(--field);
 }
 .field small,
 .assignment small {

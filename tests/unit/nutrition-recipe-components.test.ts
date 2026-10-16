@@ -118,7 +118,7 @@ describe('normalized recipe presentation', () => {
         },
       }),
     );
-    expect(markup).toContain('NORMALIZED INGREDIENT CALCULATION');
+    expect(markup).toContain('INGREDIENT-BASED NUTRITION');
     expect(markup).toContain('Recalculation needed');
     expect(markup).toContain('800 kcal');
     expect(markup).toContain('200 kcal per serving');

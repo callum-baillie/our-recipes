@@ -1,4 +1,4 @@
-import { Document, Page, View } from '@formepdf/react';
+import { Document, Page, View, Image } from '@formepdf/react';
 import { Heading } from './pdfcn/components/heading/heading';
 import { Text } from './pdfcn/components/text/text';
 import { PageFooter } from './pdfcn/components/page-footer/page-footer';
@@ -13,6 +13,7 @@ export type RecipePrintCard = {
   recipe: RecipePayload;
   servings?: number;
   occasions?: string[];
+  image?: string;
 };
 export type ScheduleMeal = {
   id: string;
@@ -61,6 +62,15 @@ function RecipeCard({ card, options }: { card: RecipePrintCard; options: PdfExpo
       <Heading level={1} style={{ fontSize: 29, marginBottom: 8 }}>
         {recipe.title}
       </Heading>
+      {options.includeImage && card.image ? (
+        <Image
+          src={card.image}
+          width={480}
+          height={180}
+          alt={recipe.title}
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
       {recipe.summary ? <Text style={{ ...body, color: muted }}>{recipe.summary}</Text> : null}
       <View style={{ padding: 11, backgroundColor: '#f0f3e9', marginTop: 8, marginBottom: 12 }}>
         <Text weight="bold" style={body} noMargin>
@@ -88,44 +98,53 @@ function RecipeCard({ card, options }: { card: RecipePrintCard; options: PdfExpo
           On your plan: {card.occasions.join('; ')}
         </Text>
       ) : null}
-      {recipe.equipment.length ? (
+      {options.includeEquipment && recipe.equipment.length ? (
         <Text variant="sm">Equipment: {recipe.equipment.join(', ')}</Text>
       ) : null}
-      <Heading level={2} style={section}>
-        Ingredients
-      </Heading>
-      {recipe.ingredientGroups.map((group, index) => (
-        <View key={index}>
-          {group.name ? (
-            <Heading level={3} style={{ fontSize: 12, marginTop: 8, marginBottom: 5 }}>
-              {group.name}
-            </Heading>
-          ) : null}
-          {group.ingredients.map((item, i) => (
-            <Text key={i} style={{ ...body, marginBottom: 5 }} noMargin>
-              {[quantity(item.quantity), item.unit, item.item].filter(Boolean).join(' ')}
-              {item.note ? ` (${item.note})` : ''}
-            </Text>
+      {options.includeIngredients && (
+        <>
+          <Heading level={2} style={section}>
+            Ingredients
+          </Heading>
+          {recipe.ingredientGroups.map((group, index) => (
+            <View key={index}>
+              {group.name ? (
+                <Heading level={3} style={{ fontSize: 12, marginTop: 8, marginBottom: 5 }}>
+                  {group.name}
+                </Heading>
+              ) : null}
+              {group.ingredients.map((item, i) => (
+                <Text key={i} style={{ ...body, marginBottom: 5 }} noMargin>
+                  {options.ingredientCheckboxes ? '[  ]  ' : ''}
+                  {[quantity(item.quantity), item.unit, item.item].filter(Boolean).join(' ')}
+                  {item.note ? ` (${item.note})` : ''}
+                </Text>
+              ))}
+            </View>
           ))}
-        </View>
-      ))}
-      <Heading level={2} style={section}>
-        Method
-      </Heading>
-      {recipe.instructionSections.map((part, index) => (
-        <View key={index}>
-          {part.title ? (
-            <Heading level={3} style={{ fontSize: 12, marginTop: 8, marginBottom: 5 }}>
-              {part.title}
-            </Heading>
-          ) : null}
-          {part.steps.map((step, i) => (
-            <Text key={i} style={{ ...body, marginBottom: 9 }}>
-              {i + 1}. {step}
-            </Text>
+        </>
+      )}
+      {options.includeMethod && (
+        <>
+          <Heading level={2} style={section}>
+            Method
+          </Heading>
+          {recipe.instructionSections.map((part, index) => (
+            <View key={index}>
+              {part.title ? (
+                <Heading level={3} style={{ fontSize: 12, marginTop: 8, marginBottom: 5 }}>
+                  {part.title}
+                </Heading>
+              ) : null}
+              {part.steps.map((step, i) => (
+                <Text key={i} style={{ ...body, marginBottom: 9 }}>
+                  {i + 1}. {step}
+                </Text>
+              ))}
+            </View>
           ))}
-        </View>
-      ))}
+        </>
+      )}
       {options.includeNotes && (recipe.tips || recipe.sharedNotes) ? (
         <View>
           <Heading level={2} style={section}>
@@ -153,7 +172,7 @@ function RecipeCard({ card, options }: { card: RecipePrintCard; options: PdfExpo
           </Text>
         </View>
       ) : null}
-      {recipe.sourceName || recipe.sourceUrl ? (
+      {options.includeSource && (recipe.sourceName || recipe.sourceUrl) ? (
         <Text variant="xs" color="mutedForeground">
           Source: {[recipe.sourceName, recipe.sourceUrl].filter(Boolean).join(' · ')}
         </Text>
@@ -227,7 +246,7 @@ function SchedulePages({
                   ))
                 ) : (
                   <Text variant="sm" color="mutedForeground">
-                    Nothing planned — leave room for leftovers or eating out.
+                    No meal planned.
                   </Text>
                 )}
               </View>
@@ -263,6 +282,70 @@ export function KitchenDocument({
       {cards.map((card) => (
         <RecipeCard key={card.key} card={card} options={options} />
       ))}
+    </Document>
+  );
+}
+
+export type InventoryPrintGroup = {
+  name: string;
+  rows: { label: string; quantity: string; detail?: string; note?: string }[];
+};
+export function InventoryDocument({
+  title,
+  groups,
+  options,
+  note,
+}: {
+  title: string;
+  note?: string;
+  groups: InventoryPrintGroup[];
+  options: PdfExportOptions & { countColumn?: boolean };
+}) {
+  return (
+    <Document title={title} author="Bòrd">
+      <Page size={options.paper} margin={{ top: 40, right: 40, bottom: 54, left: 40 }}>
+        {footer}
+        <Heading level={1}>{title}</Heading>
+        <Text variant="sm" color="mutedForeground">
+          {groups.reduce((sum, group) => sum + group.rows.length, 0)} items ·{' '}
+          {new Date().toLocaleDateString('en-US')}
+        </Text>
+        {options.includeNotes && note ? <Text style={body}>{note}</Text> : null}
+        {groups.map((group) => (
+          <View key={group.name}>
+            <Heading level={2} style={section}>
+              {group.name}
+            </Heading>
+            {group.rows.map((row, index) => (
+              <View
+                key={index}
+                style={{
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#e3e6df',
+                  paddingTop: 7,
+                  paddingBottom: 7,
+                }}
+              >
+                <Text style={body} noMargin>
+                  [ ] {row.label} · {row.quantity}
+                  {options.countColumn ? '     Count: __________' : ''}
+                </Text>
+                {row.detail ? (
+                  <Text variant="xs" color="mutedForeground" noMargin>
+                    {row.detail}
+                  </Text>
+                ) : null}
+                {options.includeNotes && row.note ? (
+                  <Text variant="xs" color="mutedForeground" noMargin>
+                    {row.note}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ))}
+        {!groups.length && <Text>No items match these print options.</Text>}
+      </Page>
     </Document>
   );
 }

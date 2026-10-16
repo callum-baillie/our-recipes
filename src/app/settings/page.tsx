@@ -18,6 +18,13 @@ export const dynamic = 'force-dynamic';
 
 const categories = [
   {
+    href: '/settings/automation',
+    eyebrow: 'BACKGROUND TASKS',
+    title: 'Queue and automation',
+    description: 'Queue status, bulk processing, and scheduled meal-plan drafts.',
+    icon: CalendarDays,
+  },
+  {
     href: '/settings/api',
     eyebrow: 'API & SECURITY',
     title: 'API keys',

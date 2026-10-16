@@ -134,8 +134,8 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
     <section className="recipe-media" aria-labelledby="recipe-photos-heading">
       <div className="recipe-media-heading">
         <div>
-          <p className="eyebrow">LOCAL RECIPE PHOTOS</p>
-          <h2 id="recipe-photos-heading">A little visual memory</h2>
+          <p className="eyebrow">RECIPE PHOTOS</p>
+          <h2 id="recipe-photos-heading">Photos</h2>
         </div>
         <div className="recipe-media-heading-actions">
           <span>{images.length} saved</span>

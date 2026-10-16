@@ -343,5 +343,30 @@
     "method": "PATCH",
     "path": "/account/profile",
     "reason": "Session-owned personal profile preferences; target derived from authenticated account."
+  },
+  {
+    "method": "GET",
+    "path": "/cook-sessions",
+    "reason": "First-party completed cooking session selector; actor resolved by core authorization."
+  },
+  {
+    "method": "GET",
+    "path": "/nutrition/profiles/{profileId}/recommendations",
+    "reason": "First-party Nutrition suggestions using the existing household context and recommendation service."
+  },
+  {
+    "method": "GET",
+    "path": "/account/automation",
+    "reason": "Session-owned automation preferences and schedule status."
+  },
+  {
+    "method": "PATCH",
+    "path": "/account/automation",
+    "reason": "Session-owned automation settings with explicit paid schedule authorization."
+  },
+  {
+    "method": "GET",
+    "path": "/ai/actions/{actionId}",
+    "reason": "First-party reviewed assistant and scheduled meal-plan draft preview."
   }
 ]

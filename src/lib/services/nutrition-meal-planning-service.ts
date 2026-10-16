@@ -124,7 +124,7 @@ export function getNutritionMealProjection(
     .prepare(
       `SELECT m.id AS meal_plan_entry_id,m.planned_for,m.meal,
               m.title AS freeform_title,m.servings AS total_servings,
-              r.id AS recipe_id,r.title AS recipe_title,
+              r.id AS recipe_id,COALESCE(NULLIF(m.recipe_title_snapshot,''),r.title) AS recipe_title,
               COALESCE(m.recipe_revision,r.current_revision) AS current_recipe_revision,
               c.id AS calculation_id,c.recipe_revision AS calculation_recipe_revision,
               c.revision AS calculation_revision,c.serving_count,c.confidence,c.completeness,
@@ -135,7 +135,7 @@ export function getNutritionMealProjection(
               v.completeness AS value_completeness
        FROM meal_plan_entries m
        LEFT JOIN recipes r ON r.id=m.recipe_id
-       LEFT JOIN recipe_nutrition_calculations c ON c.id=COALESCE(
+       LEFT JOIN recipe_nutrition_calculations c ON m.recipe_override IS NULL AND c.id=COALESCE(
          m.recipe_calculation_id,
          (SELECT latest.id FROM recipe_nutrition_calculations latest
           WHERE latest.recipe_id=r.id ORDER BY latest.revision DESC LIMIT 1)

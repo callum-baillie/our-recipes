@@ -1,0 +1,525 @@
+/* Shared by app settings and account preferences. Keep the same content grid everywhere. */
+.settings-content {
+  min-width: 0;
+  container-type: inline-size;
+}
+.settings-content > main.recipe-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 1.5rem var(--page-gutter) calc(3rem + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 1.75rem;
+  align-content: start;
+}
+.settings-content .settings-form,
+.settings-stack {
+  display: grid;
+  gap: 1.75rem;
+  min-width: 0;
+}
+.settings-content .settings-pane {
+  border: 1px solid var(--line);
+  border-inline: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  padding: 0;
+}
+.settings-content .settings-pane-header {
+  padding: 1rem 0;
+  gap: 1rem;
+  align-items: center;
+}
+.settings-content .settings-pane-header h2 {
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.settings-content .settings-pane-header h2 + p {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  max-width: 65ch;
+}
+.settings-content .settings-pane-body {
+  display: block;
+  min-width: 0;
+}
+.settings-content .settings-pane-actions {
+  width: auto;
+  flex-wrap: wrap;
+}
+.settings-content .settings-pane-danger {
+  border-top-color: color-mix(in srgb, var(--danger, #b44532) 50%, var(--line));
+}
+.settings-content .settings-row,
+.settings-content .settings-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.8fr);
+  align-items: center;
+  gap: 1rem 2.5rem;
+  padding: 1rem 0;
+  min-width: 0;
+  min-height: 4.5rem;
+  margin: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+}
+.settings-content .settings-row + .settings-row,
+.settings-content .settings-field + .settings-field,
+.settings-content .settings-row + .settings-field,
+.settings-content .settings-field + .settings-row {
+  border-top: 1px solid var(--line);
+}
+.settings-content .settings-row-start {
+  align-items: start;
+}
+.settings-content .settings-row-copy {
+  display: block;
+  min-width: 0;
+}
+.settings-content .settings-row-copy h3,
+.settings-content .settings-field-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.45;
+  margin: 0;
+  color: var(--ink);
+}
+.settings-content .settings-row-copy p,
+.settings-content .settings-field-description {
+  display: block;
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 60ch;
+}
+.settings-content .settings-row-control,
+.settings-content .settings-field-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.settings-content
+  .settings-field-control
+  > input:not([type='checkbox']):not([type='radio']):not([type='color']),
+.settings-content .settings-field-control > select,
+.settings-content .settings-field-control > textarea {
+  width: min(100%, 25rem);
+}
+.settings-content .settings-field-control > input[type='color'] {
+  width: 3.5rem;
+  padding: 0.25rem;
+}
+.settings-content .settings-field-compact .settings-field-control > input {
+  max-width: 8rem;
+}
+.settings-content input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+.settings-content select,
+.settings-content textarea {
+  min-width: 0;
+  min-height: 44px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--field);
+  color: var(--ink);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+.settings-content textarea {
+  resize: vertical;
+}
+.settings-content input:focus-visible,
+.settings-content select:focus-visible,
+.settings-content textarea:focus-visible,
+.settings-content button:focus-visible,
+.settings-content a:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
+}
+.settings-content .settings-field-control > input[type='checkbox'][role='switch'] {
+  appearance: none;
+  position: relative;
+  width: 2.65rem;
+  height: 1.5rem;
+  min-height: 0;
+  flex: 0 0 2.65rem;
+  margin: 0.6rem 0;
+  border-radius: 2rem;
+  border: 1px solid var(--muted);
+  background: var(--line);
+  cursor: pointer;
+}
+.settings-content .settings-field-control > input[type='checkbox'][role='switch']::before {
+  content: '';
+  position: absolute;
+  width: 1.1rem;
+  height: 1.1rem;
+  left: 0.15rem;
+  top: 0.14rem;
+  border-radius: 50%;
+  background: var(--field);
+  box-shadow: 0 1px 3px #0004;
+  transition: transform 0.15s ease;
+}
+.settings-content .settings-field-control > input[type='checkbox'][role='switch']:checked {
+  background: var(--leaf);
+  border-color: var(--leaf);
+}
+.settings-content .settings-field-control > input[type='checkbox'][role='switch']:checked::before {
+  transform: translateX(1.1rem);
+  background: var(--on-primary, #fff);
+}
+.settings-content .settings-field:has(> .settings-field-control > :disabled) {
+  opacity: 0.65;
+}
+.settings-content .settings-control-group {
+  gap: 0.75rem;
+}
+.settings-content .settings-row-control > output {
+  overflow-wrap: anywhere;
+  text-transform: none;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.settings-content .settings-subsection {
+  display: block;
+  min-width: 0;
+  padding: 1.15rem 0 0;
+  margin: 0.25rem 0 0;
+  border-top: 1px solid var(--line);
+}
+.settings-content .settings-subsection > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.settings-content .settings-subsection h3 {
+  font-size: 0.9rem;
+  margin: 0;
+  font-weight: 650;
+}
+.settings-content .settings-subsection > header p {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.settings-content .settings-subsection-content {
+  min-width: 0;
+}
+.settings-content .settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--field);
+  margin: 0.5rem 0;
+  min-width: 0;
+}
+.settings-content .settings-item-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-content .settings-item h4 {
+  font-size: 0.9rem;
+  margin: 0;
+}
+.settings-content .settings-item p {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.settings-content .settings-item code {
+  overflow-wrap: anywhere;
+}
+.settings-content .settings-inline-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.settings-content .settings-empty {
+  padding: 1.2rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  background: var(--linen);
+  border-radius: 0.6rem;
+}
+.settings-content .settings-action-bar {
+  margin: 0.5rem 0 0;
+  padding: 1rem 0;
+  gap: 1rem;
+  border-top: 1px solid var(--line);
+  background: transparent;
+}
+.settings-content button,
+.settings-content .text-button,
+.settings-content .primary-button,
+.settings-content .secondary-button {
+  min-height: 44px;
+}
+.settings-content .settings-fields {
+  container-type: inline-size;
+  display: block;
+  padding: 0;
+  gap: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.settings-content .settings-fields > legend {
+  padding: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+.settings-content .settings-fields > p {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+.settings-content .settings-disclosure {
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  margin-block: 0.75rem;
+  padding: 0 1rem 1rem;
+  background: var(--field);
+}
+.settings-content .settings-disclosure > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 0.85rem;
+  font-weight: 650;
+  font-size: 0.9rem;
+}
+.settings-content .settings-disclosure:not([open]) {
+  padding-bottom: 0;
+}
+.settings-content .settings-disclosure .settings-field-control > input,
+.settings-content .settings-disclosure .settings-field-control > select {
+  background: var(--page);
+}
+.settings-content fieldset:disabled {
+  opacity: 0.7;
+}
+@container (max-width: 660px) {
+  .settings-content .settings-row,
+  .settings-content .settings-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+  .settings-content .settings-field:has(> .settings-field-control > input[type='checkbox']) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .settings-content .settings-row-control,
+  .settings-content .settings-field-control {
+    justify-content: flex-start;
+  }
+  .settings-content
+    .settings-field-control
+    > input:not([type='checkbox']):not([type='radio']):not([type='color']),
+  .settings-content .settings-field-control > select,
+  .settings-content .settings-field-control > textarea,
+  .settings-content .settings-control,
+  .settings-content .settings-control-group {
+    width: 100%;
+  }
+  .settings-content .settings-row-control > output {
+    text-align: left;
+  }
+  .settings-content .settings-item {
+    align-items: start;
+    flex-direction: column;
+  }
+  .settings-content .settings-item > .settings-inline-actions {
+    width: 100%;
+  }
+  .settings-content .settings-pane-header,
+  .settings-content .settings-pane-header.has-icon {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .settings-content .settings-pane-actions {
+    margin-left: 0;
+  }
+  .settings-content .settings-control-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .settings-content input,
+  .settings-content select,
+  .settings-content textarea {
+    font-size: 16px !important;
+  }
+  .settings-content > main.recipe-page {
+    padding-top: 1rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-content input[type='checkbox']::before {
+    transition: none;
+  }
+}
+.settings-content .settings-group {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.8rem 0 0;
+  margin: 1.25rem 0 0;
+  background: transparent;
+}
+.settings-content .settings-group > legend {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-weight: 650;
+  padding: 0 0.5rem 0 0;
+  color: var(--ink);
+}
+.settings-content .settings-group-description {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+.settings-content .settings-group .settings-group {
+  margin-top: 0.75rem;
+}
+.settings-content .settings-field-title small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.settings-content .settings-field-title em {
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.settings-content .settings-field-control :where(input, select, textarea) {
+  margin: 0;
+}
+.settings-content .settings-pane > .settings-pane-body {
+  padding: 0;
+}
+.settings-content .profile-editor > .settings-pane-body > .settings-fields {
+  padding: 0;
+}
+.settings-content .settings-page {
+  display: grid;
+  gap: 1.75rem;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+.settings-content .profile-settings-list {
+  display: grid;
+  gap: 1.75rem;
+}
+.settings-content .profile-goal-settings-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.settings-content .profile-goal-settings-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+}
+.settings-content .settings-row .appearance-choices {
+  width: 100%;
+  max-width: none;
+}
+.settings-content .settings-item .settings-inline-actions {
+  flex-shrink: 0;
+}
+.settings-content .settings-field-title > span {
+  color: inherit;
+  font: inherit;
+}
+.settings-content .settings-field-title > span:only-child {
+  display: block;
+}
+.settings-content .settings-field:has(textarea) {
+  align-items: start;
+}
+.settings-content .settings-item .settings-inline-actions {
+  justify-content: flex-end;
+}
+.settings-content .api-key-rows > article {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  padding: 1rem;
+  margin: 0.5rem 0;
+}
+.settings-content .api-key-rows > article > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-content .api-key-rows {
+  min-width: 0;
+}
+@container (max-width: 660px) {
+  .settings-content .api-key-rows > article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .settings-content .settings-item .settings-inline-actions {
+    justify-content: flex-start;
+  }
+}
+
+.settings-content .settings-dialog {
+  container-type: inline-size;
+}
+.settings-content .settings-action-bar > div:last-child {
+  flex-wrap: wrap;
+}
+.settings-content .settings-pane-header > div:first-of-type {
+  flex: 1 1 12rem;
+}
+.settings-content .settings-inline-status {
+  padding-inline: 0;
+}
+.settings-content .settings-field-description small {
+  font: inherit;
+}
+.settings-content .settings-group > p {
+  margin-block: 0.5rem;
+}
+
+.settings-content .appearance-palette-grid {
+  grid-template-columns: repeat(auto-fit, minmax(4.25rem, 1fr));
+}
+.settings-content .appearance-mode-grid {
+  grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+}

@@ -1,0 +1,99 @@
+.page {
+  max-width: var(--workspace-width);
+  margin: auto;
+  padding: var(--workspace-top-space) var(--page-gutter) calc(3rem + env(safe-area-inset-bottom));
+}
+.panel {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.panel legend,
+.panel h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.panel p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 75ch;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+}
+.check input {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.choices,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.job {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+.job button,
+.retryDialog button {
+  padding: 0.65rem;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--page);
+  color: var(--ink);
+}
+.job progress {
+  max-width: 100%;
+  accent-color: var(--leaf);
+}
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel input,
+  .panel select,
+  .panel textarea {
+    font-size: 16px;
+  }
+  .panel {
+    padding: 1rem;
+  }
+  .job {
+    align-items: start;
+  }
+  .job .actions {
+    width: 100%;
+  }
+}
+
+.retryDialog {
+  width: min(30rem, 100%);
+  padding: 1.25rem;
+}
+.retryDialog p {
+  line-height: 1.6;
+  color: var(--muted);
+}

@@ -16,7 +16,8 @@
 }
 .backdrop {
   position: fixed;
-  inset: 0;
+  inset: var(--dialog-viewport-top, 0px) 0 auto;
+  height: var(--dialog-viewport-height, 100dvh);
   z-index: 80;
   display: grid;
   place-items: center;
@@ -26,7 +27,7 @@
 }
 .dialog {
   width: min(760px, 100%);
-  max-height: min(88vh, 820px);
+  max-height: min(calc(var(--dialog-viewport-height, 100dvh) - 2rem), 820px);
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 1rem;

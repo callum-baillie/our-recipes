@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, Copy, Heart, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, Copy, Heart, Star, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -22,6 +22,7 @@ export function RecipeLifecycleActions({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [rating, setRating] = useState<number | null>(personalPreference?.rating ?? null);
   const [note, setNote] = useState(personalPreference?.note ?? '');
   const [preferenceSaved, setPreferenceSaved] = useState(false);
@@ -69,7 +70,7 @@ export function RecipeLifecycleActions({
     }
   }
 
-  async function savePersonalPreference() {
+  async function savePersonalPreference(nextRating = rating) {
     setPending(true);
     setError(null);
     setPreferenceSaved(false);
@@ -77,7 +78,7 @@ export function RecipeLifecycleActions({
       const response = await fetch(`/api/v1/recipes/${recipeId}/preference`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating, note }),
+        body: JSON.stringify({ rating: nextRating, note }),
       });
       const body = (await response.json().catch(() => null)) as {
         preference?: { rating: number | null; note: string };
@@ -91,6 +92,8 @@ export function RecipeLifecycleActions({
       setNote(body.preference.note);
       setPreferenceSaved(true);
       router.refresh();
+    } catch {
+      setError('Your rating or note could not be saved. Please try again.');
     } finally {
       setPending(false);
     }
@@ -185,24 +188,27 @@ export function RecipeLifecycleActions({
               Only this profile can see these notes and rating. They are not exported or versioned.
             </p>
           </div>
-          <label>
-            <span>Your rating</span>
-            <select
-              aria-label="Your rating"
-              value={rating ?? ''}
-              disabled={pending}
-              onChange={(event) =>
-                setRating(event.target.value ? Number(event.target.value) : null)
-              }
-            >
-              <option value="">No rating</option>
-              <option value="1">1 — would skip</option>
-              <option value="2">2 — needs work</option>
-              <option value="3">3 — good</option>
-              <option value="4">4 — make again</option>
-              <option value="5">5 — household favorite</option>
-            </select>
-          </label>
+          <div className="recipe-star-rating" role="group" aria-label="Your rating">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button
+                key={value}
+                type="button"
+                disabled={pending}
+                aria-label={`Rate ${value} out of 5 stars`}
+                aria-pressed={rating === value}
+                onMouseEnter={() => setHoverRating(value)}
+                onMouseLeave={() => setHoverRating(null)}
+                onFocus={() => setHoverRating(value)}
+                onBlur={() => setHoverRating(null)}
+                onClick={() => void savePersonalPreference(value)}
+              >
+                <Star
+                  size={25}
+                  fill={value <= (hoverRating ?? rating ?? 0) ? 'currentColor' : 'none'}
+                />
+              </button>
+            ))}
+          </div>
           <label>
             <span>Personal note</span>
             <textarea
@@ -217,7 +223,7 @@ export function RecipeLifecycleActions({
           </label>
           <div>
             <button className="text-button" type="submit" disabled={pending}>
-              Save personal preference
+              Save note
             </button>
             {preferenceSaved && <span role="status">Saved for your profile.</span>}
           </div>

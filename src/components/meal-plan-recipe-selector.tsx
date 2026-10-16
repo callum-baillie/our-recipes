@@ -30,6 +30,7 @@ type RecipeSelectorProps = {
   profileNames: string[];
   initialDate?: string;
   initialMealType?: MealType;
+  onOtherKind?: (kind: 'item' | 'takeout' | 'leftover') => void;
   onClose: () => void;
   onSaved: (count: number, meals: PlannedMeal[]) => void;
 };
@@ -65,7 +66,12 @@ function RecipeChoiceCard({
   onSelect: () => void;
 }) {
   return (
-    <article className={`${styles.recipeChoice}${selected ? ` ${styles.selectedRecipe}` : ''}`}>
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={`${styles.recipeChoice}${selected ? ` ${styles.selectedRecipe}` : ''}`}
+    >
       <div className={styles.recipeChoiceMedia}>
         {recipe.image ? (
           <Image
@@ -73,7 +79,7 @@ function RecipeChoiceCard({
             alt={recipe.image.altText || recipe.title}
             width={recipe.image.width}
             height={recipe.image.height}
-            sizes="(max-width: 620px) 42vw, 240px"
+            sizes="(max-width: 620px) 90vw, 240px"
             unoptimized
           />
         ) : (
@@ -94,16 +100,12 @@ function RecipeChoiceCard({
         <p>
           <Clock3 size={14} aria-hidden="true" /> {recipeMinutes(recipe)} min
         </p>
-        <button
-          className={selected ? styles.selectedButton : styles.secondaryButton}
-          type="button"
-          onClick={onSelect}
-        >
+        <span className={selected ? styles.selectedButton : styles.secondaryButton}>
           {selected ? <Check size={16} aria-hidden="true" /> : null}
           {selected ? 'Selected' : 'Select'}
-        </button>
+        </span>
       </div>
-    </article>
+    </button>
   );
 }
 
@@ -120,6 +122,7 @@ export function MealPlanRecipeSelector({
   initialDate,
   initialMealType,
   onClose,
+  onOtherKind,
   onSaved,
 }: RecipeSelectorProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -276,7 +279,7 @@ export function MealPlanRecipeSelector({
       <div className={styles.dialogShell}>
         <header className={styles.dialogHeader}>
           <div>
-            <h2 id="recipe-selector-title">Select recipes</h2>
+            <h2 id="recipe-selector-title">Add meals</h2>
             <p>Choose a recipe for each meal in your plan.</p>
           </div>
           <button
@@ -289,6 +292,20 @@ export function MealPlanRecipeSelector({
           </button>
         </header>
 
+        {onOtherKind ? (
+          <div className={styles.collectionRow} aria-label="Other meal options">
+            <span>Plan something else</span>
+            {(['item', 'leftover', 'takeout'] as const).map((kind) => (
+              <button type="button" key={kind} onClick={() => onOtherKind(kind)}>
+                {kind === 'item'
+                  ? 'Single food or drink'
+                  : kind === 'leftover'
+                    ? 'Leftovers'
+                    : 'Takeout'}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className={styles.dialogTools}>
           <label className={styles.searchField}>
             <Search size={19} aria-hidden="true" />

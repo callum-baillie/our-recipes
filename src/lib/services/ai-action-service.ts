@@ -35,6 +35,7 @@ import {
   removeMealPlanEntryWithNutrition,
   updateMealPlanEntryWithNutrition,
 } from '@/lib/services/nutrition-planning-orchestration-service';
+import { reconcileAutomaticRestockPolicies } from '@/lib/services/pantry-grocery-cooking-service';
 import { insertMealPlanEntriesInTransaction } from '@/lib/services/planning-service';
 import {
   createRecipeInTransaction,
@@ -212,6 +213,7 @@ function commitGeneratedPlan(
           gte(mealPlanEntries.plannedFor, start),
           lte(mealPlanEntries.plannedFor, end),
           inArray(mealPlanEntries.meal, meals),
+          eq(mealPlanEntries.status, 'planned'),
         ),
       )
       .all()
@@ -283,6 +285,29 @@ function commitGeneratedPlan(
       });
     }
     if (occupiedSlotMode === 'replace' || occupiedSlotMode === 'review') {
+      const replacing = new Set(
+        occupied
+          .filter(
+            (entry) => occupiedSlotMode === 'replace' || resolutionById.get(entry.id) === 'replace',
+          )
+          .map((entry) => entry.id),
+      );
+      for (const entry of occupied) {
+        if (!replacing.has(entry.id)) continue;
+        const linked = transaction
+          .select({ id: mealPlanLeftoverLinks.destinationEntryId, status: mealPlanEntries.status })
+          .from(mealPlanLeftoverLinks)
+          .innerJoin(
+            mealPlanEntries,
+            eq(mealPlanEntries.id, mealPlanLeftoverLinks.destinationEntryId),
+          )
+          .where(eq(mealPlanLeftoverLinks.sourceEntryId, entry.id))
+          .all();
+        if (linked.some((link) => link.status === 'planned' && !replacing.has(link.id)))
+          throw new AiActionConflictError(
+            'This meal has linked leftovers outside the replacement. Update those leftovers first or keep the source meal.',
+          );
+      }
       for (const entry of occupied) {
         if (occupiedSlotMode === 'review' && resolutionById.get(entry.id) !== 'replace') continue;
         const allocated = transaction
@@ -376,6 +401,11 @@ function commitGeneratedPlan(
           createdByProfileId: profileId,
           createdAt: new Date(),
         })
+        .run();
+      transaction
+        .update(mealPlanEntries)
+        .set({ kind: 'leftover' })
+        .where(eq(mealPlanEntries.id, destination.id))
         .run();
       result.leftoverLinkIds.push(id);
     }
@@ -569,7 +599,14 @@ export async function decideAiAction(
       throw new AiActionConflictError('That AI action was already decided.');
     }
     claimed = true;
-    const result = execute(row, conflictResolutions);
+    const result =
+      row.kind === 'meal_plan_change' || row.kind === 'meal_plan_generate'
+        ? getDatabase().transaction(() => {
+            const saved = execute(row, conflictResolutions);
+            reconcileAutomaticRestockPolicies(row.profileId);
+            return saved;
+          })
+        : execute(row, conflictResolutions);
     let storedResult = result;
     if (row.kind === 'meal_plan_generate') {
       const payload = generatedPlanPayloadSchema.parse(JSON.parse(row.payload));

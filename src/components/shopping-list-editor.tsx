@@ -1,4 +1,7 @@
 'use client';
+import { ShoppingListNotes } from './shopping-list-notes';
+import { ShoppingListShortcuts } from './shopping-list-shortcuts';
+import { KitchenPrintDialog } from './kitchen-print-dialog';
 import { DecisionAssistance } from '@/components/decision-assistance';
 
 import { InstacartShopping } from './instacart-shopping';
@@ -19,7 +22,6 @@ import {
   Search,
   Settings,
   ShoppingCart,
-  StickyNote,
   Store,
   Trash2,
   X,
@@ -461,6 +463,9 @@ export function ShoppingListEditor({
   const [items, setItems] = useState(() =>
     list.items.map((item) => ({ ...item, shoppingState: normalizedState(item) })),
   );
+  const dirtyItems = useRef(new Map<string, number>());
+  const saveChains = useRef(new Map<string, Promise<boolean>>());
+  const [syncError, setSyncError] = useState('');
   const [newItem, setNewItem] = useState('');
   const [newQuantity, setNewQuantity] = useState('');
   const [newUnit, setNewUnit] = useState('');
@@ -542,6 +547,59 @@ export function ShoppingListEditor({
     if (!substituteItem && dialog?.open) dialog.close();
   }, [substituteItem]);
 
+  useEffect(() => {
+    let disposed = false;
+    let fetching = false;
+    const refresh = async () => {
+      if (
+        fetching ||
+        document.visibilityState !== 'visible' ||
+        document.activeElement?.matches('input,textarea,select')
+      )
+        return;
+      fetching = true;
+      try {
+        const response = await fetch(`/api/v1/shopping-lists/${list.id}`, { cache: 'no-store' });
+        const body = await response.json();
+        if (!response.ok)
+          throw new Error('Shared list updates paused. Your edits are kept; reconnect to sync.');
+        if (disposed) return;
+        const latest = body.list.items as Item[];
+        setItems((current) => {
+          const locked = (id: string) =>
+            dirtyItems.current.has(id) || pendingStateChanges.current.has(id);
+          const byId = new Map(current.map((item) => [item.id, item]));
+          return [
+            ...latest.map((item) =>
+              locked(item.id)
+                ? (byId.get(item.id) ?? item)
+                : { ...item, shoppingState: normalizedState(item) },
+            ),
+            ...current.filter(
+              (item) => locked(item.id) && !latest.some((next) => next.id === item.id),
+            ),
+          ];
+        });
+        setSyncError('');
+      } catch (error) {
+        if (!disposed)
+          setSyncError(
+            error instanceof Error ? error.message : 'Shared updates are temporarily unavailable.',
+          );
+      } finally {
+        fetching = false;
+      }
+    };
+    const timer = setInterval(() => void refresh(), 30000);
+    const focus = () => void refresh();
+    window.addEventListener('focus', focus);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      window.removeEventListener('focus', focus);
+    };
+  }, [list.id]);
+
   const aisleById = useMemo(
     () => new Map(list.aisles.map((aisle) => [aisle.id, aisle.name])),
     [list.aisles],
@@ -553,7 +611,7 @@ export function ShoppingListEditor({
         return left.item.localeCompare(right.item, undefined, { sensitivity: 'base' });
       }
       if (sortMode === 'recent') {
-        return right.createdAt.getTime() - left.createdAt.getTime();
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
       }
       return left.position - right.position;
     });
@@ -603,10 +661,12 @@ export function ShoppingListEditor({
       ? rankPantryMatches(item.item, stockedPantryProducts)
       : [];
 
-  const updateLocal = (id: string, patch: Partial<Item>) =>
+  const updateLocal = (id: string, patch: Partial<Item>) => {
+    dirtyItems.current.set(id, (dirtyItems.current.get(id) ?? 0) + 1);
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
 
-  const save = async (item: Item) => {
+  const persistItem = async (item: Item) => {
     try {
       const response = await fetch(`/api/v1/shopping-lists/${list.id}/items/${item.id}`, {
         method: 'PATCH',
@@ -629,16 +689,39 @@ export function ShoppingListEditor({
     }
   };
 
+  const save = (item: Item): Promise<boolean> => {
+    const version = dirtyItems.current.get(item.id);
+    const previous = saveChains.current.get(item.id) ?? Promise.resolve(true);
+    const next = previous
+      .catch(() => false)
+      .then(() => persistItem(item))
+      .then((ok) => {
+        if (ok && dirtyItems.current.get(item.id) === version) dirtyItems.current.delete(item.id);
+        return ok;
+      });
+    saveChains.current.set(item.id, next);
+    void next.finally(() => {
+      if (saveChains.current.get(item.id) === next) saveChains.current.delete(item.id);
+    });
+    return next;
+  };
+
   const setItemState = async (item: Item, state: ShoppingState, undo = false) => {
     if (pendingStateChanges.current.has(item.id)) return;
     pendingStateChanges.current.add(item.id);
     setPendingItems((current) => [...current, item.id]);
     const previous = normalizedState(item);
     const changed = { ...item, shoppingState: state, checked: state === 'sourced' };
+    const wasDirty = dirtyItems.current.has(item.id);
     updateLocal(item.id, changed);
+    const changedVersion = dirtyItems.current.get(item.id);
     try {
-      if (!(await save(changed))) updateLocal(item.id, item);
-      else {
+      if (!(await save(changed))) {
+        if (dirtyItems.current.get(item.id) === changedVersion) {
+          setItems((current) => current.map((row) => (row.id === item.id ? item : row)));
+          if (!wasDirty) dirtyItems.current.delete(item.id);
+        }
+      } else {
         setLastChecked(undo ? null : { item: changed, state: previous });
         if (state === 'cant_find') showToast(`${item.item} moved to Can’t Find.`, 'success');
       }
@@ -1799,7 +1882,30 @@ export function ShoppingListEditor({
         </section>
       ) : null}
 
+      {syncError && (
+        <p role="status" className={styles.syncNotice}>
+          {syncError}
+        </p>
+      )}
+      <ShoppingListShortcuts
+        listId={list.id}
+        currentNames={items.filter((item) => !item.checked).map((item) => item.item)}
+        onAdded={(added) =>
+          setItems((current) => [
+            ...current,
+            ...added.filter((item) => !current.some((existing) => existing.id === item.id)),
+          ])
+        }
+      />
       <InstacartShopping listId={list.id} items={items} configured={instacartEnabled} />
+      <div className={styles.utilities}>
+        <KitchenPrintDialog kind="shopping-list" listId={list.id} />
+        <ShoppingListNotes
+          listId={list.id}
+          initialNote={list.notes ?? ''}
+          initialVersion={list.notesVersion ?? 0}
+        />
+      </div>
       <div className={styles.toolbar}>
         <div className={styles.mobileSearchRow}>
           <label className={styles.search} aria-label="Search shopping items">
@@ -2008,12 +2114,6 @@ export function ShoppingListEditor({
                 : 'Choose a store profile to see aisles and prices.'}
             </p>
             <Link href="/settings/lists">Manage profiles →</Link>
-          </section>
-          <section>
-            <h2>
-              <StickyNote size={19} /> Notes
-            </h2>
-            <p>Add a note for this list...</p>
           </section>
           <section>
             <h2>

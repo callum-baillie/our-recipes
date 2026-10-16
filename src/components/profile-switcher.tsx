@@ -189,6 +189,9 @@ export function ProfileSwitcher({
           <Link className="manage-profiles-link" href="/account" data-menu-close>
             My profile
           </Link>
+          <Link className="manage-profiles-link" href="/account/automation" data-menu-close>
+            Schedules & tasks
+          </Link>
           <Link className="manage-profiles-link" href="/account/security" data-menu-close>
             Account security
           </Link>

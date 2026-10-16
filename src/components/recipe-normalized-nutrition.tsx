@@ -15,11 +15,28 @@ export function RecipeNormalizedNutrition({
   nutrition: RecipeNutritionPresentation;
 }) {
   return (
-    <section className={styles.panel} aria-labelledby="normalized-nutrition-heading">
-      <header className={styles.heading}>
+    <details
+      className={`${styles.panel} normalized-nutrition-banner`}
+      aria-labelledby="normalized-nutrition-heading"
+    >
+      <summary className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>NORMALIZED INGREDIENT CALCULATION</p>
-          <h2 id="normalized-nutrition-heading">Calculated recipe nutrition</h2>
+          <p className={styles.eyebrow}>INGREDIENT-BASED NUTRITION</p>
+          <h2 id="normalized-nutrition-heading">Nutrition calculation</h2>
+          {nutrition.status === 'current' && (
+            <small>
+              {nutrition.values
+                .filter(
+                  (value) =>
+                    ['energy_kcal', 'protein', 'carbohydrate', 'total_fat'].includes(
+                      value.nutrientCode,
+                    ) && value.perServing !== null,
+                )
+                .map((value) => `${value.label} ${number(value.perServing!)} ${value.unit}`)
+                .join(' · ')}{' '}
+              · per serving
+            </small>
+          )}
         </div>
         <span className={styles.status} data-status={nutrition.status}>
           {nutrition.status === 'current'
@@ -28,7 +45,7 @@ export function RecipeNormalizedNutrition({
               ? 'Recalculation needed'
               : 'Not calculated'}
         </span>
-      </header>
+      </summary>
       {nutrition.status === 'unavailable' ? (
         <p className={styles.callout}>
           No normalized ingredient calculation is available. Missing values are unknown, never zero.
@@ -91,6 +108,6 @@ export function RecipeNormalizedNutrition({
           description="Match ingredients to your products, review missing nutrition, or compare substitutions. Review each change before it updates the recipe."
         />
       )}
-    </section>
+    </details>
   );
 }

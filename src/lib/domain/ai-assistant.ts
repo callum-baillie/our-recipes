@@ -259,7 +259,7 @@ export const aiMealPlanOptionsSchema = z
 
 export const aiFixedMealSchema = z
   .object({
-    plannedFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    plannedFor: z.iso.date(),
     meal: mealTypePreferenceSchema,
     existingRecipeId: z.string().uuid().nullable().default(null),
     newRecipeBrief: z.string().trim().max(500).nullable().default(null),
@@ -272,8 +272,8 @@ export const aiFixedMealSchema = z
 export const aiMealPlanGenerationRequestSchema = z
   .object({
     mode: z.enum(['recipebook', 'ai']).default('ai'),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    startDate: z.iso.date(),
+    endDate: z.iso.date(),
     mealSlots: z.array(mealTypePreferenceSchema).min(1).max(5),
     servings: z.number().int().min(1).max(100),
     sourceMode: z.enum(['existing', 'new', 'mix']),
@@ -328,7 +328,7 @@ export const aiMealPlanCandidateSchema = z
         z
           .object({
             entryKey: z.string().trim().min(1).max(100).optional(),
-            plannedFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+            plannedFor: z.iso.date(),
             meal: mealTypePreferenceSchema,
             existingRecipeId: z.string().uuid().nullable(),
             newRecipeKey: z.string().max(80).nullable(),
@@ -359,7 +359,7 @@ export const aiMealPlanStructuredOutputSchema = z
       .array(
         z
           .object({
-            plannedFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+            plannedFor: z.iso.date(),
             meal: mealTypePreferenceSchema,
             existingRecipeId: z.string().nullable(),
             newRecipeKey: z.string().max(80).nullable(),

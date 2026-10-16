@@ -52,6 +52,7 @@ function mealMatchesRecipe(recipe: ReturnType<typeof listRecipes>[number], meal:
 
 function recipebookCandidate(
   request: ReturnType<typeof aiMealPlanGenerationRequestSchema.parse>,
+  occupiedSlots = new Set<string>(),
 ): AiMealPlanCandidate {
   const recipes = listRecipes().map((recipe) => ({ recipe, detail: getRecipe(recipe.id) }));
   const dates = [...dateRange(request.startDate, request.endDate)];
@@ -64,6 +65,7 @@ function recipebookCandidate(
   for (const plannedFor of dates) {
     for (const meal of request.mealSlots) {
       const key = `${plannedFor}:${meal}`;
+      if (request.occupiedSlotMode === 'keep' && occupiedSlots.has(key)) continue;
       const fixedMeal = fixed.get(key);
       if (fixedMeal?.existingRecipeId) {
         const savedRecipe = recipes.find((item) => item.recipe.id === fixedMeal.existingRecipeId);
@@ -229,6 +231,9 @@ export async function generateAiMealPlanProposal(input: {
   });
   const context = {
     ...sharedContext,
+    mealPlan: sharedContext.mealPlan.filter(
+      (meal) => !['cancelled', 'skipped'].includes(meal.status),
+    ),
     profiles: sharedContext.profiles.filter((profile) => {
       const key = typeof profile.key === 'string' ? profile.key : '';
       return selectedProfileIds.includes(key);
@@ -257,9 +262,10 @@ export async function generateAiMealPlanProposal(input: {
       );
     }
   }
+  const keptSlots = new Set(context.mealPlan.map((entry) => `${entry.plannedFor}:${entry.meal}`));
   let rawCandidate: AiMealPlanCandidate;
   if (request.mode === 'recipebook') {
-    rawCandidate = recipebookCandidate(request);
+    rawCandidate = recipebookCandidate(request, keptSlots);
     const expectedSlots =
       dateRange(request.startDate, request.endDate).size * request.mealSlots.length;
     if (request.options.generateMissingRecipes && rawCandidate.entries.length < expectedSlots) {
@@ -330,6 +336,14 @@ export async function generateAiMealPlanProposal(input: {
       }),
     );
   }
+  if (request.occupiedSlotMode === 'keep')
+    rawCandidate.entries = rawCandidate.entries.filter(
+      (entry) => !keptSlots.has(`${entry.plannedFor}:${entry.meal}`),
+    );
+  if (!rawCandidate.entries.length)
+    throw new AiMealPlanValidationError(
+      'All requested slots are already planned. Choose missing meals or explicitly replace existing ones.',
+    );
   const candidate = normalizeCandidate(rawCandidate, request, selectedProfileIds);
   const dates = dateRange(request.startDate, request.endDate);
   const slots = new Set(request.mealSlots);

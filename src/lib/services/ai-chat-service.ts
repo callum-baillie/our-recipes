@@ -1,4 +1,5 @@
 import 'server-only';
+import sharp from 'sharp';
 
 import type { RequestPrincipal } from '@/lib/services/auth-service';
 import {
@@ -15,7 +16,7 @@ import {
   type AppActionReview,
 } from '@/lib/services/ai-app-action-service';
 import { createHash, randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
@@ -23,11 +24,12 @@ import { aiChatMessages, aiChatThreads, aiOperationAudits } from '@/lib/db/schem
 import { aiChatMessageInputSchema } from '@/lib/domain/ai-assistant';
 import { manualConsumptionRequestSchema } from '@/lib/domain/nutrition-food-diary';
 import { mealPlanEntrySchema, mealPlanEntryUpdateSchema } from '@/lib/domain/planning';
+import { appRoleCan } from '@/lib/domain/permissions';
 import { recipeInputSchema } from '@/lib/domain/recipe';
 import { type AssistantTool, getAiAssistantProvider } from '@/lib/providers/ai-assistant-provider';
 import { createAiActionProposal } from '@/lib/services/ai-action-service';
 import { generateAiActionPreviewImage } from '@/lib/services/ai-action-preview-image-service';
-import { AI_BATCH_MIN_ITEMS, enqueueRecipeBatchGenerationJob } from '@/lib/services/ai-job-service';
+import { enqueueRecipeBatchGenerationJob } from '@/lib/services/ai-job-service';
 import {
   aiSafetyIdentifier,
   buildAiProfileContext,
@@ -35,8 +37,13 @@ import {
 } from '@/lib/services/ai-context-service';
 import { generateAiMealPlanProposal } from '@/lib/services/ai-meal-plan-service';
 import { getAiDataPolicy, getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
-import { listPlannedMeals } from '@/lib/services/planning-service';
-import { getRecipe, listRecipes } from '@/lib/services/recipe-service';
+import {
+  getShoppingList,
+  getPlannedMeal,
+  getRecipeForPlannedMeal,
+  listPlannedMeals,
+} from '@/lib/services/planning-service';
+import { getRecipe, recipePayloadFromDetail, listRecipes } from '@/lib/services/recipe-service';
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_RECENT_MESSAGES = 20;
@@ -50,10 +57,18 @@ export class AiChatToolError extends Error {}
 
 const dateRangeSchema = z
   .object({
-    start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
-    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    start: z.iso.date(),
+    end: z.iso.date(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (range) =>
+      Number.isFinite(Date.parse(range.start)) &&
+      Number.isFinite(Date.parse(range.end)) &&
+      range.start <= range.end &&
+      Date.parse(range.end) - Date.parse(range.start) <= 93 * 86400000,
+    'Choose a valid range of up to 93 days.',
+  );
 const recipeToolSchema = z
   .object({
     operation: z.enum(['create', 'update']),
@@ -66,7 +81,7 @@ const planChangeToolSchema = z
   .object({
     operation: z.enum(['add', 'edit', 'remove']),
     entryId: z.string().nullable(),
-    entryJson: z.string().max(10_000),
+    entryJson: z.string().max(60_000),
   })
   .strict();
 const nutritionToolSchema = z.object({ entryJson: z.string().min(2).max(20_000) }).strict();
@@ -79,6 +94,44 @@ const generatedRecipeBatchToolSchema = z
   .strict();
 
 export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
+  {
+    type: 'function',
+    name: 'read_planned_recipe',
+    strict: true,
+    description:
+      'Read a planned meal and the exact recipe used for it, including saved revision and temporary changes, in editable recipe format. Use this before preparing a temporary substitution; keep unaffected ingredients and steps.',
+    parameters: {
+      type: 'object',
+      properties: { entryId: { type: 'string' } },
+      required: ['entryId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function',
+    name: 'read_household_profiles',
+    strict: true,
+    description:
+      'For authorized parent/admin accounts, list household members and their individually shared goals and dietary needs. Use the returned keys as selectedProfileIds when planning for particular people or everyone. Respect withheld data.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  },
+  {
+    type: 'function',
+    name: 'read_shopping_context',
+    strict: true,
+    description:
+      'Read a shopping list, its manual items and recipe provenance, and planned meals in the supplied range. Use before suggesting in-store substitutions. Never assume every meal using a recipe belongs to this list; inspect pantry provenance contributions and sourceRecipeIds.',
+    parameters: {
+      type: 'object',
+      properties: {
+        listId: { type: 'string' },
+        start: { type: 'string' },
+        end: { type: 'string' },
+      },
+      required: ['listId', 'start', 'end'],
+      additionalProperties: false,
+    },
+  },
   {
     type: 'function',
     name: 'review_kitchen_data',
@@ -227,7 +280,7 @@ export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
   {
     type: 'function',
     name: 'generate_recipes',
-    description: `Generate two to twelve complete new recipes together, then prepare one review-only batch proposal. Requests with ${AI_BATCH_MIN_ITEMS} or more recipes run in the background with OpenAI Batch. Use this instead of repeated generate_recipe calls.`,
+    description: `Generate two to twelve complete new recipes together, then prepare one review-only batch proposal. Bulk requests run in the background using the user’s direct or Batch processing preference. Use this instead of repeated generate_recipe calls.`,
     parameters: {
       type: 'object',
       properties: {
@@ -393,7 +446,7 @@ export function listAiChatThreads(profileId: string) {
     .select()
     .from(aiChatThreads)
     .where(eq(aiChatThreads.profileId, profileId))
-    .orderBy(desc(aiChatThreads.updatedAt))
+    .orderBy(desc(aiChatThreads.createdAt), sql`rowid DESC`)
     .all();
 }
 
@@ -422,8 +475,35 @@ export function getAiChatMessages(threadId: string, profileId: string) {
     .select()
     .from(aiChatMessages)
     .where(eq(aiChatMessages.threadId, threadId))
-    .orderBy(asc(aiChatMessages.createdAt))
-    .all();
+    .orderBy(asc(aiChatMessages.createdAt), sql`rowid ASC`)
+    .all()
+    .map(({ attachmentsJson, ...message }) => {
+      let attachments: Array<{
+        kind: 'image';
+        name: string;
+        mimeType: 'image/webp';
+        dataBase64: string;
+      }> = [];
+      try {
+        attachments = z
+          .array(
+            z.object({
+              kind: z.literal('image'),
+              name: z.string().max(120),
+              mimeType: z.literal('image/webp'),
+              dataBase64: z
+                .string()
+                .max(2_000_000)
+                .regex(/^[a-z0-9+/]+={0,2}$/iu),
+            }),
+          )
+          .max(4)
+          .parse(JSON.parse(attachmentsJson));
+      } catch {
+        /* Legacy messages have no attachments. */
+      }
+      return { ...message, attachments };
+    });
 }
 
 function assertChatRate(profileId: string): void {
@@ -521,6 +601,53 @@ async function executeTool(input: {
       return readAppData(input.principal, input.request, input.args);
     return prepareAppActions(input.principal, input.request, input.threadId, input.args);
   }
+  if (input.name === 'read_planned_recipe') {
+    if (!policy.shareMealPlans || !policy.shareSharedRecipes)
+      throw new AiChatToolError('Meal-plan and recipe sharing are required.');
+    const { entryId } = z.object({ entryId: z.string().uuid() }).strict().parse(input.args);
+    const meal = getPlannedMeal(entryId);
+    if (!meal) throw new AiChatToolError('That meal no longer exists.');
+    const recipe = meal.recipeId ? getRecipeForPlannedMeal(meal.recipeId, entryId) : null;
+    return { meal, recipe: recipe ? recipePayloadFromDetail(recipe) : null };
+  }
+  if (input.name === 'read_household_profiles') {
+    z.object({}).strict().parse(input.args);
+    if (
+      !input.principal ||
+      !appRoleCan(input.principal.accountRole, 'shared.update') ||
+      !appRoleCan(input.principal.role, 'shared.update')
+    )
+      throw new AiChatToolError(
+        'Only an authorized parent or admin can plan for household members.',
+      );
+    return {
+      profiles: buildAiProfileContext(input.profileId),
+      note: 'Each member’s own AI sharing preferences apply. Keys identify selectable household profiles.',
+    };
+  }
+  if (input.name === 'read_shopping_context') {
+    if (
+      !policy.shareShoppingLists ||
+      !policy.shareMealPlans ||
+      !policy.shareSharedRecipes ||
+      !policy.sharePantry
+    )
+      throw new AiChatToolError(
+        'Enable sharing for shopping lists, recipes, pantry and meal plans to inspect their linked context.',
+      );
+    const args = z
+      .object({ listId: z.string().uuid(), start: z.string(), end: z.string() })
+      .strict()
+      .parse(input.args);
+    const range = dateRangeSchema.parse({ start: args.start, end: args.end });
+    const list = getShoppingList(args.listId);
+    if (!list) throw new AiChatToolError('That shopping list no longer exists.');
+    return {
+      list,
+      meals: listPlannedMeals(range.start, range.end),
+      note: 'Manual items may not be associated with any recipe. Planned recipe overrides apply only to their specific meals.',
+    };
+  }
   if (input.name === 'search_recipes') {
     if (!policy.shareSharedRecipes) throw new AiChatToolError('Recipe sharing is disabled.');
     const { query } = z
@@ -537,7 +664,10 @@ async function executeTool(input: {
     return recipe;
   }
   if (input.name === 'read_meal_plan') {
-    if (!policy.shareMealPlans) throw new AiChatToolError('Meal-plan sharing is disabled.');
+    if (!policy.shareMealPlans || !policy.shareSharedRecipes)
+      throw new AiChatToolError(
+        'Meal-plan and recipe sharing are required to read planned recipe context.',
+      );
     const range = dateRangeSchema.parse(input.args);
     return listPlannedMeals(range.start, range.end);
   }
@@ -597,7 +727,7 @@ async function executeTool(input: {
       ].join(' '),
       context: { brief, household: buildAiSharedContext(input.profileId) },
     }));
-    if (requests.length >= AI_BATCH_MIN_ITEMS) {
+    if (requests.length >= 2) {
       return enqueueRecipeBatchGenerationJob({
         profileId: input.profileId,
         threadId: input.threadId,
@@ -714,11 +844,39 @@ export async function runAiChatTurn(input: {
     ? `\n\nAttached: ${parsed.attachments.map((attachment) => attachment.name).join(', ')}`
     : '';
   const storedContent = `${parsed.message || 'Please review the attached material.'}${attachmentSummary}`;
+  const storedAttachments = [];
+  for (const attachment of parsed.attachments.filter((item) => item.kind === 'image')) {
+    try {
+      const sourceImage = sharp(Buffer.from(attachment.dataBase64, 'base64'), {
+        limitInputPixels: 40_000_000,
+      });
+      const metadata = await sourceImage.metadata();
+      if (!['jpeg', 'png', 'webp', 'gif'].includes(metadata.format))
+        throw new Error('Unsupported image.');
+      const thumbnail = await sourceImage
+        .rotate()
+        .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 75 })
+        .toBuffer();
+      storedAttachments.push({
+        kind: 'image',
+        name: attachment.name,
+        mimeType: 'image/webp',
+        dataBase64: thumbnail.toString('base64'),
+      });
+    } catch {
+      throw new AiChatToolError(
+        'One of the attached images could not be read. Choose a smaller JPG, PNG, WebP, or GIF.',
+      );
+    }
+  }
+
   const userMessage = {
     id: randomUUID(),
     threadId: thread.id,
     role: 'user' as const,
     content: storedContent,
+    attachmentsJson: JSON.stringify(storedAttachments),
     model: null,
     actionId: null,
     createdAt: now,
@@ -770,7 +928,17 @@ export async function runAiChatTurn(input: {
   const history = getAiChatMessages(thread.id, input.profileId).slice(-MAX_RECENT_MESSAGES);
   const messages: unknown[] = history.map((message) => ({
     role: message.role === 'tool' ? 'assistant' : message.role,
-    content: message.content,
+    content:
+      message.role === 'user' && message.attachments.length
+        ? [
+            { type: 'input_text', text: message.content },
+            ...message.attachments.map((image) => ({
+              type: 'input_image',
+              image_url: `data:${image.mimeType};base64,${image.dataBase64}`,
+              detail: 'auto',
+            })),
+          ]
+        : message.content,
   }));
   if (parsed.attachments.length) {
     messages[messages.length - 1] = {
@@ -811,6 +979,15 @@ export async function runAiChatTurn(input: {
         safetyIdentifier: aiSafetyIdentifier(input.profileId),
         instructions: [
           'You are the Bòrd household assistant.',
+          'For household planning, use read_household_profiles to resolve people by name and pass their keys as selectedProfileIds. If the user says for me, select only the active member; do not silently select everyone. Parents and admins may plan for all members, but each member’s own sharing settings still apply. Do not guess identity or dietary facts.',
+          'Read the existing meal plan before updating it. Honor the exact mealSlots requested (for example breakfast, lunch and dinner). For filling missing breakfasts/lunches retain dinners and use occupiedSlotMode keep; never replace occupied slots without the user asking.',
+          'Meal entries support kind recipe, item, takeout, leftover and custom. A single food uses foodItem (quantity per serving, unit, item, note, shoppingCategory), not an invented recipe. Takeout has a title and no recipeId. Leftovers must reference the original meal using leftoverSourceId; include reserved portions in source servings and do not create a second grocery demand.',
+          'Use list_app_actions to inspect schemas, read_app_data for current records, and prepare_app_actions for reviewed core CRUD including recipe duplication and standalone shopping-list items such as coffee. Preserve fields not requested for change and pass expected revisions/timestamps.',
+          'For a healthier variation ask or infer from the user wording whether to duplicate, update the library recipe, or adapt one planned meal. To duplicate with changes create a complete recipe based on the saved recipe under a distinct title; never overwrite the source merely to make a variation.',
+          'For temporary substitutions read_shopping_context and read_planned_recipe, identify the specific list item and source meal(s), and offer alternatives first. Only prepare the selected substitution after the user chooses. Use updateMealPlanEntry with recipeOverride (title, summary, servings, ingredientGroups, instructionSections) for this meal only, preserving all unaffected ingredients and adjusting cooking instructions. Use recipeOverride null to reset. Never permanently update the library for a temporary substitution.',
+          'When substituting update the selected shopping-list item FIRST, then the affected planned meals in one reviewed action group; this preserves the user correction during automatic list reconciliation. Keep quantity/unit unless a conversion is justified; preserve notes, state and unrelated items. Clear a stale product match rather than attaching the original product to the substitute. Explain when nutrition is unknown after substitution. Do not claim unrelated list copies were updated.',
+          'Batch action groups are reviewed together but may partially fail; check their reported results before claiming success.',
+
           'Use app tools for current recipe, meal-plan, and nutrition facts. Never invent stored records.',
           'For two or more standalone new recipes, use generate_recipes once rather than creating separate proposals.',
           'Set generateRecipeImages to true only when the user explicitly asks for recipe images.',

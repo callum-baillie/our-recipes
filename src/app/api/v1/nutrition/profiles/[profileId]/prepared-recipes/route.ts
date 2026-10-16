@@ -11,6 +11,7 @@ import { createPreparedRecipeSchema } from '@/lib/domain/nutrition-prepared-cons
 import {
   createPreparedRecipeInstance,
   listPreparedRecipeInstances,
+  getPreparedServingWorkspace,
 } from '@/lib/services/nutrition-prepared-consumption-service';
 
 type Context = { params: Promise<{ profileId: string }> };
@@ -22,6 +23,7 @@ export async function GET(_request: Request, context: Context) {
     const profileId = parseNutritionProfileId((await context.params).profileId);
     return NextResponse.json({
       preparedRecipes: listPreparedRecipeInstances(profileId, auth.principal.id),
+      workspace: getPreparedServingWorkspace(profileId, auth.principal.id),
     });
   } catch (error) {
     return nutritionApiError(error);

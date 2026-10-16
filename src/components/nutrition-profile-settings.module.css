@@ -7,7 +7,7 @@
 }
 
 .panel :global(.settings-pane-body) {
-  padding: 0.8rem 1rem;
+  padding: 0;
 }
 
 .panel header {
@@ -40,9 +40,7 @@
 }
 
 .form > :global(.settings-action-bar) {
-  margin-right: -1rem;
-  margin-bottom: -0.8rem;
-  margin-left: -1rem;
+  margin-inline: 0;
 }
 
 .disclosure {
@@ -220,5 +218,25 @@
 @media (max-width: 720px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.grid > *,
+.grid label {
+  min-width: 0;
+}
+.grid input:not([type='checkbox']):not([type='radio']),
+.grid select,
+.grid textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.choiceGrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+}
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

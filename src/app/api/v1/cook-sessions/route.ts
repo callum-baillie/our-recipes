@@ -5,7 +5,11 @@ import { NextResponse } from 'next/server';
 import { cookSessionStartSchema } from '@/lib/domain/cooking';
 import { cookSessionPantryStartSchema } from '@/lib/domain/pantry-grocery-cooking';
 import { jsonError } from '@/lib/http';
-import { CookingNotFoundError, startCookSession } from '@/lib/services/cooking-service';
+import {
+  CookingNotFoundError,
+  startCookSession,
+  listCookHistory,
+} from '@/lib/services/cooking-service';
 import { getCookSessionPantryPreview } from '@/lib/services/pantry-grocery-cooking-service';
 
 export const runtime = 'nodejs';
@@ -49,4 +53,22 @@ export async function POST(request: Request) {
       return withApiRequestId(jsonError(404, 'recipe_not_found', error.message), access.requestId);
     throw error;
   }
+}
+
+export async function GET(request: Request) {
+  const access = await authorizeCoreApi(request);
+  if (access.response) return access.response;
+  const actor = actorFromPrincipal(access.principal);
+  if (!actor.profileId)
+    return withApiRequestId(
+      jsonError(409, 'profile_selection_required', 'Choose a household profile first.'),
+      access.requestId,
+    );
+  return withApiRequestId(
+    NextResponse.json(
+      { sessions: listCookHistory(actor.profileId) },
+      { headers: { 'Cache-Control': 'no-store' } },
+    ),
+    access.requestId,
+  );
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.5
+  version: 1.0.0-rc.6
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
@@ -16,6 +16,130 @@ servers:
 security:
   - SessionCookie: []
 paths:
+  /pantry/export/pdf:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
+      operationId: exportPantryPdf
+      summary: Print current pantry inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paper: { type: string, enum: [A4, Letter], default: A4 }
+                format: { type: string, enum: [pdf, zip], default: pdf }
+                includeNotes: { type: boolean, default: true }
+                includeChecked: { type: boolean, default: false }
+                includeDates: { type: boolean, default: true }
+                countColumn: { type: boolean, default: true }
+                organizeByStore: { type: boolean, default: false }
+                storeId: { type: string, format: uuid }
+                locationId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Printable PDF or ZIP
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: List not found }
+        '413': { description: More than 2000 items }
+        '429': { description: Print queue is busy }
+  /shopping-lists/{listId}/export/pdf:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
+      operationId: exportShoppingListPdf
+      summary: Print a shopping list
+      parameters:
+        - { name: listId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paper: { type: string, enum: [A4, Letter], default: A4 }
+                format: { type: string, enum: [pdf, zip], default: pdf }
+                includeNotes: { type: boolean, default: true }
+                includeChecked: { type: boolean, default: false }
+                includeDates: { type: boolean, default: true }
+                countColumn: { type: boolean, default: true }
+                organizeByStore: { type: boolean, default: false }
+                storeId: { type: string, format: uuid }
+                locationId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Printable PDF or ZIP
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: List not found }
+        '413': { description: More than 2000 items }
+        '429': { description: Print queue is busy }
+  /shopping-lists/recent-items:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
+      operationId: listRecentShoppingItems
+      summary: Recently purchased household items for Buy again
+      responses:
+        '200':
+          description: Up to 30 distinct names from the last 500 recorded purchases
+          content:
+            application/json:
+              schema:
+                { type: object, properties: { items: { type: array, items: { type: object } } } }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+  /shopping-lists/{listId}/items/bulk:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create']
+      operationId: addShoppingListNamesBulk
+      summary: Add up to 100 item names atomically, skipping existing active names
+      parameters:
+        - { name: listId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  {
+                    type: array,
+                    minItems: 1,
+                    maxItems: 100,
+                    items: { type: string, minLength: 1, maxLength: 160 },
+                  }
+      responses:
+        '201':
+          description: Added items and the number of skipped names
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  properties:
+                    { items: { type: array, items: { type: object } }, skipped: { type: integer } },
+                }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: List not found }
   /exports/recipes/pdf:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -35,6 +159,14 @@ paths:
                 format: { type: string, enum: [pdf, zip], default: pdf }
                 includeNutrition: { type: boolean, default: true }
                 includeNotes: { type: boolean, default: true }
+                includeIngredients: { type: boolean, default: true }
+                ingredientCheckboxes: { type: boolean, default: false }
+                includeMethod: { type: boolean, default: true }
+                includeImage: { type: boolean, default: true }
+                includeEquipment: { type: boolean, default: true }
+                includeSource: { type: boolean, default: true }
+                organizeByStore: { type: boolean, default: false }
+                storeId: { type: string, format: uuid }
                 recipeIds:
                   type: array
                   minItems: 1
@@ -74,6 +206,14 @@ paths:
                 format: { type: string, enum: [pdf, zip], default: pdf }
                 includeNutrition: { type: boolean, default: true }
                 includeNotes: { type: boolean, default: true }
+                includeIngredients: { type: boolean, default: true }
+                ingredientCheckboxes: { type: boolean, default: false }
+                includeMethod: { type: boolean, default: true }
+                includeImage: { type: boolean, default: true }
+                includeEquipment: { type: boolean, default: true }
+                includeSource: { type: boolean, default: true }
+                organizeByStore: { type: boolean, default: false }
+                storeId: { type: string, format: uuid }
                 start: { type: string, format: date }
                 end: { type: string, format: date }
                 includeRecipes: { type: boolean, default: true }
@@ -137,7 +277,7 @@ paths:
                 required: [status, version, schemaVersion, migrationStatus, setupComplete]
                 properties:
                   status: { type: string, enum: [ok, error] }
-                  version: { type: string, example: 1.0.0-rc.5 }
+                  version: { type: string, example: 1.0.0-rc.6 }
                   schemaVersion: { type: string, example: 0038_meal_plan_ingredient_snapshots }
                   migrationStatus: { type: string, enum: [current, incomplete] }
                   setupComplete: { type: boolean }
@@ -751,6 +891,12 @@ paths:
       x-api-key-scope: recipes.read
       operationId: getRecipe
       summary: Read a structured recipe card and revision metadata
+      parameters:
+        - name: mealPlanEntryId
+          in: query
+          required: false
+          description: Return the saved recipe revision and adaptation used by this planned meal. Also requires mealPlans.read.
+          schema: { type: string, format: uuid }
       responses:
         '200': { description: Recipe card }
         '404': { description: Recipe not found }
@@ -1120,7 +1266,12 @@ paths:
       x-api-permissions: ['mealPlans:create']
       x-api-key-scope: mealPlans.create
       operationId: addMealPlanEntry
-      summary: Add an existing recipe to a date and meal
+      summary: Add a recipe, single food, takeout, or linked leftover meal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MealPlanEntryInput' }
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       responses:
@@ -1157,17 +1308,24 @@ paths:
       x-api-permissions: ['mealPlans:update']
       x-api-key-scope: mealPlans.update
       operationId: updateMealPlanEntry
-      summary: Update a planned meal or mark it planned, skipped, or cancelled
+      summary: Update a planned meal, temporary recipe adaptation, or status
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: false
-              required: [status]
-              properties:
-                status: { type: string, enum: [planned, skipped, cancelled] }
+              oneOf:
+                - allOf:
+                    - $ref: '#/components/schemas/MealPlanEntryInput'
+                    - type: object
+                      required: [expectedUpdatedAt]
+                      properties:
+                        expectedUpdatedAt: { type: string, format: date-time }
+                - type: object
+                  additionalProperties: false
+                  required: [status]
+                  properties:
+                    status: { type: string, enum: [planned, skipped, cancelled] }
       responses:
         '200': { description: Persisted meal status and derived effective status }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -1471,10 +1629,26 @@ paths:
                   properties:
                     action:
                       type: string
-                      enum: [rename, archive, restore, duplicate, set_restock_target, complete]
+                      enum:
+                        [
+                          rename,
+                          archive,
+                          restore,
+                          duplicate,
+                          set_restock_target,
+                          complete,
+                          set_notes,
+                        ]
                     name: { type: string, minLength: 1, maxLength: 120 }
+                    note: { type: string, maxLength: 2000 }
+                    expectedVersion:
+                      {
+                        type: integer,
+                        minimum: 0,
+                        description: Required with set_notes; use notesVersion returned by GET.,
+                      }
       responses:
-        '200': { description: List order saved }
+        '200': { description: List changes saved }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: List changed since it was read }
@@ -3589,50 +3763,81 @@ components:
             - category
             - values
           additionalProperties: false
-    MealPlanBatchInput:
+    MealPlanEntryInput:
       type: object
+      required: [plannedFor, meal, servings, note]
+      description: A recipe or named meal. Item meals require foodItem with an amount per serving. Leftovers require an existing source meal on or before this date, and do not create new grocery demand. Source servings must include leftover portions. Omitted kind, foodItem, and recipeOverride preserve existing metadata during updates; send the complete planned date, slot, recipe or title, servings, and note.
       properties:
-        entries:
-          minItems: 1
-          maxItems: 280
+        plannedFor: { type: string, format: date }
+        meal: { type: string, minLength: 1, maxLength: 48, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        kind: { type: string, enum: [recipe, item, takeout, leftover, custom] }
+        recipeId: { type: string, description: 'Recipe UUID, or empty for non-recipe meals.' }
+        title: { type: string, maxLength: 160, default: '' }
+        servings: { type: integer, minimum: 1, maximum: 100 }
+        note: { type: string, maxLength: 240 }
+        leftoverSourceId: { type: [string, 'null'], format: uuid }
+        foodItem:
+          anyOf:
+            - $ref: '#/components/schemas/PlannedFoodItem'
+            - type: 'null'
+        recipeOverride:
+          description: Complete ingredients and steps for this planned meal only. The library recipe is unchanged. Nutrition is unknown after adaptation. Null restores the current library recipe.
+          anyOf:
+            - $ref: '#/components/schemas/PlannedRecipeOverride'
+            - type: 'null'
+    PlannedFoodItem:
+      type: object
+      required: [item, quantity, unit, note]
+      properties:
+        item: { type: string, minLength: 1, maxLength: 160 }
+        quantity:
+          oneOf:
+            - { type: number, exclusiveMinimum: 0, maximum: 10000 }
+            - { type: string, const: '' }
+        unit: { type: string, maxLength: 30 }
+        note: { type: string, maxLength: 240 }
+        shoppingCategory: { type: string, default: Other }
+        pantryProductId:
+          { type: string, description: Pantry product UUID or empty to clear a match. }
+    PlannedRecipeOverride:
+      type: object
+      required: [title, summary, servings, ingredientGroups, instructionSections]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        summary: { type: string, maxLength: 800 }
+        servings: { type: string, maxLength: 80 }
+        ingredientGroups:
           type: array
+          minItems: 1
+          maxItems: 20
           items:
             type: object
+            required: [name, ingredients]
             properties:
-              plannedFor:
-                type: string
-                pattern: ^\d{4}-\d{2}-\d{2}$
-              meal:
-                type: string
-                minLength: 1
-                maxLength: 48
-                pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-              recipeId:
-                default: ''
-                anyOf:
-                  - type: string
-                    const: ''
-                  - type: string
-                    format: uuid
-                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-              title:
-                default: ''
-                type: string
-                maxLength: 160
-              servings:
-                type: integer
-                minimum: 1
-                maximum: 100
-              note:
-                type: string
-                maxLength: 240
-            required:
-              - plannedFor
-              - meal
-              - servings
-              - note
-      required:
-        - entries
+              name: { type: string }
+              ingredients:
+                type: array
+                minItems: 1
+                items: { $ref: '#/components/schemas/PlannedFoodItem' }
+        instructionSections:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [title, steps]
+            properties:
+              title: { type: string }
+              steps: { type: array, minItems: 1, items: { type: string } }
+    MealPlanBatchInput:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          minItems: 1
+          maxItems: 280
+          items: { $ref: '#/components/schemas/MealPlanEntryInput' }
     RecipeCalculationInput:
       type: object
       properties:

@@ -713,6 +713,7 @@ export const aiChatMessages = sqliteTable(
       .references(() => aiChatThreads.id, { onDelete: 'cascade' }),
     role: text('role', { enum: ['user', 'assistant', 'tool'] }).notNull(),
     content: text('content').notNull(),
+    attachmentsJson: text('attachments_json').notNull().default('[]'),
     model: text('model'),
     actionId: text('action_id'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -765,7 +766,9 @@ export const aiJobs = sqliteTable(
       .references(() => profiles.id, { onDelete: 'cascade' }),
     threadId: text('thread_id').references(() => aiChatThreads.id, { onDelete: 'set null' }),
     actionId: text('action_id').references(() => aiActionProposals.id, { onDelete: 'set null' }),
-    kind: text('kind', { enum: ['recipe_images', 'recipe_batch_generation'] }).notNull(),
+    kind: text('kind', {
+      enum: ['recipe_images', 'recipe_batch_generation', 'meal_plan_generation'],
+    }).notNull(),
     status: text('status', {
       enum: ['queued', 'running', 'submitted', 'completed', 'failed', 'cancelled'],
     }).notNull(),
@@ -883,6 +886,8 @@ export const mealPlanEntries = sqliteTable(
     recipeIngredientsSnapshot: text('recipe_ingredients_snapshot')
       .notNull()
       .default('{"baseServings":"","ingredients":[]}'),
+    kind: text('kind').notNull().default('custom'),
+    recipeOverride: text('recipe_override'),
     title: text('title').notNull().default(''),
     servings: integer('servings').notNull(),
     note: text('note').notNull(),
@@ -2549,4 +2554,26 @@ export const aiDecisionFeedback = sqliteTable('ai_decision_feedback', {
   action: text('action').notNull(),
   valueJson: text('value_json').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const taskPreferences = sqliteTable('task_preferences', {
+  profileId: text('profile_id')
+    .primaryKey()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  settings: text('settings').notNull(),
+  version: integer('version').notNull().default(1),
+  lastScheduledDate: text('last_scheduled_date'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const shoppingListNotes = sqliteTable('shopping_list_notes', {
+  listId: text('list_id')
+    .primaryKey()
+    .references(() => shoppingLists.id, { onDelete: 'cascade' }),
+  note: text('note').notNull().default(''),
+  version: integer('version').notNull().default(1),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });

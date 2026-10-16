@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { OnboardingWizard } from '@/components/onboarding-wizard';
-import { SettingsActionBar, SettingsPane } from '@/components/settings-primitives';
+import {
+  SettingsActionBar,
+  SettingsPane,
+  SettingsField,
+  SettingsGroup,
+  SettingsSubsection,
+  SettingsRow,
+} from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 import {
   defaultProfileGoalContext,
@@ -177,8 +184,7 @@ export function ProfileSettings({
           {profiles
             .filter((profile) => profile.role === 'child' && !profile.archivedAt)
             .map((child) => (
-              <fieldset key={child.id}>
-                <legend>{child.displayName}</legend>
+              <SettingsGroup title={<>{child.displayName}</>} key={child.id}>
                 {profiles
                   .filter(
                     (profile) =>
@@ -192,20 +198,31 @@ export function ProfileSettings({
                         item.parentProfileId === parent.id && item.childProfileId === child.id,
                     );
                     return (
-                      <label key={parent.id}>
+                      <SettingsField
+                        key={parent.id}
+                        title={
+                          <>
+                            <span>{parent.displayName}</span>
+                          </>
+                        }
+                        description={
+                          <>
+                            <small>{parent.role}</small>
+                          </>
+                        }
+                      >
                         <input
+                          role="switch"
                           type="checkbox"
                           checked={enabled}
                           onChange={(event) =>
                             void setGuardian(parent.id, child.id, event.target.checked)
                           }
                         />
-                        <span>{parent.displayName}</span>
-                        <small>{parent.role}</small>
-                      </label>
+                      </SettingsField>
                     );
                   })}
-              </fieldset>
+              </SettingsGroup>
             ))}
         </SettingsPane>
       ) : null}
@@ -392,10 +409,20 @@ export function ProfileEditor({
         )
       }
     >
-      <div className="field-grid two-columns">
+      <div className="settings-fields">
         {!personal && (
-          <label>
-            <span>Access role</span>
+          <SettingsField
+            title="Access role"
+            description={
+              <>
+                <small>
+                  {profile.isLastAdmin
+                    ? 'This is the only active admin. Promote another admin before demoting it.'
+                    : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
+                </small>
+              </>
+            }
+          >
             <select
               value={role}
               onChange={async (event) => {
@@ -408,41 +435,39 @@ export function ProfileEditor({
               <option value="parent">Parent</option>
               <option value="child">Child</option>
             </select>
-            <small>
-              {profile.isLastAdmin
-                ? 'This is the only active admin. Promote another admin before demoting it.'
-                : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
-            </small>
-          </label>
+          </SettingsField>
         )}
-        <label>
-          <span>Display name</span>
+        <SettingsField
+          description="The name shown on your profile and in shared kitchen activity."
+          title="Display name"
+        >
           <input
             value={values.displayName}
             onChange={(event) => setValues({ ...values, displayName: event.target.value })}
           />
-        </label>
-        <label>
-          <span>
-            Avatar URL <em>(optional)</em>
-          </span>
+        </SettingsField>
+        <SettingsField
+          description="Use a link to the picture you want shown with this profile."
+          title="Avatar URL (optional)"
+        >
           <input
             value={values.avatarUrl}
             onChange={(event) => setValues({ ...values, avatarUrl: event.target.value })}
           />
-        </label>
-        <label>
-          <span>Color</span>
+        </SettingsField>
+        <SettingsField description="Helps distinguish this profile in shared views." title="Color">
           <input
             type="color"
             value={values.color}
             onChange={(event) => setValues({ ...values, color: event.target.value })}
           />
-        </label>
+        </SettingsField>
         {personal && (
           <>
-            <label>
-              <span>Units</span>
+            <SettingsField
+              description="Choose how recipe quantities are displayed for this profile."
+              title="Units"
+            >
               <select
                 value={values.units}
                 onChange={(event) =>
@@ -452,9 +477,11 @@ export function ProfileEditor({
                 <option value="metric">Metric</option>
                 <option value="imperial">US customary</option>
               </select>
-            </label>
-            <label>
-              <span>Temperature</span>
+            </SettingsField>
+            <SettingsField
+              description="Choose the unit used for cooking temperatures."
+              title="Temperature"
+            >
               <select
                 value={values.temperatureUnit}
                 onChange={(event) =>
@@ -467,85 +494,97 @@ export function ProfileEditor({
                 <option value="C">Celsius</option>
                 <option value="F">Fahrenheit</option>
               </select>
-            </label>
-            <label>
-              <span>Locale</span>
+            </SettingsField>
+            <SettingsField
+              description="Controls regional number and date formatting, such as en-US or en-GB."
+              title="Locale"
+            >
               <input
                 value={values.locale}
                 onChange={(event) => setValues({ ...values, locale: event.target.value })}
               />
-            </label>
-            <label>
-              <span>Time zone</span>
+            </SettingsField>
+            <SettingsField
+              description="Use an IANA timezone, such as America/Chicago, for local dates and times."
+              title="Time zone"
+            >
               <input
                 value={values.timezone}
                 onChange={(event) => setValues({ ...values, timezone: event.target.value })}
               />
-            </label>
-            <section
-              className="full-width-field profile-goal-settings"
-              aria-labelledby={`goals-${profile.id}`}
+            </SettingsField>
+            <SettingsSubsection
+              title="Cooking goals"
+              description="Update these preferences as your priorities and routines change."
             >
-              <div>
-                <h3 id={`goals-${profile.id}`}>What this profile wants help with</h3>
-                <p>These reflections can be updated whenever priorities or routines change.</p>
-              </div>
-              <div className="profile-goal-settings-options">
-                {profileGoalFocusOptions.map((option) => {
-                  const selected = values.goalContext.focusAreas.includes(option.value);
-                  return (
-                    <label className={selected ? 'selected' : ''} key={option.value}>
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        disabled={!selected && values.goalContext.focusAreas.length >= 8}
-                        onChange={() => toggleGoalFocus(option.value)}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="field-grid two-columns">
-                <label>
-                  <span>Why it matters now</span>
+              <SettingsRow
+                title="Focus areas"
+                description="Choose the kinds of support you would find useful."
+                align="start"
+              >
+                <div className="profile-goal-settings-options">
+                  {profileGoalFocusOptions.map((option) => {
+                    const selected = values.goalContext.focusAreas.includes(option.value);
+                    return (
+                      <label className={selected ? 'selected' : ''} key={option.value}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          disabled={!selected && values.goalContext.focusAreas.length >= 8}
+                          onChange={() => toggleGoalFocus(option.value)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </SettingsRow>
+              <div className="settings-fields">
+                <SettingsField
+                  description="Describe what is motivating your cooking goals."
+                  title="Why it matters now"
+                >
                   <textarea
                     rows={3}
                     maxLength={800}
                     value={values.goalContext.motivation}
                     onChange={(event) => updateGoalContext({ motivation: event.target.value })}
                   />
-                </label>
-                <label>
-                  <span>What gets in the way</span>
+                </SettingsField>
+                <SettingsField
+                  description="Share practical obstacles the assistant should consider."
+                  title="What gets in the way"
+                >
                   <textarea
                     rows={3}
                     maxLength={800}
                     value={values.goalContext.challenges}
                     onChange={(event) => updateGoalContext({ challenges: event.target.value })}
                   />
-                </label>
-                <label className="full-width-field">
-                  <span>What success feels like</span>
+                </SettingsField>
+                <SettingsField
+                  description="Describe the outcome you are working toward."
+                  title="What success feels like"
+                >
                   <textarea
                     rows={3}
                     maxLength={800}
                     value={values.goalContext.successVision}
                     onChange={(event) => updateGoalContext({ successVision: event.target.value })}
                   />
-                </label>
+                </SettingsField>
               </div>
-            </section>
-            <label className="full-width-field">
-              <span>
-                Anything else the app should remember <em>(optional)</em>
-              </span>
+            </SettingsSubsection>
+            <SettingsField
+              description="Additional context for this profile’s cooking preferences."
+              title="Anything else the app should remember (optional)"
+            >
               <textarea
                 rows={3}
                 value={values.mainGoals}
                 onChange={(event) => setValues({ ...values, mainGoals: event.target.value })}
               />
-            </label>
+            </SettingsField>
           </>
         )}
       </div>

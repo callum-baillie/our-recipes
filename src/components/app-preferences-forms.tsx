@@ -6,9 +6,10 @@ import { useState } from 'react';
 import { InlineSkeleton } from '@/components/skeleton';
 import {
   SettingsActionBar,
-  SettingsControlGroup,
   SettingsPane,
   SettingsRow,
+  SettingsField,
+  SettingsSubsection,
 } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 import type {
@@ -75,47 +76,41 @@ export function RecipePreferencesForm({ initial }: { initial: RecipePreferences 
         title="Library defaults"
         description="Used whenever a page URL does not already specify another choice."
       >
-        <SettingsRow
+        <SettingsField
           title="Default recipe view"
           description="Choose how the shared library is ordered when someone first opens it."
         >
-          <label className="settings-control">
-            <span>Default library order</span>
-            <select
-              value={values.defaultSort}
-              onChange={(event) =>
-                setValues({
-                  ...values,
-                  defaultSort: event.target.value as RecipePreferences['defaultSort'],
-                })
-              }
-            >
-              <option value="recently-updated">Recently updated</option>
-              <option value="recently-added">Recently added</option>
-              <option value="alphabetical">Alphabetical</option>
-              <option value="most-recently-cooked">Recently cooked</option>
-              <option value="shortest-time">Shortest time</option>
-              <option value="highest-rated">Highest rated</option>
-            </select>
-          </label>
-        </SettingsRow>
-        <SettingsRow
+          <select
+            value={values.defaultSort}
+            onChange={(event) =>
+              setValues({
+                ...values,
+                defaultSort: event.target.value as RecipePreferences['defaultSort'],
+              })
+            }
+          >
+            <option value="recently-updated">Recently updated</option>
+            <option value="recently-added">Recently added</option>
+            <option value="alphabetical">Alphabetical</option>
+            <option value="most-recently-cooked">Recently cooked</option>
+            <option value="shortest-time">Shortest time</option>
+            <option value="highest-rated">Highest rated</option>
+          </select>
+        </SettingsField>
+        <SettingsField
           title="New recipe servings"
           description="Pre-fill this serving count when a household member creates a recipe."
         >
-          <label className="settings-control settings-control-compact">
-            <span>Default servings for new recipes</span>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={values.defaultServings}
-              onChange={(event) =>
-                setValues({ ...values, defaultServings: Number(event.target.value) })
-              }
-            />
-          </label>
-        </SettingsRow>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={values.defaultServings}
+            onChange={(event) =>
+              setValues({ ...values, defaultServings: Number(event.target.value) })
+            }
+          />
+        </SettingsField>
         <SettingsActionBar>
           <SaveButton pending={pending} label="Save recipe settings" />
         </SettingsActionBar>
@@ -152,42 +147,44 @@ export function MealPlanPreferencesForm({ initial }: { initial: MealPlanPreferen
         title="Planning defaults"
         description="These set the starting point; each individual week can still be changed."
       >
-        <SettingsRow
+        <SettingsSubsection
           title="Planning calendar"
           description="Choose the first day of each week and the range shown in a fresh plan."
         >
-          <SettingsControlGroup>
-            <label className="settings-control">
-              <span>Week starts on</span>
-              <select
-                value={values.weekStartsOn}
-                onChange={(event) =>
-                  setValues({ ...values, weekStartsOn: Number(event.target.value) as 0 | 1 })
-                }
-              >
-                <option value={1}>Monday</option>
-                <option value={0}>Sunday</option>
-              </select>
-            </label>
-            <label className="settings-control">
-              <span>Default planning window</span>
-              <select
-                value={values.defaultDuration}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    defaultDuration: Number(event.target.value) as 3 | 5 | 7 | 14,
-                  })
-                }
-              >
-                <option value={3}>3 days</option>
-                <option value={5}>5 days</option>
-                <option value={7}>7 days</option>
-                <option value={14}>14 days</option>
-              </select>
-            </label>
-          </SettingsControlGroup>
-        </SettingsRow>
+          <SettingsField
+            description="The first day shown in each planner week."
+            title="Week starts on"
+          >
+            <select
+              value={values.weekStartsOn}
+              onChange={(event) =>
+                setValues({ ...values, weekStartsOn: Number(event.target.value) as 0 | 1 })
+              }
+            >
+              <option value={1}>Monday</option>
+              <option value={0}>Sunday</option>
+            </select>
+          </SettingsField>
+          <SettingsField
+            description="How many days a new plan initially displays."
+            title="Default planning window"
+          >
+            <select
+              value={values.defaultDuration}
+              onChange={(event) =>
+                setValues({
+                  ...values,
+                  defaultDuration: Number(event.target.value) as 3 | 5 | 7 | 14,
+                })
+              }
+            >
+              <option value={3}>3 days</option>
+              <option value={5}>5 days</option>
+              <option value={7}>7 days</option>
+              <option value={14}>14 days</option>
+            </select>
+          </SettingsField>
+        </SettingsSubsection>
         <SettingsRow
           title="Meals shown"
           description="Select the meal slots available when building a plan."
@@ -256,72 +253,72 @@ export function PantryPreferencesForm({ initial }: { initial: PantryPreferences 
         title="Stock display"
         description="Choose the initial filter, order, and grouping used on each new Pantry visit."
       >
-        <SettingsRow
+        <SettingsSubsection
           title="Initial pantry view"
           description="These choices control the first view only; filters can still be changed while browsing."
-          align="start"
         >
-          <SettingsControlGroup>
-            <label className="settings-control">
-              <span>Default view</span>
-              <select
-                value={values.defaultView}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    defaultView: event.target.value as PantryPreferences['defaultView'],
-                  })
-                }
-              >
-                <option value="all">All stock</option>
-                <option value="pantry">Pantry</option>
-                <option value="refrigerator">Refrigerator</option>
-                <option value="freezer">Freezer</option>
-                <option value="low_stock">Low stock</option>
-                <option value="opened">Opened</option>
-                <option value="unopened">Unopened</option>
-                <option value="frozen">Frozen</option>
-                <option value="recent">Recent</option>
-              </select>
-            </label>
-            <label className="settings-control">
-              <span>Default order</span>
-              <select
-                value={values.defaultSort}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    defaultSort: event.target.value as PantryPreferences['defaultSort'],
-                  })
-                }
-              >
-                <option value="expiry">Expiry first</option>
-                <option value="name">Product name</option>
-                <option value="quantity">Quantity</option>
-                <option value="location">Location</option>
-                <option value="updated">Recently updated</option>
-                <option value="added">Recently added</option>
-              </select>
-            </label>
-            <label className="settings-control">
-              <span>Default grouping</span>
-              <select
-                value={values.defaultGroup}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    defaultGroup: event.target.value as PantryPreferences['defaultGroup'],
-                  })
-                }
-              >
-                <option value="location">Location</option>
-                <option value="category">Category</option>
-                <option value="expiry">Expiry</option>
-                <option value="none">No grouping</option>
-              </select>
-            </label>
-          </SettingsControlGroup>
-        </SettingsRow>
+          <SettingsField
+            description="The stock filter used when first opening Pantry."
+            title="Default view"
+          >
+            <select
+              value={values.defaultView}
+              onChange={(event) =>
+                setValues({
+                  ...values,
+                  defaultView: event.target.value as PantryPreferences['defaultView'],
+                })
+              }
+            >
+              <option value="all">All stock</option>
+              <option value="pantry">Pantry</option>
+              <option value="refrigerator">Refrigerator</option>
+              <option value="freezer">Freezer</option>
+              <option value="low_stock">Low stock</option>
+              <option value="opened">Opened</option>
+              <option value="unopened">Unopened</option>
+              <option value="frozen">Frozen</option>
+              <option value="recent">Recent</option>
+            </select>
+          </SettingsField>
+          <SettingsField description="How pantry stock is sorted initially." title="Default order">
+            <select
+              value={values.defaultSort}
+              onChange={(event) =>
+                setValues({
+                  ...values,
+                  defaultSort: event.target.value as PantryPreferences['defaultSort'],
+                })
+              }
+            >
+              <option value="expiry">Expiry first</option>
+              <option value="name">Product name</option>
+              <option value="quantity">Quantity</option>
+              <option value="location">Location</option>
+              <option value="updated">Recently updated</option>
+              <option value="added">Recently added</option>
+            </select>
+          </SettingsField>
+          <SettingsField
+            description="Group stock by shelf, category, or expiry."
+            title="Default grouping"
+          >
+            <select
+              value={values.defaultGroup}
+              onChange={(event) =>
+                setValues({
+                  ...values,
+                  defaultGroup: event.target.value as PantryPreferences['defaultGroup'],
+                })
+              }
+            >
+              <option value="location">Location</option>
+              <option value="category">Category</option>
+              <option value="expiry">Expiry</option>
+              <option value="none">No grouping</option>
+            </select>
+          </SettingsField>
+        </SettingsSubsection>
         <SettingsActionBar>
           <SaveButton pending={pending} label="Save pantry settings" />
         </SettingsActionBar>

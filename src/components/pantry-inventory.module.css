@@ -1,0 +1,138 @@
+.page {
+  max-width: var(--workspace-width);
+  margin: auto;
+  padding: var(--workspace-top-space) var(--page-gutter) calc(6rem + env(safe-area-inset-bottom));
+}
+.filters {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.filters label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.filters input,
+.filters select {
+  min-width: 0;
+  width: 100%;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--field);
+  color: var(--ink);
+}
+.filters select {
+  width: auto;
+}
+.stock {
+  display: grid;
+  gap: 0.6rem;
+}
+.stock article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--field);
+}
+.stock h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.stock p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0.4rem 0;
+}
+.stock small {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.count {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.count input {
+  width: 5rem;
+  min-width: 0;
+  min-height: 44px;
+  text-align: center;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--page);
+  color: var(--ink);
+}
+.count button {
+  width: 44px;
+}
+.page button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--page);
+  color: var(--ink);
+  border-radius: 0.55rem;
+}
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.confirm,
+.error {
+  grid-column: 1/-1;
+}
+.confirm button {
+  margin-right: 0.5rem;
+}
+.footer {
+  position: sticky;
+  bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  margin-top: 1rem;
+  box-shadow: 0 4px 20px #0002;
+}
+.footer button {
+  background: var(--leaf);
+  color: var(--on-primary);
+}
+@media (max-width: 700px) {
+  .stock article {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .count {
+    justify-content: start;
+  }
+  .actions {
+    justify-content: space-between;
+  }
+  .filters select {
+    width: 100%;
+  }
+  .footer {
+    flex-wrap: wrap;
+  }
+  .footer button {
+    width: 100%;
+  }
+}

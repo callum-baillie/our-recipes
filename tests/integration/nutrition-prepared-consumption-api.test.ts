@@ -13,7 +13,10 @@ vi.mock('next/headers', () => ({
 
 import { POST as consumePrepared } from '@/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/[preparedId]/consume/route';
 import { POST as recordPreparedState } from '@/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/[preparedId]/allocations/route';
-import { POST as createPrepared } from '@/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/route';
+import {
+  GET as listPrepared,
+  POST as createPrepared,
+} from '@/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/route';
 import { ACTIVE_PROFILE_COOKIE, createSignedProfileValue } from '@/lib/actor-context';
 import { getDatabase, resetDatabaseForTests } from '@/lib/db/client';
 import { cookSessions, mealPlanEntries, recipes } from '@/lib/db/schema';
@@ -205,6 +208,16 @@ describe('prepared consumption APIs', () => {
     });
     expect(first.status).toBe(201);
     expect(replay.status).toBe(200);
+    const listed = await listPrepared(new Request(`http://localhost:3000${createPath}`), {
+      params: Promise.resolve({ profileId }),
+    });
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toMatchObject({
+      preparedRecipes: [expect.objectContaining({ id: preparedId })],
+      workspace: [
+        expect.objectContaining({ id: preparedId, actualServings: 4, remainingServings: 3.5 }),
+      ],
+    });
     const firstBody = await first.json();
     const replayBody = await replay.json();
     expect(replayBody).toMatchObject({
@@ -212,6 +225,15 @@ describe('prepared consumption APIs', () => {
       intake: { id: firstBody.intake.id },
       allocation: { id: firstBody.allocation.id },
     });
+  });
+
+  it('validates the workspace profile identifier', async () => {
+    const response = await listPrepared(
+      new Request('http://localhost:3000/api/v1/nutrition/profiles/invalid/prepared-recipes'),
+      { params: Promise.resolve({ profileId: 'invalid' }) },
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).not.toHaveProperty('workspace');
   });
 
   it('records non-eaten state idempotently without creating intake', async () => {

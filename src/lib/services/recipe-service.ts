@@ -1403,3 +1403,19 @@ export function recipeAsMarkdown(recipe: RecipeDetail): string {
   if (recipe.sharedNotes) lines.push('', '## Shared notes', markdownBlock(recipe.sharedNotes));
   return `${lines.join('\n')}\n`;
 }
+
+/** Small, uncached projection for whole-library statistics; independent of pagination. */
+export function getRecipebookInsightData() {
+  ensureDatabase();
+  return getDatabase()
+    .select({
+      category: recipes.category,
+      cuisine: recipes.cuisine,
+      prepMinutes: recipes.prepMinutes,
+      cookMinutes: recipes.cookMinutes,
+      restMinutes: recipes.restMinutes,
+    })
+    .from(recipes)
+    .where(eq(recipes.status, 'active'))
+    .all();
+}

@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-profile-settings.module.css';
-import { SettingsActionBar, SettingsPane } from '@/components/settings-primitives';
+import {
+  SettingsActionBar,
+  SettingsPane,
+  SettingsField,
+  SettingsGroup,
+} from '@/components/settings-primitives';
 import { createClientUuid } from '@/lib/client/client-uuid';
 
 const CENTIMETERS_PER_INCH = 2.54;
@@ -260,22 +265,26 @@ export function NutritionProfileSettings({
     >
       <form className={styles.form} onSubmit={save}>
         <details
-          className={styles.disclosure}
+          className={`settings-disclosure ${styles.disclosure}`}
           open={optionalInputsOpen}
           onToggle={(event) => setOptionalInputsOpen(event.currentTarget.open)}
         >
           <summary>Optional body inputs and estimated targets</summary>
-          <fieldset aria-describedby="sensitive-input-explanation">
-            <legend>Optional body and reference inputs</legend>
+          <SettingsGroup
+            title={<>Optional body and reference inputs</>}
+            aria-describedby="sensitive-input-explanation"
+          >
             <p id="sensitive-input-explanation" className={styles.notice}>
               Date of birth, body measurements, the source&apos;s sex category, activity and an
               explicit pregnancy or breastfeeding life stage are requested only to support a
               separately reviewed estimate you choose to enable. They are never inferred from
               recipes or diary activity. Manual goals need none of these values.
             </p>
-            <div className={styles.grid}>
-              <label>
-                Measurement system
+            <div className={`settings-fields ${styles.grid}`}>
+              <SettingsField
+                description="Choose centimeters and kilograms, or feet, inches, and pounds."
+                title="Measurement system"
+              >
                 <select
                   name="measurementSystem"
                   value={measurementSystem}
@@ -286,16 +295,20 @@ export function NutritionProfileSettings({
                   <option value="metric">Metric</option>
                   <option value="imperial">Imperial</option>
                 </select>
-              </label>
-              <label>
-                Date of birth <span>Optional</span>
+              </SettingsField>
+              <SettingsField
+                description="Used only when you choose an age-based nutrition estimate."
+                title="Date of birth (optional)"
+              >
                 <input name="dateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ''} />
-              </label>
+              </SettingsField>
               {measurementSystem === 'imperial' ? (
-                <fieldset className={styles.grid}>
+                <fieldset className={`settings-fields ${styles.grid}`}>
                   <legend>Height · optional</legend>
-                  <label>
-                    Feet
+                  <SettingsField
+                    description="The whole-foot part of your measured height."
+                    title="Feet"
+                  >
                     <input
                       name="heightFeet"
                       type="number"
@@ -308,9 +321,11 @@ export function NutritionProfileSettings({
                           : Math.floor(profile.heightCentimeters / 2.54 / 12)
                       }
                     />
-                  </label>
-                  <label>
-                    Inches
+                  </SettingsField>
+                  <SettingsField
+                    description="The remaining inches after whole feet."
+                    title="Inches"
+                  >
                     <input
                       name="heightInches"
                       type="number"
@@ -323,11 +338,13 @@ export function NutritionProfileSettings({
                           : Number(((profile.heightCentimeters / 2.54) % 12).toFixed(1))
                       }
                     />
-                  </label>
+                  </SettingsField>
                 </fieldset>
               ) : (
-                <label>
-                  Height (cm) <span>Optional</span>
+                <SettingsField
+                  description="Enter your measured height in centimeters."
+                  title="Height (cm) (optional)"
+                >
                   <input
                     name="height"
                     type="number"
@@ -336,10 +353,12 @@ export function NutritionProfileSettings({
                     step="0.1"
                     defaultValue={profile.heightCentimeters ?? ''}
                   />
-                </label>
+                </SettingsField>
               )}
-              <label>
-                Reference source sex category <span>Optional</span>
+              <SettingsField
+                description="The category required by the selected nutrition reference method."
+                title="Reference source sex category (optional)"
+              >
                 <select
                   name="referenceSexCategory"
                   defaultValue={profile.referenceSexCategory ?? ''}
@@ -348,9 +367,11 @@ export function NutritionProfileSettings({
                   <option value="female">Female category used by the source</option>
                   <option value="male">Male category used by the source</option>
                 </select>
-              </label>
-              <label>
-                Activity level <span>Optional</span>
+              </SettingsField>
+              <SettingsField
+                description="Record your usual activity level for nutrition personalization."
+                title="Activity level (optional)"
+              >
                 <select name="activityLevel" defaultValue={profile.activityLevel ?? ''}>
                   <option value="">Not provided</option>
                   <option value="sedentary">Sedentary</option>
@@ -359,9 +380,11 @@ export function NutritionProfileSettings({
                   <option value="active">Active</option>
                   <option value="very_active">Very active</option>
                 </select>
-              </label>
-              <label>
-                Explicit life stage <span>Optional</span>
+              </SettingsField>
+              <SettingsField
+                description="Provide this only if it applies to you and you want it considered."
+                title="Explicit life stage (optional)"
+              >
                 <select
                   name="explicitlyEnteredLifeStage"
                   defaultValue={profile.explicitlyEnteredLifeStage ?? ''}
@@ -370,25 +393,30 @@ export function NutritionProfileSettings({
                   <option value="pregnant">Pregnancy explicitly entered</option>
                   <option value="breastfeeding">Breastfeeding explicitly entered</option>
                 </select>
-              </label>
+              </SettingsField>
             </div>
             <div className={styles.checks}>
-              <label>
+              <SettingsField
+                description="Keep these reference inputs available for estimates you explicitly request."
+                title="Save these inputs for estimated-target use"
+              >
                 <input
+                  role="switch"
                   name="estimatedTargetsEnabled"
                   type="checkbox"
                   defaultChecked={profile.estimatedTargetsEnabled}
                 />
-                Save these inputs for estimated-target use
-              </label>
-              <label>
+              </SettingsField>
+              <SettingsField
+                description="Allow the selected calculation to use the measurements you provide."
+                title="I explicitly consent to using the entered values for a documented estimate"
+              >
                 <input
                   name="estimatedTargetConsent"
                   type="checkbox"
                   defaultChecked={profile.estimatedTargetConsent}
                 />
-                I explicitly consent to using the entered values for a documented estimate
-              </label>
+              </SettingsField>
             </div>
             <p className={styles.warning}>
               Saving these inputs does not calculate, create, or replace a goal. Estimated targets
@@ -402,12 +430,16 @@ export function NutritionProfileSettings({
                 Table 5-16 equation. Choose a fresh activity category below; the generic activity
                 field above is never translated automatically.
               </p>
-              <label>
-                Estimate effective date
+              <SettingsField
+                description="The date this estimate should apply from."
+                title="Estimate effective date"
+              >
                 <input name="estimateEffectiveOn" type="date" defaultValue={effectiveOn} />
-              </label>
-              <label>
-                NASEM physical-activity category
+              </SettingsField>
+              <SettingsField
+                description="Choose the category after reviewing the descriptions below."
+                title="NASEM physical-activity category"
+              >
                 <select name="estimatePalCategory" defaultValue="">
                   <option value="">Choose after reviewing the descriptions</option>
                   <option value="inactive">Inactive</option>
@@ -415,7 +447,7 @@ export function NutritionProfileSettings({
                   <option value="active">Active</option>
                   <option value="very_active">Very active</option>
                 </select>
-              </label>
+              </SettingsField>
               <details>
                 <summary>How USDA describes these four categories</summary>
                 <ul>
@@ -465,8 +497,10 @@ export function NutritionProfileSettings({
                     </p>
                   </details>
                   {energyEstimate.currentEnergyGoals.length ? (
-                    <label>
-                      Current calorie goal to supersede explicitly
+                    <SettingsField
+                      description="Select a saved target only if you intend to replace it with this estimate."
+                      title="Current calorie goal to supersede explicitly"
+                    >
                       <select name="supersedesGoalVersionId" defaultValue="">
                         <option value="">Choose the exact current version</option>
                         {energyEstimate.currentEnergyGoals.map((goal) => (
@@ -475,7 +509,7 @@ export function NutritionProfileSettings({
                           </option>
                         ))}
                       </select>
-                    </label>
+                    </SettingsField>
                   ) : (
                     <p>
                       No current calorie goal will be replaced; applying starts a new goal series.
@@ -492,14 +526,15 @@ export function NutritionProfileSettings({
                 </section>
               ) : null}
             </div>
-          </fieldset>
+          </SettingsGroup>
         </details>
 
-        <fieldset id="nutrition-goals">
-          <legend>Goals and tracking choices</legend>
-          <div className={styles.grid}>
-            <label>
-              Nutrition goal type
+        <SettingsGroup title={<>Goals and tracking choices</>} id="nutrition-goals">
+          <div className={`settings-fields ${styles.grid}`}>
+            <SettingsField
+              description="Describe your goal; this does not calculate or replace a calorie target."
+              title="Nutrition goal type"
+            >
               <select name="nutritionGoalType" defaultValue={profile.nutritionGoalType}>
                 <option value="none">No body-weight goal</option>
                 <option value="maintain">Maintain</option>
@@ -507,9 +542,11 @@ export function NutritionProfileSettings({
                 <option value="loss">Loss</option>
                 <option value="custom">Custom</option>
               </select>
-            </label>
-            <label>
-              Target weight ({weightUnit}) <span>Optional</span>
+            </SettingsField>
+            <SettingsField
+              title={`Target weight (${weightUnit}) · optional`}
+              description="An optional goal for tracking progress. Record your current weight on the Nutrition page."
+            >
               <input
                 key={`target-weight-${measurementSystem}`}
                 name="targetWeight"
@@ -518,69 +555,81 @@ export function NutritionProfileSettings({
                 step="any"
                 defaultValue={displayedWeight(profile.targetWeightKilograms, measurementSystem)}
               />
-            </label>
-            <label>
-              Target date <span>Optional</span>
+            </SettingsField>
+            <SettingsField
+              description="An optional date to review progress toward your goal."
+              title="Target date (optional)"
+            >
               <input name="targetDate" type="date" defaultValue={profile.targetDate ?? ''} />
-            </label>
-            <label>
-              Preferred energy unit
+            </SettingsField>
+            <SettingsField
+              description="Display food energy as kilocalories or kilojoules."
+              title="Preferred energy unit"
+            >
               <select name="preferredEnergyUnit" defaultValue={profile.preferredEnergyUnit}>
                 <option value="kcal">Kilocalories (kcal)</option>
                 <option value="kJ">Kilojoules (kJ)</option>
               </select>
-            </label>
+            </SettingsField>
           </div>
-          <label className={styles.inlineCheck} id="weight-tracking">
+          <SettingsField
+            description="Add weigh-ins and sync measurements on the Nutrition page."
+            id="weight-tracking"
+            title="Enable weight tracking for this profile"
+          >
             <input
+              role="switch"
               name="weightTrackingEnabled"
               type="checkbox"
               defaultChecked={profile.weightTrackingEnabled}
             />
-            Enable weight tracking for this profile
-          </label>
+          </SettingsField>
           <p className={styles.notice}>
             Weight check-ins are associated with the active profile for personalization. Household
             profile selection is not access control, so use the app&apos;s account security for
             privacy. Each observation is stored separately so history is never overwritten.
           </p>
-        </fieldset>
+        </SettingsGroup>
 
-        <fieldset id="food-choices">
-          <legend>Food choices entered by you</legend>
+        <SettingsGroup title={<>Food choices entered by you</>} id="food-choices">
           <p className={styles.notice}>
             These lists are used only as explicit factual inputs. Add one item per line or separate
             items with commas; the app does not infer allergies or preferences from behavior.
           </p>
-          <div className={styles.grid}>
-            <label>
-              Dietary preferences <span>Optional</span>
+          <div className={`settings-fields ${styles.grid}`}>
+            <SettingsField
+              description="Enter one preference per line, or separate preferences with commas."
+              title="Dietary preferences (optional)"
+            >
               <textarea
                 name="dietaryPreferences"
                 defaultValue={profile.dietaryPreferences.join('\n')}
               />
-            </label>
-            <label>
-              Food allergies <span>Optional</span>
+            </SettingsField>
+            <SettingsField
+              description="Enter only allergies you have explicitly identified, one per line."
+              title="Food allergies (optional)"
+            >
               <textarea name="foodAllergies" defaultValue={profile.foodAllergies.join('\n')} />
-            </label>
-            <label>
-              Dietary exclusions <span>Optional</span>
+            </SettingsField>
+            <SettingsField
+              description="List foods or ingredients you want excluded from suggestions."
+              title="Dietary exclusions (optional)"
+            >
               <textarea
                 name="dietaryExclusions"
                 defaultValue={profile.dietaryExclusions.join('\n')}
               />
-            </label>
+            </SettingsField>
           </div>
-        </fieldset>
+        </SettingsGroup>
 
-        <fieldset>
-          <legend>Nutrition display</legend>
+        <SettingsGroup title={<>Nutrition display</>}>
           <p className={styles.notice}>
             These choices change only what this profile&apos;s Nutrition views display. They do not
             edit diary entries, meal plans, or goals.
           </p>
-          <div className={styles.grid}>
+          <div className={`settings-fields ${styles.grid}`}>
             <fieldset className={styles.choiceGroup}>
               <legend>Nutrients shown in coverage</legend>
               <div className={styles.choiceGrid}>
@@ -601,31 +650,39 @@ export function NutritionProfileSettings({
               </div>
               <p>Select between 1 and 12 nutrients.</p>
             </fieldset>
-            <label>
-              Trend range
+            <SettingsField
+              description="The initial time span shown in your nutrition trends."
+              title="Trend range"
+            >
               <select name="trendRangeDays" defaultValue={profile.trendRangeDays}>
                 <option value="7">7 days</option>
                 <option value="14">14 days</option>
                 <option value="30">30 days</option>
               </select>
-            </label>
+            </SettingsField>
           </div>
-          <label className={styles.inlineCheck}>
+          <SettingsField
+            description="Display planned intake alongside logged food."
+            title="Show planned values in Nutrition charts"
+          >
             <input
+              role="switch"
               name="showPlannedNutrition"
               type="checkbox"
               defaultChecked={profile.showPlannedNutrition}
             />
-            Show planned values in Nutrition charts
-          </label>
-          <label className={styles.inlineCheck}>
+          </SettingsField>
+          <SettingsField
+            description="Add the selected per-serving values to recipe cards."
+            title="Show compact Nutrition facts on recipe-library cards"
+          >
             <input
+              role="switch"
               name="showRecipeCardNutrition"
               type="checkbox"
               defaultChecked={profile.showRecipeCardNutrition}
             />
-            Show compact Nutrition facts on recipe-library cards
-          </label>
+          </SettingsField>
           <fieldset className={styles.choiceGroup}>
             <legend>Compact recipe-card nutrients</legend>
             <div className={styles.choiceGrid}>
@@ -650,32 +707,38 @@ export function NutritionProfileSettings({
             </div>
             <p>Select between 1 and 5 factual per-serving values.</p>
           </fieldset>
-          <label className={styles.inlineCheck}>
+          <SettingsField
+            description="Display available nutrition information while planning meals."
+            title="Show Nutrition previews in the meal planner"
+          >
             <input
+              role="switch"
               name="showMealPlanNutrition"
               type="checkbox"
               defaultChecked={profile.showMealPlanNutrition}
             />
-            Show Nutrition previews in the meal planner
-          </label>
-        </fieldset>
+          </SettingsField>
+        </SettingsGroup>
 
-        <details className={styles.disclosure}>
+        <details className={`settings-disclosure ${styles.disclosure}`}>
           <summary>Advanced dates and reference defaults</summary>
-          <fieldset>
-            <legend>Dates and references</legend>
-            <div className={styles.grid}>
-              <label>
-                Daily reset timezone
+          <SettingsGroup title={<>Dates and references</>}>
+            <div className={`settings-fields ${styles.grid}`}>
+              <SettingsField
+                description="Determines the local day used for nutrition logs."
+                title="Daily reset timezone"
+              >
                 <input
                   name="dailyResetTimezone"
                   defaultValue={profile.dailyResetTimezone}
                   required
                   maxLength={100}
                 />
-              </label>
-              <label>
-                Week starts on
+              </SettingsField>
+              <SettingsField
+                description="The first day used for weekly nutrition summaries."
+                title="Week starts on"
+              >
                 <select name="weekStartsOn" defaultValue={profile.weekStartsOn}>
                   <option value="0">Sunday</option>
                   <option value="1">Monday</option>
@@ -685,9 +748,11 @@ export function NutritionProfileSettings({
                   <option value="5">Friday</option>
                   <option value="6">Saturday</option>
                 </select>
-              </label>
-              <label>
-                Reference jurisdiction
+              </SettingsField>
+              <SettingsField
+                description="Choose the regional nutrition reference used for daily values."
+                title="Reference jurisdiction"
+              >
                 <input
                   name="referenceJurisdiction"
                   defaultValue={profile.referenceJurisdiction}
@@ -695,9 +760,9 @@ export function NutritionProfileSettings({
                   minLength={2}
                   maxLength={20}
                 />
-              </label>
+              </SettingsField>
             </div>
-          </fieldset>
+          </SettingsGroup>
         </details>
 
         <SettingsActionBar status={status}>

@@ -20,9 +20,9 @@ import { StoreMapUpload } from '@/components/store-map-upload';
 import { InlineSkeleton } from '@/components/skeleton';
 import {
   SettingsActionBar,
-  SettingsControlGroup,
   SettingsPane,
-  SettingsRow,
+  SettingsField,
+  SettingsSubsection,
 } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 import { DEFAULT_SUPERMARKET_SECTIONS } from '@/lib/domain/list-settings';
@@ -110,6 +110,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
   const [selectedId, setSelectedId] = useState<string | null>(firstActive?.id ?? null);
   const [draft, setDraft] = useState<ProfileDraft>(() => draftFor(firstActive));
   const [message, setMessage] = useState('');
+  const [statusArea, setStatusArea] = useState<'preferences' | 'store'>('preferences');
   const [isPending, startTransition] = useTransition();
 
   const activeProfiles = useMemo(
@@ -130,7 +131,13 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
     }
   }
 
-  function run(action: () => Promise<Workspace>, success: string, preferredId = draft.id) {
+  function run(
+    action: () => Promise<Workspace>,
+    success: string,
+    preferredId = draft.id,
+    area: 'preferences' | 'store' = 'store',
+  ) {
+    setStatusArea(area);
     setMessage('');
     startTransition(async () => {
       try {
@@ -214,96 +221,98 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
         title="Shopping list behavior"
         description="Shared defaults for list completion, supermarket routing, and shopping mode."
       >
-        <SettingsRow
+        <SettingsSubsection
           title="List organization"
           description="Choose the default store and what happens after an item is completed."
         >
-          <SettingsControlGroup>
-            <label className="settings-control">
-              <span>Default supermarket</span>
-              <select
-                value={workspace.settings.defaultSupermarketProfileId ?? ''}
-                onChange={(event) =>
-                  setWorkspace({
-                    ...workspace,
-                    settings: {
-                      ...workspace.settings,
-                      defaultSupermarketProfileId: event.target.value || null,
-                    },
-                  })
-                }
-              >
-                <option value="">No default</option>
-                {activeProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                    {profile.locationLabel ? ` · ${profile.locationLabel}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="settings-control">
-              <span>Completed items</span>
-              <select
-                value={workspace.settings.completedItemsBehavior}
-                onChange={(event) =>
-                  setWorkspace({
-                    ...workspace,
-                    settings: {
-                      ...workspace.settings,
-                      completedItemsBehavior: event.target
-                        .value as Settings['completedItemsBehavior'],
-                    },
-                  })
-                }
-              >
-                <option value="completed_section">Move to a Completed section</option>
-                <option value="hide">Hide completed items</option>
-                <option value="in_place">Keep items in place</option>
-              </select>
-            </label>
-          </SettingsControlGroup>
-        </SettingsRow>
-        <SettingsRow
-          title="Pantry intake"
-          description="Open purchase details as items are checked so quantities and dates can be recorded."
-        >
-          <label className={styles.toggleRow}>
-            <input
-              checked={workspace.settings.openPantryPurchaseOnCheck}
+          <SettingsField
+            description="Use this store’s route for new shopping lists."
+            title="Default supermarket"
+          >
+            <select
+              value={workspace.settings.defaultSupermarketProfileId ?? ''}
               onChange={(event) =>
                 setWorkspace({
                   ...workspace,
                   settings: {
                     ...workspace.settings,
-                    openPantryPurchaseOnCheck: event.target.checked,
+                    defaultSupermarketProfileId: event.target.value || null,
                   },
                 })
               }
-              type="checkbox"
-            />
-            <span>Open Pantry purchase details when an item is checked</span>
-          </label>
-        </SettingsRow>
-        <SettingsRow
-          title="Shopping mode"
-          description="Prevent the display from sleeping while an active list is open."
-        >
-          <label className={styles.toggleRow}>
-            <input
-              checked={workspace.settings.keepScreenAwake}
+            >
+              <option value="">No default</option>
+              {activeProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                  {profile.locationLabel ? ` · ${profile.locationLabel}` : ''}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+          <SettingsField
+            description="Choose where items go after they are marked complete."
+            title="Completed items"
+          >
+            <select
+              value={workspace.settings.completedItemsBehavior}
               onChange={(event) =>
                 setWorkspace({
                   ...workspace,
-                  settings: { ...workspace.settings, keepScreenAwake: event.target.checked },
+                  settings: {
+                    ...workspace.settings,
+                    completedItemsBehavior: event.target
+                      .value as Settings['completedItemsBehavior'],
+                  },
                 })
               }
-              type="checkbox"
-            />
-            <span>Keep the screen awake while a list is open</span>
-          </label>
-        </SettingsRow>
-        <SettingsActionBar>
+            >
+              <option value="completed_section">Move to a Completed section</option>
+              <option value="hide">Hide completed items</option>
+              <option value="in_place">Keep items in place</option>
+            </select>
+          </SettingsField>
+        </SettingsSubsection>
+        <SettingsField
+          title="Pantry intake"
+          description="Open purchase details as items are checked so quantities and dates can be recorded."
+        >
+          <input
+            role="switch"
+            checked={workspace.settings.openPantryPurchaseOnCheck}
+            onChange={(event) =>
+              setWorkspace({
+                ...workspace,
+                settings: {
+                  ...workspace.settings,
+                  openPantryPurchaseOnCheck: event.target.checked,
+                },
+              })
+            }
+            type="checkbox"
+          />
+        </SettingsField>
+        <SettingsField
+          title="Shopping mode"
+          description="Prevent the display from sleeping while an active list is open."
+        >
+          <input
+            role="switch"
+            checked={workspace.settings.keepScreenAwake}
+            onChange={(event) =>
+              setWorkspace({
+                ...workspace,
+                settings: { ...workspace.settings, keepScreenAwake: event.target.checked },
+              })
+            }
+            type="checkbox"
+          />
+        </SettingsField>
+        <SettingsActionBar
+          status={
+            statusArea === 'preferences' ? (isPending ? 'Saving preferences…' : message) : undefined
+          }
+        >
           <button
             className="primary-button compact"
             aria-busy={isPending}
@@ -319,6 +328,8 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                     keepScreenAwake: workspace.settings.keepScreenAwake,
                   }),
                 'List preferences saved.',
+                null,
+                'preferences',
               )
             }
             type="button"
@@ -328,251 +339,270 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
         </SettingsActionBar>
       </SettingsPane>
 
-      <section className={styles.profiles} aria-labelledby="supermarket-profiles-title">
-        <aside className={styles.profileRail}>
-          <p className="eyebrow" id="supermarket-profiles-title">
-            SUPERMARKET PROFILES
-          </p>
-          <div className={styles.profileList}>
-            {activeProfiles.map((profile) => (
-              <button
-                className={selectedId === profile.id ? styles.selectedProfile : ''}
-                key={profile.id}
-                onClick={() => selectProfile(profile)}
-                type="button"
-              >
-                <Store size={19} />
-                <span>
-                  <strong>{profile.name}</strong>
-                  <small>
-                    {profile.locationLabel || 'No branch set'}
-                    {workspace.settings.defaultSupermarketProfileId === profile.id
-                      ? ' · Default'
-                      : ''}
-                  </small>
-                </span>
-              </button>
-            ))}
-            <button
-              className={selectedId === null ? styles.selectedProfile : ''}
-              onClick={() => {
-                setSelectedId(null);
-                setDraft(draftFor());
-                setMessage('');
-              }}
-              type="button"
-            >
-              <Plus size={19} />
-              <span>
-                <strong>Add supermarket</strong>
-                <small>Start with a useful route</small>
-              </span>
-            </button>
-          </div>
-          {archivedProfiles.length ? (
-            <div className={styles.archivedList}>
-              <span>Archived</span>
-              {archivedProfiles.map((profile) => (
-                <button key={profile.id} onClick={() => selectProfile(profile)} type="button">
-                  <Archive size={16} /> {profile.name}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </aside>
-
-        <div className={styles.profileEditor}>
-          <div className={styles.profileFields}>
-            <label>
-              <span>Store name</span>
-              <input
-                value={draft.name}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                placeholder="My supermarket"
-              />
-            </label>
-            <label>
-              <span>Location or branch (optional)</span>
-              <input
-                value={draft.locationLabel}
-                onChange={(event) => setDraft({ ...draft, locationLabel: event.target.value })}
-                placeholder="Main store"
-              />
-            </label>
-            <label>
-              <span>Notes (optional)</span>
-              <textarea
-                value={draft.notes}
-                onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-                placeholder="Our usual weekly shop"
-              />
-            </label>
-          </div>
-
-          <StoreMapUpload
-            key={draft.id ?? 'new-store'}
-            onUse={(sections) => setDraft((current) => ({ ...current, sections }))}
-          />
-          <div className={styles.routeHeader}>
-            <div>
-              <p className="eyebrow">IN-STORE ROUTE</p>
-              <span>
-                Put sections in the order you walk the store. Keywords help place new items
-                automatically.
-              </span>
-            </div>
-          </div>
-          <ol className={styles.routeList}>
-            {draft.sections.map((section, index) => (
-              <li key={`${section.id ?? 'new'}-${index}`}>
-                <GripVertical className={styles.grip} size={18} aria-hidden="true" />
-                <span className={styles.routeNumber}>{index + 1}</span>
-                <div className={styles.routeInputs}>
-                  <input
-                    aria-label={`Section ${index + 1} name`}
-                    value={section.name}
-                    onChange={(event) => updateSection(index, { name: event.target.value })}
-                    placeholder="Section name"
-                  />
-                  <input
-                    aria-label={`Section ${index + 1} keywords`}
-                    value={section.matchTerms.join(', ')}
-                    onChange={(event) =>
-                      updateSection(index, {
-                        matchTerms: event.target.value
-                          .split(',')
-                          .map((term) => term.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    placeholder="Keywords, separated by commas"
-                  />
-                </div>
-                <div className={styles.routeActions}>
+      <SettingsPane
+        title="Stores & routes"
+        description="Save each store’s departments in the order you shop."
+      >
+        <SettingsSubsection title="Saved stores">
+          <div className={styles.profiles}>
+            <aside className={styles.profileRail}>
+              <p className="eyebrow" id="supermarket-profiles-title">
+                SUPERMARKET PROFILES
+              </p>
+              <div className={styles.profileList}>
+                {activeProfiles.map((profile) => (
                   <button
-                    aria-label={`Move ${section.name || 'section'} up`}
-                    disabled={index === 0}
-                    onClick={() => moveSection(index, -1)}
+                    className={selectedId === profile.id ? styles.selectedProfile : ''}
+                    key={profile.id}
+                    onClick={() => selectProfile(profile)}
                     type="button"
                   >
-                    <ArrowUp size={16} />
+                    <Store size={19} />
+                    <span>
+                      <strong>{profile.name}</strong>
+                      <small>
+                        {profile.locationLabel || 'No branch set'}
+                        {workspace.settings.defaultSupermarketProfileId === profile.id
+                          ? ' · Default'
+                          : ''}
+                      </small>
+                    </span>
                   </button>
-                  <button
-                    aria-label={`Move ${section.name || 'section'} down`}
-                    disabled={index === draft.sections.length - 1}
-                    onClick={() => moveSection(index, 1)}
-                    type="button"
-                  >
-                    <ArrowDown size={16} />
-                  </button>
-                  <button
-                    aria-label={`Remove ${section.name || 'section'}`}
-                    disabled={draft.sections.length === 1}
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        sections: draft.sections.filter((_, current) => current !== index),
-                      })
-                    }
-                    type="button"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <button
-            className={styles.addSection}
-            onClick={() =>
-              setDraft({
-                ...draft,
-                sections: [...draft.sections, { aisleId: '', name: '', matchTerms: [] }],
-              })
-            }
-            type="button"
-          >
-            <Plus size={17} /> Add section
-          </button>
-
-          <footer className={styles.editorFooter}>
-            <p>
-              <Info size={18} />
-              <span>
-                Manual corrections are remembered for this supermarket. Items that cannot be matched
-                stay in Unassigned.
-              </span>
-            </p>
-            <div>
-              {draft.id ? (
+                ))}
                 <button
-                  className="secondary-button compact"
-                  disabled={isPending}
-                  onClick={() =>
-                    run(
-                      () =>
-                        requestWorkspace(
-                          `/api/v1/supermarket-profiles/${draft.id}/duplicate`,
-                          'POST',
-                        ),
-                      'Supermarket duplicated.',
-                      null,
-                    )
-                  }
-                  type="button"
-                >
-                  <Copy size={16} /> Duplicate
-                </button>
-              ) : null}
-              {draft.id ? (
-                <button
-                  className={styles.archiveButton}
-                  disabled={isPending}
+                  className={selectedId === null ? styles.selectedProfile : ''}
                   onClick={() => {
-                    const next = { ...draft, archived: !draft.archived };
-                    setDraft(next);
-                    run(
-                      () =>
-                        requestWorkspace(`/api/v1/supermarket-profiles/${draft.id}`, 'PATCH', {
-                          name: next.name,
-                          locationLabel: next.locationLabel,
-                          notes: next.notes,
-                          sections: next.sections.map(({ aisleId, name, matchTerms }) => ({
-                            aisleId,
-                            name,
-                            matchTerms,
-                          })),
-                          archived: next.archived,
-                        }),
-                      next.archived ? 'Supermarket archived.' : 'Supermarket restored.',
-                    );
+                    setSelectedId(null);
+                    setDraft(draftFor());
+                    setMessage('');
                   }}
                   type="button"
                 >
-                  {draft.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
-                  {draft.archived ? 'Restore' : 'Archive'}
+                  <Plus size={19} />
+                  <span>
+                    <strong>Add supermarket</strong>
+                    <small>Start with a useful route</small>
+                  </span>
                 </button>
+              </div>
+              {archivedProfiles.length ? (
+                <div className={styles.archivedList}>
+                  <span>Archived</span>
+                  {archivedProfiles.map((profile) => (
+                    <button key={profile.id} onClick={() => selectProfile(profile)} type="button">
+                      <Archive size={16} /> {profile.name}
+                    </button>
+                  ))}
+                </div>
               ) : null}
+            </aside>
+
+            <div className={styles.profileEditor}>
+              <div className={`settings-fields ${styles.profileFields}`}>
+                <SettingsField
+                  description="The name shown when choosing a shopping route."
+                  title="Store name"
+                >
+                  <input
+                    value={draft.name}
+                    onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                    placeholder="My supermarket"
+                  />
+                </SettingsField>
+                <SettingsField
+                  description="Distinguish branches with different department layouts."
+                  title="Location or branch (optional)"
+                >
+                  <input
+                    value={draft.locationLabel}
+                    onChange={(event) => setDraft({ ...draft, locationLabel: event.target.value })}
+                    placeholder="Main store"
+                  />
+                </SettingsField>
+                <SettingsField
+                  description="Instructions or reminders about shopping at this store."
+                  title="Notes (optional)"
+                >
+                  <textarea
+                    value={draft.notes}
+                    onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+                    placeholder="Our usual weekly shop"
+                  />
+                </SettingsField>
+              </div>
+
+              <StoreMapUpload
+                key={draft.id ?? 'new-store'}
+                onUse={(sections) => setDraft((current) => ({ ...current, sections }))}
+              />
+              <div className={styles.routeHeader}>
+                <div>
+                  <p className="eyebrow">IN-STORE ROUTE</p>
+                  <span>
+                    Put sections in the order you walk the store. Keywords help place new items
+                    automatically.
+                  </span>
+                </div>
+              </div>
+              <ol className={styles.routeList}>
+                {draft.sections.map((section, index) => (
+                  <li key={`${section.id ?? 'new'}-${index}`}>
+                    <GripVertical className={styles.grip} size={18} aria-hidden="true" />
+                    <span className={styles.routeNumber}>{index + 1}</span>
+                    <div className={styles.routeInputs}>
+                      <input
+                        aria-label={`Section ${index + 1} name`}
+                        value={section.name}
+                        onChange={(event) => updateSection(index, { name: event.target.value })}
+                        placeholder="Section name"
+                      />
+                      <input
+                        aria-label={`Section ${index + 1} keywords`}
+                        value={section.matchTerms.join(', ')}
+                        onChange={(event) =>
+                          updateSection(index, {
+                            matchTerms: event.target.value
+                              .split(',')
+                              .map((term) => term.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                        placeholder="Keywords, separated by commas"
+                      />
+                    </div>
+                    <div className={styles.routeActions}>
+                      <button
+                        aria-label={`Move ${section.name || 'section'} up`}
+                        disabled={index === 0}
+                        onClick={() => moveSection(index, -1)}
+                        type="button"
+                      >
+                        <ArrowUp size={16} />
+                      </button>
+                      <button
+                        aria-label={`Move ${section.name || 'section'} down`}
+                        disabled={index === draft.sections.length - 1}
+                        onClick={() => moveSection(index, 1)}
+                        type="button"
+                      >
+                        <ArrowDown size={16} />
+                      </button>
+                      <button
+                        aria-label={`Remove ${section.name || 'section'}`}
+                        disabled={draft.sections.length === 1}
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            sections: draft.sections.filter((_, current) => current !== index),
+                          })
+                        }
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
               <button
-                className="primary-button compact"
-                aria-busy={isPending}
-                disabled={
-                  isPending ||
-                  !draft.name.trim() ||
-                  draft.sections.some((section) => !section.name.trim())
+                className={styles.addSection}
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    sections: [...draft.sections, { aisleId: '', name: '', matchTerms: [] }],
+                  })
                 }
-                onClick={saveProfile}
                 type="button"
               >
-                <Save size={16} /> {draft.id ? 'Save supermarket' : 'Add supermarket'}
+                <Plus size={17} /> Add section
               </button>
+
+              <footer className={styles.editorFooter}>
+                <p>
+                  <Info size={18} />
+                  <span>
+                    Manual corrections are remembered for this supermarket. Items that cannot be
+                    matched stay in Unassigned.
+                  </span>
+                </p>
+                <div>
+                  {draft.id ? (
+                    <button
+                      className="secondary-button compact"
+                      disabled={isPending}
+                      onClick={() =>
+                        run(
+                          () =>
+                            requestWorkspace(
+                              `/api/v1/supermarket-profiles/${draft.id}/duplicate`,
+                              'POST',
+                            ),
+                          'Supermarket duplicated.',
+                          null,
+                        )
+                      }
+                      type="button"
+                    >
+                      <Copy size={16} /> Duplicate
+                    </button>
+                  ) : null}
+                  {draft.id ? (
+                    <button
+                      className={styles.archiveButton}
+                      disabled={isPending}
+                      onClick={() => {
+                        const next = { ...draft, archived: !draft.archived };
+                        setDraft(next);
+                        run(
+                          () =>
+                            requestWorkspace(`/api/v1/supermarket-profiles/${draft.id}`, 'PATCH', {
+                              name: next.name,
+                              locationLabel: next.locationLabel,
+                              notes: next.notes,
+                              sections: next.sections.map(({ aisleId, name, matchTerms }) => ({
+                                aisleId,
+                                name,
+                                matchTerms,
+                              })),
+                              archived: next.archived,
+                            }),
+                          next.archived ? 'Supermarket archived.' : 'Supermarket restored.',
+                        );
+                      }}
+                      type="button"
+                    >
+                      {draft.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
+                      {draft.archived ? 'Restore' : 'Archive'}
+                    </button>
+                  ) : null}
+                  <button
+                    className="primary-button compact"
+                    aria-busy={isPending}
+                    disabled={
+                      isPending ||
+                      !draft.name.trim() ||
+                      draft.sections.some((section) => !section.name.trim())
+                    }
+                    onClick={saveProfile}
+                    type="button"
+                  >
+                    <Save size={16} /> {draft.id ? 'Save supermarket' : 'Add supermarket'}
+                  </button>
+                </div>
+              </footer>
+              {statusArea === 'store' && (
+                <p className={styles.status} role="status">
+                  {isPending ? (
+                    <InlineSkeleton label="Saving list settings" width="7rem" />
+                  ) : (
+                    message
+                  )}
+                </p>
+              )}
             </div>
-          </footer>
-          <p className={styles.status} role="status">
-            {isPending ? <InlineSkeleton label="Saving list settings" width="7rem" /> : message}
-          </p>
-        </div>
-      </section>
+          </div>
+        </SettingsSubsection>
+      </SettingsPane>
     </div>
   );
 }

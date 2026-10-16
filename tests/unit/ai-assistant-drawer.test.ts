@@ -41,11 +41,11 @@ describe('AI assistant drawer', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
-      value: vi.fn().mockReturnValue({
-        matches: false,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(hover: hover) and (pointer: fine)',
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
-      }),
+      })),
     });
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
@@ -58,7 +58,7 @@ describe('AI assistant drawer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('compacts historical proposal text and sends with Enter but not Shift+Enter', async () => {
+  it('compacts proposals, sends desktop Enter, and keeps mobile Enter for new lines', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === '/api/v1/ai/chat/threads' && !init?.method) {
@@ -113,5 +113,19 @@ describe('AI assistant drawer', () => {
       expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1),
     );
     expect(await screen.findByText('I can help with that.')).toBeTruthy();
+
+    vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+      media: query,
+      matches: false,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    fireEvent.change(composer, { target: { value: 'Plan breakfast too' } });
+    expect(fireEvent.keyDown(composer, { key: 'Enter' })).toBe(true);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
   });
 });

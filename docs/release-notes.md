@@ -1,5 +1,20 @@
 # Release notes
 
+## 1.0.0-rc.6
+
+- Updated framework, PDF/image import, SMTP, and transitive dependencies to patched releases.
+
+- Unified app and profile settings with labeled control rows, explanations, responsive layouts, and subsections for backups, passkeys, integrations, and background tasks.
+- Added personal passkey listing and removal in Account security, and integrated local backup recovery into System settings.
+- Expanded kitchen-assistant planning with leftovers, single-item meals, takeout, partial plan updates, meal-plan previews, image attachments, and retained conversations.
+- Added reviewed recipe variations and temporary meal substitutions with grocery-list context.
+- Refined recipebook insights, recipe pages, pantry matching, nutrition summaries, mobile navigation, dialogs, and loading states.
+- Unified PDF print previews for recipes, meal plans, shopping lists, and pantry inventory, with export-specific options.
+- Added pantry inventory counting and shopping-list shortcuts, notes, and bulk item actions.
+- Added an optional Redis/BullMQ queue, weekly meal-plan draft schedules, and bulk recipe/image processing preferences. Server configuration is documented in `docs/printing-and-automation.md`.
+- Includes additive database migrations through `0064_shopping_list_notes`. Back up your data before upgrading; rolling back the image does not roll back database migrations.
+- Mobile-app work in progress is excluded from this release.
+
 ## 1.0.0-rc.5
 
 - Moved personal preferences, appearance, nutrition settings, and integrations into My profile.

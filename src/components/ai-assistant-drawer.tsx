@@ -14,11 +14,14 @@ import { useModalSurface } from '@/components/use-modal-surface';
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
 import styles from './ai-assistant-drawer.module.css';
 
+type Attachment = { kind: 'image'; name: string; mimeType: string; dataBase64: string };
+
 type Message = {
   id: string;
   role: 'user' | 'assistant' | 'tool';
   content: string;
   actionId?: string | null;
+  attachments?: Attachment[];
 };
 
 type AiJob = {
@@ -168,6 +171,10 @@ export function AiAssistantDrawer({
   const [appActions, setAppActions] = useState<AppActionReview[]>([]);
   const [allowPaidTools, setAllowPaidTools] = useState(false);
   const [draft, setDraft] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadingHistory = useRef(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [pendingDecision, setPendingDecision] = useState<{
@@ -179,6 +186,28 @@ export function AiAssistantDrawer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const viewport = window.visualViewport;
+    const resize = () => {
+      drawerRef.current?.style.setProperty(
+        '--assistant-viewport-height',
+        `${viewport?.height ?? window.innerHeight}px`,
+      );
+      drawerRef.current?.style.setProperty(
+        '--assistant-viewport-top',
+        `${viewport?.offsetTop ?? 0}px`,
+      );
+    };
+    resize();
+    viewport?.addEventListener('resize', resize);
+    viewport?.addEventListener('scroll', resize);
+    return () => {
+      viewport?.removeEventListener('resize', resize);
+      viewport?.removeEventListener('scroll', resize);
+    };
+  }, [open]);
 
   async function newThread() {
     setBusy(true);
@@ -193,6 +222,8 @@ export function AiAssistantDrawer({
       const body = (await response.json()) as { thread: { id: string } };
       setThreadId(body.thread.id);
       setMessages([]);
+      setDraft('');
+      setAttachments([]);
       setActions([]);
       setSuggestions([]);
       setAppActions([]);
@@ -223,7 +254,8 @@ export function AiAssistantDrawer({
   }, [open, threadId]);
 
   useEffect(() => {
-    if (!open || threadId) return;
+    if (!open || threadId || loadingHistory.current) return;
+    loadingHistory.current = true;
     void (async () => {
       setBusy(true);
       setStatus('Loading your conversation…');
@@ -235,7 +267,6 @@ export function AiAssistantDrawer({
           await newThread();
           return;
         }
-        setThreadId(body.threads[0].id);
         const history = await fetch(`/api/v1/ai/chat/threads/${body.threads[0].id}`, {
           cache: 'no-store',
         });
@@ -246,12 +277,14 @@ export function AiAssistantDrawer({
           jobs?: AiJob[];
         };
         setMessages(historyBody.messages);
+        setThreadId(body.threads[0].id);
         setActions(historyBody.actions ?? []);
         setJobs(historyBody.jobs ?? []);
         setStatus('');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Could not load the assistant.');
       } finally {
+        loadingHistory.current = false;
         setBusy(false);
       }
     })();
@@ -312,17 +345,69 @@ export function AiAssistantDrawer({
   }, [draft]);
 
   useEffect(() => {
-    if (open && threadId && !busy) textareaRef.current?.focus();
+    if (
+      open &&
+      threadId &&
+      !busy &&
+      window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    )
+      textareaRef.current?.focus();
   }, [busy, open, threadId]);
+
+  async function attachImages(files: FileList | null) {
+    if (!files || attaching || busy) return;
+    setAttaching(true);
+    try {
+      if (files.length + attachments.length > 4)
+        throw new Error('Attach up to four images per message.');
+      const next: Attachment[] = [];
+      for (const file of Array.from(files)) {
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type))
+          throw new Error('Choose a JPG, PNG, WebP, or GIF image.');
+        if (file.size > 5_500_000) throw new Error('Each image must be smaller than 5.5 MB.');
+        const data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+          reader.onerror = () => reject(new Error('Could not read that image.'));
+          reader.readAsDataURL(file);
+        });
+        next.push({
+          kind: 'image',
+          name: file.name.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '_').slice(0, 120) || 'photo',
+          mimeType: file.type,
+          dataBase64: data,
+        });
+      }
+      if (
+        [...attachments, ...next].reduce((sum, file) => sum + file.dataBase64.length, 0) >
+        12_000_000
+      )
+        throw new Error('These images are too large together. Choose fewer or smaller images.');
+      setAttachments((current) => [...current, ...next]);
+      setStatus('Images attached. They will be sent with your next message.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not attach images.');
+    } finally {
+      setAttaching(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
 
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault();
     const message = draft.trim();
-    if (!threadId || !message || busy) return;
+    if (!threadId || (!message && !attachments.length) || busy || attaching) return;
+    const sentAttachments = attachments;
+    setAttachments([]);
     setDraft('');
     setMessages((current) => [
       ...current,
-      { id: createClientUuid(), role: 'user', content: message },
+      {
+        id: createClientUuid(),
+        role: 'user',
+        attachments: sentAttachments,
+        content: `${message || 'Please review the attached images.'}${sentAttachments.length ? `\n\nAttached: ${sentAttachments.map((file) => file.name).join(', ')}` : ''}`,
+      },
     ]);
     setBusy(true);
     setStatus('Thinking…');
@@ -330,7 +415,7 @@ export function AiAssistantDrawer({
       const response = await fetch(`/api/v1/ai/chat/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, allowPaidTools }),
+        body: JSON.stringify({ message, allowPaidTools, attachments: sentAttachments }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const reader = response.body?.getReader();
@@ -407,13 +492,19 @@ export function AiAssistantDrawer({
       }
       setStatus('');
     } catch (error) {
+      setDraft(message);
+      setAttachments(sentAttachments);
       setStatus(error instanceof Error ? error.message : 'The assistant request failed.');
     } finally {
       setBusy(false);
     }
   }
 
-  async function decide(actionId: string, decision: 'confirm' | 'cancel') {
+  async function decide(
+    actionId: string,
+    decision: 'confirm' | 'cancel',
+    conflictResolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+  ) {
     setBusy(true);
     setPendingDecision({ actionId, decision });
     setStatus(decision === 'confirm' ? 'Saving your change…' : 'Cancelling this preview…');
@@ -421,7 +512,7 @@ export function AiAssistantDrawer({
       const response = await fetch(`/api/v1/ai/actions/${actionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify({ decision, conflictResolutions }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const body = (await response.json()) as {
@@ -554,7 +645,22 @@ export function AiAssistantDrawer({
                   {message.role === 'assistant' ? (
                     <AssistantMessage content={compactProposalMessage(message, linkedAction)} />
                   ) : (
-                    message.content
+                    <>
+                      {message.content}
+                      {message.attachments?.length ? (
+                        <div className={styles.sentImages}>
+                          {message.attachments.map((image, index) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={index}
+                              src={`data:${image.mimeType};base64,${image.dataBase64}`}
+                              alt={image.name}
+                              loading="lazy"
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
                 {linkedAction ? (
@@ -566,7 +672,9 @@ export function AiAssistantDrawer({
                         ? pendingDecision.decision
                         : null
                     }
-                    onDecide={(actionId, decision) => void decide(actionId, decision)}
+                    onDecide={(actionId, decision, resolutions) =>
+                      void decide(actionId, decision, resolutions)
+                    }
                   />
                 ) : null}
               </Fragment>
@@ -582,7 +690,9 @@ export function AiAssistantDrawer({
                 pendingDecision={
                   pendingDecision?.actionId === action.id ? pendingDecision.decision : null
                 }
-                onDecide={(actionId, decision) => void decide(actionId, decision)}
+                onDecide={(actionId, decision, resolutions) =>
+                  void decide(actionId, decision, resolutions)
+                }
               />
             ))}
           {suggestions.map((card) => (
@@ -607,23 +717,76 @@ export function AiAssistantDrawer({
               onCommand={(jobId, command) => void commandJob(jobId, command)}
             />
           ))}
-          {isThinking ? (
-            <AsyncSkeleton
-              className={`${styles.message} ${styles.assistant} ${styles.typing}`}
-              label="Working on your request"
-              variant="message"
-            />
+          {busy ? (
+            <div role="status" aria-live="polite">
+              <AsyncSkeleton
+                className={`${styles.message} ${styles.assistant} ${styles.typing}`}
+                label={status || 'Working on your request'}
+                variant="message"
+              />
+              <p className={styles.workExplanation}>
+                <strong>{status || 'Working on your request'}</strong>
+                <br />
+                Still working. Creating several recipes or images can take a few minutes. Your
+                results will appear here as they become available.
+              </p>
+            </div>
           ) : null}
           <div ref={bottomRef} />
         </div>
         <div className={styles.composer}>
+          {attachments.length ? (
+            <ul className={styles.attachments} aria-label="Attached images">
+              {attachments.map((file, index) => (
+                <li key={`${file.name}-${index}`}>
+                  {/* Local previews are bounded data URLs, not remote image requests. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`data:${file.mimeType};base64,${file.dataBase64}`} alt={file.name} />
+                  <button
+                    type="button"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() =>
+                      setAttachments((current) => current.filter((_, i) => i !== index))
+                    }
+                  >
+                    <X size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <input
+            ref={fileInputRef}
+            className="sr-only"
+            type="file"
+            tabIndex={-1}
+            aria-label="Choose chat images"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            onChange={(event) => void attachImages(event.target.files)}
+          />
           <form onSubmit={sendMessage} aria-label="AI assistant message composer">
+            <button
+              type="button"
+              className={styles.attachButton}
+              aria-label="Attach images"
+              title="Attach images"
+              disabled={busy || attaching || attachments.length >= 4}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus />
+            </button>
             <textarea
               ref={textareaRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                if (
+                  event.key === 'Enter' &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing &&
+                  window.matchMedia('(hover: hover) and (pointer: fine)').matches
+                ) {
                   event.preventDefault();
                   event.currentTarget.form?.requestSubmit();
                 }
@@ -635,8 +798,8 @@ export function AiAssistantDrawer({
             <button
               type="submit"
               aria-label="Send message"
-              title="Send message (Enter)"
-              disabled={busy || !threadId || !draft.trim()}
+              title="Send message"
+              disabled={busy || attaching || !threadId || (!draft.trim() && !attachments.length)}
             >
               {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <Send />}
             </button>
@@ -654,7 +817,9 @@ export function AiAssistantDrawer({
             <p className={styles.status} role="status">
               {status}
             </p>
-            <p className={styles.keyboardHint}>Enter to send · Shift + Enter for a new line</p>
+            <p className={`${styles.keyboardHint} ${styles.desktopHint}`}>
+              Enter to send · Shift + Enter for a new line
+            </p>
           </div>
         </div>
       </aside>

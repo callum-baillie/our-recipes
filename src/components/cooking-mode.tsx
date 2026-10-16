@@ -54,19 +54,21 @@ type LeftoverDraft = {
 export function CookingMode({
   recipe,
   initialFavorite,
+  initialServings,
   mealPlanEntryId,
   nutritionPreparation,
   pantryAvailability,
 }: {
   recipe: RecipeDetail;
   initialFavorite: boolean;
+  initialServings?: number;
   mealPlanEntryId?: string;
   nutritionPreparation: {
     profileId: string;
     calculationId: string;
     finalWeightGrams: number | null;
   } | null;
-  pantryAvailability: PantryRecipeAvailability;
+  pantryAvailability?: PantryRecipeAvailability;
 }) {
   const router = useRouter();
   const steps = useMemo(
@@ -77,7 +79,7 @@ export function CookingMode({
     [recipe],
   );
   const baseServings = recipeYieldNumber(recipe.servings) ?? 1;
-  const [servings, setServings] = useState(baseServings);
+  const [servings, setServings] = useState(initialServings ?? baseServings);
   const [step, setStep] = useState(0);
   const [favorite, setFavorite] = useState(initialFavorite);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function CookingMode({
   const [leftovers, setLeftovers] = useState<LeftoverDraft[]>([]);
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
   const [undoConflict, setUndoConflict] = useState(false);
-  const [preparedServings, setPreparedServings] = useState(baseServings);
+  const [preparedServings, setPreparedServings] = useState(initialServings ?? baseServings);
   const [preparationAttested, setPreparationAttested] = useState(false);
   const [preparedStatus, setPreparedStatus] = useState('');
   const [preparedCreated, setPreparedCreated] = useState(false);
@@ -432,17 +434,24 @@ export function CookingMode({
           )}
         </aside>
       </section>
-      <details className="cooking-pantry">
-        <summary>
-          Pantry check
-          <span>{pantryAvailability.state.replaceAll('_', ' ')}</span>
-        </summary>
-        <RecipePantryPanel
-          initialAvailability={pantryAvailability}
-          products={[]}
-          allowMapping={false}
-        />
-      </details>
+      {pantryAvailability ? (
+        <details className="cooking-pantry">
+          <summary>
+            Pantry check
+            <span>{pantryAvailability.state.replaceAll('_', ' ')}</span>
+          </summary>
+          <RecipePantryPanel
+            initialAvailability={pantryAvailability}
+            products={[]}
+            allowMapping={false}
+          />
+        </details>
+      ) : (
+        <p>
+          This meal uses an adapted recipe. Its ingredient list is shown below; original recipe
+          nutrition and pantry checks do not apply.
+        </p>
+      )}
       <section className="cooking-layout">
         <aside className="scaled-ingredients">
           <h2>Ingredients</h2>

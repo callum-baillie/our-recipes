@@ -59,6 +59,7 @@ const nextConfig: NextConfig = {
   // installed files. Keep these Node-only packages external and copy them with
   // the standalone server output.
   serverExternalPackages: [
+    'bullmq',
     '@formepdf/core',
     '@formepdf/react',
     'tar',
@@ -80,6 +81,21 @@ const nextConfig: NextConfig = {
       {
         source: '/:path*',
         headers: securityHeaders,
+      },
+      {
+        // The print workspace embeds only PDFs created locally from authenticated exports.
+        source: '/print',
+        headers: securityHeaders.map((header) =>
+          header.key === 'Content-Security-Policy'
+            ? {
+                ...header,
+                value: header.value.replace(
+                  "object-src 'none'",
+                  'frame-src blob:; object-src blob:',
+                ),
+              }
+            : header,
+        ),
       },
     ];
   },

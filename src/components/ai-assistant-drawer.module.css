@@ -468,3 +468,102 @@
     transition: none;
   }
 }
+
+.attachments {
+  display: flex;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0 0 0.7rem;
+  padding: 0;
+  overflow-x: auto;
+}
+.attachments li {
+  position: relative;
+  flex: 0 0 76px;
+}
+.attachments img {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.attachments button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+}
+.composer form {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.composer .attachButton {
+  background: transparent;
+  color: var(--ink);
+}
+.message {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (hover: none), (pointer: coarse) {
+  .desktopHint {
+    display: none;
+  }
+}
+@media (max-width: 540px) {
+  .drawer {
+    width: 100%;
+    border: 0;
+    max-height: 100dvh;
+  }
+  .header {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+  .composer {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .composer textarea {
+    font-size: 16px;
+    max-height: 24dvh;
+  }
+  .composer button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .messages {
+    padding: 0.8rem;
+    scroll-padding-bottom: 1rem;
+  }
+  .composerMeta {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 540px) {
+  .drawer {
+    top: var(--assistant-viewport-top, 0px);
+    bottom: auto;
+    height: var(--assistant-viewport-height, 100dvh);
+  }
+}
+
+.sentImages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.sentImages img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.workExplanation {
+  margin: 0.5rem 1rem 1rem;
+  max-width: 40ch;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}

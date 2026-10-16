@@ -8,6 +8,7 @@ import { isFavorite } from '@/lib/services/cooking-service';
 import { getLatestRecipeNutritionCalculation } from '@/lib/services/nutrition-foundation-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
 import { getRecipePantryAvailability } from '@/lib/services/pantry-availability-service';
+import { getRecipeForPlannedMeal, getPlannedMeal } from '@/lib/services/planning-service';
 import { getRecipe } from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
@@ -34,10 +35,12 @@ export default async function CookRecipePage({
   params: Promise<{ recipeId: string }>;
   searchParams: Promise<{ mealPlanEntryId?: string }>;
 }) {
-  const recipe = getRecipe((await params).recipeId);
+  const mealPlanEntryId = (await searchParams).mealPlanEntryId;
+  const meal = mealPlanEntryId ? getPlannedMeal(mealPlanEntryId) : null;
+  const recipe = getRecipeForPlannedMeal((await params).recipeId, mealPlanEntryId);
   if (!recipe) notFound();
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  const calculation = getLatestRecipeNutritionCalculation(recipe.id);
+  const calculation = meal?.recipeOverride ? null : getLatestRecipeNutritionCalculation(recipe.id);
   const nutrition = actor.profileId ? resolveNutritionHouseholdContext(actor) : null;
   const nutritionPreparation =
     nutrition && calculation?.recipeRevision === recipe.currentRevision
@@ -50,10 +53,11 @@ export default async function CookRecipePage({
   return (
     <CookingMode
       recipe={recipe}
+      initialServings={meal?.servings}
       initialFavorite={actor.profileId ? isFavorite(recipe.id, actor.profileId) : false}
-      mealPlanEntryId={(await searchParams).mealPlanEntryId}
+      mealPlanEntryId={mealPlanEntryId}
       nutritionPreparation={nutritionPreparation}
-      pantryAvailability={getRecipePantryAvailability(recipe.id)}
+      pantryAvailability={getRecipePantryAvailability(recipe.id, meal?.servings, mealPlanEntryId)}
     />
   );
 }

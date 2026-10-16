@@ -7,7 +7,7 @@ import { notFound } from 'next/navigation';
 import { RecipeDetailToolbar } from '@/components/recipe-detail-toolbar';
 import { RecipeImageGallery } from '@/components/recipe-image-gallery';
 import { RecipeLifecycleActions } from '@/components/recipe-lifecycle-actions';
-import { RecipePantryPanel } from '@/components/recipe-pantry-panel';
+import { RecipePantryCard } from '@/components/recipe-pantry-card';
 import { RecipeNormalizedNutrition } from '@/components/recipe-normalized-nutrition';
 import { RecipeRevisionHistory } from '@/components/recipe-revision-history';
 import { RecipeServingDetails } from '@/components/recipe-serving-details';
@@ -61,9 +61,107 @@ export default async function RecipeDetailPage({
           description={recipe.summary}
           toolbarLeft={<RecipeDetailToolbar recipeId={recipe.id} title={recipe.title} />}
         />
+        <RecipeImageGallery
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          images={recipe.images.map(({ id, altText, width, height }) => ({
+            id,
+            altText,
+            width,
+            height,
+          }))}
+        />
         <RecipeNormalizedNutrition recipeId={recipe.id} nutrition={normalizedNutrition} />
         <RecipeServingDetails
-          key={recipe.currentRevision}
+          sidebar={
+            <>
+              <RecipePantryCard
+                initialAvailability={pantryAvailability}
+                products={pantryProducts}
+              />
+              {recipe.equipment.length > 0 && (
+                <aside className="recipe-notes equipment-note">
+                  <strong>Equipment</strong>
+                  <ul>
+                    {recipe.equipment.map((item) => (
+                      <li key={item.id}>{item.name}</li>
+                    ))}
+                  </ul>
+                </aside>
+              )}
+              {(importProvenance ||
+                recipe.sourceName ||
+                recipe.sourceUrl ||
+                recipe.originalAuthor) && (
+                <aside className="source-note">
+                  <strong>Recipe source</strong>
+                  <span title={importProvenance?.sourceName}>
+                    {recipe.sourceUrl ? (
+                      <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">
+                        {importProvenance?.label || recipe.sourceName || recipe.sourceUrl}
+                      </a>
+                    ) : (
+                      importProvenance?.label || recipe.sourceName
+                    )}
+                  </span>
+                  {recipe.originalAuthor && <span>Original author: {recipe.originalAuthor}</span>}
+                </aside>
+              )}
+              {(recipe.tips || recipe.sharedNotes) && (
+                <aside className="recipe-notes">
+                  {recipe.tips && (
+                    <div>
+                      <strong>Kitchen tips</strong>
+                      <p>{recipe.tips}</p>
+                    </div>
+                  )}
+                  {recipe.sharedNotes && (
+                    <div>
+                      <strong>Shared notes</strong>
+                      <p>{recipe.sharedNotes}</p>
+                    </div>
+                  )}
+                </aside>
+              )}
+              <section
+                className="recipe-maintenance-panel"
+                aria-labelledby="recipe-management-heading"
+              >
+                <header className="recipe-maintenance-heading">
+                  <span className="recipe-maintenance-icon" aria-hidden="true">
+                    <Settings2 size={19} />
+                  </span>
+                  <div>
+                    <h2 id="recipe-management-heading">Recipe management</h2>
+                    <p>Keep the shared recipe tidy or return to an earlier saved version.</p>
+                  </div>
+                  <span className="recipe-revision-badge">Revision {recipe.currentRevision}</span>
+                </header>
+                <RecipeLifecycleActions
+                  recipeId={recipe.id}
+                  status={recipe.status}
+                  currentRevision={recipe.currentRevision}
+                  personalPreference={recipe.personalPreference}
+                  initialFavorite={favorite}
+                />
+                <RecipeRevisionHistory
+                  recipeId={recipe.id}
+                  currentRevision={recipe.currentRevision}
+                  revisions={recipe.revisions.map((revision) => ({
+                    revision: revision.revision,
+                    editedByName: revision.editedByName,
+                    createdAt: revision.createdAt.toISOString(),
+                  }))}
+                />
+                <footer className="revision-note">
+                  Created by {recipe.createdByName} on {recipe.createdAt.toLocaleDateString()} ·
+                  Last edited by {recipe.lastEditedByName} on{' '}
+                  {recipe.updatedAt.toLocaleDateString()}
+                </footer>
+              </section>
+            </>
+          }
+          key={`${recipe.id}:${recipe.currentRevision}`}
           servings={recipe.servings}
           prepMinutes={recipe.prepMinutes}
           cookMinutes={recipe.cookMinutes}
@@ -88,91 +186,10 @@ export default async function RecipeDetailPage({
           ingredientGroups={recipe.ingredientGroups}
           instructionSections={recipe.instructionSections}
         />
-        <RecipeImageGallery
-          recipeId={recipe.id}
-          recipeTitle={recipe.title}
-          images={recipe.images.map(({ id, altText, width, height }) => ({
-            id,
-            altText,
-            width,
-            height,
-          }))}
-        />
-        <RecipePantryPanel initialAvailability={pantryAvailability} products={pantryProducts} />
-        {recipe.equipment.length > 0 && (
-          <aside className="recipe-notes equipment-note">
-            <strong>Equipment</strong>
-            <ul>
-              {recipe.equipment.map((item) => (
-                <li key={item.id}>{item.name}</li>
-              ))}
-            </ul>
-          </aside>
-        )}
-        {(importProvenance || recipe.sourceName || recipe.sourceUrl || recipe.originalAuthor) && (
-          <aside className="source-note">
-            <strong>Recipe source</strong>
-            <span title={importProvenance?.sourceName}>
-              {recipe.sourceUrl ? (
-                <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">
-                  {importProvenance?.label || recipe.sourceName || recipe.sourceUrl}
-                </a>
-              ) : (
-                importProvenance?.label || recipe.sourceName
-              )}
-            </span>
-            {recipe.originalAuthor && <span>Original author: {recipe.originalAuthor}</span>}
-          </aside>
-        )}
-        {(recipe.tips || recipe.sharedNotes) && (
-          <aside className="recipe-notes">
-            {recipe.tips && (
-              <div>
-                <strong>Kitchen tips</strong>
-                <p>{recipe.tips}</p>
-              </div>
-            )}
-            {recipe.sharedNotes && (
-              <div>
-                <strong>Shared notes</strong>
-                <p>{recipe.sharedNotes}</p>
-              </div>
-            )}
-          </aside>
-        )}
-        <section className="recipe-maintenance-panel" aria-labelledby="recipe-management-heading">
-          <header className="recipe-maintenance-heading">
-            <span className="recipe-maintenance-icon" aria-hidden="true">
-              <Settings2 size={19} />
-            </span>
-            <div>
-              <h2 id="recipe-management-heading">Recipe management</h2>
-              <p>Keep the shared recipe tidy or return to an earlier saved version.</p>
-            </div>
-            <span className="recipe-revision-badge">Revision {recipe.currentRevision}</span>
-          </header>
-          <RecipeLifecycleActions
-            recipeId={recipe.id}
-            status={recipe.status}
-            currentRevision={recipe.currentRevision}
-            personalPreference={recipe.personalPreference}
-            initialFavorite={favorite}
-          />
-          <RecipeRevisionHistory
-            recipeId={recipe.id}
-            currentRevision={recipe.currentRevision}
-            revisions={recipe.revisions.map((revision) => ({
-              revision: revision.revision,
-              editedByName: revision.editedByName,
-              createdAt: revision.createdAt.toISOString(),
-            }))}
-          />
-          <footer className="revision-note">
-            Created by {recipe.createdByName} on {recipe.createdAt.toLocaleDateString()} · Last
-            edited by {recipe.lastEditedByName} on {recipe.updatedAt.toLocaleDateString()}
-          </footer>
-        </section>
       </article>
+      <a className="jump-to-recipe" href="#recipe">
+        Jump to recipe ↓
+      </a>
     </main>
   );
 }

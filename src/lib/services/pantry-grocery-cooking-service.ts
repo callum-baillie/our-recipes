@@ -1,3 +1,4 @@
+import { parseMealPlanIngredientSnapshot } from '@/lib/domain/meal-plan-snapshot';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
@@ -134,7 +135,7 @@ function provenanceForDemand(demand: ReturnType<typeof getProjectedPantryDemand>
 type DemandContribution = {
   mealPlanEntryId: string;
   plannedFor: string;
-  recipeId: string;
+  recipeId: string | null;
   recipeTitle: string;
   servings: number;
   baseServings: number | null;
@@ -164,9 +165,12 @@ function demandContributionIndex(demand: ReturnType<typeof getProjectedPantryDem
       recipeId: mealPlanEntries.recipeId,
       recipeTitle: recipes.title,
       baseServingsText: recipes.servings,
+      snapshot: mealPlanEntries.recipeIngredientsSnapshot,
+      title: mealPlanEntries.title,
+      recipeTitleSnapshot: mealPlanEntries.recipeTitleSnapshot,
     })
     .from(mealPlanEntries)
-    .innerJoin(recipes, eq(recipes.id, mealPlanEntries.recipeId))
+    .leftJoin(recipes, eq(recipes.id, mealPlanEntries.recipeId))
     .where(inArray(mealPlanEntries.id, mealIds))
     .all();
   const recipeIds = [...new Set(meals.map((meal) => meal.recipeId).filter(Boolean))] as string[];
@@ -191,10 +195,17 @@ function demandContributionIndex(demand: ReturnType<typeof getProjectedPantryDem
     : [];
   const result = new Map<string, DemandContribution[]>();
   for (const meal of meals) {
-    if (!meal.recipeId) continue;
-    const baseServings = parseServingCount(meal.baseServingsText);
-    for (const ingredient of ingredients) {
-      if (ingredient.recipeId !== meal.recipeId || ingredient.isOptional) continue;
+    const snapshot = parseMealPlanIngredientSnapshot(meal.snapshot);
+    const baseServings = parseServingCount(snapshot?.baseServings ?? meal.baseServingsText ?? '');
+    const mealIngredients = snapshot
+      ? snapshot.ingredients.map((item) => ({
+          ...item,
+          id: item.ingredientId,
+          ingredientName: item.item,
+        }))
+      : ingredients.filter((item) => item.recipeId === meal.recipeId);
+    for (const ingredient of mealIngredients) {
+      if (ingredient.isOptional) continue;
       const requiredQuantity =
         ingredient.quantity !== null && ingredient.unit.trim() && baseServings
           ? Number(((ingredient.quantity * meal.servings) / baseServings).toFixed(6))
@@ -203,7 +214,7 @@ function demandContributionIndex(demand: ReturnType<typeof getProjectedPantryDem
         mealPlanEntryId: meal.id,
         plannedFor: meal.plannedFor,
         recipeId: meal.recipeId,
-        recipeTitle: meal.recipeTitle,
+        recipeTitle: meal.recipeTitleSnapshot || meal.recipeTitle || meal.title,
         servings: meal.servings,
         baseServings,
         ingredientId: ingredient.id,
@@ -274,7 +285,13 @@ function retireInactivePolicyInstances(
 }
 
 function sourceRecipeIds(contributions: DemandContribution[]): string[] {
-  return [...new Set(contributions.map((contribution) => contribution.recipeId))];
+  return [
+    ...new Set(
+      contributions.flatMap((contribution) =>
+        contribution.recipeId ? [contribution.recipeId] : [],
+      ),
+    ),
+  ];
 }
 
 export function formatMealPlanShoppingListName(weekStart: string, weekEnd: string): string {
@@ -1928,7 +1945,11 @@ export function getCookSessionPantryPreview(sessionId: string, actorProfileId: s
     .where(and(eq(cookSessions.id, sessionId), eq(cookSessions.profileId, actorProfileId)))
     .get();
   if (!session) throw new PantryGroceryCookingNotFoundError('That cook session no longer exists.');
-  const availability = getRecipePantryAvailability(session.recipeId, session.targetServings);
+  const availability = getRecipePantryAvailability(
+    session.recipeId,
+    session.targetServings,
+    session.mealPlanEntryId,
+  );
   const plannedMeal = session.mealPlanEntryId
     ? (getDatabase()
         .select({

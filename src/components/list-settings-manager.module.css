@@ -1,12 +1,13 @@
 .manager {
   display: grid;
-  gap: 0.75rem;
-  max-width: var(--content-width);
-  margin: 0 auto 5rem;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  gap: 1.75rem;
 }
 .preferences,
 .profiles {
-  background: color-mix(in srgb, var(--linen) 88%, white);
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 0.75rem;
 }
@@ -130,6 +131,7 @@
 .profileEditor {
   min-width: 0;
   padding: 1rem;
+  container-type: inline-size;
 }
 .profileFields {
   display: grid;
@@ -284,6 +286,26 @@
   }
   .profileList {
     grid-template-columns: 1fr;
+  }
+  .routeList li {
+    grid-template-columns: auto 1.7rem minmax(0, 1fr);
+  }
+  .routeActions {
+    grid-column: 3;
+  }
+  .editorFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .editorFooter > div {
+    flex-wrap: wrap;
+  }
+}
+
+/* The route editor can be narrow even on a laptop with the settings sidebar open. */
+@container (max-width: 660px) {
+  .routeInputs {
+    grid-template-columns: minmax(0, 1fr);
   }
   .routeList li {
     grid-template-columns: auto 1.7rem minmax(0, 1fr);

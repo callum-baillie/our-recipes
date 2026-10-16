@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { recipeInputSchema, recipeIngredientSchema } from '@/lib/domain/recipe';
+
 import { mealTypePreferenceSchema } from '@/lib/domain/app-preferences';
 
-export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date.');
+export const isoDateSchema = z.iso.date();
 
 export const mealPlanStatusSchema = z.enum(['planned', 'skipped', 'cancelled']);
 export type MealPlanStatus = z.output<typeof mealPlanStatusSchema>;
@@ -11,6 +13,19 @@ export const mealPlanStatusUpdateSchema = z.object({ status: mealPlanStatusSchem
 
 export const mealPlanEntrySchema = z
   .object({
+    kind: z.enum(['recipe', 'item', 'takeout', 'leftover', 'custom']).optional(),
+    leftoverSourceId: z.string().uuid().nullable().optional(),
+    foodItem: recipeIngredientSchema.nullable().optional(),
+    recipeOverride: recipeInputSchema
+      .pick({
+        title: true,
+        summary: true,
+        servings: true,
+        ingredientGroups: true,
+        instructionSections: true,
+      })
+      .nullable()
+      .optional(),
     plannedFor: isoDateSchema,
     meal: mealTypePreferenceSchema,
     recipeId: z.union([z.literal(''), z.string().uuid()]).default(''),
@@ -19,7 +34,33 @@ export const mealPlanEntrySchema = z
     note: z.string().trim().max(240),
   })
   .superRefine((value, context) => {
-    if (!value.recipeId && !value.title) {
+    if (value.kind === 'leftover' && !value.leftoverSourceId)
+      context.addIssue({
+        code: 'custom',
+        path: ['leftoverSourceId'],
+        message: 'Choose the meal these leftovers come from.',
+      });
+    if (value.kind === 'item' && !value.foodItem)
+      context.addIssue({
+        code: 'custom',
+        path: ['foodItem'],
+        message: 'Add the food and quantity per serving.',
+      });
+    if (value.recipeOverride && !value.recipeId)
+      context.addIssue({
+        code: 'custom',
+        path: ['recipeOverride'],
+        message: 'Choose the original recipe before adapting it.',
+      });
+    if (value.kind === 'recipe' && !value.recipeId)
+      context.addIssue({ code: 'custom', path: ['recipeId'], message: 'Choose a recipe.' });
+    if (['item', 'takeout', 'custom'].includes(value.kind ?? '') && value.recipeId)
+      context.addIssue({
+        code: 'custom',
+        path: ['recipeId'],
+        message: 'This meal type does not use a recipe.',
+      });
+    if (!value.recipeId && !value.title && !value.leftoverSourceId) {
       context.addIssue({
         code: 'custom',
         path: ['title'],
@@ -50,7 +91,7 @@ export const mealPlanBatchSchema = z.object({
   entries: z.array(mealPlanEntrySchema).min(1).max(280),
 });
 
-export const mealPlanEntryUpdateSchema = mealPlanEntrySchema.extend({
+export const mealPlanEntryUpdateSchema = mealPlanEntrySchema.safeExtend({
   expectedUpdatedAt: z.string().datetime(),
 });
 
@@ -128,6 +169,13 @@ export const shoppingListRetryStoreSchema = z
   .strict();
 
 export const shoppingListManageSchema = z.discriminatedUnion('action', [
+  z
+    .object({
+      action: z.literal('set_notes'),
+      note: z.string().trim().max(2000),
+      expectedVersion: z.number().int().min(0),
+    })
+    .strict(),
   z.object({ action: z.literal('rename'), name: z.string().trim().min(1).max(120) }).strict(),
   z.object({ action: z.literal('archive') }).strict(),
   z.object({ action: z.literal('restore') }).strict(),

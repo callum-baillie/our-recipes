@@ -409,3 +409,57 @@
     width: 100%;
   }
 }
+
+.planPreview {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+.planPreview section {
+  border-top: 1px solid var(--line);
+  padding: 0.7rem 0;
+}
+.planPreview h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+.planPreview ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.planPreview li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.15rem 0.6rem;
+}
+.planPreview li span {
+  text-transform: capitalize;
+  color: var(--muted);
+}
+.planPreview li small {
+  grid-column: 2;
+  color: var(--muted);
+}
+.planPreview p {
+  font-size: 0.8rem;
+}
+
+.planPreview label {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.planPreview select {
+  max-width: 100%;
+  min-height: 44px;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem;
+  font: inherit;
+}

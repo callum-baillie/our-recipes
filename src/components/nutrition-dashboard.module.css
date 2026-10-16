@@ -2540,3 +2540,50 @@
 .mobileViewButton {
   margin-bottom: 0;
 }
+
+.entryIcon,
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.entryIcon svg,
+.iconButton svg {
+  margin: 0;
+  display: block;
+}
+@media (max-width: 700px) {
+  .page {
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+  }
+  .page input:not([type='checkbox']):not([type='radio']),
+  .page select,
+  .page textarea {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .page label,
+  .page form,
+  .panel {
+    min-width: 0;
+  }
+  .accessGrid,
+  .twoColumn,
+  .contextGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .macroSummary {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .headerActions,
+  .headerSelectors,
+  .headerButtons {
+    flex-wrap: wrap;
+  }
+  .panel {
+    padding: 1rem;
+  }
+}

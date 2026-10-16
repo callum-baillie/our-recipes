@@ -1,4 +1,7 @@
 'use client';
+import { MealEntryEditor } from '@/components/meal-entry-editor';
+import { parseMealPlanIngredientSnapshot } from '@/lib/domain/meal-plan-snapshot';
+import type { MealPlanEntryInput } from '@/lib/domain/planning';
 import { PageHeader } from '@/components/page-header';
 import { DecisionAssistance } from '@/components/decision-assistance';
 
@@ -19,7 +22,6 @@ import {
   GripVertical,
   Move,
   Plus,
-  Printer,
   Redo2,
   Salad,
   Save,
@@ -87,7 +89,10 @@ type MealPlannerProps = {
   initialAiSummary?: AiSummaryCardData | null;
 };
 
-type MealEntrySnapshot = {
+type MealEntrySnapshot = Pick<
+  MealPlanEntryInput,
+  'kind' | 'leftoverSourceId' | 'foodItem' | 'recipeOverride'
+> & {
   plannedFor: string;
   meal: string;
   recipeId: string;
@@ -171,7 +176,22 @@ function recipeForMeal(meal: PlannedMeal, recipes: RecipeListItem[]) {
 }
 
 function mealEntrySnapshot(meal: PlannedMeal): MealEntrySnapshot {
+  const item = parseMealPlanIngredientSnapshot(meal.recipeIngredientsSnapshot)?.ingredients[0];
   return {
+    kind: meal.kind as MealPlanEntryInput['kind'],
+    leftoverSourceId: meal.leftoverSourceId ?? null,
+    recipeOverride: meal.recipeOverride ? JSON.parse(meal.recipeOverride) : null,
+    foodItem:
+      meal.kind === 'item' && item
+        ? {
+            item: item.item,
+            quantity: item.quantity ?? '',
+            unit: item.unit,
+            note: item.note,
+            shoppingCategory: item.shoppingCategory,
+            pantryProductId: item.productId ?? '',
+          }
+        : null,
     plannedFor: meal.plannedFor,
     meal: meal.meal,
     recipeId: meal.recipeId ?? '',
@@ -211,6 +231,7 @@ function PlannedMealCard({
   pantryStatus,
   onRemove,
   onRefreshRecipe,
+  onEdit,
   onStatus,
   onServings,
   onDuplicate,
@@ -226,6 +247,7 @@ function PlannedMealCard({
   pantryStatus: 'covered' | 'shortage' | 'uncertain' | 'unknown';
   onRemove: (id: string) => void;
   onRefreshRecipe: (id: string) => void;
+  onEdit: (meal: PlannedMeal) => void;
   onStatus: (id: string, status: 'planned' | 'skipped' | 'cancelled') => void;
   onServings: (meal: PlannedMeal, servings: number) => void;
   onDuplicate: (meal: PlannedMeal) => void;
@@ -267,6 +289,20 @@ function PlannedMealCard({
             <span className="sr-only">{pantryLabel}</span>
           </span>
         </div>
+        {meal.kind === 'leftover' ||
+        meal.kind === 'takeout' ||
+        meal.kind === 'item' ||
+        meal.recipeOverride ? (
+          <small>
+            {meal.kind === 'leftover'
+              ? 'Leftovers'
+              : meal.kind === 'takeout'
+                ? 'Takeout'
+                : meal.kind === 'item'
+                  ? 'Single food'
+                  : 'Adapted for this meal'}
+          </small>
+        ) : null}
         <span className={styles.mealMeta}>
           <label className={styles.servingEditor} title="Edit servings">
             <UsersRound size={13} aria-hidden="true" />
@@ -303,6 +339,9 @@ function PlannedMealCard({
           <span className={styles.dragHint}>
             <GripVertical size={14} aria-hidden="true" /> Drag to move or swap
           </span>
+          <button type="button" disabled={busy} onClick={() => onEdit(meal)}>
+            Edit meal{meal.recipeId ? ' / adapt recipe' : ''}
+          </button>
           <button type="button" disabled={busy} onClick={() => onDuplicate(meal)}>
             <CopyPlus size={14} aria-hidden="true" /> Duplicate to next day
           </button>
@@ -375,7 +414,10 @@ function PlannedMealCard({
               </select>
             </label>
           )}
-          {meal.recipeId && meal.status === 'planned' && meal.effectiveStatus !== 'cooked' ? (
+          {meal.recipeId &&
+          meal.kind !== 'leftover' &&
+          meal.status === 'planned' &&
+          meal.effectiveStatus !== 'cooked' ? (
             <Link
               href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
               aria-label={`Cook ${meal.recipeTitle} from this planned meal`}
@@ -383,7 +425,7 @@ function PlannedMealCard({
               Cook
             </Link>
           ) : null}
-          {meal.recipeChangedSincePlanning ? (
+          {meal.recipeChangedSincePlanning && meal.kind !== 'leftover' ? (
             <button type="button" disabled={busy} onClick={() => onRefreshRecipe(meal.id)}>
               Refresh recipe
             </button>
@@ -441,6 +483,7 @@ export function MealPlanner({
     profiles.map((profile) => profile.id),
   );
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [mealEditor, setMealEditor] = useState<{ entry?: PlannedMeal; kind?: string } | null>(null);
   const [pickerContext, setPickerContext] = useState<{ date: string; meal: MealType } | null>(null);
   const [draggedMealId, setDraggedMealId] = useState<string | null>(null);
   const [showMobileSetup, setShowMobileSetup] = useState(false);
@@ -1226,12 +1269,6 @@ export function MealPlanner({
             >
               <Copy size={16} aria-hidden="true" /> Copy week
             </button>
-            <a href={`/api/v1/meal-plan/export?start=${weekStart}&end=${weekEnd}`}>
-              <CalendarDays size={16} aria-hidden="true" /> Export calendar
-            </a>
-            <button type="button" onClick={() => window.print()}>
-              <Printer size={16} aria-hidden="true" /> Print plan
-            </button>
           </div>
         </details>
       </div>
@@ -1841,6 +1878,7 @@ export function MealPlanner({
                               pantryStatus={pantryStatusByMeal[meal.id] ?? 'unknown'}
                               onRemove={removeMeal}
                               onRefreshRecipe={refreshPlannedRecipe}
+                              onEdit={(entry) => setMealEditor({ entry })}
                               onStatus={updateMealStatus}
                               onServings={(entry, servings) =>
                                 void updateMealEntry(entry, { servings }, 'Serving count updated.')
@@ -1908,6 +1946,7 @@ export function MealPlanner({
                           pantryStatus={pantryStatusByMeal[meal.id] ?? 'unknown'}
                           onRemove={removeMeal}
                           onRefreshRecipe={refreshPlannedRecipe}
+                          onEdit={(entry) => setMealEditor({ entry })}
                           onStatus={updateMealStatus}
                           onServings={(entry, servings) =>
                             void updateMealEntry(entry, { servings }, 'Serving count updated.')
@@ -2084,7 +2123,28 @@ export function MealPlanner({
         </aside>
       </div>
 
+      {mealEditor ? (
+        <MealEntryEditor
+          entry={mealEditor.entry}
+          initialKind={mealEditor.kind}
+          date={pickerContext?.date ?? startDate}
+          slot={pickerContext?.meal ?? selectedMeals[0] ?? 'dinner'}
+          slots={selectedMeals}
+          meals={meals}
+          servings={selectedProfiles.length}
+          onClose={() => setMealEditor(null)}
+          onSaved={() => {
+            setUndoStack([]);
+            setRedoStack([]);
+            router.refresh();
+          }}
+        />
+      ) : null}
       <MealPlanRecipeSelector
+        onOtherKind={(kind) => {
+          setSelectorOpen(false);
+          setMealEditor({ kind });
+        }}
         key={`${startDate}-${duration}-${selectedMeals.join('-')}-${pickerContext?.date ?? ''}-${pickerContext?.meal ?? ''}`}
         open={selectorOpen}
         startDate={pickerContext?.date ?? startDate}

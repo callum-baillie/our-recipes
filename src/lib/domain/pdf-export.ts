@@ -6,6 +6,14 @@ export const exportOptionsSchema = z
     format: z.enum(['pdf', 'zip']).default('pdf'),
     includeNutrition: z.boolean().default(true),
     includeNotes: z.boolean().default(true),
+    includeIngredients: z.boolean().default(true),
+    ingredientCheckboxes: z.boolean().default(false),
+    includeMethod: z.boolean().default(true),
+    includeImage: z.boolean().default(true),
+    includeEquipment: z.boolean().default(true),
+    includeSource: z.boolean().default(true),
+    organizeByStore: z.boolean().default(false),
+    storeId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -74,3 +82,11 @@ export function exportFileStem(title: string): string {
       .slice(0, 70) || 'recipe'
   );
 }
+
+export const inventoryPdfExportSchema = exportOptionsSchema.extend({
+  includeChecked: z.boolean().default(false),
+  includeDates: z.boolean().default(true),
+  countColumn: z.boolean().default(true),
+  locationId: z.string().uuid().optional(),
+});
+export type InventoryPdfExportInput = z.infer<typeof inventoryPdfExportSchema>;

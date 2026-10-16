@@ -1,8 +1,7 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   AiJobForbiddenError,
@@ -18,10 +17,6 @@ export const dynamic = 'force-dynamic';
 
 const commandSchema = z.object({ command: z.enum(['cancel', 'retry']) }).strict();
 
-async function profileId() {
-  return getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value).profileId;
-}
-
 function errorResponse(error: unknown) {
   if (error instanceof AiJobNotFoundError) return jsonError(404, 'job_not_found', error.message);
   if (error instanceof AiJobForbiddenError) return jsonError(403, 'job_forbidden', error.message);
@@ -29,8 +24,13 @@ function errorResponse(error: unknown) {
   throw error;
 }
 
-export async function GET(_request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const actor = await profileId();
+export async function GET(request: Request, context: { params: Promise<{ jobId: string }> }) {
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  const actor = principal
+    ? new URL(request.url).searchParams.get('personal') === 'true'
+      ? principal.linkedProfileId
+      : principal.profileId
+    : null;
   if (!actor)
     return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
   try {
@@ -43,9 +43,16 @@ export async function GET(_request: Request, context: { params: Promise<{ jobId:
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
   if (!hasTrustedMutationOrigin(request))
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const actor = await profileId();
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  const actor = principal
+    ? new URL(request.url).searchParams.get('personal') === 'true'
+      ? principal.linkedProfileId
+      : principal.profileId
+    : null;
   if (!actor)
     return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  if (principal?.role === 'child')
+    return jsonError(403, 'forbidden', 'Only adult accounts can change background tasks.');
   const parsed = commandSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_job_command', 'Choose cancel or retry.');
   try {
