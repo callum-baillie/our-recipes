@@ -2,7 +2,7 @@ import { z } from 'zod';
 export const taskSettingsSchema = z
   .object({
     executionMode: z.enum(['auto', 'direct', 'batch']).default('auto'),
-    batchMinItems: z.number().int().min(2).max(50).default(4),
+    batchMinItems: z.number().int().min(2).max(50).default(2),
     weeklyPlanEnabled: z.boolean().default(false),
     allowPaidGeneration: z.boolean().default(false),
     weekday: z.number().int().min(0).max(6).default(0),

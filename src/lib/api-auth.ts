@@ -1,3 +1,4 @@
+import { canAccountUseAi } from '@/lib/services/ai-access-service';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
@@ -28,6 +29,20 @@ export async function authorizeApi(
   const requestId = incoming && incoming.length <= 128 ? incoming : randomUUID();
   try {
     const principal = await authenticateApiRequest(request, resource, action);
+    const aiMutation =
+      !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+      /(?:\/ai\/|\/images\/generate$|\/nutrition\/estimate$|\/improve$)/u.test(
+        new URL(request.url).pathname,
+      );
+    if (
+      aiMutation &&
+      (!canAccountUseAi(principal.userId) || principal.profileId !== principal.linkedProfileId)
+    )
+      throw new RequestAuthError(
+        403,
+        'ai_disabled',
+        'AI is disabled or requires your own account profile.',
+      );
     if (principal.kind === 'api-key') {
       for (const required of additionalIntegrationPermissions(
         new URL(request.url).pathname,

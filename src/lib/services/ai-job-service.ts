@@ -1,5 +1,16 @@
 import 'server-only';
+import {
+  assertProfileAiEnabled,
+  AiAccessDeniedError,
+  aiUserIdForProfile,
+  canAccountUseAi,
+} from './ai-access-service';
 
+import {
+  aiRecipeImageSchema,
+  aiRecipeResponseContent,
+  type AiRecipeImage,
+} from '@/lib/domain/ai-bulk-import';
 import { taskExecutionMode } from './task-settings-service';
 import { AI_GROUNDING_INSTRUCTIONS } from '@/lib/domain/ai-grounding';
 
@@ -38,7 +49,7 @@ const DIRECT_CONCURRENCY = Math.min(
 );
 export const AI_BATCH_MIN_ITEMS = Math.min(
   50,
-  Math.max(4, Number(process.env.AI_BATCH_MIN_ITEMS ?? '4')),
+  Math.max(2, Number(process.env.AI_BATCH_MIN_ITEMS ?? '2')),
 );
 
 type AiJobRow = typeof aiJobs.$inferSelect;
@@ -46,6 +57,8 @@ type AiJobItemRow = typeof aiJobItems.$inferSelect;
 
 type RecipeImageJobInput = AiImageGenerationInput & { recipeId: string };
 type RecipeGenerationJobInput = {
+  images?: AiRecipeImage[];
+  label?: string;
   instructions: string;
   context: unknown;
   safetyIdentifier: string;
@@ -95,6 +108,8 @@ const imageItemSchema = z
 
 const recipeItemSchema = z
   .object({
+    images: z.array(aiRecipeImageSchema).max(4).optional(),
+    label: z.string().max(2048).optional(),
     instructions: z.string().min(1).max(12_000),
     context: z.unknown(),
     safetyIdentifier: z.string().min(1).max(160),
@@ -112,6 +127,23 @@ function parseJson(value: string): unknown {
   } catch {
     throw new Error('The queued AI job data is invalid.');
   }
+}
+
+function jobOwnerUserId(job: AiJobRow) {
+  const payload = parseJson(job.payload) as { ownerUserId?: string; userId?: string };
+  return job.kind === 'meal_plan_generation' ? payload.userId : payload.ownerUserId;
+}
+
+function assertJobAiAccess(job: AiJobRow) {
+  const owner = jobOwnerUserId(job);
+  if (
+    owner
+      ? !canAccountUseAi(owner) || aiUserIdForProfile(job.profileId) !== owner
+      : process.env.NODE_ENV !== 'test'
+  ) {
+    throw new AiAccessDeniedError('The original account can no longer run this AI task.');
+  }
+  assertProfileAiEnabled(job.profileId);
 }
 
 function titleFor(job: AiJobRow): string {
@@ -147,11 +179,11 @@ function publicJob(job: AiJobRow, items: AiJobItemRow[]) {
     updatedAt: job.updatedAt,
     completedAt: job.completedAt,
     items: items.map((item) => {
-      const payload = parseJson(item.payload) as { recipeTitle?: string };
+      const payload = parseJson(item.payload) as { recipeTitle?: string; label?: string };
       return {
         id: item.id,
         recipeId: item.recipeId,
-        label: payload.recipeTitle ?? `Recipe ${item.position + 1}`,
+        label: payload.recipeTitle ?? payload.label ?? `Recipe ${item.position + 1}`,
         status: item.status,
         errorCode: item.errorCode,
       };
@@ -175,12 +207,19 @@ function jobWithItems(jobId: string, profileId?: string) {
   return { job, items };
 }
 
-export function getAiJob(jobId: string, profileId: string) {
+export function getAiJob(jobId: string, profileId: string, userId?: string) {
   const { job, items } = jobWithItems(jobId, profileId);
+  if (userId && jobOwnerUserId(job) !== userId)
+    throw new AiJobForbiddenError('That background task belongs to another account.');
   return publicJob(job, items);
 }
 
-export function listAiJobs(input: { profileId: string; threadId?: string | null; limit?: number }) {
+export function listAiJobs(input: {
+  profileId: string;
+  userId?: string;
+  threadId?: string | null;
+  limit?: number;
+}) {
   ensureDatabase();
   const rows = getDatabase()
     .select()
@@ -194,10 +233,16 @@ export function listAiJobs(input: { profileId: string; threadId?: string | null;
     .limit(Math.min(100, Math.max(1, input.limit ?? 25)))
     .all()
     .reverse();
-  return rows.map((job) => {
-    const items = getDatabase().select().from(aiJobItems).where(eq(aiJobItems.jobId, job.id)).all();
-    return publicJob(job, items);
-  });
+  return rows
+    .filter((job) => !input.userId || jobOwnerUserId(job) === input.userId)
+    .map((job) => {
+      const items = getDatabase()
+        .select()
+        .from(aiJobItems)
+        .where(eq(aiJobItems.jobId, job.id))
+        .all();
+      return publicJob(job, items);
+    });
 }
 
 function insertImageAudit(input: {
@@ -246,6 +291,8 @@ export function enqueueRecipeImageJob(input: {
   if (!input.images.length) return null;
   const now = new Date();
   const setting = getAiWorkloadSetting(input.profileId, 'image_generation');
+  if (!setting.enabled)
+    throw new AiJobForbiddenError('Image generation is disabled for this account.');
   const id = randomUUID();
   const mode = taskExecutionMode(input.profileId, input.images.length);
   getDatabase().transaction(() => {
@@ -260,7 +307,7 @@ export function enqueueRecipeImageJob(input: {
         status: 'queued',
         executionMode: mode,
         model: setting.model,
-        payload: JSON.stringify({}),
+        payload: JSON.stringify({ ownerUserId: aiUserIdForProfile(input.profileId) }),
         result: null,
         sourceDigest: digest(input.images),
         providerBatchId: null,
@@ -318,6 +365,7 @@ export function enqueueRecipeBatchGenerationJob(input: {
   generateRecipeImages: boolean;
 }) {
   ensureDatabase();
+  assertProfileAiEnabled(input.profileId);
   if (!input.recipes.length || input.recipes.length > 50)
     throw new AiJobStateError('Choose 1 to 50 recipes for a background task.');
   const now = new Date();
@@ -334,7 +382,10 @@ export function enqueueRecipeBatchGenerationJob(input: {
         status: 'queued',
         executionMode: taskExecutionMode(input.profileId, input.recipes.length),
         model: input.model,
-        payload: JSON.stringify({ generateRecipeImages: input.generateRecipeImages }),
+        payload: JSON.stringify({
+          generateRecipeImages: input.generateRecipeImages,
+          ownerUserId: aiUserIdForProfile(input.profileId),
+        }),
         result: null,
         sourceDigest: digest(input.recipes),
         providerBatchId: null,
@@ -358,7 +409,7 @@ export function enqueueRecipeBatchGenerationJob(input: {
           kind: 'recipe-generation',
           status: 'requested',
           sourceDigest: digest(recipe.context),
-          sourceLabel: `Queued recipe ${position + 1}`,
+          sourceLabel: (recipe.label ?? `Queued recipe ${position + 1}`).slice(0, 160),
           provider: 'OpenAI',
           model: input.model,
           reasoningEffort: recipe.reasoningEffort,
@@ -522,7 +573,7 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
           input: [
             {
               role: 'user',
-              content: `Untrusted household recipe context follows:\n${JSON.stringify(recipe.context)}`,
+              content: aiRecipeResponseContent(recipe.context, recipe.images),
             },
           ],
           text: { format: zodTextFormat(aiStructuredRecipeSchema, 'generated_recipe') },
@@ -636,6 +687,9 @@ async function attachRecipeImage(
 
 async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
   try {
+    assertJobAiAccess(job);
+    if (!getAiWorkloadSetting(job.profileId, 'image_generation').enabled)
+      throw new AiJobForbiddenError('AI is disabled.');
     const image = imageItemSchema.parse(parseJson(item.payload));
     const generated = await getAiProvider().generateRecipeImage(image, { model: job.model });
     await attachRecipeImage(item, image, generated.bytes, job, generated.altText);
@@ -646,6 +700,9 @@ async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
 
 async function processDirectRecipe(item: AiJobItemRow, job: AiJobRow) {
   try {
+    assertJobAiAccess(job);
+    if (!getAiWorkloadSetting(job.profileId, 'recipe_generation').enabled)
+      throw new AiJobForbiddenError('AI is disabled.');
     const request = recipeItemSchema.parse(parseJson(item.payload));
     const recipe = recipeInputSchema.parse(
       await getAiAssistantProvider().generateRecipe({
@@ -654,6 +711,7 @@ async function processDirectRecipe(item: AiJobItemRow, job: AiJobRow) {
         safetyIdentifier: request.safetyIdentifier,
         instructions: [AI_GROUNDING_INSTRUCTIONS, request.instructions].join('\n'),
         context: request.context,
+        images: request.images,
       }),
     );
     if (ownsActiveLease(job)) updateItemSuccess(item, recipe);
@@ -977,21 +1035,41 @@ async function runOneAiJob(candidate: AiJobRow) {
   }, 60000);
   heartbeat.unref?.();
   try {
+    if (job.status !== 'submitted') {
+      assertJobAiAccess(job);
+      const setting = getAiWorkloadSetting(
+        job.profileId,
+        job.kind === 'recipe_images'
+          ? 'image_generation'
+          : job.kind === 'meal_plan_generation'
+            ? 'meal_plan_generation'
+            : 'recipe_generation',
+      );
+      if (!setting.enabled) throw new AiJobForbiddenError('This AI task is disabled.');
+    }
     if (job.kind === 'meal_plan_generation') {
       const { runScheduledPlanJob } = await import('./task-scheduler-service');
       await runScheduledPlanJob(job);
     } else if (job.status === 'submitted') await pollBatchJob(job, items);
     else if (job.executionMode === 'batch') await submitBatchJob(job, items);
     else await runDirectJob(job, items);
-  } catch {
+  } catch (error) {
     const now = new Date();
+    const failure =
+      error instanceof AiAccessDeniedError || error instanceof AiJobForbiddenError
+        ? 'ai_disabled'
+        : 'worker_failed';
+    if (job.status !== 'submitted' && ownsActiveLease(job))
+      items
+        .filter((item) => item.status === 'pending')
+        .forEach((item) => updateItemFailure(item, failure));
     getDatabase()
       .update(aiJobs)
       .set({
         // Polling an existing batch is safe to repeat; never submit another paid batch
         // merely because a status/output request temporarily failed.
         status: job.status === 'submitted' ? 'submitted' : 'failed',
-        errorCode: job.status === 'submitted' ? 'provider_poll_retry_pending' : 'worker_failed',
+        errorCode: job.status === 'submitted' ? 'provider_poll_retry_pending' : failure,
         nextAttemptAt: new Date(now.getTime() + Math.max(60_000, POLL_MS)),
         leaseToken: null,
         leaseExpiresAt: null,

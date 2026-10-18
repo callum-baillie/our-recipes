@@ -184,46 +184,14 @@ export function TaskSettings({
           void save();
         }}
       >
-        <SettingsGroup
-          title={<>Bulk processing</>}
-          disabled={busy || !canEdit}
-          className={styles.panel}
+        <SettingsPane
+          title="Bulk processing"
+          description="Choose task models and Direct or Batch processing in your AI preferences. Existing queued tasks retain their selected processing mode."
         >
-          <SettingsField
-            description="Choose direct processing or Batch for queued recipe and image requests."
-            title="Recipe and image jobs"
-          >
-            <select
-              value={settings.executionMode}
-              onChange={(event) =>
-                set('executionMode', event.target.value as Preferences['executionMode'])
-              }
-            >
-              <option value="auto">Automatic — batch larger jobs</option>
-              <option value="direct">Direct — finish sooner</option>
-              <option value="batch">Batch — lower cost, up to 24 hours</option>
-            </select>
-          </SettingsField>
-          <p>
-            Batch applies to bulk recipe drafts and recipe images. Meal-plan generation runs as a
-            separate queued task. Existing queued tasks keep their selected mode; retries use the
-            current preference.
-          </p>
-          {settings.executionMode === 'auto' && (
-            <SettingsField
-              description="Automatic mode uses Batch when a job reaches this size."
-              title="Use Batch at this many items"
-            >
-              <input
-                type="number"
-                min="2"
-                max="50"
-                value={settings.batchMinItems}
-                onChange={(event) => set('batchMinItems', Number(event.target.value))}
-              />
-            </SettingsField>
-          )}
-        </SettingsGroup>
+          <a className="text-button" href="/account/ai">
+            Open my AI preferences
+          </a>
+        </SettingsPane>
         <SettingsGroup
           title={<>Weekly meal-plan draft</>}
           disabled={busy || !canEdit}

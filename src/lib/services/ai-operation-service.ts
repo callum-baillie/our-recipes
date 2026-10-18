@@ -1,4 +1,5 @@
 import 'server-only';
+import { getEffectiveAiPolicy, aiUserIdForProfile } from './ai-access-service';
 
 import { createHash, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
@@ -25,7 +26,7 @@ import {
 } from '@/lib/services/recipe-service';
 
 const AI_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1_000;
-const AI_RATE_LIMIT_MAXIMUM = 4;
+
 const MAX_VISION_BYTES = 6 * 1024 * 1024;
 const MAX_VISION_IMAGES = 4;
 const aiAttempts = new Map<string, number[]>();
@@ -63,19 +64,23 @@ function toAudit(row: AiAuditRow): AiOperationAudit {
   };
 }
 
-function assertAiRateLimit(profileId: string, now = Date.now()): void {
-  const recent = (aiAttempts.get(profileId) ?? []).filter(
+export function assertAiRateLimit(profileId: string, now = Date.now()): void {
+  if (!getEffectiveAiPolicy(profileId).enabled)
+    throw new AiOperationError('ai_not_configured', 'AI is disabled for this account.');
+  const limit = getEffectiveAiPolicy(profileId).generationsPerTenMinutes;
+  const rateKey = aiUserIdForProfile(profileId) ?? profileId;
+  const recent = (aiAttempts.get(rateKey) ?? []).filter(
     (attempt) => attempt > now - AI_RATE_LIMIT_WINDOW_MS,
   );
-  if (recent.length >= AI_RATE_LIMIT_MAXIMUM) {
-    aiAttempts.set(profileId, recent);
+  if (recent.length >= limit) {
+    aiAttempts.set(rateKey, recent);
     throw new AiOperationError(
       'rate_limited',
-      'Please wait before using OpenAI again. This household profile can start four AI actions every ten minutes.',
+      `Please wait before using OpenAI again. This account can start ${limit} AI actions every ten minutes.`,
     );
   }
   recent.push(now);
-  aiAttempts.set(profileId, recent);
+  aiAttempts.set(rateKey, recent);
 }
 
 function beginAudit(input: {
@@ -176,6 +181,8 @@ export async function createAiReviewCandidate(input: {
     const sourceText = input.action.sourceText;
     const sourceLabel = input.action.sourceLabel;
     const setting = getAiWorkloadSetting(input.actorProfileId, 'recipe_review');
+    if (!setting.enabled)
+      throw new AiOperationError('ai_not_configured', 'This AI task is disabled in AI settings.');
     const audit = beginAudit({
       kind: 'text-normalization',
       sourceDigest: digest(sourceText),
@@ -239,6 +246,8 @@ export async function createAiReviewCandidate(input: {
   }
   const sourceDigest = digest(files.map((entry) => entry.artifact.sourceSha256).join(':'));
   const setting = getAiWorkloadSetting(input.actorProfileId, 'recipe_review');
+  if (!setting.enabled)
+    throw new AiOperationError('ai_not_configured', 'This AI task is disabled in AI settings.');
   const audit = beginAudit({
     kind: 'vision-extraction',
     sourceDigest,
@@ -293,6 +302,8 @@ export async function improveAiRecipe(input: {
   assertAiRateLimit(input.actorProfileId);
   const provider = configuredProvider();
   const setting = getAiWorkloadSetting(input.actorProfileId, 'recipe_review');
+  if (!setting.enabled)
+    throw new AiOperationError('ai_not_configured', 'This AI task is disabled in AI settings.');
   const audit = beginAudit({
     kind: 'recipe-improvement',
     sourceDigest: digest(JSON.stringify(input.recipe)),
@@ -414,6 +425,8 @@ export async function estimateAiRecipeNutrition(input: {
     );
   }
   const setting = getAiWorkloadSetting(input.actorProfileId, 'nutrition_estimation');
+  if (!setting.enabled)
+    throw new AiOperationError('ai_not_configured', 'This AI task is disabled in AI settings.');
   const audit = beginAudit({
     kind: 'nutrition-estimation',
     sourceDigest: digest(

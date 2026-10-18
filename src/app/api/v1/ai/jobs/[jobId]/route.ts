@@ -1,3 +1,4 @@
+import { canAccountUseAi } from '@/lib/services/ai-access-service';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -26,15 +27,13 @@ function errorResponse(error: unknown) {
 
 export async function GET(request: Request, context: { params: Promise<{ jobId: string }> }) {
   const principal = await getAuthenticatedSessionPrincipal(request);
-  const actor = principal
-    ? new URL(request.url).searchParams.get('personal') === 'true'
-      ? principal.linkedProfileId
-      : principal.profileId
-    : null;
+  const actor = principal?.linkedProfileId ?? null;
   if (!actor)
     return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
   try {
-    return NextResponse.json({ job: getAiJob((await context.params).jobId, actor) });
+    return NextResponse.json({
+      job: getAiJob((await context.params).jobId, actor, principal!.userId),
+    });
   } catch (error) {
     return errorResponse(error);
   }
@@ -44,19 +43,20 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   if (!hasTrustedMutationOrigin(request))
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
   const principal = await getAuthenticatedSessionPrincipal(request);
-  const actor = principal
-    ? new URL(request.url).searchParams.get('personal') === 'true'
-      ? principal.linkedProfileId
-      : principal.profileId
-    : null;
+  const actor = principal?.linkedProfileId ?? null;
   if (!actor)
     return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
-  if (principal?.role === 'child')
-    return jsonError(403, 'forbidden', 'Only adult accounts can change background tasks.');
   const parsed = commandSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_job_command', 'Choose cancel or retry.');
+  if (
+    parsed.data.command === 'retry' &&
+    principal &&
+    (!canAccountUseAi(principal.userId) || principal.profileId !== principal.linkedProfileId)
+  )
+    return jsonError(403, 'ai_disabled', 'AI is disabled or requires your own account profile.');
   try {
     const jobId = (await context.params).jobId;
+    getAiJob(jobId, actor, principal!.userId);
     const job =
       parsed.data.command === 'cancel' ? await cancelAiJob(jobId, actor) : retryAiJob(jobId, actor);
     return NextResponse.json({ job });

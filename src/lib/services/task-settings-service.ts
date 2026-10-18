@@ -1,7 +1,8 @@
 import 'server-only';
+import { getEffectiveAiPolicy, getUserAiPolicy } from './ai-access-service';
 import { eq } from 'drizzle-orm';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
-import { taskPreferences } from '@/lib/db/schema';
+import { taskPreferences, aiUserSettings } from '@/lib/db/schema';
 import { taskSettingsSchema, type TaskSettings } from '@/lib/domain/task-settings';
 import type { RequestPrincipal } from './auth-service';
 export function getTaskSettings(profileId: string) {
@@ -11,12 +12,19 @@ export function getTaskSettings(profileId: string) {
     .from(taskPreferences)
     .where(eq(taskPreferences.profileId, profileId))
     .get();
+  const effective = getEffectiveAiPolicy(profileId);
   return {
-    settings: taskSettingsSchema.parse(
-      row
-        ? JSON.parse(row.settings)
-        : { batchMinItems: Math.min(50, Math.max(2, Number(process.env.AI_BATCH_MIN_ITEMS) || 4)) },
-    ),
+    settings: {
+      ...taskSettingsSchema.parse(
+        row
+          ? JSON.parse(row.settings)
+          : {
+              batchMinItems: Math.min(50, Math.max(2, Number(process.env.AI_BATCH_MIN_ITEMS) || 2)),
+            },
+      ),
+      executionMode: effective.executionMode,
+      batchMinItems: effective.batchMinItems,
+    },
     version: row?.version ?? 0,
     lastScheduledDate: row?.lastScheduledDate ?? null,
   };
@@ -40,6 +48,30 @@ export function saveTaskSettings(
       .get();
     if ((current?.version ?? 0) !== expectedVersion)
       throw new Error('These settings changed. Reload before saving.');
+    const effective = getEffectiveAiPolicy(profileId);
+    if (
+      parsed.executionMode !== effective.executionMode ||
+      parsed.batchMinItems !== effective.batchMinItems
+    ) {
+      const account = getUserAiPolicy(principal.userId);
+      const preferences = {
+        ...account.preferences,
+        processing: { executionMode: parsed.executionMode, batchMinItems: parsed.batchMinItems },
+      };
+      transaction
+        .insert(aiUserSettings)
+        .values({
+          userId: principal.userId,
+          enabled: account.enabled,
+          preferences: JSON.stringify(preferences),
+          version: account.version + 1,
+        })
+        .onConflictDoUpdate({
+          target: aiUserSettings.userId,
+          set: { preferences: JSON.stringify(preferences), version: account.version + 1 },
+        })
+        .run();
+    }
     transaction
       .insert(taskPreferences)
       .values({
@@ -67,7 +99,7 @@ export function saveTaskSettings(
   });
 }
 export function taskExecutionMode(profileId: string, count: number): 'direct' | 'batch' {
-  const { settings } = getTaskSettings(profileId);
+  const settings = getEffectiveAiPolicy(profileId);
   return settings.executionMode === 'auto'
     ? count >= settings.batchMinItems
       ? 'batch'

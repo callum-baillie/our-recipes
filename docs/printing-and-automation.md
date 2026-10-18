@@ -48,3 +48,13 @@ New schema: `0063_task_preferences.sql` and `0064_shopping_list_notes.sql`. Thes
 - Shopping-list workflow inspiration: https://www.anylist.com/lists
 
 Implementation checks are recorded in the task response. This document does not claim that Redis, Docker or Unraid has been deployed or validated on a device.
+
+## AI defaults and bulk imports
+
+Administrators manage **Settings → AI settings** (`/settings/ai`): installation AI access, the default 10 immediate generations per account per ten minutes, task models and reasoning effort, queued processing mode, automatic Batch threshold, and individual account access. Child accounts start with AI disabled; an administrator can grant AI draft/chat access without granting permission to change shared records. Disabling an account prevents new AI requests and queued work that has not been submitted. Submitted provider batches still finish and are collected; pending tasks can be cancelled.
+
+**My profile → AI preferences** (`/account/ai`) contains account model and processing overrides, with explicit inheritance of global defaults. Privacy sharing and summary choices remain separate and versioned. An account override cannot re-enable a globally disabled task or administrator-disabled AI access. AI requests use the signed-in account's own linked profile; switch back to your own profile before starting AI work. Existing automation processing preferences migrate into account overrides.
+
+**Add a recipe → Bulk add recipes** (`/capture/bulk`) accepts 2–20 prompts, public recipe URLs, or separate recipe photos. Each photo is one recipe; use the single-image importer for multiple pages of the same recipe. Photos are validated and resized on the server. URL capture uses the existing public-fetch SSRF controls. Explicit confirmation is required before sending the import to OpenAI. The assistant also has an `import_recipes` tool for multi-source imports from chat, including current-message image attachments.
+
+Bulk recipe drafts and queued images use Batch by default from two items. Global or account preferences may choose direct processing or another threshold. Interactive chat and immediate single-recipe tools remain synchronous. Batch supports the Responses endpoint with its normal text and image inputs; provider processing can take up to 24 hours ([OpenAI Batch guide](https://developers.openai.com/api/docs/guides/batch)). Tasks and results persist in SQLite and the production worker polls without an open browser. Review results under **My profile → Schedules & background tasks** before saving recipes. Partial failures remain visible and only unfinished items are retried. No recipe is saved automatically by a bulk import.

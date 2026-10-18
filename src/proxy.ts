@@ -1,3 +1,4 @@
+import { canAccountUseAi } from '@/lib/services/ai-access-service';
 import { NextRequest, NextResponse } from 'next/server';
 
 import {
@@ -153,10 +154,29 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(target);
   }
 
+  if (
+    /(?:\/ai\/|\/images\/generate$|\/nutrition\/estimate$|\/improve$)/u.test(pathname) &&
+    pathname !== '/api/v1/ai/settings' &&
+    !/^\/api\/v1\/ai\/jobs\/[^/]+$/u.test(pathname) &&
+    !['GET', 'HEAD'].includes(request.method)
+  ) {
+    if (!canAccountUseAi(principal.userId))
+      return apiError(
+        403,
+        'ai_disabled',
+        'AI is disabled for your account. Ask an administrator to review access.',
+      );
+    if (principal.profileId !== principal.linkedProfileId)
+      return apiError(
+        403,
+        'ai_account_profile_required',
+        'Switch to your own profile to use AI with your account preferences.',
+      );
+  }
+
   const personalSettingsRedirects: Record<string, string> = {
     '/settings/nutrition': '/account/nutrition',
     '/settings/integrations': '/account/integrations',
-    '/settings/ai': '/account/ai',
   };
   if (personalSettingsRedirects[pathname] && request.method === 'GET')
     return redirectTo(request, personalSettingsRedirects[pathname]);

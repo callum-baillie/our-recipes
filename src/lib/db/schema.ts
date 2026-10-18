@@ -2590,3 +2590,18 @@ export const shoppingListNotes = sqliteTable('shopping_list_notes', {
   version: integer('version').notNull().default(1),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+// AI access belongs to authenticated accounts, never switchable household profiles.
+export const aiRuntimeSettings = sqliteTable('ai_runtime_settings', {
+  id: text('id').primaryKey(),
+  settings: text('settings').notNull(),
+  version: integer('version').notNull().default(1),
+});
+export const aiUserSettings = sqliteTable('ai_user_settings', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  preferences: text('preferences').notNull().default('{}'),
+  version: integer('version').notNull().default(1),
+});

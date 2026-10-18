@@ -1,4 +1,5 @@
 import {
+  Sparkles,
   CalendarDays,
   ChevronRight,
   ClipboardList,
@@ -17,6 +18,13 @@ import { getHouseholdState } from '@/lib/services/household-service';
 export const dynamic = 'force-dynamic';
 
 const categories = [
+  {
+    href: '/settings/ai',
+    eyebrow: 'AI SETTINGS',
+    title: 'AI models and access',
+    description: 'Global AI defaults, batch processing, and account permissions.',
+    icon: Sparkles,
+  },
   {
     href: '/settings/automation',
     eyebrow: 'BACKGROUND TASKS',

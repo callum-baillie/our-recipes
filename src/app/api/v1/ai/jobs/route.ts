@@ -10,12 +10,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const principal = await getAuthenticatedSessionPrincipal(request);
   if (!principal) return jsonError(401, 'sign_in_required', 'Sign in to view background tasks.');
-  const profileId =
-    new URL(request.url).searchParams.get('personal') === 'true'
-      ? principal.linkedProfileId
-      : principal.profileId;
+  const profileId = principal.linkedProfileId;
   const threadId = new URL(request.url).searchParams.get('threadId');
   return NextResponse.json({
-    jobs: listAiJobs({ profileId, threadId: threadId || null }),
+    jobs: listAiJobs({ profileId, userId: principal.userId, threadId: threadId || null }),
   });
 }

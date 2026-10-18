@@ -197,7 +197,7 @@ export const aiChatMessageInputSchema = z
   .object({
     message: z.string().trim().max(8_000).default(''),
     allowPaidTools: z.boolean().default(false),
-    attachments: z.array(aiChatAttachmentSchema).max(4).default([]),
+    attachments: z.array(aiChatAttachmentSchema).max(20).default([]),
   })
   .strict()
   .superRefine((input, context) => {

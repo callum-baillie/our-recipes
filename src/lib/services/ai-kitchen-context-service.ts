@@ -23,8 +23,6 @@ const kitchenContextRequestSchema = z
 /** Focused reads deliberately omit unrelated linked/private objects from API payloads. */
 export function readAiKitchenContext(principal: RequestPrincipal, input: unknown) {
   if (
-    !appRoleCan(principal.accountRole, 'ai.use') ||
-    !appRoleCan(principal.role, 'ai.use') ||
     !appRoleCan(principal.accountRole, 'shared.read') ||
     !appRoleCan(principal.role, 'shared.read')
   ) {

@@ -1,4 +1,5 @@
 import 'server-only';
+import { aiRecipeResponseContent, type AiRecipeImage } from '@/lib/domain/ai-bulk-import';
 
 import { AI_GROUNDING_INSTRUCTIONS } from '@/lib/domain/ai-grounding';
 
@@ -55,6 +56,7 @@ export interface AiAssistantProvider {
     safetyIdentifier: string;
   }): Promise<AiMealPlanCandidate>;
   generateRecipe(input: {
+    images?: AiRecipeImage[];
     model: string;
     reasoningEffort: AiReasoningEffort | null;
     instructions: string;
@@ -171,7 +173,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         input: [
           {
             role: 'user',
-            content: `Untrusted household recipe context follows:\n${JSON.stringify(input.context)}`,
+            content: aiRecipeResponseContent(input.context, input.images),
           },
         ],
         text: { format: zodTextFormat(aiStructuredRecipeSchema, 'generated_recipe') },

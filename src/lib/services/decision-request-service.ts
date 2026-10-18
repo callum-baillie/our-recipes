@@ -1,7 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
-import { appRoleCan } from '@/lib/domain/permissions';
+import { canAccountUseAi } from './ai-access-service';
 import { hasTrustedMutationOrigin } from '@/lib/http';
 import { DecisionError } from '@/lib/providers/decisions-provider';
 
@@ -10,7 +10,7 @@ export async function decisionPrincipal(request: Request) {
     throw new DecisionError('Use a trusted app origin.', 403);
   const p = await getAuthenticatedSessionPrincipal(request);
   if (!p) throw new DecisionError('Sign in to use AI assistance.', 401);
-  if (!appRoleCan(p.role, 'ai.use') || !appRoleCan(p.accountRole, 'ai.use'))
+  if (!canAccountUseAi(p.userId))
     throw new DecisionError('This account cannot use AI assistance.', 403);
   return p;
 }

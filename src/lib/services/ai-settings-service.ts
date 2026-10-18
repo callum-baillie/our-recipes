@@ -1,10 +1,18 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
-import { aiProfileSettings, aiSummaryJobs, aiWorkloadSettings } from '@/lib/db/schema';
+import {
+  aiProfileSettings,
+  aiSummaryJobs,
+  aiWorkloadSettings,
+  aiRuntimeSettings,
+  aiUserSettings,
+  user,
+} from '@/lib/db/schema';
 import {
   AI_MODEL_CATALOG,
   AI_SUMMARY_FREQUENCY_MS,
@@ -17,6 +25,9 @@ import {
   type AiReasoningEffort,
   type AiWorkload,
 } from '@/lib/domain/ai-assistant';
+
+import { getEffectiveAiPolicy, getGlobalAiPolicy, getUserAiPolicy } from './ai-access-service';
+import { aiRuntimeSchema, aiUserPreferencesSchema } from '@/lib/domain/ai-runtime-settings';
 
 export class AiSettingsConflictError extends Error {}
 export class AiSettingsValidationError extends Error {}
@@ -120,9 +131,14 @@ export function getAiWorkloadSettings(profileId: string): AiWorkloadSetting[] {
 }
 
 export function getAiWorkloadSetting(profileId: string, workload: AiWorkload): AiWorkloadSetting {
+  const policy = getEffectiveAiPolicy(profileId);
   const setting = getAiWorkloadSettings(profileId).find((item) => item.workload === workload);
   if (!setting) throw new AiSettingsValidationError(`AI workload ${workload} is unavailable.`);
-  return setting;
+  const override = policy.workloads.find((item) => item.workload === workload);
+  const effective = override
+    ? { ...override, enabled: setting.enabled && override.enabled }
+    : setting;
+  return { ...effective, enabled: effective.enabled && policy.enabled };
 }
 
 export function getAiDataPolicy(profileId: string): AiDataPolicy {
@@ -259,3 +275,122 @@ export function updateAiSettings(profileId: string, raw: unknown) {
   });
   return getAiSettings(profileId);
 }
+
+export function getGlobalAiSettings(profileId: string) {
+  return {
+    ...getGlobalAiPolicy(),
+    workloads: getAiWorkloadSettings(profileId),
+    modelCatalog: AI_MODEL_CATALOG,
+    users: db()
+      .select({ id: user.id, name: user.name, role: user.role })
+      .from(user)
+      .all()
+      .map((account) => ({ ...account, ...getUserAiPolicy(account.id) })),
+  };
+}
+export function saveGlobalAiSettings(profileId: string, raw: unknown) {
+  const input = globalAiUpdateSchema.parse(raw);
+  db().transaction((transaction) => {
+    const previous = getGlobalAiPolicy();
+    if (previous.version !== input.version)
+      throw new AiSettingsConflictError('Global settings changed. Reload before saving.');
+    if (input.workloads) updateAiSettings(profileId, { workloads: input.workloads });
+    transaction
+      .insert(aiRuntimeSettings)
+      .values({
+        id: 'global',
+        settings: JSON.stringify(input.settings),
+        version: input.version + 1,
+      })
+      .onConflictDoUpdate({
+        target: aiRuntimeSettings.id,
+        set: { settings: JSON.stringify(input.settings), version: input.version + 1 },
+      })
+      .run();
+    for (const account of input.users) {
+      if (!transaction.select().from(user).where(eq(user.id, account.id)).get())
+        throw new AiSettingsValidationError('Account no longer exists.');
+      const current = getUserAiPolicy(account.id);
+      if (current.version !== account.version)
+        throw new AiSettingsConflictError('Account settings changed. Reload before saving.');
+      transaction
+        .insert(aiUserSettings)
+        .values({
+          userId: account.id,
+          enabled: account.enabled,
+          preferences: JSON.stringify(current.preferences),
+          version: current.version + 1,
+        })
+        .onConflictDoUpdate({
+          target: aiUserSettings.userId,
+          set: { enabled: account.enabled, version: current.version + 1 },
+        })
+        .run();
+    }
+  });
+  return getGlobalAiSettings(profileId);
+}
+export function getPersonalAiSettings(userId: string, profileId: string) {
+  return {
+    ...getAiSettings(profileId),
+    account: getUserAiPolicy(userId),
+    global: getGlobalAiPolicy().settings,
+  };
+}
+export function savePersonalAiSettings(userId: string, profileId: string, raw: unknown) {
+  const privacyOnly = aiSettingsUpdateSchema.safeParse(raw);
+  if (privacyOnly.success && privacyOnly.data.dataPolicy && !privacyOnly.data.workloads) {
+    updateAiSettings(profileId, { dataPolicy: privacyOnly.data.dataPolicy });
+    return getPersonalAiSettings(userId, profileId);
+  }
+  const input = personalAiUpdateSchema.parse(raw);
+  db().transaction((transaction) => {
+    const previous = getUserAiPolicy(userId);
+    if (previous.version !== input.version)
+      throw new AiSettingsConflictError('Personal settings changed. Reload before saving.');
+    input.preferences.workloads.forEach((item) =>
+      assertCompatible(item.workload, item.model, item.reasoningEffort),
+    );
+    if (input.dataPolicy) updateAiSettings(profileId, { dataPolicy: input.dataPolicy });
+    transaction
+      .insert(aiUserSettings)
+      .values({
+        userId,
+        enabled: previous.enabled,
+        preferences: JSON.stringify(input.preferences),
+        version: previous.version + 1,
+      })
+      .onConflictDoUpdate({
+        target: aiUserSettings.userId,
+        set: { preferences: JSON.stringify(input.preferences), version: previous.version + 1 },
+      })
+      .run();
+  });
+  return getPersonalAiSettings(userId, profileId);
+}
+
+const globalAiUpdateSchema = z
+  .object({
+    settings: aiRuntimeSchema,
+    version: z.number().int().min(0),
+    workloads: aiSettingsUpdateSchema.shape.workloads,
+    users: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(200),
+            enabled: z.boolean(),
+            version: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .max(500),
+  })
+  .strict();
+const personalAiUpdateSchema = z
+  .object({
+    preferences: aiUserPreferencesSchema,
+    version: z.number().int().min(0),
+    dataPolicy: aiDataPolicySchema.optional(),
+  })
+  .strict();

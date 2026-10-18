@@ -85,7 +85,13 @@ function label(value: string) {
   return value.replaceAll('_', ' ');
 }
 
-export function AiSettingsForm({ initialSettings }: { initialSettings: Settings }) {
+export function AiSettingsForm({
+  initialSettings,
+  privacyOnly = false,
+}: {
+  initialSettings: Settings;
+  privacyOnly?: boolean;
+}) {
   const [settings, setSettings] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,7 +111,11 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
     const response = await fetch('/api/v1/ai/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workloads: settings.workloads, dataPolicy: settings.dataPolicy }),
+      body: JSON.stringify(
+        privacyOnly
+          ? { dataPolicy: settings.dataPolicy }
+          : { workloads: settings.workloads, dataPolicy: settings.dataPolicy },
+      ),
     });
     const body = (await response.json()) as Settings & { error?: { message?: string } };
     if (!response.ok) throw new Error(body.error?.message ?? 'AI settings could not be saved.');
@@ -153,32 +163,34 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
 
   return (
     <div className="settings-stack">
-      <SettingsPane
-        title="Recipe images"
-        description="Shared permission to offer paid AI image generation. Each creation flow still asks whether to generate images."
-      >
-        <SettingsField
-          title="Offer AI image generation"
-          description="Allow recipe and meal-plan tools to offer generated photos."
+      {!privacyOnly && (
+        <SettingsPane
+          title="Recipe images"
+          description="Shared permission to offer paid AI image generation. Each creation flow still asks whether to generate images."
         >
-          <input
-            type="checkbox"
-            role="switch"
-            checked={imageGeneration?.enabled ?? true}
-            disabled={saving || refreshing}
-            onChange={(event) =>
-              setSettings((current) => ({
-                ...current,
-                workloads: current.workloads.map((item) =>
-                  item.workload === 'image_generation'
-                    ? { ...item, enabled: event.target.checked }
-                    : item,
-                ),
-              }))
-            }
-          />
-        </SettingsField>
-      </SettingsPane>
+          <SettingsField
+            title="Offer AI image generation"
+            description="Allow recipe and meal-plan tools to offer generated photos."
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              checked={imageGeneration?.enabled ?? true}
+              disabled={saving || refreshing}
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  workloads: current.workloads.map((item) =>
+                    item.workload === 'image_generation'
+                      ? { ...item, enabled: event.target.checked }
+                      : item,
+                  ),
+                }))
+              }
+            />
+          </SettingsField>
+        </SettingsPane>
+      )}
       <SettingsPane
         title="Summaries"
         description="Choose which summaries to prepare and how often to refresh them."
@@ -236,104 +248,106 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: Settings 
           </button>
         </SettingsRow>
       </SettingsPane>
-      <SettingsPane
-        title="Models by task"
-        description="These model choices are shared by the household. Compatible custom model IDs are supported."
-      >
-        <SettingsRow
-          title="Recommended defaults"
-          description="Select the recommended Luna models for text tasks. Save to apply your changes."
+      {!privacyOnly && (
+        <SettingsPane
+          title="Models by task"
+          description="These model choices are shared by the household. Compatible custom model IDs are supported."
         >
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={saving || refreshing}
-            onClick={() =>
-              setSettings((current) => ({
-                ...current,
-                workloads: current.workloads.map((item) => {
-                  const workload = aiWorkloadSchema.safeParse(item.workload);
-                  return workload.success && workload.data !== 'image_generation'
-                    ? { ...item, ...AI_WORKLOAD_DEFAULTS[workload.data] }
-                    : item;
-                }),
-              }))
-            }
+          <SettingsRow
+            title="Recommended defaults"
+            description="Select the recommended Luna models for text tasks. Save to apply your changes."
           >
-            Use recommended models
-          </button>
-        </SettingsRow>
-        {settings.workloads.map((item, index) => {
-          const choices = settings.modelCatalog.filter((model) =>
-            model.workloads.includes(item.workload),
-          );
-          const known = choices.some((model) => model.id === item.model);
-          const reasoning = settings.modelCatalog.find((model) => model.id === item.model)
-            ?.reasoning ?? ['none', 'low', 'medium', 'high', 'xhigh'];
-          return (
-            <SettingsSubsection key={item.workload} title={label(item.workload)}>
-              <SettingsField
-                title="Model"
-                description="Select the model used for this type of request."
-              >
-                <select
-                  disabled={saving || refreshing}
-                  value={known ? item.model : '__custom'}
-                  onChange={(event) =>
-                    updateWorkload(index, {
-                      model:
-                        event.target.value === '__custom' ? 'custom-model' : event.target.value,
-                      reasoningEffort: null,
-                    })
-                  }
-                >
-                  {choices.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.label}
-                    </option>
-                  ))}
-                  <option value="__custom">Custom model ID</option>
-                </select>
-              </SettingsField>
-              {!known && (
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={saving || refreshing}
+              onClick={() =>
+                setSettings((current) => ({
+                  ...current,
+                  workloads: current.workloads.map((item) => {
+                    const workload = aiWorkloadSchema.safeParse(item.workload);
+                    return workload.success && workload.data !== 'image_generation'
+                      ? { ...item, ...AI_WORKLOAD_DEFAULTS[workload.data] }
+                      : item;
+                  }),
+                }))
+              }
+            >
+              Use recommended models
+            </button>
+          </SettingsRow>
+          {settings.workloads.map((item, index) => {
+            const choices = settings.modelCatalog.filter((model) =>
+              model.workloads.includes(item.workload),
+            );
+            const known = choices.some((model) => model.id === item.model);
+            const reasoning = settings.modelCatalog.find((model) => model.id === item.model)
+              ?.reasoning ?? ['none', 'low', 'medium', 'high', 'xhigh'];
+            return (
+              <SettingsSubsection key={item.workload} title={label(item.workload)}>
                 <SettingsField
-                  title="Custom model ID"
-                  description="Enter a model available to the configured provider account."
+                  title="Model"
+                  description="Select the model used for this type of request."
                 >
-                  <input
+                  <select
                     disabled={saving || refreshing}
-                    value={item.model}
-                    onChange={(event) => updateWorkload(index, { model: event.target.value })}
-                  />
-                </SettingsField>
-              )}
-              <SettingsField
-                title="Reasoning effort"
-                description="Use the model default or choose an available effort level."
-              >
-                <select
-                  disabled={saving || refreshing}
-                  value={item.reasoningEffort ?? 'none'}
-                  onChange={(event) =>
-                    updateWorkload(index, {
-                      reasoningEffort: event.target.value === 'none' ? null : event.target.value,
-                    })
-                  }
-                >
-                  <option value="none">Model default</option>
-                  {reasoning
-                    .filter((value) => value !== 'none')
-                    .map((value) => (
-                      <option key={value} value={value}>
-                        {value}
+                    value={known ? item.model : '__custom'}
+                    onChange={(event) =>
+                      updateWorkload(index, {
+                        model:
+                          event.target.value === '__custom' ? 'custom-model' : event.target.value,
+                        reasoningEffort: null,
+                      })
+                    }
+                  >
+                    {choices.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.label}
                       </option>
                     ))}
-                </select>
-              </SettingsField>
-            </SettingsSubsection>
-          );
-        })}
-      </SettingsPane>
+                    <option value="__custom">Custom model ID</option>
+                  </select>
+                </SettingsField>
+                {!known && (
+                  <SettingsField
+                    title="Custom model ID"
+                    description="Enter a model available to the configured provider account."
+                  >
+                    <input
+                      disabled={saving || refreshing}
+                      value={item.model}
+                      onChange={(event) => updateWorkload(index, { model: event.target.value })}
+                    />
+                  </SettingsField>
+                )}
+                <SettingsField
+                  title="Reasoning effort"
+                  description="Use the model default or choose an available effort level."
+                >
+                  <select
+                    disabled={saving || refreshing}
+                    value={item.reasoningEffort ?? 'none'}
+                    onChange={(event) =>
+                      updateWorkload(index, {
+                        reasoningEffort: event.target.value === 'none' ? null : event.target.value,
+                      })
+                    }
+                  >
+                    <option value="none">Model default</option>
+                    {reasoning
+                      .filter((value) => value !== 'none')
+                      .map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                  </select>
+                </SettingsField>
+              </SettingsSubsection>
+            );
+          })}
+        </SettingsPane>
+      )}
       <SettingsPane
         title="Data sharing"
         description="Only enabled categories may be sent for this profile’s future AI requests. Earlier requests cannot be recalled."

@@ -484,6 +484,13 @@
       "when": 1792281600000,
       "tag": "0067_bord_catalog_links",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1792281600001,
+      "tag": "0068_ai_account_settings",
+      "breakpoints": true
     }
   ]
 }

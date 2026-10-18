@@ -7,6 +7,7 @@ import { useRef, type RefObject } from 'react';
 import { useModalSurface } from '@/components/use-modal-surface';
 
 const options = [
+  { href: '/capture/bulk', label: 'Bulk add recipes', icon: Plus },
   { href: '/recipes/new', label: 'From scratch', icon: FileText },
   { href: '/capture?mode=text', label: 'Paste/AI Recipe', icon: Sparkles },
   { href: '/capture?mode=url', label: 'From URL', icon: Link2 },

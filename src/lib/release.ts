@@ -5,9 +5,9 @@ import { accessSync, constants } from 'node:fs';
 import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
 import { ensureDatabase, getSqliteDatabase } from '@/lib/db/client';
 
-export const APPLICATION_VERSION = '1.0.0-rc.14';
-export const SCHEMA_VERSION = '0067_bord_catalog_links';
-export const EXPECTED_MIGRATION_COUNT = 69;
+export const APPLICATION_VERSION = '1.0.0-rc.15';
+export const SCHEMA_VERSION = '0068_ai_account_settings';
+export const EXPECTED_MIGRATION_COUNT = 70;
 
 export type ReleaseStatus = {
   applicationVersion: string;

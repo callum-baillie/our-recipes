@@ -1,17 +1,20 @@
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 
 import { AiSettingsForm } from '@/components/ai-settings-form';
 import { SettingsPageHeader } from '@/components/settings-page-header';
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
-import { getAiSettings } from '@/lib/services/ai-settings-service';
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
+import { AiRuntimeSettingsForm } from '@/components/ai-runtime-settings-form';
+import { getPersonalAiSettings } from '@/lib/services/ai-settings-service';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AiSettingsPage() {
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId)
+  const principal = await getAuthenticatedSessionPrincipal(
+    new Request('http://localhost/account/ai', { headers: await headers() }),
+  );
+  if (!principal)
     return (
       <main className="recipe-page settings-hub">
         <SettingsPageHeader
@@ -22,6 +25,7 @@ export default async function AiSettingsPage() {
         <Link href="/settings/profiles">Open profile settings</Link>
       </main>
     );
+  const data = getPersonalAiSettings(principal.userId, principal.linkedProfileId);
   return (
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
@@ -36,7 +40,14 @@ export default async function AiSettingsPage() {
         }
       />
 
-      <AiSettingsForm initialSettings={getAiSettings(actor.profileId)} />
+      <AiRuntimeSettingsForm
+        global={data.global}
+        workloads={data.workloads}
+        personal={data.account.preferences}
+        enabled={data.account.enabled}
+        version={data.account.version}
+      />
+      <AiSettingsForm initialSettings={data} privacyOnly />
     </main>
   );
 }

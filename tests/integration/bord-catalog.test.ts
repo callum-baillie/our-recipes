@@ -331,9 +331,9 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
         'canonical_product_id',
       ])
         legacy.exec(`ALTER TABLE food_provider_snapshots DROP COLUMN ${column}`);
-      legacy.exec(
-        'DELETE FROM __drizzle_migrations WHERE created_at = (SELECT max(created_at) FROM __drizzle_migrations)',
-      );
+      // Restore the pre-catalog prefix, including tables introduced after that migration.
+      legacy.exec('DROP TABLE ai_user_settings; DROP TABLE ai_runtime_settings;');
+      legacy.exec('DELETE FROM __drizzle_migrations WHERE created_at >= 1792281600000');
       legacy.close();
       resetDatabaseForTests();
       vi.stubEnv('DATABASE_URL', path);

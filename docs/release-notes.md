@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.0-rc.15
+
+- Increase the default immediate AI allowance to 10 actions per account per ten minutes.
+- Add administrator AI settings for installation access, account access, task models and reasoning, and queued Direct/Batch processing defaults. Personal model and processing overrides inherit shared defaults and cannot bypass administrator restrictions.
+- Default queued recipe sets and images to Batch from two items. Preserve previous automation preferences when migrating and block unsubmitted work after access is revoked. Submitted batches remain recoverable and cancellable.
+- Add bulk recipe imports from 2–20 prompts, public links, or separate recipe photos, with explicit paid confirmation, server image normalization, protected URL capture, background progress, and review before saving.
+- Add a multi-source recipe import tool in chat and support up to 20 image attachments within the existing total upload limit.
+- Include additive migration `0068_ai_account_settings`; back up household data before upgrading. Provider credentials stay server-side and no live OpenAI calls are required by the test suite.
+
 ## 1.0.0-rc.14
 
 - Add the native Bòrd Food API transport alongside the existing USDA/OFF providers, with server-only credentials, bounded validated requests and explicit direct/preferred/catalog-only modes.

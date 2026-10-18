@@ -168,16 +168,19 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   ).toBeVisible();
   await expect(page.getByLabel('pasta quantity')).toHaveValue('200');
 
-  await page.goto('/account/ai');
-  const globalImageGeneration = page.getByRole('switch', {
-    name: /Offer AI image generation/u,
-  });
+  await page.goto('/settings/ai');
+  const imageTask = page
+    .locator('.settings-subsection')
+    .filter({ has: page.getByRole('heading', { name: 'image generation', exact: true }) });
+  const globalImageGeneration = imageTask.getByRole('switch', { name: 'Enable task', exact: true });
   await expect(globalImageGeneration).toBeChecked();
   await globalImageGeneration.uncheck();
-  await page.getByRole('button', { name: 'Save AI settings' }).click();
+  await page.getByRole('button', { name: 'Save global AI settings' }).click();
   await expect(
-    page.getByText('Saved. New privacy choices apply to future AI requests.'),
+    page.getByText('AI settings saved. New requests will use these choices.'),
   ).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('switch', { name: /Offer AI image generation/u })).not.toBeChecked();
+  await expect(
+    imageTask.getByRole('switch', { name: 'Enable task', exact: true }),
+  ).not.toBeChecked();
 });

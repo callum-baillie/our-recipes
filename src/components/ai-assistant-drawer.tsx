@@ -341,8 +341,8 @@ export function AiAssistantDrawer({
     if (!files || attaching || busy) return;
     setAttaching(true);
     try {
-      if (files.length + attachments.length > 4)
-        throw new Error('Attach up to four images per message.');
+      if (files.length + attachments.length > 20)
+        throw new Error('Attach up to 20 images per message.');
       const next: Attachment[] = [];
       for (const file of Array.from(files)) {
         if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type))
@@ -829,7 +829,7 @@ export function AiAssistantDrawer({
                 className={styles.attachButton}
                 aria-label="Attach images"
                 title="Attach images"
-                disabled={busy || attaching || attachments.length >= 4}
+                disabled={busy || attaching || attachments.length >= 20}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Plus />

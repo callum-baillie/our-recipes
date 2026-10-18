@@ -378,5 +378,10 @@
     "method": "PATCH",
     "path": "/account/kitchen-context",
     "reason": "Session-owned kitchen interview with revision-checked updates and no provider calls."
+  },
+  {
+    "method": "POST",
+    "path": "/ai/imports",
+    "reason": "First-party paid bulk recipe import; authenticated account and explicit confirmation required."
   }
 ]

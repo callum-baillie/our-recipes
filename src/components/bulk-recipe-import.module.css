@@ -1,0 +1,47 @@
+.root {
+  min-width: 0;
+}
+.root textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+.upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px dashed var(--border-color, #73816b);
+  border-radius: 1rem;
+}
+.upload input {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.images {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+.images li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+.images span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.images button {
+  flex: 0 0 44px;
+  min-height: 44px;
+}
+.error {
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.75rem;
+}

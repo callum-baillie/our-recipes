@@ -134,6 +134,13 @@ export function authorizeAppRequest(input: {
     return { allowed: true };
   if (method === 'POST' && pathname === '/api/v1/exports/recipes/pdf') return { allowed: true };
 
+  // An administrator may grant a child account chat access; this never grants shared CRUD.
+  if (
+    pathname === '/api/v1/ai/imports' ||
+    /^\/api\/v1\/ai\/jobs\/[^/]+$/u.test(pathname) ||
+    /^\/api\/v1\/ai\/chat\/threads(?:\/[^/]+(?:\/messages)?)?$/u.test(pathname)
+  )
+    return { allowed: true };
   if (role !== 'child') return { allowed: true };
 
   if (pathname === '/api/v1/nutrition/household') {

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Sparkles,
   ChefHat,
   Workflow,
   ClipboardList,
@@ -15,6 +16,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const links = [
+  { href: '/settings/ai', label: 'AI settings', icon: Sparkles },
   { href: '/settings', label: 'All settings', icon: Settings2 },
   { href: '/settings/profiles', label: 'Profiles & roles', icon: Users },
   { href: '/settings/recipes', label: 'Recipes', icon: ClipboardList },
