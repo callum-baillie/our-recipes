@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.0-rc.13
+
+- Keep recipe and pantry quick filters in one horizontally scrollable row on desktop, with overflow arrows and all filters available without expanding the page.
+- Combine search and tags into a compact mobile surface with an inset search field, swipeable tags, clear selected states, and touch-sized controls.
+- Preserve keyboard access to off-screen tags and bring selected filters into view without scrolling the page. Remove duplicated hidden tag measurement markup.
+- Verify desktop, tablet, and 320/390px mobile layouts, actual tag/search results, advanced search, pantry filtering, and dark-theme accessibility. No database migration is required.
+
 ## 1.0.0-rc.12
 
 - Rebuild planner cards with inset photos, clearer titles and household context, aligned serving/time details, and centered square menu buttons, following the supplied mockup.

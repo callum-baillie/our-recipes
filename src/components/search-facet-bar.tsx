@@ -1,7 +1,7 @@
 'use client';
 
-import { Heart, MoreHorizontal, Search, SlidersHorizontal, ChevronUp } from 'lucide-react';
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import styles from './search-facet-bar.module.css';
 
 export type SearchFacet = {
@@ -12,7 +12,7 @@ export type SearchFacet = {
   icon?: 'heart';
 };
 
-/** A shared search surface: one inset search field and a bounded, expandable facet shelf. */
+/** A shared search field with a single scrollable row of quick filters. */
 export function SearchFacetBar({
   query,
   onQueryChange,
@@ -34,46 +34,56 @@ export function SearchFacetBar({
   label?: string;
   advancedActive?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [visible, setVisible] = useState(6);
+  const shelfId = useId();
   const shelf = useRef<HTMLDivElement>(null);
-  const measure = useRef<HTMLDivElement>(null);
-  const signature = facets.map((f) => `${f.key}:${f.label}:${f.count ?? ''}`).join('|');
-  useLayoutEffect(() => {
-    const resize = () => {
-      if (!shelf.current || !measure.current) return;
-      const width = shelf.current.clientWidth;
-      const sizes = Array.from(measure.current.children).map(
-        (child) => child.getBoundingClientRect().width,
-      );
-      let row = 0,
-        used = 0,
-        count = 0;
-      for (let i = 0; i < sizes.length; i++) {
-        const size = Math.min(sizes[i], width);
-        const reserve = i < sizes.length - 1 ? 52 : 0;
-        if (used + size + (row === 1 ? reserve : 0) > width && used > 0) {
-          row++;
-          used = 0;
-        }
-        if (row > 1 || (row === 1 && used + size + reserve > width)) break;
-        used += size + 8;
-        count++;
-      }
-      setVisible(Math.max(1, count));
-    };
-    resize();
-    const observer = new ResizeObserver(resize);
+  const track = useRef<HTMLDivElement>(null);
+  const [scroll, setScroll] = useState({ previous: false, next: false });
+  const activeKey = facets.findLast((facet) => facet.active)?.key;
+  const updateScroll = useCallback(() => {
+    const element = shelf.current;
+    if (!element) return;
+    const previous = element.scrollLeft > 2;
+    const next = element.scrollLeft + element.clientWidth < element.scrollWidth - 2;
+    setScroll((current) =>
+      current.previous === previous && current.next === next ? current : { previous, next },
+    );
+  }, []);
+  useEffect(() => {
+    const observer = new ResizeObserver(updateScroll);
     if (shelf.current) observer.observe(shelf.current);
+    if (track.current) observer.observe(track.current);
+    updateScroll();
     return () => observer.disconnect();
-  }, [signature]);
+  }, [updateScroll]);
+  useEffect(() => {
+    const element = shelf.current;
+    const active = Array.from(
+      track.current?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+    ).find((button) => button.dataset.facetKey === activeKey);
+    if (!element || !active) return;
+    const bounds = element.getBoundingClientRect();
+    const button = active.getBoundingClientRect();
+    if (button.left < bounds.left) element.scrollLeft -= bounds.left - button.left + 4;
+    else if (button.right > bounds.right) element.scrollLeft += button.right - bounds.right + 4;
+    updateScroll();
+  }, [activeKey, updateScroll]);
+  function scrollFilters(direction: number) {
+    const element = shelf.current;
+    if (!element) return;
+    element.scrollBy({
+      left: direction * element.clientWidth * 0.75,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    });
+  }
   function content(facet: SearchFacet) {
     return (
       <>
         {facet.icon === 'heart' ? (
           <Heart aria-hidden="true" fill={facet.active ? 'currentColor' : 'none'} />
         ) : (
-          facet.label
+          <span className={styles.facetLabel}>{facet.label}</span>
         )}
         {facet.count !== undefined && !facet.icon ? (
           <span className={styles.count}>{facet.count}</span>
@@ -91,6 +101,17 @@ export function SearchFacetBar({
           onSearch?.();
         }}
       >
+        <button type="submit" aria-label={label} title={label}>
+          <Search aria-hidden="true" />
+        </button>
+        <input
+          aria-label={label}
+          type="search"
+          maxLength={160}
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={placeholder}
+        />
         {onAdvanced ? (
           <button
             type="button"
@@ -100,55 +121,65 @@ export function SearchFacetBar({
             data-active={advancedActive || undefined}
             onClick={onAdvanced}
           >
-            <SlidersHorizontal />
+            <SlidersHorizontal aria-hidden="true" />
           </button>
         ) : null}
-        <input
-          aria-label={label}
-          type="search"
-          maxLength={160}
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={placeholder}
-        />
-        <button type="submit" aria-label={label} title={label}>
-          <Search />
-        </button>
       </form>
-      <div className={styles.shelf} ref={shelf}>
-        {(expanded ? facets : facets.slice(0, visible)).map((facet) => (
-          <button
-            key={facet.key}
-            type="button"
-            className={styles.chip}
-            aria-label={facet.icon ? facet.label : undefined}
-            title={facet.label}
-            aria-pressed={Boolean(facet.active)}
-            onClick={() => onFacet(facet.key)}
+      {facets.length > 0 && (
+        <div className={styles.facetRow}>
+          {scroll.previous || scroll.next ? (
+            <button
+              className={styles.scrollButton}
+              type="button"
+              aria-label="Scroll filters backward"
+              aria-controls={shelfId}
+              disabled={!scroll.previous}
+              onClick={() => scrollFilters(-1)}
+            >
+              <ChevronLeft aria-hidden="true" />
+            </button>
+          ) : null}
+          <div
+            id={shelfId}
+            className={styles.shelf}
+            ref={shelf}
+            onScroll={updateScroll}
+            data-can-previous={scroll.previous || undefined}
+            data-can-next={scroll.next || undefined}
+            role="group"
+            aria-label={`${label} quick filters`}
           >
-            {content(facet)}
-          </button>
-        ))}
-        {facets.length > visible ? (
-          <button
-            type="button"
-            className={styles.more}
-            aria-label={expanded ? 'Show fewer filters' : 'Show all filters'}
-            title={expanded ? 'Show fewer filters' : 'Show all filters'}
-            aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? <ChevronUp /> : <MoreHorizontal />}
-          </button>
-        ) : null}
-      </div>
-      <div ref={measure} className={styles.measure} aria-hidden="true">
-        {facets.map((facet) => (
-          <span key={facet.key} className={styles.chip}>
-            {content(facet)}
-          </span>
-        ))}
-      </div>
+            <div className={styles.track} ref={track}>
+              {facets.map((facet) => (
+                <button
+                  key={facet.key}
+                  data-facet-key={facet.key}
+                  type="button"
+                  className={styles.chip}
+                  aria-label={facet.icon ? facet.label : undefined}
+                  title={facet.label}
+                  aria-pressed={Boolean(facet.active)}
+                  onClick={() => onFacet(facet.key)}
+                >
+                  {content(facet)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {scroll.previous || scroll.next ? (
+            <button
+              className={styles.scrollButton}
+              type="button"
+              aria-label="Scroll filters forward"
+              aria-controls={shelfId}
+              disabled={!scroll.next}
+              onClick={() => scrollFilters(1)}
+            >
+              <ChevronRight aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
