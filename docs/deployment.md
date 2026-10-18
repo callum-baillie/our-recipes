@@ -13,6 +13,8 @@
 - Optional `OPENAI_API_KEY` only when the household intentionally enables review suggestions or generated serving images. Never put `.api_keys` in a bind mount, image, or backup.
 - Optional server-only `USDA_FDC_API_KEY` enables FoodData Central search. Open Food Facts exact barcode reads need no credential. Camera scanning requires the trusted Nginx Proxy Manager HTTPS route described in [food-data-integrations.md](food-data-integrations.md).
 
+To point USDA searches at a local `bord-food-api` container, follow [the local food API guide](local-food-api.md), including its Compose environment override and connection checks.
+
 Profiles are not authentication. Do not expose an `AUTH_MODE=none` household deployment directly to the public internet.
 
 ## Compose

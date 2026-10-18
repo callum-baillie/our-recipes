@@ -26,6 +26,27 @@ const configSchema = z.object({
   backupRetentionDays: z.number().int().min(1).max(3_650),
   backupIntervalHours: z.number().int().min(1).max(168),
   foodData: z.object({
+    mode: z.enum(['direct', 'catalog_preferred', 'catalog_only']),
+    allowRemoteFallback: z.boolean(),
+    catalog: z.object({
+      baseUrl: z
+        .string()
+        .url()
+        .refine((value) => {
+          const url = new URL(value);
+          return (
+            ['http:', 'https:'].includes(url.protocol) &&
+            !url.username &&
+            !url.password &&
+            !url.search &&
+            !url.hash
+          );
+        }, 'Use an HTTP(S) catalog URL without credentials, query or fragment.')
+        .nullable(),
+      apiKey: z.string().min(1).nullable(),
+      timeoutMs: z.number().int().min(100).max(30_000),
+      storeDirectoryEnabled: z.boolean(),
+    }),
     openFoodFacts: z.object({
       enabled: z.boolean(),
       baseUrl: z.string().url(),
@@ -147,13 +168,21 @@ export function getRuntimeConfig(): RuntimeConfig {
     backupRetentionDays: Number(process.env.BACKUP_RETENTION_DAYS ?? '30'),
     backupIntervalHours: Number(process.env.BACKUP_INTERVAL_HOURS ?? '24'),
     foodData: {
+      mode: process.env.FOOD_DATA_MODE ?? 'direct',
+      allowRemoteFallback: environmentBoolean('FOOD_DATA_ALLOW_REMOTE_FALLBACK', false),
+      catalog: {
+        baseUrl: process.env.BORD_FOOD_API_BASE_URL?.trim() || null,
+        apiKey: process.env.BORD_FOOD_API_KEY?.trim() || null,
+        timeoutMs: Number(process.env.BORD_FOOD_API_TIMEOUT_MS ?? '5000'),
+        storeDirectoryEnabled: environmentBoolean('STORE_DIRECTORY_ENABLED', false),
+      },
       openFoodFacts: {
         enabled: process.env.OPEN_FOOD_FACTS_ENABLED !== 'false',
         baseUrl: process.env.OPEN_FOOD_FACTS_BASE_URL ?? 'https://world.openfoodfacts.org',
         apiVersion: process.env.OPEN_FOOD_FACTS_API_VERSION ?? 'v3.6',
         userAgent:
           process.env.OPEN_FOOD_FACTS_USER_AGENT ??
-          'Bord/1.0.0-rc.13 (https://github.com/callum-baillie/bord)',
+          'Bord/1.0.0-rc.14 (https://github.com/callum-baillie/bord)',
         timeoutMs: Number(process.env.OPEN_FOOD_FACTS_TIMEOUT_MS ?? '5000'),
         requestsPerMinute: Number(process.env.OPEN_FOOD_FACTS_PRODUCT_RPM ?? '12'),
       },

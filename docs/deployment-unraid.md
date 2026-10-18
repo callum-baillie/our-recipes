@@ -2,6 +2,8 @@
 
 Barcode camera deployment uses the existing Nginx Proxy Manager path and a trusted local CA. Follow [food-data-integrations.md](food-data-integrations.md#camera-https-through-nginx-proxy-manager), set `APP_ORIGIN=https://recipes.tower`, and add the masked `USDA_FDC_API_KEY` variable only when USDA search is wanted. Keep the direct Bòrd port and NPM Proxy Host private to the trusted LAN.
 
+For USDA data hosted beside Bòrd on Unraid, follow [the local food API configuration guide](local-food-api.md). It covers installing the separate `bord-food-api` service, setting Bòrd's `USDA_FDC_BASE_URL` and key, Docker networking, and verifying a search from Bòrd's container.
+
 1. Create `/mnt/user/appdata/bord` and a dedicated `/mnt/user/backups/bord` directory. On first start the image initializes the exact mapped directories before dropping to its non-root runtime user; do not map a broad shared or Kopia repository directory directly into Bòrd.
 2. Import `unraid/bord.xml` as a custom template, or adapt `docker-compose.unraid.yml`. Both use the public `ghcr.io/callum-baillie/bord:latest` image.
 3. Map container `/data` to `/mnt/user/appdata/bord`, map container `/backup` to `/mnt/user/backups/bord`, set `BACKUP_DIR=/backup`, and map container port `3000` to an unused LAN port (for example host port `4123`). Bòrd writes complete `.tar.gz` bundles to `/backup`; configure Kopia to snapshot the host-side `/mnt/user/backups/bord` directory.

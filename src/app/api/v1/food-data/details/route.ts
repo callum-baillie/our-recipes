@@ -12,7 +12,9 @@ export async function POST(request: Request) {
   try {
     const input = foodDetailsInputSchema.parse(await readFoodDataJson(request));
     return withApiRequestId(
-      foodDataJson(await getFoodDetails(input.provider, input.recordId, input.language)),
+      foodDataJson(
+        await getFoodDetails(input.provider, input.recordId, input.language, input.catalogRef),
+      ),
       access.requestId,
     );
   } catch (error) {

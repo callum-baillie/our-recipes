@@ -175,6 +175,16 @@ export class UsdaFoodDataProvider implements FoodDataProvider {
     init: RequestInit,
     parser: (value: unknown) => FoodRecord | FoodRecord[] | null,
   ) {
+    const policy = getRuntimeConfig().foodData;
+    if (
+      policy.mode === 'catalog_only' ||
+      (policy.mode === 'catalog_preferred' && !policy.allowRemoteFallback)
+    )
+      throw new FoodDataError(
+        'DISABLED',
+        'Direct food lookups are disabled by the catalog policy.',
+        this.id,
+      );
     const config = getRuntimeConfig().foodData.usda;
     if (!config.enabled || !config.apiKey)
       throw new FoodDataError(
@@ -189,6 +199,7 @@ export class UsdaFoodDataProvider implements FoodDataProvider {
         ...init,
         headers: { ...init.headers, 'X-Api-Key': config.apiKey, Accept: 'application/json' },
         signal: controller.signal,
+        redirect: 'error',
       });
       const quota = rate(response);
       if (response.status === 401 || response.status === 403)
@@ -276,4 +287,8 @@ export class UsdaFoodDataProvider implements FoodDataProvider {
     );
     return result as ProviderResponse<FoodRecord | null>;
   }
+}
+
+export function normalizeCatalogUsdaFood(value: unknown): FoodRecord {
+  return normalizeFood(foodSchema.parse(value));
 }

@@ -1,7 +1,14 @@
 import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
 import { z } from 'zod';
-import { foodCatalogImportInputSchema } from '@/lib/domain/food-data';
-import { importFoodCatalogRecord } from '@/lib/services/food-catalog-import-service';
+import { FoodDataError, foodCatalogImportInputSchema } from '@/lib/domain/food-data';
+import {
+  importFoodCatalogRecord,
+  replayFoodCatalogImport,
+} from '@/lib/services/food-catalog-import-service';
+import {
+  isNativeCatalogEnabled,
+  directFoodFallbackAllowed,
+} from '@/lib/services/bord-catalog-service';
 import { getFoodDetails } from '@/lib/services/food-data-service';
 import { foodDataApiError, foodDataJson, readFoodDataJson } from '../../food-data/_shared';
 
@@ -20,12 +27,21 @@ export async function POST(request: Request) {
 
   try {
     const input = inputSchema.parse(await readFoodDataJson(request));
+    const { batches, ...catalogInput } = input;
+    const replay = replayFoodCatalogImport(catalogInput, 'pantry', input.batches);
+    if (replay) return withApiRequestId(foodDataJson(replay, { status: 201 }), access.requestId);
+    if (isNativeCatalogEnabled() && !directFoodFallbackAllowed() && !input.selection.catalogRef)
+      throw new FoodDataError(
+        'REVISION_EXPIRED',
+        'Review this food through the catalog before saving.',
+      );
     const { record } = await getFoodDetails(
       input.selection.provider,
       input.selection.recordId,
       'en',
+      input.selection.catalogRef,
+      true,
     );
-    const { batches, ...catalogInput } = input;
     return withApiRequestId(
       foodDataJson(
         importFoodCatalogRecord({

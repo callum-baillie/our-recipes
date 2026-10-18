@@ -16,6 +16,7 @@ import {
 import { useMemo, useState, useTransition, useRef } from 'react';
 
 import { createClientUuid } from '@/lib/client/client-uuid';
+import { CatalogStoreLink } from '@/components/catalog-store-link';
 import { StoreMapUpload } from '@/components/store-map-upload';
 
 import { InlineSkeleton } from '@/components/skeleton';
@@ -52,6 +53,9 @@ type Profile = {
   notes: string;
   archivedAt: string | Date | null;
   sections: Section[];
+  catalogStoreId?: string | null;
+  catalogMetadata?: string | null;
+  catalogLinkedAt?: string | Date | null;
 };
 
 type Workspace = { settings: Settings; profiles: Profile[] };
@@ -445,6 +449,16 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                 </SettingsField>
               </div>
 
+              {draft.id && (
+                <CatalogStoreLink
+                  key={`catalog-${draft.id}`}
+                  profile={workspace.profiles.find((profile) => profile.id === draft.id)!}
+                  onChange={(next) => {
+                    // Linking only changes the association. Keep unsaved household labels and route edits.
+                    setWorkspace(next as Workspace);
+                  }}
+                />
+              )}
               <StoreMapUpload
                 key={draft.id ?? 'new-store'}
                 onUse={(sections) =>

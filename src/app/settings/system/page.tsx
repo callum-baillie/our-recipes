@@ -10,6 +10,7 @@ import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 import { getBackupStorageStatus, listBackups } from '@/lib/services/backup-service';
 import { getHouseholdState } from '@/lib/services/household-service';
 import { getReleaseStatus } from '@/lib/release';
+import { getCatalogStatus } from '@/lib/services/bord-catalog-service';
 import { listFoodProviderStatuses } from '@/lib/services/food-data-service';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export default async function SystemSettingsPage() {
   const state = getHouseholdState();
   if (!state.household) notFound();
   const release = getReleaseStatus();
+  const catalogStatus = await getCatalogStatus();
   const foodProviders = listFoodProviderStatuses();
   const backupStorage = getBackupStorageStatus();
   const backups = (await listBackups()).map((backup) => ({
@@ -61,6 +63,45 @@ export default async function SystemSettingsPage() {
         title="Read-only providers"
         description="Credentials stay in the server environment. Camera scanning also requires a trusted HTTPS origin."
       >
+        <SettingsRow title="Bòrd Food API">
+          <output>
+            {catalogStatus.state.replaceAll('_', ' ')} · {catalogStatus.mode.replaceAll('_', ' ')}
+          </output>
+        </SettingsRow>
+        <SettingsRow title="Store directory">
+          <output>{catalogStatus.storeDirectoryEnabled ? 'Enabled' : 'Disabled'}</output>
+        </SettingsRow>
+        {Object.entries(catalogStatus.packs).map(([name, pack]) => (
+          <SettingsRow key={name} title={`Catalog · ${name}`}>
+            <output>
+              {!pack.enabled
+                ? 'Disabled'
+                : pack.stale
+                  ? 'Stale'
+                  : pack.available
+                    ? 'Available'
+                    : 'Initializing'}
+            </output>
+          </SettingsRow>
+        ))}
+        {Object.entries(catalogStatus.sources).map(([name, source]) => (
+          <SettingsRow key={name} title={`Source · ${name.replaceAll('_', ' ')}`}>
+            <output>
+              {!source.enabled
+                ? 'Disabled'
+                : source.stale
+                  ? 'Stale'
+                  : source.available
+                    ? 'Available'
+                    : 'Initializing'}
+            </output>
+          </SettingsRow>
+        ))}
+        {catalogStatus.mapAssetsRightsBlocked && (
+          <SettingsRow title="Map assets">
+            <output>Rights blocked · official links may still be available</output>
+          </SettingsRow>
+        )}
         {foodProviders.map((provider) => (
           <SettingsRow
             key={provider.provider}

@@ -965,6 +965,7 @@ export function PantryManager({
         body: JSON.stringify({
           provider: record.provider,
           recordId: record.providerRecordId,
+          catalogRef: record.catalogRef,
           language: navigator.language.slice(0, 2),
         }),
       });

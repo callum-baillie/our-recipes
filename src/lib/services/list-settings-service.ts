@@ -346,6 +346,14 @@ function replaceProfileSections(
   executor: DatabaseExecutor,
 ) {
   const now = new Date();
+  const existing = new Map(
+    executor
+      .select()
+      .from(supermarketProfileAisles)
+      .where(eq(supermarketProfileAisles.supermarketProfileId, supermarketProfileId))
+      .all()
+      .map((section) => [section.aisleId, section]),
+  );
   executor
     .delete(supermarketProfileAisles)
     .where(eq(supermarketProfileAisles.supermarketProfileId, supermarketProfileId))
@@ -358,7 +366,7 @@ function replaceProfileSections(
     executor
       .insert(supermarketProfileAisles)
       .values({
-        id: randomUUID(),
+        id: existing.get(aisle.id)?.id ?? randomUUID(),
         supermarketProfileId,
         aisleId: aisle.id,
         displayName: section.name,
@@ -366,7 +374,7 @@ function replaceProfileSections(
         matchTerms: JSON.stringify(
           [...new Set(section.matchTerms.map(normalizeShoppingMatchText))].filter(Boolean),
         ),
-        createdAt: now,
+        createdAt: existing.get(aisle.id)?.createdAt ?? now,
         updatedAt: now,
       })
       .run();
@@ -902,4 +910,38 @@ export function setShoppingListSupermarket(
 export function getShoppingListProductId(itemId: string): string | null {
   ensureDatabase();
   return itemProductId(itemId, getDatabase());
+}
+
+/** Catalog identity is an association; household labels and route identity are never replaced. */
+export function setSupermarketCatalogLink(
+  profileId: string,
+  link: { storeId: string; revision: string; generation: string; metadata: string } | null,
+  actorProfileId: string,
+) {
+  ensureDatabase();
+  const database = getDatabase();
+  requireActor(actorProfileId, database);
+  const household = requireHousehold(database);
+  const profile = database
+    .select()
+    .from(supermarketProfiles)
+    .where(
+      and(eq(supermarketProfiles.id, profileId), eq(supermarketProfiles.householdId, household.id)),
+    )
+    .get();
+  if (!profile) throw new ListSettingsNotFoundError('That saved store was not found.');
+  database
+    .update(supermarketProfiles)
+    .set({
+      catalogStoreId: link?.storeId ?? null,
+      catalogRevision: link?.revision ?? null,
+      catalogGeneration: link?.generation ?? null,
+      catalogMetadata: link?.metadata ?? null,
+      catalogLinkedAt: link ? new Date() : null,
+      updatedAt: new Date(),
+      updatedByProfileId: actorProfileId,
+    })
+    .where(eq(supermarketProfiles.id, profileId))
+    .run();
+  return getListSettingsWorkspace();
 }

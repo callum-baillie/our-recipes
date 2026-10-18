@@ -9,6 +9,14 @@ export type IntegrationRoute = {
 // Explicit allowlist shared by the proxy, route authorization, and API documentation.
 // Personal nutrition, account security, backups, and AI assistant conversations stay session-only.
 export const integrationRoutes: IntegrationRoute[] = [
+  { path: '/food-data/catalog/status', resource: 'pantry', methods: { GET: 'read' } },
+  { path: '/food-data/catalog/stores', resource: 'shoppingLists', methods: { POST: 'read' } },
+  { path: '/food-data/catalog/retail-evidence', resource: 'pantry', methods: { POST: 'read' } },
+  {
+    path: '/supermarket-profiles/{profileId}/catalog-link',
+    resource: 'shoppingLists',
+    methods: { GET: 'read', PATCH: 'update', DELETE: 'update' },
+  },
   { path: '/shopping-lists/recent-items', resource: 'shoppingLists', methods: { GET: 'read' } },
   {
     path: '/shopping-lists/{listId}/items/bulk',

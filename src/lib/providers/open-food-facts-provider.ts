@@ -276,6 +276,16 @@ export class OpenFoodFactsProvider implements FoodDataProvider {
     return { value: [], rateLimit: null, rateRemaining: null, retryAt: null };
   }
   async getDetails(recordId: string, language: string) {
+    const policy = getRuntimeConfig().foodData;
+    if (
+      policy.mode === 'catalog_only' ||
+      (policy.mode === 'catalog_preferred' && !policy.allowRemoteFallback)
+    )
+      throw new FoodDataError(
+        'DISABLED',
+        'Direct food lookups are disabled by the catalog policy.',
+        this.id,
+      );
     const config = getRuntimeConfig().foodData.openFoodFacts;
     if (!config.enabled)
       throw new FoodDataError('NOT_CONFIGURED', 'Open Food Facts is disabled.', this.id);
@@ -291,6 +301,7 @@ export class OpenFoodFactsProvider implements FoodDataProvider {
             'Accept-Language': language,
           },
           signal: controller.signal,
+          redirect: 'error',
         }),
         language,
       );
@@ -303,4 +314,8 @@ export class OpenFoodFactsProvider implements FoodDataProvider {
       clearTimeout(timeout);
     }
   }
+}
+
+export function normalizeCatalogOffFood(value: unknown, language: string): FoodRecord {
+  return normalizeProduct(productSchema.parse(value), language);
 }

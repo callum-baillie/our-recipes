@@ -283,6 +283,127 @@ paths:
                   setupComplete: { type: boolean }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '503': { description: Storage is unavailable }
+  /food-data/catalog/status:
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
+      operationId: getCatalogStatus
+      summary: Report sanitized catalog bootstrap and pack readiness
+      responses:
+        '200': { description: Read result or updated local workspace }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Selected revision changed; review required }
+        '503':
+          description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+  /food-data/catalog/stores:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
+      operationId: searchCatalogStores
+      summary: Search public branches without changing saved stores
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                additionalProperties: false,
+                required: [query],
+                properties:
+                  {
+                    query: { type: string, minLength: 2, maxLength: 200 },
+                    state: { type: string, minLength: 2, maxLength: 2 },
+                    cursor: { type: string, maxLength: 2048 },
+                  },
+              }
+      responses:
+        '200': { description: Read result or updated local workspace }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Selected revision changed; review required }
+        '503':
+          description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+  /food-data/catalog/retail-evidence:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
+      operationId: getCatalogRetailEvidence
+      summary: Read branch evidence without inferring current stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                additionalProperties: false,
+                required: [productId],
+                properties:
+                  {
+                    productId: { type: string, maxLength: 160 },
+                    storeId: { type: string, maxLength: 160 },
+                  },
+              }
+      responses:
+        '200': { description: Read result or updated local workspace }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Selected revision changed; review required }
+        '503':
+          description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+  /supermarket-profiles/{profileId}/catalog-link:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
+      operationId: reviewCatalogStore
+      summary: Review official branch updates and map rights
+      responses:
+        '200': { description: Read result or updated local workspace }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Selected revision changed; review required }
+        '503':
+          description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+    patch:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
+      operationId: linkCatalogStore
+      summary: Link reviewed branch metadata without changing household routes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                additionalProperties: false,
+                required: [storeId, revision],
+                properties:
+                  {
+                    storeId: { type: string, maxLength: 160 },
+                    revision: { type: string, maxLength: 160 },
+                  },
+              }
+      responses:
+        '200': { description: Read result or updated local workspace }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Selected revision changed; review required }
+        '503':
+          description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+    delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:update']
+      operationId: unlinkCatalogStore
+      summary: Remove official association while preserving custom store
+      responses:
+        '200': { description: Read result or updated local workspace }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Selected revision changed; review required }
+        '503':
+          description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
   /food-data/status:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -363,6 +484,7 @@ paths:
                 provider: { type: string, enum: [open_food_facts, usda_fdc] }
                 recordId: { type: string, minLength: 1, maxLength: 160 }
                 language: { type: string, default: en }
+                catalogRef: { $ref: '#/components/schemas/CatalogReference' }
       responses:
         '200': { description: Normalized provider record and freshness metadata }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -3187,6 +3309,25 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    CatalogReference:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          transport_id,
+          source_id,
+          source_record_id,
+          source_revision,
+          catalog_generation,
+          canonical_product_id,
+        ]
+      properties:
+        transport_id: { type: string, enum: [bord_food_api] }
+        source_id: { type: string, enum: [usda_fdc, open_food_facts] }
+        source_record_id: { type: string, minLength: 1, maxLength: 160 }
+        source_revision: { type: string, minLength: 1, maxLength: 160 }
+        catalog_generation: { type: string, minLength: 1, maxLength: 160 }
+        canonical_product_id: { type: [string, 'null'], maxLength: 160 }
     ApiPermissions:
       type: object
       additionalProperties: false

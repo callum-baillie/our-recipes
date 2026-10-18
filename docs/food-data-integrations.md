@@ -10,6 +10,16 @@ Bòrd has a provider-neutral, read-only food-data layer for reviewed Pantry, rec
 
 Provider responses are validated and normalized before caching or presentation. Missing nutrients stay missing, zero stays zero, original nutrient identifiers and units are retained, and records are grouped only by a checksum-valid canonical GTIN. Provider records are not averaged or merged by name.
 
+## Native catalog and store directory
+
+For source revisions, catalog-only mode and official branch linking, use the [native Bòrd Food API integration](bord-catalog-integration.md). Its settings remain server-only; existing USDA mirror configuration remains supported in direct mode.
+
+## Local USDA catalog
+
+The USDA provider can use a separate `bord-food-api` container containing imported USDA JSON datasets. Follow [Configure Bòrd to use a local USDA food API](local-food-api.md) for Unraid, Compose, and local development. Set `USDA_FDC_BASE_URL` to the local service's `/fdc/v1` URL and keep `USDA_FDC_API_KEY` nonempty (`local` when API authentication is disabled, or the matching shared key when enabled). The current Compose templates pass the base URL and key through from `.env`; older deployments can use the explicit override in that guide.
+
+The catalog lives in the food API's persistent volume, separate from Bòrd's data and backups. Bòrd continues to apply its provider cache, review workflow, and quota budget. Open Food Facts remains a separate barcode provider.
+
 ## Review and persistence
 
 The shared picker offers camera scan, manual GTIN entry, and explicit USDA search. A selection opens an editable local-product review; the server reloads the selected validated record rather than accepting provider nutrition echoed by the browser.

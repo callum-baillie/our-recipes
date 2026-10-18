@@ -1,5 +1,16 @@
 # Release notes
 
+## 1.0.0-rc.14
+
+- Add the native Bòrd Food API transport alongside the existing USDA/OFF providers, with server-only credentials, bounded validated requests and explicit direct/preferred/catalog-only modes.
+- Pin reviewed foods to exact source revisions, retain durable nutrition provenance, and require renewed review when a selected revision changes or disappears. Completed imports can replay during catalog outages.
+- Add mobile-friendly official branch search, link/unlink and update review to saved stores while preserving household labels, notes, aisle identities, routes and shopping-list relationships.
+- Display sanitized catalog/source readiness, unknown retail availability and official map links with explicit rights status. Catalog reads create no stock or cart actions; catalog-only mode blocks remote fallback and source images.
+- Isolate caches by transport/configuration, generation, normalizer and locale, without charging local catalog reads against external provider quotas.
+- Include additive migration `0067_bord_catalog_links`. Back up household data before upgrading. Native catalog activation requires the server settings in [the integration guide](bord-catalog-integration.md).
+
+Validation includes deterministic catalog/client/auth tests, migration and outage checks, OpenAPI validation, production build/artifact verification, and production browser checks at 320/390/768/1440px with light/dark accessibility. Live activation evidence is recorded separately from fixture evidence. In-progress mobile-app work is excluded from this release.
+
 ## 1.0.0-rc.13
 
 - Keep recipe and pantry quick filters in one horizontally scrollable row on desktop, with overflow arrows and all filters available without expanding the page.

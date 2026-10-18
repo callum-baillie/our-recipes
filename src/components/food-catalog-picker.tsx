@@ -1,5 +1,7 @@
 'use client';
 
+import { CatalogRetailEvidence } from '@/components/catalog-retail-evidence';
+
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { Barcode, Camera, Database, Search, X } from 'lucide-react';
@@ -223,6 +225,7 @@ export function FoodCatalogPicker({
       const result = (await post('/api/v1/food-data/details', {
         provider: record.provider,
         recordId: record.providerRecordId,
+        catalogRef: record.catalogRef,
         language: navigator.language.slice(0, 2),
       })) as { record: FoodRecord };
       setSelected(result.record);
@@ -246,6 +249,7 @@ export function FoodCatalogPicker({
         provider: selected.provider,
         recordId: selected.providerRecordId,
         expectedCanonicalGtin: selected.canonicalGtin,
+        catalogRef: selected.catalogRef,
       },
       product: {
         displayName: String(data.get('displayName') ?? ''),
@@ -751,6 +755,22 @@ export function FoodCatalogPicker({
                     <small>{selected.license}</small>
                   </div>
                 </div>
+                {selected.catalogRef && (
+                  <details>
+                    <summary>Catalog source revision</summary>
+                    <small>
+                      {selected.catalogRef.source_id} · {selected.catalogRef.source_revision}
+                      <br />
+                      Your selection is checked again before saving.
+                    </small>
+                  </details>
+                )}
+                {selected.catalogRef?.canonical_product_id && (
+                  <CatalogRetailEvidence
+                    key={`${selected.provider}:${selected.providerRecordId}`}
+                    reference={selected.catalogRef}
+                  />
+                )}
                 <div className={styles.reviewGrid}>
                   <label>
                     Name

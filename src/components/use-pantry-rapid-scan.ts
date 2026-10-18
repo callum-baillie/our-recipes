@@ -181,6 +181,7 @@ export function usePantryRapidScan(
                   provider: record.provider,
                   recordId: record.providerRecordId,
                   expectedCanonicalGtin: record.canonicalGtin,
+                  catalogRef: record.catalogRef,
                 },
                 product: {
                   displayName: record.displayName.slice(0, 160),

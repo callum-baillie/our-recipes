@@ -262,3 +262,79 @@ describe('real authenticated integration access', () => {
     expect(fakeAsset.status).toBe(401);
   });
 });
+
+describe('catalog companion routes retain real actor/origin guards', () => {
+  it('protects catalog reads, rejects untrusted mutations before egress, and attributes link/unlink to the authenticated actor', async () => {
+    const { startCatalogFixture } = await import('../fixtures/bord-catalog-server');
+    const fixture = await startCatalogFixture();
+    const { clearCatalogStateForTests } = await import('@/lib/services/bord-catalog-service');
+    vi.stubEnv('BORD_FOOD_API_BASE_URL', fixture.baseUrl);
+    vi.stubEnv('BORD_FOOD_API_KEY', 'synthetic-read-key');
+    vi.stubEnv('STORE_DIRECTORY_ENABLED', 'true');
+    clearCatalogStateForTests();
+    try {
+      const statusRoute = await import('@/app/api/v1/food-data/catalog/status/route');
+      expect((await statusRoute.GET(request('/food-data/catalog/status'))).status).toBe(401);
+      const read = await statusRoute.GET(request('/food-data/catalog/status', { cookie }));
+      expect(read.status).toBe(200);
+      expect(JSON.stringify(await read.json())).not.toMatch(/synthetic-read-key|127\.0\.0\.1/u);
+      const settings = await import('@/lib/services/list-settings-service');
+      settings.createSupermarketProfile(
+        {
+          name: 'Authenticated store',
+          locationLabel: '',
+          notes: 'Private notes',
+          sections: [{ aisleId: '', name: 'Our aisle', matchTerms: [] }],
+        },
+        profileId,
+      );
+      const store = settings
+        .listSupermarketProfiles()
+        .find((p) => p.name === 'Authenticated store')!;
+      const route =
+        await import('@/app/api/v1/supermarket-profiles/[profileId]/catalog-link/route');
+      const context = { params: Promise.resolve({ profileId: store.id }) };
+      const path = `/supermarket-profiles/${store.id}/catalog-link`;
+      const body = { storeId: 'sto_fixture', revision: 'store_1' };
+      const before = fixture.calls.length;
+      expect(
+        (
+          await route.PATCH(
+            request(path, { cookie, origin: `${origin}.evil.example`, method: 'PATCH', body }),
+            context,
+          )
+        ).status,
+      ).toBe(403);
+      expect(fixture.calls).toHaveLength(before);
+      const { secret } = await createKey({ pantry: ['read'] });
+      expect(
+        (await route.PATCH(request(path, { key: secret, method: 'PATCH', body }), context)).status,
+      ).toBe(403);
+      const success = await route.PATCH(
+        request(path, { cookie, origin, method: 'PATCH', body }),
+        context,
+      );
+      expect(success.status).toBe(200);
+      expect(settings.getSupermarketProfile(store.id)).toMatchObject({
+        updatedByProfileId: profileId,
+        catalogStoreId: 'sto_fixture',
+        sections: store.sections,
+        notes: store.notes,
+      });
+      fixture.state.unavailable = true;
+      expect(
+        (await route.DELETE(request(path, { cookie, origin, method: 'DELETE' }), context)).status,
+      ).toBe(200);
+      expect(settings.getSupermarketProfile(store.id)).toMatchObject({
+        catalogStoreId: null,
+        sections: store.sections,
+        notes: store.notes,
+      });
+    } finally {
+      await fixture.close();
+      for (const key of ['BORD_FOOD_API_BASE_URL', 'BORD_FOOD_API_KEY', 'STORE_DIRECTORY_ENABLED'])
+        delete process.env[key];
+      clearCatalogStateForTests();
+    }
+  });
+});

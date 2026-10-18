@@ -2,6 +2,18 @@ import { z } from 'zod';
 
 import { NUTRIENT_CODES, type NutrientCode } from '@/lib/domain/nutrition';
 
+export const catalogReferenceSchema = z
+  .object({
+    transport_id: z.literal('bord_food_api'),
+    source_id: z.enum(['usda_fdc', 'open_food_facts']),
+    source_record_id: z.string().min(1).max(160),
+    source_revision: z.string().min(1).max(160),
+    catalog_generation: z.string().min(1).max(160),
+    canonical_product_id: z.string().min(1).max(160).nullable(),
+  })
+  .strict();
+export type CatalogReference = z.infer<typeof catalogReferenceSchema>;
+
 export const foodProviderIdSchema = z.enum(['local', 'open_food_facts', 'usda_fdc']);
 export type FoodProviderId = z.infer<typeof foodProviderIdSchema>;
 
@@ -13,6 +25,10 @@ export const providerStatusCodeSchema = z.enum([
   'authentication_failed',
   'invalid_response',
   'disabled',
+  'initializing',
+  'stale',
+  'partial',
+  'rights_blocked',
 ]);
 
 export type ProviderStatusCode = z.infer<typeof providerStatusCodeSchema>;
@@ -54,6 +70,7 @@ export type NormalizedNutrient = {
 };
 
 export type FoodRecord = {
+  catalogRef?: CatalogReference;
   provider: Exclude<FoodProviderId, 'local'>;
   providerRecordId: string;
   canonicalGtin: string | null;
@@ -161,6 +178,7 @@ export const foodDetailsInputSchema = z
   .object({
     provider: foodProviderIdSchema.exclude(['local']),
     recordId: z.string().trim().min(1).max(160),
+    catalogRef: catalogReferenceSchema.optional(),
     language: z
       .string()
       .trim()
@@ -189,6 +207,7 @@ export const foodCatalogImportInputSchema = z
     selection: z.object({
       provider: foodProviderIdSchema.exclude(['local']),
       recordId: z.string().trim().min(1).max(160),
+      catalogRef: catalogReferenceSchema.optional(),
       expectedCanonicalGtin: z
         .string()
         .length(14)
@@ -216,7 +235,11 @@ export class FoodDataError extends Error {
       | 'UNAVAILABLE'
       | 'TIMEOUT'
       | 'MALFORMED_RESPONSE'
-      | 'NORMALIZATION_FAILED',
+      | 'NORMALIZATION_FAILED'
+      | 'REVISION_EXPIRED'
+      | 'INITIALIZING'
+      | 'DISABLED'
+      | 'RIGHTS_BLOCKED',
     message: string,
     public readonly provider: FoodProviderId | null = null,
     public readonly retryAt: Date | null = null,

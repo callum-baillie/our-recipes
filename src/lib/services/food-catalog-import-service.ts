@@ -14,7 +14,11 @@ import {
   pantryProductProviderLinks,
   pantryProducts,
 } from '@/lib/db/schema';
-import type { FoodCatalogImportInput, FoodRecord } from '@/lib/domain/food-data';
+import {
+  FoodDataError,
+  type FoodCatalogImportInput,
+  type FoodRecord,
+} from '@/lib/domain/food-data';
 import { normalizePantryName, pantryBatchInputSchema } from '@/lib/domain/pantry';
 import { normalizeInventoryUnit } from '@/lib/domain/inventory-units';
 import {
@@ -143,6 +147,17 @@ export function importFoodCatalogRecord(args: {
     throw new PantryConflictError('The reviewed provider record changed. Review it again.');
   if (input.selection.expectedCanonicalGtin !== record.canonicalGtin)
     throw new PantryConflictError('The reviewed barcode changed. Review it again.');
+  if (
+    input.selection.catalogRef &&
+    (!record.catalogRef ||
+      input.selection.catalogRef.source_revision !== record.catalogRef.source_revision ||
+      input.selection.catalogRef.source_id !== record.catalogRef.source_id ||
+      input.selection.catalogRef.source_record_id !== record.catalogRef.source_record_id)
+  )
+    throw new FoodDataError(
+      'REVISION_EXPIRED',
+      'The reviewed food revision changed. Review it again.',
+    );
   const requestDigest = digest({ input, destination, batches: args.batches ?? [] });
   const database = getDatabase();
   const existingOperation = database
@@ -233,6 +248,10 @@ export function importFoodCatalogRecord(args: {
         dataType: record.dataType,
         canonicalGtin: record.canonicalGtin,
         normalizedPayload: JSON.stringify(record),
+        transportId: record.catalogRef?.transport_id ?? null,
+        sourceRevision: record.catalogRef?.source_revision ?? null,
+        catalogGeneration: record.catalogRef?.catalog_generation ?? null,
+        canonicalProductId: record.catalogRef?.canonical_product_id ?? null,
         providerMetadata: JSON.stringify(record.providerMetadata),
         contentHash,
         schemaVersion: record.schemaVersion,
@@ -364,5 +383,27 @@ export function importFoodCatalogRecord(args: {
   return {
     ...result,
     product: listPantryProducts(true).find((product) => product.id === result.productId)!,
+  };
+}
+
+/** Replay a completed confirmation without depending on catalog availability. */
+export function replayFoodCatalogImport(
+  input: FoodCatalogImportInput,
+  destination: 'catalog' | 'pantry',
+  batches: unknown[] = [],
+) {
+  ensureDatabase();
+  const operation = getDatabase()
+    .select()
+    .from(foodCatalogImportOperations)
+    .where(eq(foodCatalogImportOperations.id, input.operationId))
+    .get();
+  if (!operation) return null;
+  if (operation.requestDigest !== digest({ input, destination, batches }))
+    throw new PantryConflictError('That import operation ID was already used for different data.');
+  return JSON.parse(operation.result) as {
+    productId: string;
+    batchIds: string[];
+    reusedProduct: boolean;
   };
 }

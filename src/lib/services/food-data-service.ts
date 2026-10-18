@@ -15,12 +15,23 @@ import {
   FoodDataError,
   normalizeGtin,
   type FoodRecord,
+  type CatalogReference,
   type FoodResultGroup,
   type ProviderStatus,
 } from '@/lib/domain/food-data';
 import { OpenFoodFactsProvider } from '@/lib/providers/open-food-facts-provider';
 import type { FoodDataProvider, ProviderResponse } from '@/lib/providers/food-data-provider';
 import { UsdaFoodDataProvider } from '@/lib/providers/usda-food-data-provider';
+
+import {
+  catalogProviderStatus,
+  clearCatalogStateForTests,
+  directFoodFallbackAllowed,
+  getCatalogFoodDetails,
+  lookupCatalogBarcode,
+  searchCatalogFoods,
+  isNativeCatalogEnabled,
+} from '@/lib/services/bord-catalog-service';
 
 type Operation = 'barcode' | 'search' | 'details';
 type RemoteProviderId = 'open_food_facts' | 'usda_fdc';
@@ -56,7 +67,11 @@ function digest(value: string): string {
 }
 
 function cacheId(provider: RemoteProviderId, operation: Operation, key: string) {
-  return digest(`${provider}\0${operation}\0${key}`);
+  const config = getRuntimeConfig().foodData;
+  const endpoint = provider === 'usda_fdc' ? config.usda : config.openFoodFacts;
+  return digest(
+    JSON.stringify([provider, operation, key, endpoint, config.mode, 'direct-normalizer-v1']),
+  );
 }
 
 function cacheDurations(operation: Operation, kind: 'success' | 'not_found' | 'transient_failure') {
@@ -371,6 +386,8 @@ function errorStatus(provider: FoodDataProvider, error: unknown): ProviderStatus
 export function listFoodProviderStatuses(): ProviderStatus[] {
   ensureDatabase();
   const database = getDatabase();
+  if (isNativeCatalogEnabled())
+    return Object.keys(providers).map((id) => catalogProviderStatus(id as RemoteProviderId));
   return Object.values(providers).map((provider) => {
     const status = provider.status();
     const quota = database
@@ -405,6 +422,21 @@ export async function lookupFoodByBarcode(
       cache: { hit: true, stale: false },
       localProduct,
     };
+  if (isNativeCatalogEnabled()) {
+    try {
+      const catalog = await lookupCatalogBarcode(canonicalGtin, language);
+      if (catalog.preferred || !directFoodFallbackAllowed()) return { ...catalog, localProduct };
+    } catch (error) {
+      if (!directFoodFallbackAllowed())
+        return {
+          preferred: null,
+          alternatives: [],
+          providerStatuses: [catalogProviderStatus('open_food_facts', error)],
+          cache: { hit: false, stale: false },
+          localProduct,
+        };
+    }
+  }
   const statuses: ProviderStatus[] = [];
   const alternatives: FoodRecord[] = [];
   let preferred: FoodRecord | null = null;
@@ -412,7 +444,7 @@ export async function lookupFoodByBarcode(
   let stale = false;
   const off = providers.open_food_facts;
   try {
-    const result = await providerCall(off.id, 'barcode', canonicalGtin, () =>
+    const result = await providerCall(off.id, 'barcode', `${canonicalGtin}:${language}`, () =>
       off.lookupBarcode(canonicalGtin, language),
     );
     preferred = result.value;
@@ -426,7 +458,7 @@ export async function lookupFoodByBarcode(
   if (shouldUseUsda) {
     const usda = providers.usda_fdc;
     try {
-      const result = await providerCall(usda.id, 'barcode', canonicalGtin, () =>
+      const result = await providerCall(usda.id, 'barcode', `${canonicalGtin}:${language}`, () =>
         usda.lookupBarcode(canonicalGtin, language),
       );
       if (result.value) {
@@ -466,6 +498,21 @@ export async function searchFoodData(
         .includes(normalized),
     )
     .slice(0, 20);
+  if (isNativeCatalogEnabled()) {
+    try {
+      const catalog = await searchCatalogFoods(query, page, kind);
+      if (catalog.records.length || !directFoodFallbackAllowed())
+        return { localProducts, ...catalog };
+    } catch (error) {
+      if (!directFoodFallbackAllowed())
+        return {
+          localProducts,
+          records: [] as FoodRecord[],
+          providerStatuses: [catalogProviderStatus('usda_fdc', error)],
+          cache: { hit: false, stale: false },
+        };
+    }
+  }
   const provider = providers.usda_fdc;
   try {
     const result = await providerCall(provider.id, 'search', `${normalized}:${page}:${kind}`, () =>
@@ -491,7 +538,22 @@ export async function getFoodDetails(
   providerId: RemoteProviderId,
   recordId: string,
   language: string,
+  catalogRef?: CatalogReference,
+  confirmation = false,
 ) {
+  if (catalogRef) return getCatalogFoodDetails(providerId, recordId, language, catalogRef);
+  if (isNativeCatalogEnabled() && confirmation && !directFoodFallbackAllowed())
+    throw new FoodDataError(
+      'REVISION_EXPIRED',
+      'Review this food through the catalog before saving.',
+    );
+  if (isNativeCatalogEnabled() && !confirmation) {
+    try {
+      return await getCatalogFoodDetails(providerId, recordId, language);
+    } catch (error) {
+      if (!directFoodFallbackAllowed()) throw error;
+    }
+  }
   const provider = providers[providerId];
   const result = await providerCall(providerId, 'details', `${recordId}:${language}`, () =>
     provider.getDetails(recordId, language),
@@ -507,6 +569,7 @@ export async function getFoodDetails(
 
 export function clearFoodDataServiceStateForTests() {
   inflight.clear();
+  clearCatalogStateForTests();
 }
 
 export function setFoodDataObserverForTests(next: ((event: FoodDataEvent) => void) | null) {
