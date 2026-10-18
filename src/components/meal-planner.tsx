@@ -1,4 +1,7 @@
 'use client';
+import { AppDialog } from './app-dialog';
+import cardStyles from './meal-planner-card.module.css';
+import settingsStyles from './meal-plan-settings.module.css';
 import { MealEntryEditor } from '@/components/meal-entry-editor';
 import { parseMealPlanIngredientSnapshot } from '@/lib/domain/meal-plan-snapshot';
 import type { MealPlanEntryInput } from '@/lib/domain/planning';
@@ -47,7 +50,8 @@ import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react
 import { AiMealPlanGenerator } from '@/components/ai-meal-plan-generator';
 import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import { MealPlanRecipeSelector } from '@/components/meal-plan-recipe-selector';
-import { InlineSkeleton } from '@/components/skeleton';
+import { ButtonSpinner, InlineSkeleton } from '@/components/skeleton';
+import { InlineAlert } from '@/components/inline-alert';
 import {
   addPlannerDays,
   formatPlannerDate,
@@ -253,7 +257,7 @@ function MealThumbnail({ meal, recipes }: { meal: PlannedMeal; recipes: RecipeLi
   const recipe = meal.recipeId ? recipes.find((item) => item.id === meal.recipeId) : null;
   if (!recipe?.image) {
     return (
-      <span className={styles.mealPlaceholder} aria-hidden="true">
+      <span className={cardStyles.mealPlaceholder} aria-hidden="true">
         {mealLabel(meal.meal).charAt(0)}
       </span>
     );
@@ -264,7 +268,7 @@ function MealThumbnail({ meal, recipes }: { meal: PlannedMeal; recipes: RecipeLi
       alt={recipe.image.altText || recipe.title}
       width={recipe.image.width}
       height={recipe.image.height}
-      sizes="96px"
+      sizes="(max-width: 600px) 80px, 112px"
       unoptimized
     />
   );
@@ -272,6 +276,7 @@ function MealThumbnail({ meal, recipes }: { meal: PlannedMeal; recipes: RecipeLi
 
 function PlannedMealCard({
   meal,
+  compact = false,
   profiles,
   recipes,
   busy,
@@ -290,6 +295,7 @@ function PlannedMealCard({
   onDragStart,
 }: {
   meal: PlannedMeal;
+  compact?: boolean;
   profiles: Array<{ id: string; displayName: string }>;
   recipes: RecipeListItem[];
   busy: boolean;
@@ -321,7 +327,7 @@ function PlannedMealCard({
 
   return (
     <article
-      className={styles.plannedMeal}
+      className={`${cardStyles.plannedMeal} ${compact ? cardStyles.compact : ''}`}
       draggable={!busy}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move';
@@ -329,7 +335,7 @@ function PlannedMealCard({
         onDragStart(meal.id);
       }}
     >
-      <div className={styles.mealThumb}>
+      <div className={cardStyles.mealThumb}>
         {meal.recipeId ? (
           <Link
             href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
@@ -340,14 +346,22 @@ function PlannedMealCard({
         ) : (
           <MealThumbnail meal={meal} recipes={recipes} />
         )}
+        {pantryStatus !== 'unknown' && (
+          <span
+            className={`${cardStyles.pantryDot} ${cardStyles[`pantryDot${pantryStatus}`]}`}
+            title={pantryLabel}
+          >
+            <span className="sr-only">{pantryLabel}</span>
+          </span>
+        )}
       </div>
-      <div className={styles.plannedMealCopy}>
-        <div className={styles.mealTitleRow}>
+      <div className={cardStyles.plannedMealCopy}>
+        <div className={cardStyles.mealTitleRow}>
           {alternatives.length > 1 ? (
-            <div className={styles.mealOptionDisplay} aria-label="Choose one of these meals">
+            <div className={cardStyles.mealOptionDisplay} aria-label="Choose one of these meals">
               {alternatives.map((option, index) => (
-                <span className={styles.mealOptionChoice} key={`${option.kind}:${index}`}>
-                  {index ? <span className={styles.mealOptionOr}>or</span> : null}
+                <span className={cardStyles.mealOptionChoice} key={`${option.kind}:${index}`}>
+                  {index ? <span className={cardStyles.mealOptionOr}>or</span> : null}
                   {option.kind === 'recipe' ? (
                     <Link href={`/recipes/${option.recipeId}/cook`} title={`Make ${option.label}`}>
                       {option.label}
@@ -360,7 +374,7 @@ function PlannedMealCard({
             </div>
           ) : meal.recipeId ? (
             <Link
-              className={styles.mealRecipeLink}
+              className={cardStyles.mealRecipeLink}
               href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
               title={`Make ${meal.recipeTitle}`}
             >
@@ -369,15 +383,9 @@ function PlannedMealCard({
           ) : (
             <strong title={meal.recipeTitle}>{meal.recipeTitle}</strong>
           )}
-          <span
-            className={`${styles.pantryDot} ${styles[`pantryDot${pantryStatus}`]}`}
-            title={pantryLabel}
-          >
-            <span className="sr-only">{pantryLabel}</span>
-          </span>
         </div>
         {meal.profileIds && meal.profileIds !== '[]' ? (
-          <small>
+          <small className={cardStyles.audience}>
             For{' '}
             {profiles
               .filter((p) => (JSON.parse(meal.profileIds!) as string[]).includes(p.id))
@@ -385,7 +393,7 @@ function PlannedMealCard({
               .join(', ') || 'selected members'}
           </small>
         ) : (
-          <small>Shared household meal</small>
+          <small className={cardStyles.audience}>Shared household meal</small>
         )}
         {meal.kind === 'leftover' ||
         meal.kind === 'takeout' ||
@@ -404,8 +412,8 @@ function PlannedMealCard({
                     : 'Adapted for this meal'}
           </small>
         ) : null}
-        <span className={styles.mealMeta}>
-          <label className={styles.servingEditor} title="Edit servings">
+        <span className={cardStyles.mealMeta}>
+          <label className={cardStyles.servingEditor} title="Edit servings">
             <UsersRound size={13} aria-hidden="true" />
             <input
               key={`${meal.id}-${meal.servings}-${meal.updatedAt instanceof Date ? meal.updatedAt.toISOString() : meal.updatedAt}`}
@@ -426,14 +434,14 @@ function PlannedMealCard({
             <span>servings</span>
           </label>
           {totalMinutes ? (
-            <>
-              <Clock3 size={13} aria-hidden="true" /> {totalMinutes}m
-            </>
+            <span className={cardStyles.duration}>
+              <Clock3 size={16} aria-hidden="true" /> {totalMinutes}m
+            </span>
           ) : null}
         </span>
       </div>
       <details
-        className={styles.mealActions}
+        className={cardStyles.mealActions}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.currentTarget.open = false;
@@ -464,7 +472,7 @@ function PlannedMealCard({
           <button type="button" disabled={busy} onClick={() => onDuplicate(meal)}>
             <CopyPlus size={14} aria-hidden="true" /> Duplicate to next day
           </button>
-          <div className={styles.mealActionGroup}>
+          <div className={cardStyles.mealActionGroup}>
             <span>
               <Move size={14} aria-hidden="true" /> Move to
             </span>
@@ -514,7 +522,7 @@ function PlannedMealCard({
               <ChevronRight size={16} aria-hidden="true" /> Next day
             </button>
           ) : null}
-          <div className={styles.mealActionGroup}>
+          <div className={cardStyles.mealActionGroup}>
             <span>
               <ArrowRightLeft size={14} aria-hidden="true" /> Swap with
             </span>
@@ -580,7 +588,7 @@ function PlannedMealCard({
             </button>
           ) : null}
           <button
-            className={styles.destructiveAction}
+            className={cardStyles.destructiveAction}
             type="button"
             disabled={busy}
             onClick={() => onRemove(meal.id)}
@@ -627,6 +635,7 @@ export function MealPlanner({
   const [mealTypePreferences, setMealTypePreferences] = useState(mealPlanPreferences);
   const [customMealName, setCustomMealName] = useState('');
   const [preferencesBusy, setPreferencesBusy] = useState(false);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
   const [selectedMeals, setSelectedMeals] = useState<MealType[]>(defaultMealTypes);
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>(() =>
     profiles.map((profile) => profile.id),
@@ -635,7 +644,7 @@ export function MealPlanner({
   const [mealEditor, setMealEditor] = useState<{ entry?: PlannedMeal; kind?: string } | null>(null);
   const [pickerContext, setPickerContext] = useState<{ date: string; meal: MealType } | null>(null);
   const [draggedMealId, setDraggedMealId] = useState<string | null>(null);
-  const [showMobileSetup, setShowMobileSetup] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileNutritionOpen, setMobileNutritionOpen] = useState(false);
   const [selectedMobileDate, setSelectedMobileDate] = useState(() => {
     if (today >= weekStart && today <= weekEnd) return today;
@@ -908,7 +917,7 @@ export function MealPlanner({
   async function saveMealTypePreferences() {
     setPreferencesBusy(true);
     try {
-      setError(null);
+      setPreferencesError(null);
       const response = await fetch('/api/v1/settings/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -918,7 +927,7 @@ export function MealPlanner({
         error?: { message?: string };
       } | null;
       if (!response.ok) {
-        setError(body?.error?.message ?? 'We could not save those meal types.');
+        setPreferencesError(body?.error?.message ?? 'We could not save those meal types.');
         return;
       }
       setSelectedMeals((current) =>
@@ -928,7 +937,7 @@ export function MealPlanner({
       setFeedback('Meal types saved.');
       router.refresh();
     } catch {
-      setError(
+      setPreferencesError(
         'We could not confirm that change. Check your connection, refresh the plan, and try again.',
       );
     } finally {
@@ -1297,7 +1306,7 @@ export function MealPlanner({
 
   function handleRecipesSaved(count: number, addedMeals: PlannedMeal[]) {
     setSelectorOpen(false);
-    setShowMobileSetup(false);
+    setSettingsOpen(false);
     setFeedback(`${count} ${count === 1 ? 'recipe was' : 'recipes were'} added to your plan.`);
     if (addedMeals.length) {
       recordHistory({
@@ -1334,9 +1343,10 @@ export function MealPlanner({
             <button
               className={styles.planOptionsButton}
               type="button"
-              aria-expanded={showMobileSetup}
+              aria-expanded={settingsOpen}
               aria-controls="planner-settings-panel"
-              onClick={() => setShowMobileSetup((value) => !value)}
+              aria-haspopup="dialog"
+              onClick={() => setSettingsOpen((value) => !value)}
             >
               Plan settings
             </button>
@@ -1433,306 +1443,320 @@ export function MealPlanner({
           </div>
         </details>
       </div>
-      <div
-        className={`${styles.plannerLayout} ${styles.refinedPlanner} ${showMobileSetup ? styles.setupExpanded : ''} planner-workspace-grid`}
-      >
-        <section
-          className={`${styles.setupPanel} ${showMobileSetup ? styles.mobileSetupOpen : ''}`}
-          id="planner-settings-panel"
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setShowMobileSetup(false);
-          }}
-          aria-label="Plan settings"
-        >
-          <div className={styles.setupHeading}>
-            <div>
-              <p className={styles.railEyebrow}>PLAN SETTINGS</p>
-              <h2>Build your plan</h2>
-              <p className={styles.railDescription}>Choose dates, meals and who’s eating.</p>
-            </div>
-            <button
-              type="button"
-              aria-label="Close plan settings"
-              onClick={() => setShowMobileSetup(false)}
-            >
-              <X size={20} aria-hidden="true" />
-            </button>
-          </div>
-
-          <fieldset className={styles.setupStep}>
-            <legend>
-              <span>1</span> Date range
-            </legend>
-            <div
-              className={styles.dateRangeField}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') setRangePickerOpen(false);
-              }}
-            >
+      <div className={`${styles.plannerLayout} ${styles.refinedPlanner} planner-workspace-grid`}>
+        {settingsOpen && (
+          <AppDialog
+            className={settingsStyles.dialog}
+            id="planner-settings-panel"
+            onClose={() => setSettingsOpen(false)}
+            aria-labelledby="planner-settings-title"
+            aria-describedby="planner-settings-description"
+          >
+            <div className={settingsStyles.setupHeading}>
+              <div>
+                <p className={settingsStyles.railEyebrow}>PLAN SETTINGS</p>
+                <h2 id="planner-settings-title">Plan settings</h2>
+                <p id="planner-settings-description" className={settingsStyles.railDescription}>
+                  Choose when, what, and who you’re planning for.
+                </p>
+              </div>
               <button
-                className={styles.dateRangeVisual}
                 type="button"
-                aria-expanded={rangePickerOpen}
-                aria-controls="planner-date-range-picker"
-                onClick={() => setRangePickerOpen((open) => !open)}
+                aria-label="Close plan settings"
+                onClick={() => setSettingsOpen(false)}
               >
-                <CalendarDays size={18} />
-                <span>{humanRange(startDate, selectedPlanEnd)}</span>
-                <ChevronDown
-                  className={rangePickerOpen ? styles.dateRangeChevronOpen : undefined}
-                  size={18}
-                />
+                <X size={20} aria-hidden="true" />
               </button>
-              {rangePickerOpen ? (
+            </div>
+
+            <div className={settingsStyles.content}>
+              {preferencesError && <InlineAlert tone="error">{preferencesError}</InlineAlert>}
+              <fieldset className={settingsStyles.setupStep}>
+                <legend>
+                  <span>1</span> Date range
+                </legend>
                 <div
-                  className={styles.dateRangePicker}
-                  id="planner-date-range-picker"
-                  role="group"
-                  aria-label="Choose planning date range"
+                  className={settingsStyles.dateRangeField}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && rangePickerOpen) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setRangePickerOpen(false);
+                    }
+                  }}
                 >
-                  <div className={styles.dateRangeQuickActions} aria-label="Quick date ranges">
-                    <span>From today</span>
-                    <div>
-                      {[3, 5, 7, 14].map((days) => (
-                        <button
-                          type="button"
-                          key={days}
-                          onClick={() => {
-                            setStartDate(today);
-                            setEndDate(addPlannerDays(today, days - 1));
+                  <button
+                    className={settingsStyles.dateRangeVisual}
+                    type="button"
+                    aria-expanded={rangePickerOpen}
+                    aria-controls="planner-date-range-picker"
+                    onClick={() => setRangePickerOpen((open) => !open)}
+                  >
+                    <CalendarDays size={18} />
+                    <span>{humanRange(startDate, selectedPlanEnd)}</span>
+                    <ChevronDown
+                      className={rangePickerOpen ? settingsStyles.dateRangeChevronOpen : undefined}
+                      size={18}
+                    />
+                  </button>
+                  {rangePickerOpen ? (
+                    <div
+                      className={settingsStyles.dateRangePicker}
+                      id="planner-date-range-picker"
+                      role="group"
+                      aria-label="Choose planning date range"
+                    >
+                      <div
+                        className={settingsStyles.dateRangeQuickActions}
+                        aria-label="Quick date ranges"
+                      >
+                        <span>From today</span>
+                        <div>
+                          {[3, 5, 7, 14].map((days) => (
+                            <button
+                              type="button"
+                              key={days}
+                              onClick={() => {
+                                setStartDate(today);
+                                setEndDate(addPlannerDays(today, days - 1));
+                              }}
+                            >
+                              {days} days
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <label>
+                        <span>Start date</span>
+                        <input
+                          type="date"
+                          value={startDate}
+                          onInput={(event) => {
+                            const nextStart = event.currentTarget.value;
+                            if (!nextStart) return;
+                            const maximumEnd = addPlannerDays(nextStart, 13);
+                            setStartDate(nextStart);
+                            setEndDate((currentEnd) => {
+                              if (currentEnd < nextStart) return nextStart;
+                              if (currentEnd > maximumEnd) return maximumEnd;
+                              return currentEnd;
+                            });
                           }}
-                        >
-                          {days} days
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span>End date</span>
+                        <input
+                          type="date"
+                          min={startDate}
+                          max={addPlannerDays(startDate, 13)}
+                          value={endDate}
+                          onInput={(event) => {
+                            if (event.currentTarget.value) setEndDate(event.currentTarget.value);
+                          }}
+                          required
+                        />
+                      </label>
+                      <div className={settingsStyles.dateRangePickerFooter}>
+                        <span>
+                          {duration} {duration === 1 ? 'day' : 'days'} selected
+                        </span>
+                        <button type="button" onClick={() => setRangePickerOpen(false)}>
+                          Done
                         </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </fieldset>
+
+              <fieldset className={settingsStyles.setupStep}>
+                <legend>
+                  <span>2</span>
+                  <span className={settingsStyles.stepTitle}>Meals to plan</span>
+                  <button
+                    className={settingsStyles.legendAction}
+                    type="button"
+                    aria-expanded={mealTypeSettingsOpen}
+                    aria-controls="planner-meal-type-settings"
+                    onClick={() => setMealTypeSettingsOpen((open) => !open)}
+                  >
+                    Edit types
+                  </button>
+                </legend>
+                {mealTypeSettingsOpen ? (
+                  <div
+                    className={settingsStyles.mealTypeSettings}
+                    id="planner-meal-type-settings"
+                    role="group"
+                    aria-label="Meal types shown in the planner"
+                  >
+                    <div className={settingsStyles.mealTypeSettingsHeader}>
+                      <div>
+                        <strong>Meal types</strong>
+                        <span>Choose which rows appear in your planner.</span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Close meal type settings"
+                        onClick={() => setMealTypeSettingsOpen(false)}
+                      >
+                        <X size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                    <div className={settingsStyles.mealTypeOptionList}>
+                      {mealTypeOptions.map((option) => (
+                        <label key={option.value}>
+                          <input
+                            type="checkbox"
+                            checked={mealTypePreferences.visibleMealTypes.includes(option.value)}
+                            onChange={() => toggleVisibleMealType(option.value)}
+                          />
+                          <span>
+                            <strong>{option.label}</strong>
+                            {option.description ? <small>{option.description}</small> : null}
+                          </span>
+                          {option.value.startsWith('custom-') ? (
+                            <button
+                              type="button"
+                              aria-label={`Remove custom meal type ${option.label}`}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                removeCustomMealType(option.value);
+                              }}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                            </button>
+                          ) : null}
+                        </label>
                       ))}
                     </div>
-                  </div>
-                  <label>
-                    <span>Start date</span>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onInput={(event) => {
-                        const nextStart = event.currentTarget.value;
-                        if (!nextStart) return;
-                        const maximumEnd = addPlannerDays(nextStart, 13);
-                        setStartDate(nextStart);
-                        setEndDate((currentEnd) => {
-                          if (currentEnd < nextStart) return nextStart;
-                          if (currentEnd > maximumEnd) return maximumEnd;
-                          return currentEnd;
-                        });
-                      }}
-                      required
-                    />
-                  </label>
-                  <label>
-                    <span>End date</span>
-                    <input
-                      type="date"
-                      min={startDate}
-                      max={addPlannerDays(startDate, 13)}
-                      value={endDate}
-                      onInput={(event) => {
-                        if (event.currentTarget.value) setEndDate(event.currentTarget.value);
-                      }}
-                      required
-                    />
-                  </label>
-                  <div className={styles.dateRangePickerFooter}>
-                    <span>
-                      {duration} {duration === 1 ? 'day' : 'days'} selected
-                    </span>
-                    <button type="button" onClick={() => setRangePickerOpen(false)}>
-                      Done
+                    <div className={settingsStyles.customMealTypeForm}>
+                      <label>
+                        <span>Custom meal type</span>
+                        <input
+                          value={customMealName}
+                          maxLength={48}
+                          placeholder="e.g. Afternoon tea"
+                          onChange={(event) => setCustomMealName(event.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={!customMealName.trim()}
+                        onClick={addCustomMealType}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <button
+                      className={settingsStyles.mealTypeSaveButton}
+                      aria-busy={preferencesBusy}
+                      type="button"
+                      disabled={preferencesBusy || !mealTypePreferences.visibleMealTypes.length}
+                      onClick={() => void saveMealTypePreferences()}
+                    >
+                      {preferencesBusy && <ButtonSpinner />}
+                      {preferencesBusy ? 'Saving…' : 'Save meal types'}
                     </button>
                   </div>
-                </div>
-              ) : null}
-            </div>
-          </fieldset>
-
-          <fieldset className={styles.setupStep}>
-            <legend>
-              <span>2</span>
-              <span className={styles.stepTitle}>Meals to plan</span>
-              <button
-                className={styles.legendAction}
-                type="button"
-                aria-expanded={mealTypeSettingsOpen}
-                aria-controls="planner-meal-type-settings"
-                onClick={() => setMealTypeSettingsOpen((open) => !open)}
-              >
-                Edit types
-              </button>
-            </legend>
-            {mealTypeSettingsOpen ? (
-              <div
-                className={styles.mealTypeSettings}
-                id="planner-meal-type-settings"
-                role="group"
-                aria-label="Meal types shown in the planner"
-              >
-                <div className={styles.mealTypeSettingsHeader}>
-                  <div>
-                    <strong>Meal types</strong>
-                    <span>Choose which rows appear in your planner.</span>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Close meal type settings"
-                    onClick={() => setMealTypeSettingsOpen(false)}
-                  >
-                    <X size={16} aria-hidden="true" />
-                  </button>
-                </div>
-                <div className={styles.mealTypeOptionList}>
-                  {mealTypeOptions.map((option) => (
+                ) : null}
+                <div className={settingsStyles.mealChoices}>
+                  {scheduleMeals.map((option) => (
                     <label key={option.value}>
                       <input
                         type="checkbox"
-                        checked={mealTypePreferences.visibleMealTypes.includes(option.value)}
-                        onChange={() => toggleVisibleMealType(option.value)}
+                        checked={selectedMeals.includes(option.value)}
+                        onChange={() => toggleMeal(option.value)}
                       />
-                      <span>
-                        <strong>{option.label}</strong>
-                        {option.description ? <small>{option.description}</small> : null}
+                      <span className={settingsStyles.checkMark} aria-hidden="true">
+                        {selectedMeals.includes(option.value) ? <Check size={15} /> : null}
                       </span>
-                      {option.value.startsWith('custom-') ? (
-                        <button
-                          type="button"
-                          aria-label={`Remove custom meal type ${option.label}`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            removeCustomMealType(option.value);
-                          }}
-                        >
-                          <Trash2 size={14} aria-hidden="true" />
-                        </button>
-                      ) : null}
+                      {option.label}
                     </label>
                   ))}
                 </div>
-                <div className={styles.customMealTypeForm}>
-                  <label>
-                    <span>Custom meal type</span>
-                    <input
-                      value={customMealName}
-                      maxLength={48}
-                      placeholder="e.g. Afternoon tea"
-                      onChange={(event) => setCustomMealName(event.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    disabled={!customMealName.trim()}
-                    onClick={addCustomMealType}
-                  >
-                    Add
-                  </button>
-                </div>
-                <button
-                  className={styles.mealTypeSaveButton}
-                  type="button"
-                  disabled={preferencesBusy || !mealTypePreferences.visibleMealTypes.length}
-                  onClick={() => void saveMealTypePreferences()}
-                >
-                  {preferencesBusy ? 'Saving…' : 'Save meal types'}
-                </button>
-              </div>
-            ) : null}
-            <div className={styles.mealChoices}>
-              {scheduleMeals.map((option) => (
-                <label key={option.value}>
-                  <input
-                    type="checkbox"
-                    checked={selectedMeals.includes(option.value)}
-                    onChange={() => toggleMeal(option.value)}
-                  />
-                  <span className={styles.checkMark} aria-hidden="true">
-                    {selectedMeals.includes(option.value) ? <Check size={15} /> : null}
-                  </span>
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+              </fieldset>
 
-          <fieldset className={styles.setupStep}>
-            <legend>
-              <span>3</span>
-              <span className={styles.stepTitle}>Who&apos;s eating?</span>
-              <Link className={styles.legendAction} href="/settings/profiles">
-                Add New +
-              </Link>
-            </legend>
-            {profiles.length ? (
-              <div className={styles.profileChoiceWrap}>
-                <div className={styles.profileChoices}>
-                  {profiles.map((profile, index) => {
-                    const selected = selectedProfileIds.includes(profile.id);
-                    return (
-                      <label key={profile.id}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleProfile(profile.id)}
-                        />
-                        <span
-                          className={`${styles.profileAvatar} ${styles[`profileAvatar${(index % 4) + 1}`]}`}
-                          aria-hidden="true"
-                        >
-                          {profileInitial(profile.displayName)}
-                        </span>
-                        <span>{profile.displayName}</span>
-                        {selected ? (
-                          <span className={styles.profileRemove} aria-hidden="true">
-                            <X size={17} />
-                          </span>
-                        ) : null}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <p className={styles.setupHint}>
-                <CircleUserRound size={18} aria-hidden="true" />
-                <Link href="/settings/profiles">Add a household profile to start planning.</Link>
+              <fieldset className={settingsStyles.setupStep}>
+                <legend>
+                  <span>3</span>
+                  <span className={settingsStyles.stepTitle}>Who&apos;s eating?</span>
+                  <Link className={settingsStyles.legendAction} href="/settings/profiles">
+                    Add New +
+                  </Link>
+                </legend>
+                {profiles.length ? (
+                  <div className={settingsStyles.profileChoiceWrap}>
+                    <div className={settingsStyles.profileChoices}>
+                      {profiles.map((profile, index) => {
+                        const selected = selectedProfileIds.includes(profile.id);
+                        return (
+                          <label key={profile.id}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleProfile(profile.id)}
+                            />
+                            <span
+                              className={`${settingsStyles.profileAvatar} ${styles[`profileAvatar${(index % 4) + 1}`]}`}
+                              aria-hidden="true"
+                            >
+                              {profileInitial(profile.displayName)}
+                            </span>
+                            <span>{profile.displayName}</span>
+                            {selected ? (
+                              <span className={settingsStyles.profileRemove} aria-hidden="true">
+                                <X size={17} />
+                              </span>
+                            ) : null}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className={settingsStyles.setupHint}>
+                    <CircleUserRound size={18} aria-hidden="true" />
+                    <Link href="/settings/profiles">
+                      Add a household profile to start planning.
+                    </Link>
+                  </p>
+                )}
+              </fieldset>
+            </div>
+            <div className={settingsStyles.setupFooter}>
+              <p>
+                <UsersRound size={18} aria-hidden="true" />
+                <span>
+                  {selectedProfiles.length} {selectedProfiles.length === 1 ? 'person' : 'people'} ·{' '}
+                  {selectedProfiles.length} {selectedProfiles.length === 1 ? 'serving' : 'servings'}{' '}
+                  per meal
+                </span>
               </p>
-            )}
-          </fieldset>
-
-          <div className={styles.setupFooter}>
-            <p className={styles.setupHint}>
-              New meals use these selected people and estimated servings. Nutrition portions are
-              allocated explicitly below and are never split equally by this selection.
-            </p>
-            <p>
-              <UsersRound size={18} aria-hidden="true" />
-              <span>
-                {selectedProfiles.length} {selectedProfiles.length === 1 ? 'person' : 'people'} ·{' '}
-                {selectedProfiles.length} {selectedProfiles.length === 1 ? 'serving' : 'servings'}{' '}
-                per meal
-              </span>
-            </p>
-            <div className={styles.autoPlanAction}>
-              <AiMealPlanGenerator
-                weekStart={startDate}
-                weekEnd={selectedPlanEnd}
-                mealSlots={selectedMeals}
-                profiles={selectedProfiles}
-                label="Generate meal plan"
-                disabled={!setupValid}
-                aiModel={aiMealPlanModel}
-                imageGenerationEnabled={aiImageGenerationEnabled}
-              />
+              <div className={settingsStyles.autoPlanAction}>
+                <AiMealPlanGenerator
+                  weekStart={startDate}
+                  weekEnd={selectedPlanEnd}
+                  mealSlots={selectedMeals}
+                  profiles={selectedProfiles}
+                  label="Generate meal plan"
+                  disabled={!setupValid}
+                  aiModel={aiMealPlanModel}
+                  imageGenerationEnabled={aiImageGenerationEnabled}
+                />
+              </div>
+              <button
+                className={settingsStyles.doneButton}
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+              >
+                Done
+              </button>
             </div>
-            <p className={styles.setupHint}>
-              Start with trusted recipes or create a balanced plan automatically.
-            </p>
-          </div>
-        </section>
+          </AppDialog>
+        )}
 
         <section
           className={`${styles.weekPlan} planner-workspace-center`}
@@ -2030,6 +2054,7 @@ export function MealPlanner({
                         {slotMeals.length ? (
                           slotMeals.map((meal) => (
                             <PlannedMealCard
+                              compact={viewMode === 'week'}
                               profiles={profiles}
                               key={meal.id}
                               meal={meal}

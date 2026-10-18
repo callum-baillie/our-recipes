@@ -530,57 +530,6 @@ input:checked ~ .checkMark {
   background: color-mix(in srgb, var(--leaf-pale) 56%, transparent);
 }
 
-.plannedMeal {
-  position: relative;
-  display: grid;
-  grid-template-rows: 3.6rem auto;
-  min-width: 0;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--linen) 94%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 0.45rem;
-}
-
-.mealThumb {
-  overflow: hidden;
-  background: var(--leaf-pale);
-}
-
-.mealThumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.mealPlaceholder {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  color: var(--leaf);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.5rem;
-}
-
-.plannedMealCopy {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-  padding: 0.45rem 1.75rem 0.5rem 0.5rem;
-}
-
-.plannedMealCopy strong {
-  overflow: hidden;
-  font-size: 0.72rem;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-}
-
-.plannedMealCopy span {
-  color: var(--muted);
-  font-size: 0.64rem;
-}
-
 .cookLink {
   width: fit-content;
   color: var(--accent, #52643b);
@@ -602,16 +551,6 @@ input:checked ~ .checkMark {
   text-align: left;
   text-decoration: underline;
   text-underline-offset: 0.14rem;
-}
-
-.plannedMealCopy select {
-  max-width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  padding: 0.25rem 0.4rem;
-  background: var(--page);
-  color: var(--ink);
-  font: inherit;
 }
 
 .removeButton,
@@ -1103,7 +1042,7 @@ input:checked ~ .checkMark {
   .mobileSchedule details + details {
     border-top: 1px solid var(--line);
   }
-  .mobileSchedule summary {
+  .mobileSchedule > details > summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1113,17 +1052,17 @@ input:checked ~ .checkMark {
     cursor: pointer;
     list-style: none;
   }
-  .mobileSchedule summary::-webkit-details-marker {
+  .mobileSchedule > details > summary::-webkit-details-marker {
     display: none;
   }
-  .mobileSchedule summary > span {
+  .mobileSchedule > details > summary > span {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     color: var(--muted);
     font-size: 0.78rem;
   }
-  .mobileSchedule summary strong {
+  .mobileSchedule > details > summary strong {
     color: var(--ink);
     font-size: 0.9rem;
   }
@@ -1157,10 +1096,6 @@ input:checked ~ .checkMark {
     background: transparent;
     border: 1px dashed var(--line-strong);
     border-radius: 0.45rem;
-  }
-  .mobileSchedule .plannedMeal {
-    grid-template-columns: 4.5rem minmax(0, 1fr);
-    grid-template-rows: 3.6rem;
   }
   .selectorDialog {
     inset: 0;
@@ -1693,101 +1628,15 @@ input:checked ~ .checkMark {
 
 .emptySlot:focus-visible,
 .scheduleSlot:focus-visible,
-.weekNavigation button:focus-visible,
-.mealActions summary:focus-visible,
-.servingEditor input:focus-visible {
+.weekNavigation button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--leaf) 50%, transparent);
   outline-offset: 2px;
 }
 
-.plannedMeal {
-  height: 100%;
-  cursor: grab;
-  border-color: color-mix(in srgb, var(--line) 78%, transparent);
-  box-shadow: 0 2px 8px rgb(48 39 29 / 4%);
-}
-
-.plannedMeal:active {
-  cursor: grabbing;
-}
-
-.mealTitleRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.3rem;
-  justify-content: space-between;
-}
-
-.pantryDot {
-  flex: 0 0 auto;
-  width: 0.48rem;
-  height: 0.48rem;
-  margin-top: 0.15rem;
-  background: var(--muted);
-  border-radius: 50%;
-}
-
-.pantryDotcovered {
-  background: var(--selection-surface);
-}
-
-.pantryDotshortage {
-  background: var(--tomato);
-}
-
-.pantryDotuncertain {
-  background: #d99a32;
-}
-
-.pantryDotunknown {
-  opacity: 0.45;
-}
-
-.servingEditor {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.16rem;
-}
-
-.servingEditor input {
-  width: 1.65rem;
-  padding: 0;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  font-size: inherit;
-  text-align: center;
-}
-
-.servingEditor > span {
-  display: none;
-}
-
-.mealActions > div {
-  width: 16rem;
-  max-height: min(28rem, 68vh);
-  overflow-y: auto;
-}
-
-.mealActions label {
-  gap: 0.3rem;
-  padding: 0.45rem;
-  border-top: 1px solid var(--line);
-}
-
-.mealActions label > span,
 .dragHint {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-}
-
-.mealActions label button {
-  justify-content: center;
-  min-height: 1.9rem;
-  color: var(--leaf);
-  border: 1px solid var(--line);
-  border-radius: 0.35rem;
 }
 
 .destructiveAction {
@@ -2008,10 +1857,6 @@ input:checked ~ .checkMark {
   .emptyMobileMeal .mobileMealContent {
     min-height: 5.5rem;
     padding: 0.75rem 0 0;
-  }
-
-  .mobileSchedule .servingEditor > span {
-    display: inline;
   }
 
   .planSummary {
@@ -2281,98 +2126,6 @@ input:checked ~ .checkMark {
 
 .emptySlot::after {
   content: 'Add recipe';
-}
-
-.plannedMeal {
-  grid-template-rows: 3.45rem auto;
-  border-radius: 0.4rem;
-}
-
-.plannedMealCopy {
-  gap: 0.35rem;
-  padding: 0.42rem 0.42rem 0.5rem;
-}
-
-.plannedMealCopy strong {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 0.67rem;
-  line-height: 1.18;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.mealMeta {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 0.6rem !important;
-}
-
-.mealServingText > span {
-  display: none;
-}
-
-.mealActions {
-  position: absolute;
-  z-index: 4;
-  top: 0.12rem;
-  right: 0.12rem;
-}
-
-.mealActions summary {
-  display: grid;
-  width: 1.6rem;
-  height: 1.6rem;
-  place-items: center;
-  color: var(--ink);
-  background: rgb(250 248 242 / 82%);
-  border-radius: 999px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.mealActions summary::-webkit-details-marker {
-  display: none;
-}
-
-.mealActions > div {
-  position: absolute;
-  top: calc(100% + 0.2rem);
-  right: 0;
-  display: grid;
-  min-width: 9.5rem;
-  padding: 0.35rem;
-  background: var(--linen);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  box-shadow: var(--shadow);
-}
-
-.mealActions button,
-.mealActions a,
-.mealActions label,
-.mealActions > div > span {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 2rem;
-  padding: 0.35rem 0.45rem;
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  font-size: 0.7rem;
-  text-align: left;
-}
-
-.mealActions label {
-  display: grid;
-}
-
-.mealActions select {
-  width: 100%;
-  min-height: 1.8rem;
-  border: 1px solid var(--line);
 }
 
 .planSummary {
@@ -3070,47 +2823,6 @@ input:checked ~ .checkMark {
     border: 1px dashed var(--line-strong);
     border-radius: 0.65rem;
     font-size: 0.9rem;
-  }
-
-  .mobileSchedule .plannedMeal {
-    grid-template-columns: minmax(6.8rem, 42%) minmax(0, 1fr);
-    grid-template-rows: minmax(6.4rem, 1fr);
-    border: 0;
-  }
-
-  .mobileSchedule .plannedMeal + .plannedMeal {
-    padding-top: 0.55rem;
-    border-top: 1px solid var(--line);
-    border-radius: 0;
-  }
-
-  .mobileSchedule .mealThumb {
-    border-radius: 0.65rem;
-  }
-
-  .mobileSchedule .plannedMealCopy {
-    align-content: center;
-    gap: 0.65rem;
-    padding: 0.8rem 2rem 0.8rem 1rem;
-  }
-
-  .mobileSchedule .plannedMealCopy strong {
-    font-size: 1rem;
-    -webkit-line-clamp: 2;
-  }
-
-  .mobileSchedule .mealMeta {
-    gap: 0.35rem;
-    font-size: 0.78rem !important;
-  }
-
-  .mobileSchedule .mealServingText > span {
-    display: inline;
-  }
-
-  .mobileSchedule .mealActions {
-    top: 50%;
-    transform: none;
   }
 
   .planSummary {
@@ -4803,34 +4515,6 @@ input:checked ~ .checkMark {
 }
 
 /* Keep calendar cards legible at laptop column widths. */
-.refinedPlanner .plannedMeal {
-  border-radius: 0.55rem;
-  border-color: var(--line);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
-}
-.refinedPlanner .plannedMeal:focus-within {
-  border-color: var(--leaf);
-  box-shadow: 0 0 0 1px var(--leaf);
-}
-.refinedPlanner .plannedMealCopy {
-  padding: 0.5rem;
-  gap: 0.4rem;
-}
-.refinedPlanner .plannedMealCopy strong {
-  font-size: 0.75rem;
-  line-height: 1.35;
-}
-.refinedPlanner .mealMeta {
-  flex-wrap: wrap;
-  row-gap: 0.3rem;
-  font-size: 0.68rem !important;
-}
-.refinedPlanner .mealActions summary {
-  width: 1.85rem;
-  height: 1.85rem;
-  background: var(--page);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
-}
 
 .recipeChoice {
   text-align: left;
@@ -4864,112 +4548,6 @@ input:checked ~ .checkMark {
 }
 
 /* Keep the action trigger inside each card and give the mobile menu room to breathe. */
-.refinedPlanner .mealTitleRow {
-  padding-right: 3rem;
-}
-.refinedPlanner .mealTitleRow > :first-child {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.refinedPlanner .mealThumb > a {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.refinedPlanner .mealRecipeLink,
-.refinedPlanner .mealOptionDisplay a {
-  color: var(--ink);
-  font-weight: 750;
-  text-decoration: none;
-}
-.refinedPlanner .mealRecipeLink {
-  display: -webkit-box;
-  overflow: hidden;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-.refinedPlanner .mealRecipeLink:hover,
-.refinedPlanner .mealOptionDisplay a:hover {
-  color: var(--leaf);
-  text-decoration: underline;
-  text-underline-offset: 0.14em;
-}
-.refinedPlanner .mealOptionDisplay {
-  display: flex;
-  flex: 1 1 0;
-  flex-wrap: wrap;
-  align-items: baseline;
-  min-width: 0;
-  gap: 0.12rem 0.25rem;
-  padding-right: 0.1rem;
-  font-size: 0.76rem;
-  line-height: 1.3;
-}
-.refinedPlanner .mealOptionChoice {
-  display: contents;
-}
-.refinedPlanner .mealOptionDisplay strong {
-  font-size: inherit;
-  line-height: inherit;
-}
-.refinedPlanner .mealOptionOr {
-  color: var(--leaf);
-  font-size: 0.67rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-.refinedPlanner .mealActions > div {
-  width: min(19rem, calc(100vw - 1rem));
-  max-height: min(32rem, 70dvh);
-  padding: 0.5rem;
-  border-radius: 0.8rem;
-}
-.refinedPlanner .mealActions[open] {
-  z-index: 1000;
-}
-.refinedPlanner .mealActions button,
-.refinedPlanner .mealActions a {
-  min-height: 2.75rem;
-  padding: 0.6rem 0.7rem;
-  border-radius: 0.5rem;
-  font-size: 0.82rem;
-}
-.refinedPlanner .mealActions label {
-  gap: 0.45rem;
-  padding: 0.65rem 0.45rem;
-  font-size: 0.8rem;
-}
-.refinedPlanner .mealActionGroup {
-  display: grid;
-  gap: 0.4rem;
-  padding: 0.65rem 0.45rem;
-  border-top: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 0.8rem;
-}
-.refinedPlanner .mealActionGroup > span {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 1.8rem;
-  padding: 0;
-}
-.refinedPlanner .mealActionGroup button {
-  justify-content: center;
-  min-height: 2.75rem;
-  color: var(--leaf);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--field);
-}
-.refinedPlanner .mealActions select {
-  min-height: 2.75rem;
-  padding: 0.5rem;
-  font: inherit;
-  font-size: 16px;
-}
 .viewModeControl {
   align-items: stretch;
   min-height: 2.75rem;
@@ -4986,59 +4564,6 @@ input:checked ~ .checkMark {
   text-align: center;
   vertical-align: middle;
 }
-@media (max-width: 700px) {
-  .refinedPlanner .mealTitleRow {
-    padding-right: 3.15rem;
-  }
-  .refinedPlanner .mealActions {
-    top: 0.35rem;
-    right: 0.35rem;
-  }
-  .refinedPlanner .mealActions summary {
-    width: 44px;
-    height: 44px;
-  }
-  .refinedPlanner .mealActions[open] > div {
-    position: fixed;
-    inset: auto 0.55rem max(0.55rem, env(safe-area-inset-bottom));
-    z-index: 100;
-    width: auto;
-    max-height: min(74dvh, 38rem);
-    padding: 0.75rem;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    border-radius: 1rem;
-    box-shadow: 0 1rem 3.5rem rgb(20 24 19 / 28%);
-  }
-  .refinedPlanner .mealActions[open] > div > button,
-  .refinedPlanner .mealActions[open] > div > a {
-    min-height: 3rem;
-    padding: 0.7rem;
-    font-size: 0.92rem;
-  }
-  .refinedPlanner .mealActions[open] > div > label {
-    padding: 0.75rem 0.35rem;
-  }
-  .refinedPlanner .mealActions[open] > div > .mealActionGroup {
-    gap: 0.55rem;
-    padding: 0.8rem 0.35rem;
-  }
-  .refinedPlanner .mealActions[open] > div > label button {
-    min-height: 3rem;
-    font-size: 0.92rem;
-  }
-  .refinedPlanner .mealActions[open] > div > .mealActionGroup button {
-    min-height: 3rem;
-    font-size: 0.92rem;
-  }
-  .refinedPlanner .mealActions[open] > div > label select {
-    min-height: 3rem;
-  }
-  .refinedPlanner .mealOptionDisplay {
-    font-size: 0.87rem;
-  }
-}
 
 /* Meal-type shortcuts add a row above the filters. Keep only results flexible. */
 .dialogShell.dialogShellWithOptions {
@@ -5046,90 +4571,6 @@ input:checked ~ .checkMark {
 }
 
 /* A calendar meal has a clear title, one metric rail and a contained action trigger. */
-.refinedPlanner .plannedMeal {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr;
-  min-width: 0;
-  border-radius: 0.8rem;
-  border: 1px solid var(--line);
-  background: var(--field);
-  overflow: visible;
-}
-.refinedPlanner .mealThumb {
-  border-radius: 0.75rem 0.75rem 0 0;
-  overflow: hidden;
-}
-.refinedPlanner .plannedMealCopy {
-  min-width: 0;
-  display: grid;
-  gap: 0.4rem;
-  padding: 0.65rem;
-}
-.refinedPlanner .mealTitleRow {
-  min-width: 0;
-  padding-right: 1.65rem;
-}
-.refinedPlanner .plannedMealCopy strong {
-  font-size: 0.82rem;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-.refinedPlanner .mealMeta {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.73rem !important;
-  line-height: 1.2;
-  flex-wrap: wrap;
-}
-.refinedPlanner .mealMeta svg {
-  display: block;
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  margin: 0;
-}
-.refinedPlanner .servingEditor {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: inherit;
-  line-height: inherit;
-}
-.refinedPlanner .servingEditor input {
-  width: 2.5rem;
-  min-height: 30px;
-  padding: 0.2rem;
-  font: inherit;
-  text-align: center;
-}
-.refinedPlanner .mealActions {
-  top: 0.35rem;
-  right: 0.35rem;
-  margin: 0;
-}
-.refinedPlanner .mealActions summary {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  margin: 0;
-  border-radius: 0.5rem;
-  line-height: 1;
-  background: var(--field);
-  border: 1px solid var(--line);
-}
-.refinedPlanner .mealActions summary svg {
-  display: block;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-}
-.refinedPlanner .mealActions[open] {
-  z-index: 12;
-}
 .viewModeControl button {
   display: inline-flex;
   align-items: center;
@@ -5146,28 +4587,27 @@ input:checked ~ .checkMark {
 .mealHeading > svg {
   flex: 0 0 18px;
 }
-@media (max-width: 700px) {
-  .refinedPlanner .mealActions summary {
-    width: 44px;
-    height: 44px;
-  }
-  .refinedPlanner .mealTitleRow {
-    padding-right: 2rem;
-  }
-  .refinedPlanner .plannedMealCopy strong {
-    font-size: 0.92rem;
-  }
-  .refinedPlanner .mobileSchedule .plannedMeal {
-    grid-template-columns: 5rem minmax(0, 1fr);
-  }
-  .refinedPlanner .mobileSchedule .mealThumb {
-    border-radius: 0.75rem 0 0 0.75rem;
-  }
-}
 
-.refinedPlanner .plannedMeal:has(.mealActions[open]) {
-  z-index: 70;
+/* Each calendar row grows with its meals; cards never cover the following row. */
+@media (min-width: 901px) {
+  .refinedPlanner .weekPlan {
+    overflow-y: auto;
+  }
+  .refinedPlanner .desktopSchedule {
+    flex: 0 0 auto;
+    grid-auto-rows: minmax(6rem, max-content);
+    align-content: start;
+  }
+  .refinedPlanner .scheduleSlot {
+    align-content: start;
+  }
 }
-.refinedPlanner .mealActions {
-  transform: none;
+@media (max-width: 700px) {
+  .mobileMealLabel {
+    padding-right: 0;
+    border-right: 0;
+  }
+  .mobileMealContent {
+    padding-left: 0;
+  }
 }

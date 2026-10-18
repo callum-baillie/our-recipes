@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.0-rc.12
+
+- Rebuild planner cards with inset photos, clearer titles and household context, aligned serving/time details, and centered square menu buttons, following the supplied mockup.
+- Replace the planner settings sidebar with a shared native dialog used by the meal editor, with scroll locking, focus containment and restoration, Escape/backdrop dismissal, and mobile viewport support.
+- Refine planning dates, meal and household choices, meal-type editing, loading/error feedback, and a footer that remains visible while content scrolls.
+- Fix inherited mobile summary padding, stray meal-heading dividers, and desktop cards overlapping following calendar rows.
+- Verify 320, 390, 768, and 1440px layouts, dark-theme accessibility, modal keyboard behavior, meal editing, and the planner assignment workflow. No database migration is required.
+
 ## 1.0.0-rc.11
 
 ### Kitchen assistant

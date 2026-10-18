@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, Plus, Search, Trash2, X } from 'lucide-react';
 import { ButtonSpinner, InlineSkeleton } from '@/components/skeleton';
 import { mealTypeLabel, type MealType } from './meal-planner-types';
@@ -11,6 +11,7 @@ import type { RecipePayload } from '@/lib/domain/recipe';
 import type { PlannedMeal } from '@/lib/services/planning-service';
 import type { RecipeDetail } from '@/lib/services/recipe-service';
 import styles from './meal-entry-editor.module.css';
+import { AppDialog } from './app-dialog';
 
 type Adaptation = Pick<
   RecipePayload,
@@ -66,7 +67,6 @@ export function MealEntryEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [sourceMeals, setSourceMeals] = useState(meals);
   const [kind, setKind] = useState(entry?.kind ?? initialKind ?? 'item');
   const [sourceMealsLoaded, setSourceMealsLoaded] = useState(kind !== 'leftover');
@@ -118,9 +118,6 @@ export function MealEntryEditor({
         : pantryProducts.slice(0, 8),
     [normalizedOptionQuery, pantryProducts],
   );
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
   useEffect(() => {
     if (kind !== 'options' || pantryProductsLoaded) return;
     let active = true;
@@ -288,16 +285,7 @@ export function MealEntryEditor({
     }
   }
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onClose={onClose}
-      aria-labelledby="meal-editor-title"
-    >
+    <AppDialog className={styles.dialog} onClose={onClose} aria-labelledby="meal-editor-title">
       <form onSubmit={save}>
         <header>
           <div>
@@ -806,6 +794,6 @@ export function MealEntryEditor({
           </button>
         </footer>
       </form>
-    </dialog>
+    </AppDialog>
   );
 }

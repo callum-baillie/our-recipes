@@ -125,7 +125,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   ).toBe(true);
   await generator.getByRole('button', { name: 'Close meal plan generator' }).click();
   await page.getByRole('button', { name: 'Plan settings' }).click();
-  const setup = page.getByRole('region', { name: 'Plan settings', exact: true });
+  const setup = page.getByRole('dialog', { name: 'Plan settings', exact: true });
   await expect(setup.getByRole('checkbox', { name: 'Callum' })).toBeChecked();
   await expect(setup.getByRole('checkbox', { name: 'Julia' })).toBeChecked();
   await setup.getByText('Breakfast', { exact: true }).filter({ visible: true }).click();

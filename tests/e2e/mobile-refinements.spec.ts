@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { completeInitialOnboarding } from './helpers/onboarding';
+import { appAxe } from './helpers/accessibility';
 
 test('mobile planning, cooking, shopping, and assistant controls stay usable', async ({ page }) => {
   test.setTimeout(120_000);
@@ -24,6 +25,81 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   });
   expect(mealResponse.ok()).toBeTruthy();
   await page.goto(`/planner?view=day&date=${plannedFor}`);
+  const settingsTrigger = page.getByRole('button', { name: 'Plan settings', exact: true });
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await settingsTrigger.click();
+    const settings = page.getByRole('dialog', { name: 'Plan settings', exact: true });
+    await expect(settings).toBeVisible();
+    await settings.getByRole('button', { name: 'Close plan settings' }).focus();
+    await page.keyboard.press('Shift+Tab');
+    await expect(settings.getByRole('button', { name: 'Done', exact: true })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(settings.getByRole('button', { name: 'Close plan settings' })).toBeFocused();
+    const bounds = await settings.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(844);
+    await settings.getByRole('button', { name: 'Edit types', exact: true }).click();
+    await expect(
+      settings.getByRole('group', { name: 'Meal types shown in the planner' }),
+    ).toBeVisible();
+    await settings.getByRole('button', { name: 'Close meal type settings' }).click();
+    await settings.locator('button[aria-controls="planner-date-range-picker"]').click();
+    await expect(settings.getByLabel('Start date', { exact: true })).toBeVisible();
+    await settings.getByLabel('Start date', { exact: true }).focus();
+    await page.keyboard.press('Escape');
+    await expect(settings).toBeVisible();
+    await expect(settings.getByLabel('Start date', { exact: true })).toHaveCount(0);
+    await page.screenshot({ path: `/tmp/bord-planner-settings-${width}.png` });
+    await page.keyboard.press('Escape');
+    await expect(settings).toHaveCount(0);
+    await expect(settingsTrigger).toBeFocused();
+    const trigger = page
+      .getByLabel('Actions for Traditional Scottish Stovies')
+      .filter({ visible: true });
+    await trigger.scrollIntoViewIfNeeded();
+    const card = page.getByRole('article').filter({ has: trigger });
+    const cardBounds = await card.boundingBox();
+    const slotBounds = await card.locator('..').boundingBox();
+    expect(cardBounds!.y + cardBounds!.height).toBeLessThanOrEqual(
+      slotBounds!.y + slotBounds!.height + 1,
+    );
+    const button = await trigger.boundingBox();
+    const icon = await trigger.locator('svg').boundingBox();
+    expect(Math.abs(button!.width - button!.height)).toBeLessThan(1);
+    expect(Math.abs(button!.x + button!.width / 2 - (icon!.x + icon!.width / 2))).toBeLessThan(1);
+    expect(Math.abs(button!.y + button!.height / 2 - (icon!.y + icon!.height / 2))).toBeLessThan(1);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBeTruthy();
+    await page.screenshot({ path: `/tmp/bord-planner-cards-${width}.png` });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.style.colorScheme = 'dark';
+  });
+  await settingsTrigger.click();
+  const darkSettings = page.getByRole('dialog', { name: 'Plan settings', exact: true });
+  expect((await appAxe(page).include('#planner-settings-panel').analyze()).violations).toEqual([]);
+  await page.screenshot({ path: '/tmp/bord-planner-settings-dark.png' });
+  await darkSettings.getByRole('button', { name: 'Done', exact: true }).click();
+  await page
+    .getByLabel('Actions for Traditional Scottish Stovies')
+    .filter({ visible: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/bord-planner-cards-dark.png' });
+  await page
+    .getByRole('article')
+    .filter({
+      has: page.getByLabel('Actions for Traditional Scottish Stovies').filter({ visible: true }),
+    })
+    .screenshot({ path: '/tmp/bord-planner-card-detail-dark.png' });
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'light';
+    document.documentElement.style.colorScheme = 'light';
+  });
   const actions = page
     .getByLabel('Actions for Traditional Scottish Stovies')
     .filter({ visible: true });
@@ -38,6 +114,9 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
       .filter({ visible: true }),
   ).toBeVisible();
   await page.screenshot({ path: '/tmp/bord-mobile-planner.png', fullPage: true });
+  await page.getByRole('button', { name: 'Edit meal / adapt recipe', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Edit planned meal', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close meal editor', exact: true }).click();
   await page.getByRole('button', { name: 'Close meal actions' }).click();
   await page
     .getByRole('link', { name: 'Traditional Scottish Stovies', exact: true })

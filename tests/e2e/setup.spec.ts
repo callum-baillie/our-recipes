@@ -682,7 +682,10 @@ test('a fresh household can complete the supported local release acceptance work
   const weekEndDate = new Date(`${weekStart}T12:00:00Z`);
   weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
   const weekEnd = weekEndDate.toISOString().slice(0, 10);
-  await page.getByRole('button', { name: 'Done' }).click();
+  await page
+    .getByRole('group', { name: 'Choose planning date range' })
+    .getByRole('button', { name: 'Done', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Close plan settings' }).click();
   await page.locator(`[data-planner-slot="${weekStart}:dinner"]`).click();
   const recipeSelector = page.getByRole('dialog', { name: 'Add meals' });
