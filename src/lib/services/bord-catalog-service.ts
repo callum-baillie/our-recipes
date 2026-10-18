@@ -259,18 +259,59 @@ async function candidateFoods(
   }
   return { records, statuses };
 }
-export async function lookupCatalogBarcode(gtin: string, language: string) {
+export async function lookupCatalogBarcode(gtin: string, language: string, compareUsda = false) {
   const normalized = normalizeGtin(gtin).canonicalGtin;
   const client = new BordCatalogClient();
-  const response = await client.resolve(normalized);
-  const { records, statuses } = await candidateFoods(
-    response.data.flatMap((r) => r.candidates),
-    language,
-  );
+  const records: FoodRecord[] = [];
+  const statuses: ProviderStatus[] = [];
+  try {
+    const response = await client.resolve(normalized);
+    const resolved = await candidateFoods(
+      response.data.flatMap((r) => r.candidates),
+      language,
+    );
+    records.push(...resolved.records);
+    statuses.push(
+      ...(resolved.statuses.length
+        ? resolved.statuses
+        : [catalogProviderStatus('open_food_facts')]),
+    );
+  } catch (error) {
+    statuses.push(catalogProviderStatus('open_food_facts', error));
+  }
+  // USDA is independently published; an absent optional product pack must not disable its barcodes.
+  // This is another local catalog read, never an external-provider fallback.
+  if (!records.length || compareUsda) {
+    try {
+      const exact = normalized.replace(/^0+(?=\d{8,})/u, '');
+      const result = await client.usdaSearch(exact, 1, 'branded');
+      const match = result.foods
+        .map(normalizeCatalogUsdaFood)
+        .find((record) => record.canonicalGtin === normalized);
+      if (
+        match &&
+        !records.some(
+          (record) =>
+            record.provider === 'usda_fdc' && record.providerRecordId === match.providerRecordId,
+        )
+      ) {
+        const detail = await getCatalogFoodDetails('usda_fdc', match.providerRecordId, language);
+        if (detail.record.canonicalGtin !== normalized)
+          throw new FoodDataError(
+            'REVISION_EXPIRED',
+            'This barcode changed. Review the food again.',
+          );
+        records.push(detail.record);
+      }
+      statuses.push(catalogProviderStatus('usda_fdc'));
+    } catch (error) {
+      statuses.push(catalogProviderStatus('usda_fdc', error));
+    }
+  }
   return {
     preferred: records[0] ?? null,
     alternatives: records.slice(1),
-    providerStatuses: statuses.length ? statuses : [catalogProviderStatus('open_food_facts')],
+    providerStatuses: statuses,
     cache: { hit: false, stale: false },
   };
 }

@@ -424,7 +424,7 @@ export async function lookupFoodByBarcode(
     };
   if (isNativeCatalogEnabled()) {
     try {
-      const catalog = await lookupCatalogBarcode(canonicalGtin, language);
+      const catalog = await lookupCatalogBarcode(canonicalGtin, language, compareUsda);
       if (catalog.preferred || !directFoodFallbackAllowed()) return { ...catalog, localProduct };
     } catch (error) {
       if (!directFoodFallbackAllowed())

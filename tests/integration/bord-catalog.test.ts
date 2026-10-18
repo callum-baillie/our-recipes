@@ -245,6 +245,24 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     expect((await lookupFoodByBarcode('04006381333931', 'en')).preferred).toBeNull();
     expect(fixture.calls.every((c) => c.key === 'synthetic-read-key')).toBe(true);
   });
+  it('keeps local USDA barcodes working when the optional product pack is unavailable', async () => {
+    fixture.state.productsUnavailable = true;
+    fixture.state.barcodeMatch = true;
+    const result = await lookupFoodByBarcode('04006381333931', 'en');
+    expect(result.preferred).toMatchObject({
+      provider: 'usda_fdc',
+      canonicalGtin: '04006381333931',
+      images: [],
+      catalogRef: { source_id: 'usda_fdc', source_revision: 'revision_1' },
+    });
+    expect(result.providerStatuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: 'usda_fdc', status: 'available' }),
+      ]),
+    );
+    expect(getDatabase().select().from(foodProviderRateLimits).all()).toHaveLength(0);
+    expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
+  });
   it('isolates config, generation and normalizer caches and polls generation after five minutes', async () => {
     const now = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);

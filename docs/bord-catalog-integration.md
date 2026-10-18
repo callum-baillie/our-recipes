@@ -29,7 +29,7 @@ Store-directory access is independently controlled by `STORE_DIRECTORY_ENABLED` 
 
 ## Food review and confirmation
 
-The existing food picker and rapid barcode queue use the native transport in catalog modes. USDA name search uses the same local service’s `/fdc/v1/foods/search`; OFF product search and GTIN resolution use native routes. Sources remain `usda_fdc` and `open_food_facts`. Separate alternatives retain their own nutrition and attribution.
+The existing food picker and rapid barcode queue use the native transport in catalog modes. USDA name search uses the same local service’s `/fdc/v1/foods/search`; OFF product search and GTIN resolution use native routes. When the optional product pack is absent or has no match, barcode lookup can still match and pin a branded USDA record through the same local service. Generic/branded USDA filters are sent before pagination. Sources remain `usda_fdc` and `open_food_facts`. Separate alternatives retain their own nutrition and attribution.
 
 Selections carry a `catalogRef` with transport, source record, exact content revision, catalog generation and optional canonical product ID. Confirmation re-reads the exact revision without stale-cache fallback. Changed or removed revisions return `409 REVISION_EXPIRED`, asking the user to review again. Successful operation IDs can replay during an outage without creating duplicate stock. Local product edits remain separate from imported provenance.
 

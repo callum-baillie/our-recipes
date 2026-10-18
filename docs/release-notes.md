@@ -6,6 +6,7 @@
 - Pin reviewed foods to exact source revisions, retain durable nutrition provenance, and require renewed review when a selected revision changes or disappears. Completed imports can replay during catalog outages.
 - Add mobile-friendly official branch search, link/unlink and update review to saved stores while preserving household labels, notes, aisle identities, routes and shopping-list relationships.
 - Display sanitized catalog/source readiness, unknown retail availability and official map links with explicit rights status. Catalog reads create no stock or cart actions; catalog-only mode blocks remote fallback and source images.
+- Keep local USDA barcode matching available when the optional product pack is absent, and apply generic/branded USDA filters before pagination.
 - Isolate caches by transport/configuration, generation, normalizer and locale, without charging local catalog reads against external provider quotas.
 - Include additive migration `0067_bord_catalog_links`. Back up household data before upgrading. Native catalog activation requires the server settings in [the integration guide](bord-catalog-integration.md).
 

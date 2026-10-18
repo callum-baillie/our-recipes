@@ -22,6 +22,8 @@ export async function startCatalogFixture() {
     mapRights: true,
     protein: 12,
     missingFood: false,
+    productsUnavailable: false,
+    barcodeMatch: false,
   };
   const calls: Array<{ path: string; method: string; body: unknown; key: string | undefined }> = [];
   const store = () => ({
@@ -84,8 +86,18 @@ export async function startCatalogFixture() {
           map_assets: { implemented: true, rights_blocked: state.mapRights },
         }),
       );
-    if (url.pathname === '/fdc/v1/foods/search') return send(200, { foods: [syntheticUsda] });
+    if (url.pathname === '/fdc/v1/foods/search')
+      return send(200, {
+        foods: [
+          {
+            ...syntheticUsda,
+            ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: '4006381333931' } : {}),
+          },
+        ],
+      });
     if (url.pathname === '/v1/products') return send(200, envelope([]));
+    if (url.pathname === '/v1/products/resolve' && state.productsUnavailable)
+      return send(503, { error: { code: 'CATALOG_NOT_READY' } });
     if (url.pathname === '/v1/products/resolve')
       return send(
         200,
@@ -125,6 +137,7 @@ export async function startCatalogFixture() {
               }
             : {
                 ...syntheticUsda,
+                ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: '4006381333931' } : {}),
                 foodNutrients: [
                   { nutrient: { id: 1003, name: 'Protein', unitName: 'g' }, amount: state.protein },
                 ],
