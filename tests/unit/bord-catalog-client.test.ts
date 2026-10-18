@@ -78,6 +78,18 @@ describe('bounded native catalog client', () => {
       identifiers: [{ namespace: 'gtin', value: '96385074' }],
     });
   });
+  it('filters USDA source types before pagination to preserve generic and branded search behavior', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ foods: [] }));
+    const client = new BordCatalogClient(fetcher);
+    await client.usdaSearch('oats', 2, 'generic');
+    let params = new URL(String(fetcher.mock.calls[0]![0])).searchParams;
+    expect(params.getAll('dataType')).toEqual(['Foundation', 'Survey (FNDDS)']);
+    expect(params.get('pageNumber')).toBe('2');
+    expect(params.get('pageSize')).toBe('20');
+    await client.usdaSearch('oats', 1, 'branded');
+    params = new URL(String(fetcher.mock.calls[1]![0])).searchParams;
+    expect(params.getAll('dataType')).toEqual(['Branded']);
+  });
   it('catalog-only denies direct USDA/OFF calls even when invoked outside the routing service', async () => {
     vi.stubEnv('FOOD_DATA_MODE', 'catalog_only');
     vi.stubEnv('FOOD_DATA_ALLOW_REMOTE_FALLBACK', 'true');

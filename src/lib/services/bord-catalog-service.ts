@@ -312,11 +312,17 @@ export async function searchCatalogFoods(
     }
     try {
       if (source === 'usda_fdc') {
-        const response = await client.usdaSearch(query, page);
+        const response = await client.usdaSearch(query, page, kind);
         records.push(
           ...response.foods
             .map(normalizeCatalogUsdaFood)
-            .filter((r) => kind === 'any' || (kind === 'branded') === /branded/iu.test(r.dataType)),
+            .filter(
+              (r) =>
+                kind === 'any' ||
+                (kind === 'generic'
+                  ? ['Foundation', 'Survey (FNDDS)'].includes(r.dataType)
+                  : /branded/iu.test(r.dataType)),
+            ),
         );
       } else if (kind !== 'generic' && page === 1) {
         const response = await client.products(query);

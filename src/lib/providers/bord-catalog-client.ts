@@ -202,9 +202,16 @@ export class BordCatalogClient {
     );
   }
   // The native API preserves the USDA-compatible search surface and original source payload.
-  usdaSearch(query: string, page: number) {
+  usdaSearch(query: string, page: number, kind: 'any' | 'generic' | 'branded' = 'any') {
+    const params = new URLSearchParams({ query, pageNumber: String(page), pageSize: '20' });
+    for (const type of kind === 'generic'
+      ? ['Foundation', 'Survey (FNDDS)']
+      : kind === 'branded'
+        ? ['Branded']
+        : [])
+      params.append('dataType', type);
     return this.request(
-      `fdc/v1/foods/search?${new URLSearchParams({ query, pageNumber: String(page), pageSize: '20' })}`,
+      `fdc/v1/foods/search?${params}`,
       z.object({ foods: z.array(z.record(z.string(), z.unknown())).max(100) }),
     );
   }
