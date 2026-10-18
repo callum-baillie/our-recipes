@@ -49,7 +49,7 @@ describe('Pantry recipe and planner presentation', () => {
       }),
     );
     expect(markup).toContain('/recipes/recipe-1/cook?mealPlanEntryId=meal-1');
-    expect(markup).toContain('Cook Lentil soup from this planned meal');
+    expect(markup).toContain('Make Lentil soup from this planned meal');
   });
 
   it('keeps plan totals in the insights rail without the former calendar footer', () => {

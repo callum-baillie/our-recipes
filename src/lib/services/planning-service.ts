@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
 import {
+  profiles,
   mealPlanEntries,
   mealPlanLeftoverLinks,
   pantryPurchaseIntakes,
@@ -90,9 +91,14 @@ export type MealPlanEntryChanged = (
   next: typeof mealPlanEntries.$inferSelect | null,
 ) => void;
 
-export type PlannedMeal = Omit<typeof mealPlanEntries.$inferSelect, 'kind' | 'recipeOverride'> & {
+export type PlannedMeal = Omit<
+  typeof mealPlanEntries.$inferSelect,
+  'kind' | 'recipeOverride' | 'options' | 'profileIds'
+> & {
   kind?: string;
   recipeOverride?: string | null;
+  options?: string;
+  profileIds?: string;
   leftoverSourceId?: string | null;
   leftoverSourceTitle?: string | null;
   recipeTitle: string;
@@ -192,9 +198,24 @@ function mealDetails(
     throw new PlanningNotFoundError('Choose the leftover meal type to link a source.');
   if (previous && kind !== previous.kind && !['recipe', 'item'].includes(kind))
     guardSourceChange(tx as PlanningTransaction, entryId);
-  let details = { kind, recipeOverride: previous?.recipeOverride ?? null } as Partial<
-    typeof mealPlanEntries.$inferSelect
-  >;
+  if (input.profileIds?.length) {
+    const found = tx
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(inArray(profiles.id, input.profileIds))
+      .all();
+    if (found.length !== input.profileIds.length)
+      throw new PlanningNotFoundError('Choose household members that still exist.');
+  }
+  let details = {
+    kind,
+    profileIds:
+      input.profileIds === undefined
+        ? (previous?.profileIds ?? '[]')
+        : JSON.stringify(input.profileIds),
+    options: kind === 'options' ? (previous?.options ?? '[]') : '[]',
+    recipeOverride: previous?.recipeOverride ?? null,
+  } as Partial<typeof mealPlanEntries.$inferSelect>;
   if (kind === 'leftover') {
     const source = sourceId
       ? tx.select().from(mealPlanEntries).where(eq(mealPlanEntries.id, sourceId)).get()
@@ -259,6 +280,63 @@ function mealDetails(
     else if (previous?.kind === 'item')
       details.recipeIngredientsSnapshot = previous.recipeIngredientsSnapshot;
     else throw new PlanningNotFoundError('Add the food and quantity per serving.');
+  } else if (kind === 'options') {
+    const choices = input.options ?? [];
+    if (choices.length < 2) throw new PlanningNotFoundError('Add at least two meal options.');
+    const recipeIds = [
+      ...new Set(choices.flatMap((choice) => (choice.kind === 'recipe' ? [choice.recipeId] : []))),
+    ];
+    const productIds = [
+      ...new Set(choices.flatMap((choice) => (choice.kind === 'pantry' ? [choice.productId] : []))),
+    ];
+    const savedRecipes = recipeIds.length
+      ? tx
+          .select({ id: recipes.id, title: recipes.title })
+          .from(recipes)
+          .where(inArray(recipes.id, recipeIds))
+          .all()
+      : [];
+    const savedProducts = productIds.length
+      ? tx
+          .select({ id: pantryProducts.id, title: pantryProducts.displayName })
+          .from(pantryProducts)
+          .where(inArray(pantryProducts.id, productIds))
+          .all()
+      : [];
+    if (savedRecipes.length !== recipeIds.length)
+      throw new PlanningNotFoundError('Choose recipes that still exist in this household.');
+    if (savedProducts.length !== productIds.length)
+      throw new PlanningNotFoundError('Choose Pantry items that still exist in this household.');
+    const recipeNames = new Map(savedRecipes.map((recipe) => [recipe.id, recipe.title]));
+    const productNames = new Map(savedProducts.map((product) => [product.id, product.title]));
+    const normalizedChoices = choices.map((choice) =>
+      choice.kind === 'recipe'
+        ? { ...choice, label: recipeNames.get(choice.recipeId)! }
+        : { ...choice, label: productNames.get(choice.productId)! },
+    );
+    const title = normalizedChoices.map((choice) => choice.label).join(' or ');
+    details = {
+      ...details,
+      recipeId: null,
+      recipeRevision: null,
+      recipeCalculationId: null,
+      recipeTitleSnapshot: title,
+      recipeIngredientsSnapshot: EMPTY_MEAL_PLAN_INGREDIENT_SNAPSHOT,
+      recipeOverride: null,
+      options: JSON.stringify(normalizedChoices),
+      title,
+    };
+  } else if (kind === 'fast') {
+    details = {
+      ...details,
+      recipeId: null,
+      recipeRevision: null,
+      recipeCalculationId: null,
+      recipeTitleSnapshot: input.title || 'Fasting',
+      recipeIngredientsSnapshot: EMPTY_MEAL_PLAN_INGREDIENT_SNAPSHOT,
+      recipeOverride: null,
+      title: input.title || 'Fasting',
+    };
   }
   if (kind !== 'leftover') {
     if (input.recipeOverride === null || input.recipeId !== previous?.recipeId)
@@ -1127,7 +1205,7 @@ export function generateShoppingList(
   const combined: GeneratedItem[] = [];
 
   plannedMeals.forEach((plannedMeal) => {
-    if (plannedMeal.kind === 'leftover' || plannedMeal.kind === 'takeout') return;
+    if (['leftover', 'takeout', 'fast', 'options'].includes(plannedMeal.kind ?? '')) return;
     const snapshot = parseMealPlanIngredientSnapshot(plannedMeal.recipeIngredientsSnapshot);
     const recipe = snapshot || !plannedMeal.recipeId ? null : getRecipe(plannedMeal.recipeId);
     if (!snapshot && !recipe) return;
@@ -1731,6 +1809,8 @@ export function addShoppingListItem(
         : aisleIdOrNull(input.aisleId),
     checked: input.checked,
     shoppingState: input.checked ? 'sourced' : (input.shoppingState ?? 'to_buy'),
+    cartQuantity: input.cartQuantity ?? 0,
+    cartLabel: input.cartLabel ?? '',
     sourceRecipeIds: JSON.stringify(input.recipeId ? [input.recipeId] : []),
     createdAt: now,
     updatedAt: now,
@@ -1822,6 +1902,8 @@ export function updateShoppingListItem(
             ? resolveShoppingAisle(list.supermarketProfileId, { item: input.item }, transaction)
             : aisleIdOrNull(input.aisleId),
         checked: input.checked,
+        cartQuantity: input.cartQuantity ?? previous.cartQuantity,
+        cartLabel: input.cartLabel ?? previous.cartLabel,
         shoppingState:
           input.checked || input.shoppingState === 'sourced'
             ? 'sourced'

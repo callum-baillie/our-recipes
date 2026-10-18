@@ -1,14 +1,11 @@
 import { PageHeader } from '@/components/page-header';
-import { CalendarDays, ChevronLeft, Clock3 } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { BordHeaderLockup } from '@/components/bord-brand';
 import { instacartConfigured } from '@/lib/services/instacart-service';
 import { ShoppingListEditor } from '@/components/shopping-list-editor';
 import { ShoppingListMobileMenu } from '@/components/shopping-list-mobile-menu';
-import { shoppingListSourceKind, shoppingListSourceLabel } from '@/lib/domain/planning';
 import { listPantryOptionSummaries } from '@/lib/services/pantry-service';
 import { getShoppingList } from '@/lib/services/planning-service';
 
@@ -34,59 +31,24 @@ export default async function ShoppingListPage({
 }) {
   const list = getShoppingList((await params).listId);
   if (!list) notFound();
-  const toFind = list.items.filter(
-    (item) => item.shoppingState === 'to_buy' || item.shoppingState === 'cant_find',
-  ).length;
-  const inCart = list.items.filter((item) => item.shoppingState === 'in_cart').length;
-  const sourced = list.items.filter((item) => item.shoppingState === 'sourced').length;
   const restored = (await searchParams).restored === '1';
-  const source = shoppingListSourceKind(list.sourceMode);
-  const updated = new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(list.updatedAt);
   return (
     <main className={`${styles.page} shopping-list-focus-page`}>
       <header className={styles.mobileHeader}>
-        <Link href="/lists" aria-label="Back to all lists">
-          <ChevronLeft />
-        </Link>
         <BordHeaderLockup className={styles.mobileBrand} />
         <ShoppingListMobileMenu listId={list.id} listName={list.name} />
       </header>
       <PageHeader
         className={styles.listPageHeader}
+        density="compact"
         title={list.name}
-        eyebrow="SHOPPING LIST"
         description={
           <>
-            {list.weekStart ? `${list.weekStart} — ${list.weekEnd}` : 'Manual household list'}
+            {list.weekStart
+              ? `${list.weekStart} — ${list.weekEnd}`
+              : 'A list for this shopping trip'}
             {list.isAutomaticRestockTarget ? ' · Next shop' : ''}
           </>
-        }
-        actions={
-          <Link className="secondary-button compact" href="/lists">
-            <ChevronLeft size={16} /> All lists
-          </Link>
-        }
-        meta={
-          <div className={styles.heroMeta}>
-            <span>
-              <Clock3 /> <strong>{toFind} to find</strong>
-              <small>
-                {inCart} in cart · {sourced} sourced
-              </small>
-            </span>
-            <span>
-              <CalendarDays /> <strong>{shoppingListSourceLabel(source)}</strong>
-            </span>
-            <span>
-              <Clock3 /> <strong>Updated</strong>
-              <small>{updated}</small>
-            </span>
-          </div>
         }
       />
 

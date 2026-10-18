@@ -1,9 +1,13 @@
 'use client';
+import { formatShoppingQuantity } from '@/lib/domain/shopping-quantity';
+import { ButtonSpinner } from './skeleton';
+import { InlineAlert } from './inline-alert';
 
 import { Check, ChevronLeft, ChevronRight, Heart, Play, Plus, Timer, X } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react';
 
 import { createClientUuid } from '@/lib/client/client-uuid';
 import { RecipePantryPanel } from '@/components/recipe-pantry-panel';
@@ -13,7 +17,13 @@ import type { RecipeDetail } from '@/lib/services/recipe-service';
 
 import styles from './cooking-mode.module.css';
 
-type LocalTimer = { id: string; label: string; remaining: number; running: boolean };
+type LocalTimer = {
+  id: string;
+  label: string;
+  remaining: number;
+  running: boolean;
+  endsAt: number;
+};
 type BatchDeduction = {
   batchId: string;
   locationName: string;
@@ -81,6 +91,11 @@ export function CookingMode({
   const baseServings = recipeYieldNumber(recipe.servings) ?? 1;
   const [servings, setServings] = useState(initialServings ?? baseServings);
   const [step, setStep] = useState(0);
+  const [readingMode, setReadingMode] = useState<'steps' | 'recipe'>('steps');
+  const [cookingBusy, setCookingBusy] = useState(false);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set());
   const [favorite, setFavorite] = useState(initialFavorite);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [pantryReview, setPantryReview] = useState<ReviewLine[]>([]);
@@ -110,13 +125,14 @@ export function CookingMode({
   const [timerMinutes, setTimerMinutes] = useState(5);
   const [temperature, setTemperature] = useState('');
   const [temperatureUnit, setTemperatureUnit] = useState<'C' | 'F'>('C');
+  const touchStartX = useRef<number | null>(null);
   useEffect(() => {
     const id = window.setInterval(
       () =>
         setTimers((current) =>
           current.map((timer) =>
             timer.running && timer.remaining > 0
-              ? { ...timer, remaining: timer.remaining - 1 }
+              ? { ...timer, remaining: Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000)) }
               : timer,
           ),
         ),
@@ -137,6 +153,8 @@ export function CookingMode({
         recommendedConsumptions?: Array<Omit<ReviewLine, 'decision' | 'note'>>;
       };
     } | null;
+    if (!response.ok || !body?.session)
+      throw new Error('Could not start cooking. Please try again.');
     if (body?.session) {
       setSessionId(body.session.id);
       setPlannedMeal(body.pantry?.plannedMeal ?? null);
@@ -333,15 +351,37 @@ export function CookingMode({
     setPreparedStatus('Prepared Nutrition batch saved. Nothing has been marked eaten.');
     router.refresh();
   };
+  const runCookingAction = async () => {
+    if (cookingBusy) return;
+    setCookingBusy(true);
+    setActionError('');
+    try {
+      await (sessionId ? finishCooking() : startCooking());
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Could not update cooking. Please try again.',
+      );
+    } finally {
+      setCookingBusy(false);
+    }
+  };
   const toggleFavorite = async () => {
-    const next = !favorite;
-    setFavorite(next);
-    const response = await fetch(`/api/v1/recipes/${recipe.id}/favorite`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ favorite: next }),
-    });
-    if (!response.ok) setFavorite(!next);
+    if (favoriteBusy) return;
+    setFavoriteBusy(true);
+    setActionError('');
+    try {
+      const response = await fetch(`/api/v1/recipes/${recipe.id}/favorite`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: !favorite }),
+      });
+      if (!response.ok) throw new Error('Could not save your favorite. Please try again.');
+      setFavorite(!favorite);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not save your favorite.');
+    } finally {
+      setFavoriteBusy(false);
+    }
   };
   const addTimer = () => {
     const seconds = Math.max(1, Math.round(timerMinutes * 60));
@@ -352,31 +392,70 @@ export function CookingMode({
         label: `Timer ${current.length + 1}`,
         remaining: seconds,
         running: true,
+        endsAt: Date.now() + seconds * 1000,
       },
     ]);
   };
   const formatted = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const changeStep = (next: number) => {
+    setReadingMode('steps');
+    setStep(Math.max(0, Math.min(Math.max(steps.length - 1, 0), next)));
+  };
+  const toggleCurrentStep = () => {
+    const wasComplete = completedSteps.has(step);
+    setCompletedSteps((current) => {
+      const next = new Set(current);
+      if (next.has(step)) next.delete(step);
+      else next.add(step);
+      return next;
+    });
+    if (!wasComplete && step < steps.length - 1) changeStep(step + 1);
+  };
+  const showTimers = () =>
+    document.getElementById('cook-timers')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const handleStepTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    const startX = touchStartX.current;
+    const endX = event.changedTouches[0]?.clientX;
+    touchStartX.current = null;
+    if (startX === null || endX === undefined || Math.abs(endX - startX) < 60) return;
+    changeStep(step + (endX < startX ? 1 : -1));
+  };
   return (
     <main className="cooking-page">
       <header className="cooking-header">
         <Link className="quiet-link" href={`/recipes/${recipe.id}`}>
-          ← Recipe card
+          ← Recipe details
         </Link>
         <button
           className="favorite-button"
           type="button"
+          disabled={favoriteBusy}
+          aria-busy={favoriteBusy}
           aria-pressed={favorite}
           onClick={() => void toggleFavorite()}
         >
+          {favoriteBusy && <ButtonSpinner />}
           <Heart size={18} fill={favorite ? 'currentColor' : 'none'} />{' '}
           {favorite ? 'Favorite' : 'Save favorite'}
         </button>
       </header>
+      {actionError && <InlineAlert tone="error">{actionError}</InlineAlert>}
       <section className="cooking-top">
         <div>
-          <p className="eyebrow">COOKING {recipe.title.toUpperCase()}</p>
+          {recipe.images[0] ? (
+            <Image
+              className="cooking-recipe-image"
+              src={`/api/v1/recipes/${recipe.id}/images/${recipe.images[0].id}`}
+              alt={recipe.images[0].altText || recipe.title}
+              width={recipe.images[0].width}
+              height={recipe.images[0].height}
+              unoptimized
+            />
+          ) : null}
+          <p className="eyebrow">MAKE THIS MEAL</p>
           <h1>{recipe.title}</h1>
+          {recipe.summary ? <p className="cooking-recipe-summary">{recipe.summary}</p> : null}
           <div className="serving-control">
             <label>
               Cook for{' '}
@@ -392,9 +471,15 @@ export function CookingMode({
             <button
               className="primary-button compact"
               type="button"
-              onClick={() => void (sessionId ? finishCooking() : startCooking())}
+              disabled={cookingBusy}
+              aria-busy={cookingBusy}
+              onClick={() => void runCookingAction()}
             >
-              {sessionId ? (
+              {cookingBusy ? (
+                <>
+                  <ButtonSpinner /> Saving…
+                </>
+              ) : sessionId ? (
                 <>
                   <Check size={16} /> Finish cooking
                 </>
@@ -462,8 +547,13 @@ export function CookingMode({
                 {group.ingredients.map((ingredient) => (
                   <li key={ingredient.id}>
                     <strong>
-                      {scaledQuantity(ingredient.quantity, recipe.servings, servings) ?? ''}{' '}
-                      {ingredient.unit}
+                      {ingredient.quantity === null
+                        ? ingredient.unit
+                        : formatShoppingQuantity(
+                            scaledQuantity(ingredient.quantity, recipe.servings, servings) ??
+                              ingredient.quantity,
+                            ingredient.unit,
+                          )}
                     </strong>{' '}
                     {ingredient.item}
                     {ingredient.note && <em> — {ingredient.note}</em>}
@@ -474,31 +564,92 @@ export function CookingMode({
           ))}
         </aside>
         <section className="step-focus">
-          <p className="eyebrow">
-            STEP {step + 1} OF {steps.length}
-          </p>
-          <h2>{steps[step]?.section || 'Method'}</h2>
-          <p>{steps[step]?.body}</p>
-          <div className="step-actions">
+          <div className="button-row" role="group" aria-label="Recipe reading mode">
             <button
-              className="text-button"
               type="button"
-              disabled={step === 0}
-              onClick={() => setStep((current) => current - 1)}
+              aria-pressed={readingMode === 'recipe'}
+              onClick={() => setReadingMode('recipe')}
             >
-              <ChevronLeft size={18} /> Back
+              Full recipe
             </button>
             <button
-              className="primary-button"
               type="button"
-              disabled={step === steps.length - 1}
-              onClick={() => setStep((current) => current + 1)}
+              aria-pressed={readingMode === 'steps'}
+              onClick={() => setReadingMode('steps')}
             >
-              Next step <ChevronRight size={18} />
+              Step by step
             </button>
           </div>
+          {readingMode === 'recipe' ? (
+            <ol className="cooking-full-method">
+              {steps.map((entry, index) => (
+                <li key={index}>
+                  <strong>{entry.section}</strong>
+                  <p>{entry.body}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(index);
+                      setReadingMode('steps');
+                    }}
+                  >
+                    Start at step {index + 1}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <>
+              <p className="eyebrow">
+                STEP {steps.length ? step + 1 : 0} OF {steps.length}
+              </p>
+              <div
+                className="cooking-step-progress"
+                role="progressbar"
+                aria-label="Recipe step progress"
+                aria-valuemin={0}
+                aria-valuemax={steps.length || 1}
+                aria-valuenow={steps.length ? step + 1 : 0}
+              >
+                <span
+                  style={{
+                    width: `${steps.length ? ((step + 1) / steps.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <h2>{steps[step]?.section || 'Method'}</h2>
+              <p
+                className="cooking-instruction"
+                aria-live="polite"
+                onTouchStart={(event) => {
+                  touchStartX.current = event.changedTouches[0]?.clientX ?? null;
+                }}
+                onTouchEnd={handleStepTouchEnd}
+              >
+                {steps[step]?.body || 'This recipe does not have written steps yet.'}
+              </p>
+              <div className="step-actions">
+                <button
+                  className="text-button"
+                  type="button"
+                  disabled={step === 0}
+                  onClick={() => changeStep(step - 1)}
+                >
+                  <ChevronLeft size={18} /> Back
+                </button>
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={step === steps.length - 1}
+                  onClick={() => changeStep(step + 1)}
+                >
+                  Next step <ChevronRight size={18} />
+                </button>
+              </div>
+            </>
+          )}
         </section>
-        <aside className={`timer-panel ${styles.timerPanel}`}>
+        <aside id="cook-timers" className={`timer-panel ${styles.timerPanel}`}>
           <h2>
             <Timer size={20} /> Timers
           </h2>
@@ -514,6 +665,11 @@ export function CookingMode({
               <Plus size={16} /> Add
             </button>
           </div>
+          <p role="status">
+            {timers.some((timer) => timer.remaining === 0)
+              ? 'Timer finished. Check your food.'
+              : ''}
+          </p>
           {timers.length ? (
             timers.map((timer) => (
               <article key={timer.id}>
@@ -525,7 +681,13 @@ export function CookingMode({
                   onClick={() =>
                     setTimers((current) =>
                       current.map((entry) =>
-                        entry.id === timer.id ? { ...entry, running: !entry.running } : entry,
+                        entry.id === timer.id
+                          ? {
+                              ...entry,
+                              running: !entry.running,
+                              endsAt: Date.now() + entry.remaining * 1000,
+                            }
+                          : entry,
                       ),
                     )
                   }
@@ -904,6 +1066,35 @@ export function CookingMode({
             )
           ) : null}
         </div>
+      )}
+      {!showPantryConfirmation && (
+        <nav className="cooking-mobile-toolbar" aria-label="Cooking controls">
+          <button type="button" disabled={step === 0} onClick={() => changeStep(step - 1)}>
+            <ChevronLeft aria-hidden="true" /> <span>Previous</span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={completedSteps.has(step)}
+            disabled={!steps.length}
+            onClick={toggleCurrentStep}
+          >
+            <Check aria-hidden="true" />
+            <span>{completedSteps.has(step) ? 'Done' : 'Complete step'}</span>
+          </button>
+          <span className="cooking-toolbar-count">
+            {steps.length ? `${step + 1} / ${steps.length}` : 'No steps'}
+          </span>
+          <button
+            type="button"
+            disabled={step >= steps.length - 1}
+            onClick={() => changeStep(step + 1)}
+          >
+            <span>Next</span> <ChevronRight aria-hidden="true" />
+          </button>
+          <button type="button" onClick={showTimers}>
+            <Timer aria-hidden="true" /> <span>Timer</span>
+          </button>
+        </nav>
       )}
     </main>
   );

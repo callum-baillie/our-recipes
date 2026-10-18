@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { Plus, RefreshCw, Settings2, X, Unplug } from 'lucide-react';
 import { syncIntervals, type IntegrationState } from '@/lib/domain/integration-settings';
+import { ButtonSpinner } from '@/components/skeleton';
 import styles from './integrations-manager.module.css';
 type Reading = { userId: string; userLabel?: string; weightKilograms: number; measuredAt: string };
 type Account = IntegrationState['accounts'][number];
@@ -132,9 +133,19 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
           title="VeSync"
           description="Connect an Etekcity ESF24 account to import weigh-ins and supported body metrics into Nutrition."
         >
-          <button className="secondary-button" type="button" onClick={connect} disabled={busy}>
-            <Plus size={17} />
-            {state.accounts.length ? 'Add another account' : 'Connect VeSync'}
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={connect}
+            disabled={busy}
+            aria-busy={busy}
+          >
+            {busy ? <ButtonSpinner /> : <Plus size={17} />}
+            {busy
+              ? 'Please wait…'
+              : state.accounts.length
+                ? 'Add another account'
+                : 'Connect VeSync'}
           </button>
         </SettingsRow>
         <SettingsSubsection
@@ -157,10 +168,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                       className="text-button"
                       type="button"
                       disabled={busy || !account.mappings.length || account.syncing}
+                      aria-busy={busy}
                       onClick={() => void sync(account)}
                     >
-                      <RefreshCw size={16} />
-                      Sync now
+                      {busy ? <ButtonSpinner /> : <RefreshCw size={16} />}
+                      {busy ? 'Syncing…' : 'Sync now'}
                     </button>
                     <button
                       className="text-button"
@@ -209,6 +221,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     type="button"
                     disabled={busy}
                     className="text-button"
+                    aria-busy={busy}
                     onClick={() =>
                       void run(async () => {
                         await request({ action: 'unassign', id: mapping.id });
@@ -217,7 +230,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                       })
                     }
                   >
-                    Remove assignment
+                    {busy ? <ButtonSpinner /> : null}
+                    {busy ? 'Removing…' : 'Remove assignment'}
                   </button>
                 }
               />
@@ -356,7 +370,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               </select>
             </SettingsField>
             <SettingsActionBar>
-              <button className={styles.primary} disabled={busy}>
+              <button className={styles.primary} disabled={busy} aria-busy={busy}>
+                {busy ? <ButtonSpinner /> : null}
                 {busy ? 'Connecting…' : 'Sign in to VeSync'}
               </button>
             </SettingsActionBar>
@@ -415,7 +430,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 </select>
               </SettingsField>
               <SettingsActionBar>
-                <button className={styles.primary} disabled={busy}>
+                <button className={styles.primary} disabled={busy} aria-busy={busy}>
+                  {busy ? <ButtonSpinner /> : null}
                   {busy ? 'Please wait…' : 'Save settings'}
                 </button>
               </SettingsActionBar>
@@ -479,6 +495,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 <button
                   className={styles.secondary}
                   disabled={busy || !device}
+                  aria-busy={busy}
                   onClick={() =>
                     void run(async () => {
                       const result = await request({
@@ -495,6 +512,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     })
                   }
                 >
+                  {busy ? <ButtonSpinner /> : null}
                   {busy ? 'Please wait…' : 'Find VeSync profiles'}
                 </button>
                 {readings.length ? (
@@ -548,6 +566,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     <button
                       className={styles.secondary}
                       disabled={busy || !profileId || !scaleUser}
+                      aria-busy={busy}
                       onClick={() =>
                         void run(async () => {
                           await request({
@@ -564,7 +583,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                         })
                       }
                     >
-                      Assign profile
+                      {busy ? <ButtonSpinner /> : null}
+                      {busy ? 'Assigning…' : 'Assign profile'}
                     </button>
                   </>
                 ) : null}
@@ -577,9 +597,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               <button
                 className={styles.secondary}
                 disabled={busy || !editing.mappings.length}
+                aria-busy={busy}
                 onClick={() => void sync(editing)}
               >
-                <RefreshCw size={16} /> Sync now
+                {busy ? <ButtonSpinner /> : <RefreshCw size={16} />}
+                {busy ? 'Syncing…' : 'Sync now'}
               </button>
             </SettingsRow>
             <SettingsRow
@@ -591,6 +613,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   <button
                     className={styles.danger}
                     disabled={busy}
+                    aria-busy={busy}
                     onClick={() =>
                       void run(async () => {
                         await request({ action: 'remove', id: editing.id });
@@ -600,7 +623,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                       })
                     }
                   >
-                    Remove {editing.label}
+                    {busy ? <ButtonSpinner /> : null}
+                    {busy ? 'Removing…' : `Remove ${editing.label}`}
                   </button>
                   <button
                     className={styles.secondary}

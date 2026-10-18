@@ -1252,7 +1252,7 @@ export function PantryManager({
   }
 
   if (!dashboard && !initialLoadComplete) {
-    return <PageSkeleton as="div" variant="workspace" />;
+    return <PageSkeleton as="div" variant="workspace" label="Loading pantry inventory" />;
   }
 
   if (!dashboard) {

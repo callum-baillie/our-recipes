@@ -463,3 +463,23 @@
   padding: 0.5rem;
   font: inherit;
 }
+
+.genericCard details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.genericCard {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 540px) {
+  .actions button {
+    min-height: 44px;
+  }
+  .genericCard {
+    padding: 0.85rem;
+  }
+}

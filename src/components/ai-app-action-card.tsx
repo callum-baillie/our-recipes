@@ -1,9 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ImagePlus, Pencil, Trash2 } from 'lucide-react';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
-import styles from './decision-assistance.module.css';
-import { AsyncSkeleton } from './skeleton';
+import { InlineAlert } from './inline-alert';
+import { ButtonSpinner } from './skeleton';
+import styles from './ai-app-action-card.module.css';
 function ReviewValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span>Not set</span>;
   if (Array.isArray(value))
@@ -31,16 +33,23 @@ function ReviewValue({ value }: { value: unknown }) {
     );
   return <span>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}</span>;
 }
+
 export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
   const router = useRouter();
-  const generatesImages = proposal.actions.some((action) =>
-    action.path.endsWith('/images/generate'),
-  );
-  const [status, setStatus] = useState(proposal.status);
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('');
+  const [outcome, setOutcome] = useState<{
+    status: string;
+    results: NonNullable<AppActionReview['results']>;
+    skipped?: number;
+  } | null>(null);
+  const [pending, setPending] = useState<'apply' | 'dismiss' | null>(null);
+  const [error, setError] = useState('');
+  const status =
+    proposal.status !== 'pending' ? proposal.status : (outcome?.status ?? proposal.status);
+  const results = proposal.results ?? outcome?.results ?? [];
+  const images = proposal.actions.every((action) => action.path.endsWith('/images/generate'));
   async function decide(decision: 'apply' | 'dismiss') {
-    setPending(true);
+    setPending(decision);
+    setError('');
     try {
       const response = await fetch('/api/v1/ai/app-actions', {
         method: 'POST',
@@ -50,56 +59,112 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error?.message ?? 'Unable to confirm these changes.');
-      setStatus(result.status);
-      setMessage(
-        result.results
-          .map((r: { summary: string; message: string }) => `${r.summary}: ${r.message}`)
-          .join(' ') + (result.skipped ? ` ${result.skipped} later actions were skipped.` : ''),
-      );
+      setOutcome(result);
+      window.dispatchEvent(new Event('bord:ai-jobs-changed'));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to confirm.');
+      setError(error instanceof Error ? error.message : 'Unable to confirm.');
     } finally {
-      setPending(false);
+      setPending(null);
     }
   }
+  function row(action: AppActionReview['actions'][number], index: number) {
+    const image = action.path.endsWith('/images/generate');
+    const Icon = image ? ImagePlus : action.method === 'DELETE' ? Trash2 : Pencil;
+    return (
+      <li key={index} className={styles.row}>
+        <Icon size={17} aria-hidden="true" />
+        <div>
+          <strong>{action.recordLabel ?? action.summary.split('. ')[0]}</strong>
+          <span>
+            {action.changeLabel ??
+              (action.method === 'DELETE' ? 'Remove' : action.method === 'POST' ? 'Add' : 'Update')}
+          </span>
+          {!image && (
+            <details>
+              <summary>Details</summary>
+              <ReviewValue value={{ record: action.parameters, changes: action.body }} />
+            </details>
+          )}
+        </div>
+      </li>
+    );
+  }
   return (
-    <section className={styles.card} aria-label="Review proposed app changes">
-      <span className={styles.badge}>{status === 'pending' ? 'Review before saving' : status}</span>
-      <h3>{proposal.title}</h3>
-      <p>
-        {proposal.actions.length} {proposal.actions.length === 1 ? 'change' : 'changes'}. Check the
-        affected records and values below.
-      </p>
-      {proposal.actions.map((action, index) => (
-        <details key={index} open={proposal.actions.length === 1}>
-          <summary>
-            {index + 1}. {action.summary}
-            {action.method === 'DELETE' ? ' — delete' : ''}
-          </summary>
-          <div className={styles.evidence}>
-            <ReviewValue value={{ record: action.parameters, changes: action.body }} />
-          </div>
+    <section
+      className={styles.card}
+      aria-label="Review proposed app changes"
+      aria-busy={pending !== null}
+    >
+      <header>
+        <span className={styles.badge}>
+          {status === 'pending'
+            ? 'Review changes'
+            : status === 'queued'
+              ? 'Background task'
+              : status}
+        </span>
+        <h3>{proposal.title}</h3>
+        <small>
+          {proposal.actions.length} {images ? 'images' : 'changes'}
+          {images && status === 'pending' ? ' · Paid generation' : ''}
+        </small>
+      </header>
+      <ul className={styles.rows}>{proposal.actions.slice(0, 4).map(row)}</ul>
+      {proposal.actions.length > 4 && (
+        <details>
+          <summary>Show {proposal.actions.length - 4} more</summary>
+          <ul className={styles.rows}>
+            {proposal.actions.slice(4).map((action, index) => row(action, index + 4))}
+          </ul>
         </details>
-      ))}
+      )}
       {status === 'pending' && (
         <div className={styles.actions}>
-          <button className={styles.primary} disabled={pending} onClick={() => decide('apply')}>
-            {pending
-              ? generatesImages
-                ? 'Generating images…'
-                : 'Saving…'
-              : `Confirm ${proposal.actions.length === 1 ? 'change' : 'selected batch'}`}
+          <button type="button" disabled={pending !== null} onClick={() => void decide('apply')}>
+            {pending === 'apply' && <ButtonSpinner />}
+            {pending === 'apply'
+              ? 'Starting…'
+              : images
+                ? `Generate ${proposal.actions.length === 1 ? 'image' : `${proposal.actions.length} images`}`
+                : 'Confirm changes'}
           </button>
-          <button disabled={pending} onClick={() => decide('dismiss')}>
-            Dismiss
+          <button type="button" disabled={pending !== null} onClick={() => void decide('dismiss')}>
+            {pending === 'dismiss' ? 'Dismissing…' : 'Dismiss'}
           </button>
         </div>
       )}
-      {pending && generatesImages ? (
-        <AsyncSkeleton variant="image" label="Generating recipe images" />
-      ) : null}
-      {message && <p role="status">{message}</p>}
+      {status === 'queued' && (
+        <InlineAlert>
+          Queued. You can close the browser; the server will save the results. Follow progress in
+          background tasks.
+        </InlineAlert>
+      )}
+      {status === 'partial' && (
+        <InlineAlert tone="warning">
+          {results.filter((result) => result.ok).length} of {proposal.actions.length} changes
+          completed. Review the results before retrying.
+        </InlineAlert>
+      )}
+      {status === 'applied' && (
+        <InlineAlert tone="success">
+          {proposal.actions.length} {images ? 'images saved' : 'changes saved'}.
+        </InlineAlert>
+      )}
+      {!!results.length && status !== 'queued' && (
+        <details>
+          <summary>Results</summary>
+          <ul className={styles.results}>
+            {results.map((result, index) => (
+              <li key={index}>
+                <strong>{result.summary}</strong>
+                <span>{result.message}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {error && <InlineAlert tone="error">{error}</InlineAlert>}
     </section>
   );
 }

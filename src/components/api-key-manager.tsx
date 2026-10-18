@@ -29,6 +29,7 @@ import { authClient } from '@/lib/auth/client';
 import type { ApiKeyDto } from '@/lib/services/api-key-service';
 import type { ApiAction, ApiPermissions, ApiResource } from '@/lib/domain/auth';
 import { useToast } from '@/components/toast-provider';
+import { ButtonSpinner } from '@/components/skeleton';
 
 const resources: Array<{ id: ApiResource; label: string; icon: typeof BookOpen }> = [
   { id: 'recipes', label: 'Recipes', icon: BookOpen },
@@ -70,6 +71,9 @@ export function ApiKeyManager({
     value: string;
   } | null>(null);
   const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    { type: 'create' } | { type: 'rotate' | 'revoke' | 'enable'; apiKeyId: string } | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -100,8 +104,10 @@ export function ApiKeyManager({
   async function apiRequest(
     path: string,
     init: RequestInit,
+    action: Exclude<typeof pendingAction, null>,
   ): Promise<Record<string, unknown> | null> {
     setPending(true);
+    setPendingAction(action);
     setError(null);
     try {
       const response = await fetch(path, {
@@ -126,15 +132,20 @@ export function ApiKeyManager({
       return null;
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
   async function createKey(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body = await apiRequest('/api/v1/admin/api-keys', {
-      method: 'POST',
-      body: JSON.stringify({ name, expiresInDays, permissions }),
-    });
+    const body = await apiRequest(
+      '/api/v1/admin/api-keys',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, expiresInDays, permissions }),
+      },
+      { type: 'create' },
+    );
     const apiKey = body?.apiKey as ApiKeyDto | undefined;
     const secret = body?.secret as string | undefined;
     if (!apiKey || !secret) return;
@@ -151,10 +162,14 @@ export function ApiKeyManager({
     ) {
       return;
     }
-    const body = await apiRequest(`/api/v1/admin/api-keys/${apiKey.id}`, {
-      method: enabled ? 'PATCH' : 'DELETE',
-      body: enabled ? JSON.stringify({ enabled: true }) : undefined,
-    });
+    const body = await apiRequest(
+      `/api/v1/admin/api-keys/${apiKey.id}`,
+      {
+        method: enabled ? 'PATCH' : 'DELETE',
+        body: enabled ? JSON.stringify({ enabled: true }) : undefined,
+      },
+      { type: enabled ? 'enable' : 'revoke', apiKeyId: apiKey.id },
+    );
     const updated = body?.apiKey as ApiKeyDto | undefined;
     if (!updated) return;
     setKeys((current) =>
@@ -170,10 +185,14 @@ export function ApiKeyManager({
     ) {
       return;
     }
-    const body = await apiRequest(`/api/v1/admin/api-keys/${apiKey.id}/rotate`, {
-      method: 'POST',
-      body: '{}',
-    });
+    const body = await apiRequest(
+      `/api/v1/admin/api-keys/${apiKey.id}/rotate`,
+      {
+        method: 'POST',
+        body: '{}',
+      },
+      { type: 'rotate', apiKeyId: apiKey.id },
+    );
     const replacement = body?.apiKey as ApiKeyDto | undefined;
     const secret = body?.secret as string | undefined;
     if (!replacement || !secret) return;
@@ -331,9 +350,14 @@ export function ApiKeyManager({
               className="primary-button"
               type="submit"
               disabled={pending || needsConfirmation || Boolean(revealedSecret)}
+              aria-busy={pendingAction?.type === 'create'}
             >
-              <Plus size={16} aria-hidden="true" />
-              {pending ? 'Creating…' : 'Create key'}
+              {pendingAction?.type === 'create' ? (
+                <ButtonSpinner />
+              ) : (
+                <Plus size={16} aria-hidden="true" />
+              )}{' '}
+              {pendingAction?.type === 'create' ? 'Creating…' : 'Create key'}
             </button>
           </SettingsActionBar>
         </SettingsPane>
@@ -383,19 +407,39 @@ export function ApiKeyManager({
                           className="secondary-button"
                           type="button"
                           disabled={pending}
+                          aria-busy={
+                            pendingAction?.type === 'rotate' && pendingAction.apiKeyId === apiKey.id
+                          }
                           onClick={() => rotateKey(apiKey)}
                         >
-                          <RefreshCw size={15} aria-hidden="true" />
-                          Rotate
+                          {pendingAction?.type === 'rotate' &&
+                          pendingAction.apiKeyId === apiKey.id ? (
+                            <ButtonSpinner />
+                          ) : (
+                            <RefreshCw size={15} aria-hidden="true" />
+                          )}{' '}
+                          {pendingAction?.type === 'rotate' && pendingAction.apiKeyId === apiKey.id
+                            ? 'Rotating…'
+                            : 'Rotate'}
                         </button>
                         <button
                           className="danger-button"
                           type="button"
                           disabled={pending}
+                          aria-busy={
+                            pendingAction?.type === 'revoke' && pendingAction.apiKeyId === apiKey.id
+                          }
                           onClick={() => setEnabled(apiKey, false)}
                         >
-                          <ShieldOff size={15} aria-hidden="true" />
-                          Revoke
+                          {pendingAction?.type === 'revoke' &&
+                          pendingAction.apiKeyId === apiKey.id ? (
+                            <ButtonSpinner />
+                          ) : (
+                            <ShieldOff size={15} aria-hidden="true" />
+                          )}{' '}
+                          {pendingAction?.type === 'revoke' && pendingAction.apiKeyId === apiKey.id
+                            ? 'Revoking…'
+                            : 'Revoke'}
                         </button>
                       </>
                     ) : (
@@ -403,9 +447,18 @@ export function ApiKeyManager({
                         className="secondary-button"
                         type="button"
                         disabled={pending}
+                        aria-busy={
+                          pendingAction?.type === 'enable' && pendingAction.apiKeyId === apiKey.id
+                        }
                         onClick={() => setEnabled(apiKey, true)}
                       >
-                        Re-enable
+                        {pendingAction?.type === 'enable' &&
+                        pendingAction.apiKeyId === apiKey.id ? (
+                          <ButtonSpinner />
+                        ) : null}
+                        {pendingAction?.type === 'enable' && pendingAction.apiKeyId === apiKey.id
+                          ? 'Enabling…'
+                          : 'Re-enable'}
                       </button>
                     )}
                   </div>
@@ -507,7 +560,8 @@ function ApiKeyConfirmation({
         </p>
       ) : null}
       <div className="settings-inline-actions">
-        <button type="submit" className="primary-button" disabled={pending}>
+        <button type="submit" className="primary-button" disabled={pending} aria-busy={pending}>
+          {pending ? <ButtonSpinner /> : null}
           {pending ? 'Confirming…' : 'Confirm identity'}
         </button>
         <button type="button" className="secondary-button" disabled={pending} onClick={onCancel}>

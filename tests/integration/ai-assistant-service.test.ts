@@ -1,3 +1,5 @@
+import { prepareAppActions, confirmAppActions } from '@/lib/services/ai-app-action-service';
+import type { RequestPrincipal } from '@/lib/services/auth-service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 
@@ -5,6 +7,7 @@ vi.mock('server-only', () => ({}));
 
 import { getDatabase, resetDatabaseForTests } from '@/lib/db/client';
 import {
+  aiChatMessages,
   aiActionPreviewImages,
   aiJobs,
   aiOperationAudits,
@@ -34,7 +37,8 @@ import { buildAiProfileContext } from '@/lib/services/ai-context-service';
 import { setAiProviderForTests } from '@/lib/services/ai-readiness-service';
 import { generateAiMealPlanProposal } from '@/lib/services/ai-meal-plan-service';
 import {
-  enqueueRecipeImageJob,
+  getAiJob,
+  retryAiJob,
   runDueAiJobs,
   setAiBatchClientForTests,
 } from '@/lib/services/ai-job-service';
@@ -49,7 +53,7 @@ import {
   getAiSettings,
   updateAiSettings,
 } from '@/lib/services/ai-settings-service';
-import { completeSetup } from '@/lib/services/household-service';
+import { completeSetup, updateProfile } from '@/lib/services/household-service';
 import { addMealPlanEntryWithNutrition } from '@/lib/services/nutrition-planning-orchestration-service';
 import { listPlannedMeals } from '@/lib/services/planning-service';
 import { createRecipe, listRecipes } from '@/lib/services/recipe-service';
@@ -227,6 +231,35 @@ describe('AI assistant services', () => {
         },
       ],
     });
+  });
+
+  it('retains kitchen interview context while respecting dietary sharing', () => {
+    const profile = setupProfile();
+    const interview = {
+      taste: 'Sweet tooth',
+      snacks: 'Apples at night',
+      desserts: 'Ice cream occasionally',
+      routine: 'Shared dinners',
+      favorites: 'Soup',
+      avoid: 'No mushrooms',
+    };
+    updateProfile(profile.id, {
+      displayName: profile.displayName,
+      color: profile.color,
+      units: profile.units,
+      temperatureUnit: profile.temperatureUnit,
+      locale: profile.locale,
+      timezone: profile.timezone,
+      goalContext: { ...profile.goalContext, kitchenInterview: interview },
+    });
+    updateAiSettings(profile.id, {
+      dataPolicy: { ...getAiDataPolicy(profile.id), shareDietaryPreferences: false },
+    });
+    expect(buildAiProfileContext(profile.id)[0]).not.toHaveProperty('kitchenInterview');
+    updateAiSettings(profile.id, {
+      dataPolicy: { ...getAiDataPolicy(profile.id), shareDietaryPreferences: true },
+    });
+    expect(buildAiProfileContext(profile.id)[0]).toMatchObject({ kitchenInterview: interview });
   });
 
   it('keeps reflective profile goals out of AI context until separately enabled', () => {
@@ -819,77 +852,150 @@ describe('AI assistant services', () => {
     ]);
   });
 
-  it('uses Batch output custom IDs to attach four recipe images out of order', async () => {
-    const profile = setupProfile();
-    const imageBytes = await sharp({
-      create: { width: 48, height: 48, channels: 3, background: '#758c58' },
-    })
-      .png()
-      .toBuffer();
-    let submittedLines = '';
-    let output = '';
-    setAiBatchClientForTests({
-      submit: async ({ lines }) => {
-        submittedLines = lines;
-        const requests = lines
-          .split('\n')
-          .map((line) => JSON.parse(line) as { custom_id: string })
-          .reverse();
-        output = requests
-          .map((request) =>
-            JSON.stringify({
-              custom_id: request.custom_id,
-              response: {
-                status_code: 200,
-                body: { data: [{ b64_json: imageBytes.toString('base64') }] },
-              },
-            }),
-          )
-          .join('\n');
-        return { batchId: 'batch-test', inputFileId: 'file-input' };
-      },
-      retrieve: async () => ({
-        id: 'batch-test',
-        status: 'completed',
-        inputFileId: 'file-input',
-        outputFileId: 'file-output',
-        errorFileId: null,
-      }),
-      read: async () => output,
-      cancel: async () => undefined,
-      deleteFile: async () => undefined,
-    });
-    const recipeIds = Array.from(
-      { length: 4 },
-      (_, index) => createRecipe({ ...recipe, title: `Queued recipe ${index + 1}` }, profile.id).id,
-    );
-    const job = enqueueRecipeImageJob({
-      profileId: profile.id,
-      images: recipeIds.map((recipeId, index) => ({
-        recipeId,
-        recipeTitle: `Queued recipe ${index + 1}`,
-        recipeSummary: 'A compact queued image fixture.',
-        ingredientNames: ['chickpeas'],
-      })),
-    });
+  it.each([10, 4])(
+    'queues ten confirmed images and reports %i successful out-of-order outputs',
+    async (successfulCount) => {
+      const profile = setupProfile();
+      const thread = createAiChatThread(profile.id);
+      updateAiSettings(profile.id, {
+        dataPolicy: { ...getAiDataPolicy(profile.id), shareSharedRecipes: true },
+      });
+      setAiProviderForTests({
+        name: 'OpenAI',
+        getStatus: () => ({
+          provider: 'OpenAI',
+          state: 'configured',
+          enabled: true,
+          message: 'Mock provider',
+          supportedOperationKinds: ['image-generation'],
+        }),
+      } as unknown as AiProvider);
+      const principal: RequestPrincipal = {
+        kind: 'session',
+        userId: 'test-user',
+        role: 'admin',
+        accountRole: 'admin',
+        activeProfileRole: 'admin',
+        sessionId: 'test-session',
+        apiKeyId: null,
+        linkedProfileId: profile.id,
+        profileId: profile.id,
+      };
+      const imageBytes = await sharp({
+        create: { width: 48, height: 48, channels: 3, background: '#758c58' },
+      })
+        .png()
+        .toBuffer();
+      let submittedLines = '';
+      let output = '';
+      setAiBatchClientForTests({
+        submit: async ({ lines }) => {
+          submittedLines = lines;
+          const requests = lines
+            .split('\n')
+            .map((line) => JSON.parse(line) as { custom_id: string })
+            .reverse();
+          output = requests
+            .slice(0, successfulCount)
+            .map((request) =>
+              JSON.stringify({
+                custom_id: request.custom_id,
+                response: {
+                  status_code: 200,
+                  body: { data: [{ b64_json: imageBytes.toString('base64') }] },
+                },
+              }),
+            )
+            .join('\n');
+          return { batchId: 'batch-test', inputFileId: 'file-input' };
+        },
+        retrieve: async () => ({
+          id: 'batch-test',
+          status: 'completed',
+          inputFileId: 'file-input',
+          outputFileId: 'file-output',
+          errorFileId: null,
+        }),
+        read: async () => output,
+        cancel: async () => undefined,
+        deleteFile: async () => undefined,
+      });
+      const recipeIds = Array.from(
+        { length: 10 },
+        (_, index) =>
+          createRecipe({ ...recipe, title: `Queued recipe ${index + 1}` }, profile.id).id,
+      );
+      const request = new Request('http://localhost/api/v1/ai/app-actions', {
+        method: 'POST',
+        headers: { origin: 'http://localhost' },
+      });
+      const { appAction } = await prepareAppActions(principal, request, thread.id, {
+        title: 'Generate ten images',
+        actions: recipeIds.map((recipeId) => ({
+          operationId: 'generateRecipeImage',
+          parametersJson: JSON.stringify({ recipeId }),
+          bodyJson: JSON.stringify({ confirm: true }),
+        })),
+      });
+      expect(appAction.actions[0]).toMatchObject({
+        recordLabel: 'Queued recipe 1',
+        changeLabel: 'Create image',
+      });
+      const result = await confirmAppActions(principal, request, {
+        id: appAction.id,
+        version: appAction.version,
+        decision: 'apply',
+      });
+      expect(result.status).toBe('queued');
+      expect(getDatabase().select().from(aiJobs).all()).toHaveLength(1);
+      await expect(
+        confirmAppActions(principal, request, {
+          id: appAction.id,
+          version: appAction.version,
+          decision: 'apply',
+        }),
+      ).rejects.toThrow(/handled/);
 
-    expect(job).toMatchObject({ executionMode: 'batch', totalItems: 4 });
-    await runDueAiJobs();
-    expect(submittedLines.split('\n')).toHaveLength(4);
-    getDatabase()
-      .update(aiJobs)
-      .set({ nextAttemptAt: new Date(0) })
-      .run();
-    await runDueAiJobs();
-
-    expect(getDatabase().select().from(recipeImages).all()).toHaveLength(4);
-    expect(
+      await runDueAiJobs();
+      expect(submittedLines.split('\n')).toHaveLength(10);
       getDatabase()
-        .select({ recipeId: recipeImages.recipeId })
-        .from(recipeImages)
-        .all()
-        .map((image) => image.recipeId)
-        .sort(),
-    ).toEqual([...recipeIds].sort());
-  });
+        .update(aiJobs)
+        .set({ nextAttemptAt: new Date(0) })
+        .run();
+      await runDueAiJobs();
+
+      expect(getDatabase().select().from(recipeImages).all()).toHaveLength(successfulCount);
+      expect(getDatabase().select().from(aiJobs).all()[0]?.status).toBe(
+        successfulCount === 10 ? 'completed' : 'failed',
+      );
+      expect(
+        getDatabase()
+          .select({ recipeId: recipeImages.recipeId })
+          .from(recipeImages)
+          .all()
+          .map((image) => image.recipeId)
+          .sort(),
+      ).toEqual([...recipeIds].reverse().slice(0, successfulCount).sort());
+      expect(
+        getDatabase()
+          .select()
+          .from(aiChatMessages)
+          .all()
+          .some((message) =>
+            message.content.includes(`${successfulCount} of 10 recipe images saved`),
+          ),
+      ).toBe(true);
+      if (successfulCount === 4) {
+        const jobId = getDatabase().select().from(aiJobs).all()[0]!.id;
+        const retry = retryAiJob(jobId, profile.id);
+        expect(retry.completedItems).toBe(4);
+        expect(
+          getAiJob(jobId, profile.id).items.filter((item) => item.status === 'pending'),
+        ).toHaveLength(6);
+        await runDueAiJobs();
+        expect(submittedLines.split('\n')).toHaveLength(6);
+        expect(getDatabase().select().from(recipeImages).all()).toHaveLength(4);
+      }
+    },
+  );
 });

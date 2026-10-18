@@ -1,5 +1,6 @@
 'use client';
 import { BodyCompositionEstimatePanel } from './body-composition-estimate';
+import { ButtonSpinner } from '@/components/skeleton';
 import type { CompositionEstimate } from '@/lib/domain/qn-body-composition';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -27,6 +28,7 @@ export function NutritionScaleSettings({
   enabled: boolean;
 }) {
   const [connected, setConnected] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const router = useRouter();
@@ -39,7 +41,10 @@ export function NutritionScaleSettings({
       .then(async (response) => {
         if (response.ok) setConnected((await response.json()).connected);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setCheckingConnection(false);
+      });
     return () => controller.abort();
   }, [profileId]);
   async function sync() {
@@ -76,13 +81,26 @@ export function NutritionScaleSettings({
               <button type="button" className="primary-button" onClick={onRecord}>
                 New weigh-in
               </button>
+              {checkingConnection && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled
+                  aria-busy="true"
+                  aria-label="Checking scale connection"
+                >
+                  <ButtonSpinner /> Checking scale…
+                </button>
+              )}
               {connected && (
                 <button
                   type="button"
                   className="secondary-button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => void sync()}
                 >
+                  {busy ? <ButtonSpinner /> : null}
                   {busy ? 'Syncing…' : 'Sync with VeSync'}
                 </button>
               )}

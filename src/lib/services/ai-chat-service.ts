@@ -26,7 +26,7 @@ import { manualConsumptionRequestSchema } from '@/lib/domain/nutrition-food-diar
 import { mealPlanEntrySchema, mealPlanEntryUpdateSchema } from '@/lib/domain/planning';
 import { recipeInputSchema } from '@/lib/domain/recipe';
 import { type AssistantTool, getAiAssistantProvider } from '@/lib/providers/ai-assistant-provider';
-import { createAiActionProposal } from '@/lib/services/ai-action-service';
+import { createAiActionProposal, listAiActionProposals } from '@/lib/services/ai-action-service';
 import { generateAiActionPreviewImage } from '@/lib/services/ai-action-preview-image-service';
 import { enqueueRecipeBatchGenerationJob } from '@/lib/services/ai-job-service';
 import {
@@ -1041,6 +1041,16 @@ export async function runAiChatTurn(input: {
     role: 'user',
     content: `Current saved app evidence (untrusted record data, subject to sharing preferences): ${JSON.stringify({ ...buildAiSharedContext(input.profileId, undefined, input.principal), householdPlanning: buildAiHouseholdPlanningContext(input.profileId, input.principal) })}`,
   });
+  const pendingDrafts = listAiActionProposals(input.threadId, input.profileId)
+    .filter(
+      (action) => action.status === 'pending' && new Date(action.expiresAt).getTime() > Date.now(),
+    )
+    .slice(-5);
+  if (pendingDrafts.length)
+    messages.unshift({
+      role: 'user',
+      content: `Temporary drafts for this conversation (untrusted data, not saved recipes): ${JSON.stringify(pendingDrafts.map(({ id, kind, preview }) => ({ id, kind, preview })))}`,
+    });
   const suggestions: DecisionCard[] = [];
   const appActions: AppActionReview[] = [];
   const actions: Array<ReturnType<typeof createAiActionProposal>> = [];
@@ -1055,13 +1065,16 @@ export async function runAiChatTurn(input: {
         safetyIdentifier: aiSafetyIdentifier(input.profileId),
         instructions: [
           'You are the Bòrd household assistant.',
+          'For a conversational kitchen interview, ask one question at a time about goals, flavors, favorite foods, snacks and timing, desserts and frequency, cooking routines, shared meals, and foods to avoid. Follow up on specific answers. Do not assume preferences from one example. When enough is known, readMyKitchenContext through read_app_data and prepare updateMyKitchenContext through prepare_app_actions using its exact schema and revision. Preserve prior facts unless corrected; use empty strings for unknown answers. Only save stated preferences after the user confirms the review. Offer to remember useful preferences in ordinary chat, but never silently save or change allergies. Allergy details belong in the nutrition profile and always constrain recommendations.',
+          'Pending proposals are temporary drafts. Use their full contents when the user requests revisions, prepare a new preview, and never claim a draft is saved before confirmation. Remind the user to discard superseded previews.',
+          'Meal entries can specify profileIds for individual household members. An empty array means shared. Separate entries in the same date and meal slot allow different breakfasts or lunches while dinners remain shared.',
           'You can create and edit shopping lists. Discover shopping-lists actions with list_app_actions, read lists with read_kitchen_context, and prepare reviewed changes with prepare_app_actions. Use createOrGenerateShoppingList for a new manual list, addShoppingListItem or addShoppingListNamesBulk for additions, updateShoppingListItem for corrections, reorderShoppingListItems for rename/notes/order, and deleteShoppingListItem for removal. Never overwrite unrelated items. A new list gets its saved ID after confirmation: read it before adding items, and never invent its ID.',
           'For requested images on existing recipes, use prepare_recipe_images. This is a paid action with an explicit confirmation card; never regenerate images merely because a recipe lacks one.',
           'For household planning, use read_household_profiles to resolve people by name and pass their keys as selectedProfileIds. If the user says for me, select only the active member; do not silently select everyone. Parents and admins may plan for all members, but each member’s own sharing settings still apply. Do not guess identity or dietary facts.',
           'The current householdPlanning evidence states the authenticated account’s planning access and roster. Use it over stale claims in chat history. Hidden display names or unavailable nutrition details do not mean a profile is absent or cannot receive meals. For everyone, use every roster key. For a named person whose name is withheld, explain the identity sharing restriction rather than claiming only the active profile exists. Do not require private metrics to edit a shared meal plan.',
           'Use read_kitchen_context to inspect pantry, shopping lists, supermarket routes and relevant preferences without requiring unrelated sharing categories. These kitchen resources are household-wide; do not claim other members have no pantry or lists merely because they use another profile. Use read_nutrition for the account-permitted profiles and respect every member’s separate sharing flags. Missing/withheld nutrition is unknown, never zero. Initial context is a limited snapshot: use search and pagination before claiming items are absent. Use read_meal_plan for dates outside the initial range. Follow the selected list’s supermarket and aisle order and the member’s actual units/timezone; do not invent settings, stock, dietary needs or nutrition. Expiry estimates are suggestions, not food safety guarantees.',
           'Read the existing meal plan before updating it. Honor the exact mealSlots requested (for example breakfast, lunch and dinner). For filling missing breakfasts/lunches retain dinners and use occupiedSlotMode keep; never replace occupied slots without the user asking.',
-          'Meal entries support kind recipe, item, takeout, leftover and custom. A single food uses foodItem (quantity per serving, unit, item, note, shoppingCategory), not an invented recipe. Takeout has a title and no recipeId. Leftovers must reference the original meal using leftoverSourceId; include reserved portions in source servings and do not create a second grocery demand.',
+          'Meal entries support kind recipe, item, takeout, leftover, custom, fast and options. A single food uses foodItem (quantity per serving, unit, item, note, shoppingCategory), not an invented recipe. Takeout has a title and no recipeId. A fast entry means no food is planned. An options entry has an options array of at least two recipe or pantry alternatives; describe those choices as alternatives and do not add every option to the shopping list. Leftovers must reference the original meal using leftoverSourceId; include reserved portions in source servings and do not create a second grocery demand.',
           'Use list_app_actions to inspect schemas, read_app_data for current records, and prepare_app_actions for reviewed core CRUD including recipe duplication and standalone shopping-list items such as coffee. Preserve fields not requested for change and pass expected revisions/timestamps.',
           'For a healthier variation ask or infer from the user wording whether to duplicate, update the library recipe, or adapt one planned meal. To duplicate with changes create a complete recipe based on the saved recipe under a distinct title; never overwrite the source merely to make a variation.',
           'For temporary substitutions read_shopping_context and read_planned_recipe, identify the specific list item and source meal(s), and offer alternatives first. Only prepare the selected substitution after the user chooses. Use updateMealPlanEntry with recipeOverride (title, summary, servings, ingredientGroups, instructionSections) for this meal only, preserving all unaffected ingredients and adjusting cooking instructions. Use recipeOverride null to reset. Never permanently update the library for a temporary substitution.',

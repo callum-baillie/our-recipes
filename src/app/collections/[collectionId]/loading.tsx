@@ -1,5 +1,5 @@
 import { PageSkeleton } from '@/components/skeleton';
 
 export default function Loading() {
-  return <PageSkeleton variant="collection" />;
+  return <PageSkeleton variant="collectionDetail" label="Loading this collection" />;
 }

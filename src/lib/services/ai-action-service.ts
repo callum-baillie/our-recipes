@@ -338,6 +338,13 @@ function commitGeneratedPlan(
     }
     const input: MealPlanBatchInput = {
       entries: entriesToCreate.map((entry) => ({
+        profileIds: [
+          ...new Set(
+            candidate.allocations
+              .filter((allocation) => allocation.entryKey === entry.entryKey)
+              .map((allocation) => allocation.householdProfileId),
+          ),
+        ],
         plannedFor: entry.plannedFor,
         meal: entry.meal,
         recipeId: entry.existingRecipeId ?? recipeIdsByKey.get(entry.newRecipeKey ?? '') ?? '',

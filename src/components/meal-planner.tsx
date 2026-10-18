@@ -19,7 +19,6 @@ import {
   Copy,
   CopyPlus,
   Ellipsis,
-  GripVertical,
   Move,
   Plus,
   Redo2,
@@ -65,6 +64,7 @@ import {
 } from '@/lib/domain/app-preferences';
 import type { PlannedMeal } from '@/lib/services/planning-service';
 import type { RecipeListItem } from '@/lib/services/recipe-service';
+import type { MealPlanOptionInput } from '@/lib/domain/planning';
 
 type MealPlannerProps = {
   weekStart: string;
@@ -99,7 +99,7 @@ type MealPlannerProps = {
 
 type MealEntrySnapshot = Pick<
   MealPlanEntryInput,
-  'kind' | 'leftoverSourceId' | 'foodItem' | 'recipeOverride'
+  'kind' | 'options' | 'profileIds' | 'leftoverSourceId' | 'foodItem' | 'recipeOverride'
 > & {
   plannedFor: string;
   meal: string;
@@ -200,10 +200,33 @@ function recipeForMeal(meal: PlannedMeal, recipes: RecipeListItem[]) {
   return meal.recipeId ? (recipes.find((item) => item.id === meal.recipeId) ?? null) : null;
 }
 
+function mealOptions(meal: PlannedMeal): MealPlanOptionInput[] {
+  if (meal.kind !== 'options' || !meal.options) return [];
+  try {
+    const parsed: unknown = JSON.parse(meal.options);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item): MealPlanOptionInput[] => {
+      if (typeof item !== 'object' || item === null) return [];
+      const option = item as Record<string, unknown>;
+      if (typeof option.label !== 'string') return [];
+      if (option.kind === 'recipe' && typeof option.recipeId === 'string')
+        return [{ kind: 'recipe', recipeId: option.recipeId, label: option.label }];
+      if (option.kind === 'pantry' && typeof option.productId === 'string')
+        return [{ kind: 'pantry', productId: option.productId, label: option.label }];
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
 function mealEntrySnapshot(meal: PlannedMeal): MealEntrySnapshot {
   const item = parseMealPlanIngredientSnapshot(meal.recipeIngredientsSnapshot)?.ingredients[0];
+  const options = mealOptions(meal);
   return {
+    profileIds: JSON.parse(meal.profileIds ?? '[]'),
     kind: meal.kind as MealPlanEntryInput['kind'],
+    ...(options.length ? { options } : {}),
     leftoverSourceId: meal.leftoverSourceId ?? null,
     recipeOverride: meal.recipeOverride ? JSON.parse(meal.recipeOverride) : null,
     foodItem:
@@ -249,10 +272,12 @@ function MealThumbnail({ meal, recipes }: { meal: PlannedMeal; recipes: RecipeLi
 
 function PlannedMealCard({
   meal,
+  profiles,
   recipes,
   busy,
   dates,
   weekMeals,
+  mealTypes,
   pantryStatus,
   onRemove,
   onRefreshRecipe,
@@ -265,10 +290,12 @@ function PlannedMealCard({
   onDragStart,
 }: {
   meal: PlannedMeal;
+  profiles: Array<{ id: string; displayName: string }>;
   recipes: RecipeListItem[];
   busy: boolean;
   dates: string[];
   weekMeals: PlannedMeal[];
+  mealTypes: MealTypeOption[];
   pantryStatus: 'covered' | 'shortage' | 'uncertain' | 'unknown';
   onRemove: (id: string) => void;
   onRefreshRecipe: (id: string) => void;
@@ -281,6 +308,7 @@ function PlannedMealCard({
   onDragStart: (mealId: string) => void;
 }) {
   const recipe = recipeForMeal(meal, recipes);
+  const alternatives = mealOptions(meal);
   const totalMinutes = recipe ? recipe.prepMinutes + recipe.cookMinutes + recipe.restMinutes : null;
   const [moveTarget, setMoveTarget] = useState(`${meal.plannedFor}:${meal.meal}`);
   const [swapTarget, setSwapTarget] = useState('');
@@ -302,11 +330,45 @@ function PlannedMealCard({
       }}
     >
       <div className={styles.mealThumb}>
-        <MealThumbnail meal={meal} recipes={recipes} />
+        {meal.recipeId ? (
+          <Link
+            href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
+            aria-label={`Make ${meal.recipeTitle}`}
+          >
+            <MealThumbnail meal={meal} recipes={recipes} />
+          </Link>
+        ) : (
+          <MealThumbnail meal={meal} recipes={recipes} />
+        )}
       </div>
       <div className={styles.plannedMealCopy}>
         <div className={styles.mealTitleRow}>
-          <strong title={meal.recipeTitle}>{meal.recipeTitle}</strong>
+          {alternatives.length > 1 ? (
+            <div className={styles.mealOptionDisplay} aria-label="Choose one of these meals">
+              {alternatives.map((option, index) => (
+                <span className={styles.mealOptionChoice} key={`${option.kind}:${index}`}>
+                  {index ? <span className={styles.mealOptionOr}>or</span> : null}
+                  {option.kind === 'recipe' ? (
+                    <Link href={`/recipes/${option.recipeId}/cook`} title={`Make ${option.label}`}>
+                      {option.label}
+                    </Link>
+                  ) : (
+                    <strong title={option.label}>{option.label}</strong>
+                  )}
+                </span>
+              ))}
+            </div>
+          ) : meal.recipeId ? (
+            <Link
+              className={styles.mealRecipeLink}
+              href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
+              title={`Make ${meal.recipeTitle}`}
+            >
+              {meal.recipeTitle}
+            </Link>
+          ) : (
+            <strong title={meal.recipeTitle}>{meal.recipeTitle}</strong>
+          )}
           <span
             className={`${styles.pantryDot} ${styles[`pantryDot${pantryStatus}`]}`}
             title={pantryLabel}
@@ -314,18 +376,32 @@ function PlannedMealCard({
             <span className="sr-only">{pantryLabel}</span>
           </span>
         </div>
+        {meal.profileIds && meal.profileIds !== '[]' ? (
+          <small>
+            For{' '}
+            {profiles
+              .filter((p) => (JSON.parse(meal.profileIds!) as string[]).includes(p.id))
+              .map((p) => p.displayName)
+              .join(', ') || 'selected members'}
+          </small>
+        ) : (
+          <small>Shared household meal</small>
+        )}
         {meal.kind === 'leftover' ||
         meal.kind === 'takeout' ||
+        meal.kind === 'fast' ||
         meal.kind === 'item' ||
         meal.recipeOverride ? (
           <small>
             {meal.kind === 'leftover'
               ? 'Leftovers'
               : meal.kind === 'takeout'
-                ? 'Takeout'
-                : meal.kind === 'item'
-                  ? 'Single food'
-                  : 'Adapted for this meal'}
+                ? 'Eating out'
+                : meal.kind === 'fast'
+                  ? 'Fasting'
+                  : meal.kind === 'item'
+                    ? 'Single food'
+                    : 'Adapted for this meal'}
           </small>
         ) : null}
         <span className={styles.mealMeta}>
@@ -356,27 +432,49 @@ function PlannedMealCard({
           ) : null}
         </span>
       </div>
-      <details className={styles.mealActions}>
+      <details
+        className={styles.mealActions}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.currentTarget.open = false;
+            event.currentTarget.querySelector('summary')?.focus();
+          }
+        }}
+      >
         <summary aria-label={`Actions for ${meal.recipeTitle}`} title="Meal actions">
           <Ellipsis size={17} aria-hidden="true" />
         </summary>
         <div>
-          <span className={styles.dragHint}>
-            <GripVertical size={14} aria-hidden="true" /> Drag to move or swap
-          </span>
+          <button
+            type="button"
+            onClick={(event) => {
+              const menu = event.currentTarget.closest('details');
+              if (menu) {
+                menu.open = false;
+                menu.querySelector('summary')?.focus();
+              }
+            }}
+            aria-label="Close meal actions"
+          >
+            Close menu <X size={18} />
+          </button>
           <button type="button" disabled={busy} onClick={() => onEdit(meal)}>
             Edit meal{meal.recipeId ? ' / adapt recipe' : ''}
           </button>
           <button type="button" disabled={busy} onClick={() => onDuplicate(meal)}>
             <CopyPlus size={14} aria-hidden="true" /> Duplicate to next day
           </button>
-          <label>
+          <div className={styles.mealActionGroup}>
             <span>
               <Move size={14} aria-hidden="true" /> Move to
             </span>
-            <select value={moveTarget} onChange={(event) => setMoveTarget(event.target.value)}>
+            <select
+              aria-label={`Move ${meal.recipeTitle} to another day or meal`}
+              value={moveTarget}
+              onChange={(event) => setMoveTarget(event.target.value)}
+            >
               {dates.flatMap((date) =>
-                MEAL_OPTIONS.map((option) => (
+                mealTypes.map((option) => (
                   <option key={`${date}:${option.value}`} value={`${date}:${option.value}`}>
                     {formatPlannerDate(date, { weekday: 'short' })} · {option.label}
                   </option>
@@ -393,12 +491,38 @@ function PlannedMealCard({
             >
               Move
             </button>
-          </label>
-          <label>
+          </div>
+          {dates[dates.indexOf(meal.plannedFor) - 1] ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                onMove(meal, dates[dates.indexOf(meal.plannedFor) - 1]!, meal.meal as MealType)
+              }
+            >
+              <ChevronLeft size={16} aria-hidden="true" /> Previous day
+            </button>
+          ) : null}
+          {dates[dates.indexOf(meal.plannedFor) + 1] ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                onMove(meal, dates[dates.indexOf(meal.plannedFor) + 1]!, meal.meal as MealType)
+              }
+            >
+              <ChevronRight size={16} aria-hidden="true" /> Next day
+            </button>
+          ) : null}
+          <div className={styles.mealActionGroup}>
             <span>
               <ArrowRightLeft size={14} aria-hidden="true" /> Swap with
             </span>
-            <select value={swapTarget} onChange={(event) => setSwapTarget(event.target.value)}>
+            <select
+              aria-label={`Swap ${meal.recipeTitle} with another planned meal`}
+              value={swapTarget}
+              onChange={(event) => setSwapTarget(event.target.value)}
+            >
               <option value="">Choose a meal</option>
               {weekMeals
                 .filter((candidate) => candidate.id !== meal.id)
@@ -419,7 +543,7 @@ function PlannedMealCard({
             >
               Swap
             </button>
-          </label>
+          </div>
           {meal.effectiveStatus === 'cooked' ? (
             <span>Cooked</span>
           ) : (
@@ -445,9 +569,9 @@ function PlannedMealCard({
           meal.effectiveStatus !== 'cooked' ? (
             <Link
               href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
-              aria-label={`Cook ${meal.recipeTitle} from this planned meal`}
+              aria-label={`Make ${meal.recipeTitle} from this planned meal`}
             >
-              Cook
+              Make this meal
             </Link>
           ) : null}
           {meal.recipeChangedSincePlanning && meal.kind !== 'leftover' ? (
@@ -828,7 +952,13 @@ export function MealPlanner({
       plannedFor: overrides.plannedFor ?? meal.plannedFor,
       meal: overrides.meal ?? meal.meal,
       recipeId: meal.recipeId ?? '',
+      profileIds: JSON.parse(meal.profileIds ?? '[]'),
       title: meal.recipeId ? '' : meal.title,
+      kind: meal.kind as MealPlanEntryInput['kind'],
+      ...(mealOptions(meal).length ? { options: mealOptions(meal) } : {}),
+      leftoverSourceId: meal.leftoverSourceId ?? null,
+      foodItem: mealEntrySnapshot(meal).foodItem,
+      recipeOverride: meal.recipeOverride ? JSON.parse(meal.recipeOverride) : null,
       servings: overrides.servings ?? meal.servings,
       note: meal.note,
       expectedUpdatedAt:
@@ -891,7 +1021,13 @@ export function MealPlanner({
           plannedFor: targetDate,
           meal: meal.meal,
           recipeId: meal.recipeId ?? '',
+          profileIds: JSON.parse(meal.profileIds ?? '[]'),
           title: meal.recipeId ? '' : meal.title,
+          kind: meal.kind as MealPlanEntryInput['kind'],
+          ...(mealOptions(meal).length ? { options: mealOptions(meal) } : {}),
+          leftoverSourceId: meal.leftoverSourceId ?? null,
+          foodItem: mealEntrySnapshot(meal).foodItem,
+          recipeOverride: meal.recipeOverride ? JSON.parse(meal.recipeOverride) : null,
           servings: meal.servings,
           note: meal.note,
         }),
@@ -1569,8 +1705,8 @@ export function MealPlanner({
 
           <div className={styles.setupFooter}>
             <p className={styles.setupHint}>
-              This headcount estimates recipe servings only. Nutrition portions are allocated
-              explicitly below and are never split equally by this selection.
+              New meals use these selected people and estimated servings. Nutrition portions are
+              allocated explicitly below and are never split equally by this selection.
             </p>
             <p>
               <UsersRound size={18} aria-hidden="true" />
@@ -1894,12 +2030,14 @@ export function MealPlanner({
                         {slotMeals.length ? (
                           slotMeals.map((meal) => (
                             <PlannedMealCard
+                              profiles={profiles}
                               key={meal.id}
                               meal={meal}
                               recipes={recipes}
                               busy={Boolean(busyAction)}
                               dates={dates}
                               weekMeals={meals}
+                              mealTypes={scheduleMeals}
                               pantryStatus={pantryStatusByMeal[meal.id] ?? 'unknown'}
                               onRemove={removeMeal}
                               onRefreshRecipe={refreshPlannedRecipe}
@@ -1962,12 +2100,14 @@ export function MealPlanner({
                     {slotMeals.length ? (
                       slotMeals.map((meal) => (
                         <PlannedMealCard
+                          profiles={profiles}
                           key={meal.id}
                           meal={meal}
                           recipes={recipes}
                           busy={Boolean(busyAction)}
                           dates={dates}
                           weekMeals={meals}
+                          mealTypes={scheduleMeals}
                           pantryStatus={pantryStatusByMeal[meal.id] ?? 'unknown'}
                           onRemove={removeMeal}
                           onRefreshRecipe={refreshPlannedRecipe}
@@ -2150,8 +2290,13 @@ export function MealPlanner({
 
       {mealEditor ? (
         <MealEntryEditor
+          profiles={profiles}
+          initialProfileIds={
+            selectedProfileIds.length === profiles.length ? [] : selectedProfileIds
+          }
           entry={mealEditor.entry}
           initialKind={mealEditor.kind}
+          recipes={recipes.map(({ id, title }) => ({ id, title }))}
           date={pickerContext?.date ?? startDate}
           slot={pickerContext?.meal ?? selectedMeals[0] ?? 'dinner'}
           slots={selectedMeals}
@@ -2183,6 +2328,7 @@ export function MealPlanner({
         collections={collections}
         collectionMemberships={collectionMemberships}
         servings={selectedProfiles.length}
+        profileIds={selectedProfileIds.length === profiles.length ? [] : selectedProfileIds}
         profileNames={selectedProfiles.map((profile) => profile.displayName)}
         initialDate={pickerContext?.date}
         initialMealType={pickerContext?.meal}

@@ -1681,8 +1681,11 @@
   background: var(--linen);
 }
 .summary > button .summaryIcon {
+  flex: 0 0 2.25rem;
   width: 2.25rem;
   height: 2.25rem;
+  aspect-ratio: 1;
+  border-radius: 0.7rem;
 }
 .summary > button .summaryCopy {
   display: flex;

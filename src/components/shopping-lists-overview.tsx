@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react';
 
 import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import { useToast } from '@/components/toast-provider';
+import { ButtonSpinner } from '@/components/skeleton';
 import { shoppingListSourceLabel } from '@/lib/domain/planning';
 import type { ShoppingListSummary } from '@/lib/services/planning-service';
 
@@ -77,6 +78,7 @@ export function ShoppingListsOverview({
   const [name, setName] = useState('');
   const [makeNextShop, setMakeNextShop] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ListFilter>('all');
   const [sort, setSort] = useState<ListSort>('updated');
@@ -121,7 +123,9 @@ export function ShoppingListsOverview({
 
   async function createList(event: React.FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy('create');
+    setPendingAction('create');
     try {
       const response = await fetch('/api/v1/shopping-lists', {
         method: 'POST',
@@ -139,6 +143,7 @@ export function ShoppingListsOverview({
       showToast('The list could not be created. Check the connection and try again.', 'error');
     } finally {
       setBusy(null);
+      setPendingAction(null);
     }
   }
 
@@ -147,7 +152,9 @@ export function ShoppingListsOverview({
     action: 'rename' | 'archive' | 'restore' | 'duplicate' | 'set_restock_target' | 'complete',
     nextName?: string,
   ) {
+    if (busy) return;
     setBusy(listId);
+    setPendingAction(action);
     try {
       const response = await fetch(`/api/v1/shopping-lists/${listId}`, {
         method: 'PATCH',
@@ -178,11 +185,14 @@ export function ShoppingListsOverview({
       showToast('The list change could not be saved. Check the connection and try again.', 'error');
     } finally {
       setBusy(null);
+      setPendingAction(null);
     }
   }
 
   async function remove(listId: string) {
+    if (busy) return;
     setBusy(listId);
+    setPendingAction('delete');
     try {
       const response = await fetch(`/api/v1/shopping-lists/${listId}`, { method: 'DELETE' });
       const body = (await response.json().catch(() => null)) as {
@@ -201,6 +211,7 @@ export function ShoppingListsOverview({
       showToast('The list could not be deleted. Check the connection and try again.', 'error');
     } finally {
       setBusy(null);
+      setPendingAction(null);
     }
   }
 
@@ -256,7 +267,8 @@ export function ShoppingListsOverview({
                 />
                 <small>e.g. Weekend market</small>
               </label>
-              <button type="submit" aria-busy={busy === 'create'} disabled={busy === 'create'}>
+              <button type="submit" aria-busy={busy === 'create'} disabled={busy !== null}>
+                {busy === 'create' ? <ButtonSpinner /> : null}
                 {busy === 'create' ? 'Creating…' : 'Create list'}
               </button>
               <label className={styles.nextShopOption}>
@@ -383,10 +395,13 @@ export function ShoppingListsOverview({
                           </label>
                           <button
                             type="submit"
-                            aria-busy={busy === list.id}
-                            disabled={busy === list.id}
+                            aria-busy={busy === list.id && pendingAction === 'rename'}
+                            disabled={busy !== null}
                           >
-                            {busy === list.id ? 'Saving…' : 'Save'}
+                            {busy === list.id && pendingAction === 'rename' ? (
+                              <ButtonSpinner />
+                            ) : null}
+                            {busy === list.id && pendingAction === 'rename' ? 'Saving…' : 'Save'}
                           </button>
                           <button type="button" onClick={() => setEditingId(null)}>
                             Cancel
@@ -399,16 +414,22 @@ export function ShoppingListsOverview({
                           </button>
                           <button
                             type="button"
-                            aria-busy={busy === list.id}
-                            disabled={busy === list.id}
+                            aria-busy={busy === list.id && pendingAction === 'duplicate'}
+                            disabled={busy !== null}
                             onClick={() => void manage(list.id, 'duplicate')}
                           >
-                            Duplicate
+                            {busy === list.id && pendingAction === 'duplicate' ? (
+                              <ButtonSpinner />
+                            ) : null}
+                            {busy === list.id && pendingAction === 'duplicate'
+                              ? 'Duplicating…'
+                              : 'Duplicate'}
                           </button>
                           {!list.isAutomaticRestockTarget && !list.archivedAt ? (
                             <button
                               type="button"
-                              disabled={busy === list.id}
+                              disabled={busy !== null}
+                              aria-busy={busy === list.id && pendingAction === 'set_restock_target'}
                               onClick={() => {
                                 if (
                                   window.confirm(
@@ -419,7 +440,12 @@ export function ShoppingListsOverview({
                                 }
                               }}
                             >
-                              Make Next shop
+                              {busy === list.id && pendingAction === 'set_restock_target' ? (
+                                <ButtonSpinner />
+                              ) : null}
+                              {busy === list.id && pendingAction === 'set_restock_target'
+                                ? 'Updating…'
+                                : 'Make Next shop'}
                             </button>
                           ) : null}
                           <details>
@@ -429,28 +455,51 @@ export function ShoppingListsOverview({
                             <div>
                               <button
                                 type="button"
-                                aria-busy={busy === list.id}
-                                disabled={busy === list.id}
+                                aria-busy={
+                                  busy === list.id &&
+                                  pendingAction === (list.archivedAt ? 'restore' : 'archive')
+                                }
+                                disabled={busy !== null}
                                 onClick={() =>
                                   void manage(list.id, list.archivedAt ? 'restore' : 'archive')
                                 }
                               >
-                                <Archive size={15} aria-hidden="true" />
-                                {list.archivedAt ? 'Restore' : 'Archive'}
+                                {busy === list.id &&
+                                pendingAction === (list.archivedAt ? 'restore' : 'archive') ? (
+                                  <ButtonSpinner />
+                                ) : (
+                                  <Archive size={15} aria-hidden="true" />
+                                )}
+                                {busy === list.id &&
+                                pendingAction === (list.archivedAt ? 'restore' : 'archive')
+                                  ? list.archivedAt
+                                    ? 'Restoring…'
+                                    : 'Archiving…'
+                                  : list.archivedAt
+                                    ? 'Restore'
+                                    : 'Archive'}
                               </button>
                               {list.isAutomaticRestockTarget ? (
                                 <button
                                   type="button"
-                                  disabled={busy === list.id}
+                                  disabled={busy !== null}
+                                  aria-busy={busy === list.id && pendingAction === 'complete'}
                                   onClick={() => void manage(list.id, 'complete')}
                                 >
-                                  <CheckCircle2 size={15} aria-hidden="true" /> Complete trip
+                                  {busy === list.id && pendingAction === 'complete' ? (
+                                    <ButtonSpinner />
+                                  ) : (
+                                    <CheckCircle2 size={15} aria-hidden="true" />
+                                  )}{' '}
+                                  {busy === list.id && pendingAction === 'complete'
+                                    ? 'Completing…'
+                                    : 'Complete trip'}
                                 </button>
                               ) : null}
                               <button
                                 type="button"
-                                aria-busy={busy === list.id}
-                                disabled={busy === list.id}
+                                aria-busy={busy === list.id && pendingAction === 'delete'}
+                                disabled={busy !== null}
                                 onClick={() => {
                                   if (
                                     window.confirm(
@@ -461,7 +510,14 @@ export function ShoppingListsOverview({
                                   }
                                 }}
                               >
-                                <Trash2 size={15} aria-hidden="true" /> Delete
+                                {busy === list.id && pendingAction === 'delete' ? (
+                                  <ButtonSpinner />
+                                ) : (
+                                  <Trash2 size={15} aria-hidden="true" />
+                                )}{' '}
+                                {busy === list.id && pendingAction === 'delete'
+                                  ? 'Deleting…'
+                                  : 'Delete'}
                               </button>
                             </div>
                           </details>

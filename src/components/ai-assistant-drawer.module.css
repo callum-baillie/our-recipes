@@ -669,3 +669,97 @@
   flex: 1;
   min-width: 0;
 }
+
+/* The surface fills the device; only its content follows the keyboard viewport. */
+.drawer {
+  display: block;
+  height: 100dvh;
+  top: 0;
+  bottom: 0;
+}
+.viewport {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+.header {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  gap: 0.4rem;
+}
+.messages > * {
+  flex-shrink: 0;
+}
+.settingsPanel {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--field);
+  font-size: 0.85rem;
+}
+.settingsPanel h3 {
+  margin-top: 0;
+}
+.settingsPanel .paidTools {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  min-height: 44px;
+}
+.settingsPanel input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+@media (max-width: 540px) {
+  .drawer {
+    top: 0;
+    height: 100dvh;
+    max-height: none;
+  }
+  .viewport {
+    padding-top: var(--assistant-viewport-top, 0px);
+    height: calc(var(--assistant-viewport-height, 100dvh) + var(--assistant-viewport-top, 0px));
+    box-sizing: border-box;
+  }
+  .assistantMark {
+    display: none;
+  }
+  .header {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+  .header h2 {
+    font-size: 1rem;
+  }
+}
+
+.draftTray {
+  margin-bottom: 0.65rem;
+  font-size: 0.8rem;
+  max-height: 25dvh;
+  overflow: auto;
+}
+.draftTray summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.composer .draftTray button {
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  padding: 0.6rem;
+  border-radius: 10px;
+  margin: 0.3rem 0;
+}
+.settingsPanel {
+  position: absolute;
+  z-index: 2;
+  top: calc(5rem + env(safe-area-inset-top));
+  left: 0.75rem;
+  right: 0.75rem;
+  max-height: 60%;
+  overflow: auto;
+  box-shadow: var(--shadow);
+}

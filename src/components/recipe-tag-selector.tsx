@@ -3,6 +3,8 @@
 import { Plus, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
+import { InlineSkeleton } from '@/components/skeleton';
+
 type RecipeTagSelectorProps = {
   value: string[];
   onChange: (tags: string[]) => void;
@@ -20,17 +22,23 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
   const labelId = useId();
   const [input, setInput] = useState('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [loadingTags, setLoadingTags] = useState(true);
   const normalizedValue = useMemo(() => value.map(normalizeTag).filter(Boolean), [value]);
 
   useEffect(() => {
-    fetch('/api/v1/tags')
+    const controller = new AbortController();
+    fetch('/api/v1/tags', { signal: controller.signal })
       .then(async (response) => (response.ok ? response.json() : null))
       .then((body: { tags?: Array<{ name?: string }> } | null) => {
         setAvailableTags(
           body?.tags?.flatMap((tag) => (tag.name ? [normalizeTag(tag.name)] : [])) ?? [],
         );
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingTags(false);
+      });
+    return () => controller.abort();
   }, []);
 
   function addTag(rawTag = input) {
@@ -92,7 +100,11 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
           <Plus size={17} aria-hidden="true" />
         </button>
       </div>
-      {suggestions.length > 0 ? (
+      {loadingTags ? (
+        <span className="recipe-tag-empty" role="status" aria-label="Loading saved tag suggestions">
+          Loading saved tags <InlineSkeleton label="Loading saved tag suggestions" width="4rem" />
+        </span>
+      ) : suggestions.length > 0 ? (
         <div className="recipe-tag-suggestions" aria-label="Available tags">
           {suggestions.map((tag) => (
             <button type="button" key={tag} onClick={() => addTag(tag)}>

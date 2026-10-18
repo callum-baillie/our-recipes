@@ -1,3 +1,4 @@
+import { getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { cookies } from 'next/headers';
 
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
@@ -22,6 +23,7 @@ export default async function ProfileSettingsPage() {
         description="Manage household members, account roles, guardian assignments, and archived profiles."
       />
       <ProfileSettings
+        aiEnabled={getAiReadiness().enabled}
         initialProfiles={state.profiles.map((profile) => ({
           ...profile,
           role: accessByProfile.get(profile.id)?.role ?? 'parent',

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ButtonSpinner } from '@/components/skeleton';
 import { PantryAvailabilityPill } from '@/components/pantry-availability-pill';
 import type { PantryRecipeAvailability } from '@/lib/domain/pantry-availability';
 
@@ -27,18 +28,29 @@ export function RecipePantryPanel({
   const [availability, setAvailability] = useState(initialAvailability);
   const [servings, setServings] = useState(String(initialAvailability.targetServings ?? ''));
   const [pendingIngredientId, setPendingIngredientId] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
   const [message, setMessage] = useState('');
 
   async function refreshForServings() {
     const value = Number(servings);
     if (!Number.isFinite(value) || value <= 0) return;
-    const response = await fetch(
-      `/api/v1/pantry/recipes/${availability.recipeId}/availability?servings=${encodeURIComponent(value)}`,
-    );
-    const body = (await response.json().catch(() => null)) as {
-      availability?: PantryRecipeAvailability;
-    } | null;
-    if (response.ok && body?.availability) setAvailability(body.availability);
+    setRecalculating(true);
+    setMessage('');
+    try {
+      const response = await fetch(
+        `/api/v1/pantry/recipes/${availability.recipeId}/availability?servings=${encodeURIComponent(value)}`,
+      );
+      const body = (await response.json().catch(() => null)) as {
+        availability?: PantryRecipeAvailability;
+        error?: { message?: string };
+      } | null;
+      if (response.ok && body?.availability) setAvailability(body.availability);
+      else setMessage(body?.error?.message ?? 'Pantry availability could not be recalculated.');
+    } catch {
+      setMessage('Pantry availability could not be recalculated. Check your connection and retry.');
+    } finally {
+      setRecalculating(false);
+    }
   }
 
   async function changeMapping(ingredientId: string, productId: string, isOptional: boolean) {
@@ -53,8 +65,8 @@ export function RecipePantryPanel({
           : null,
       });
       if (response.ok) {
-        setMessage('Pantry mapping saved.');
         await refreshForServings();
+        setMessage('Pantry mapping saved.');
         router.refresh();
       } else {
         const body = (await response.json().catch(() => null)) as {
@@ -94,8 +106,14 @@ export function RecipePantryPanel({
             value={servings}
             onChange={(event) => setServings(event.target.value)}
           />
-          <button type="button" onClick={() => void refreshForServings()}>
-            Recalculate
+          <button
+            type="button"
+            disabled={recalculating}
+            aria-busy={recalculating}
+            onClick={() => void refreshForServings()}
+          >
+            {recalculating ? <ButtonSpinner /> : null}
+            {recalculating ? 'Recalculating…' : 'Recalculate'}
           </button>
         </div>
       )}

@@ -473,13 +473,14 @@ export function getProjectedPantryDemand(
       .map((ingredient) => {
         let reason: string | null = null;
         let quantity: number | null = null;
-        if (ingredient.quantity !== null && ingredient.unit.trim() && baseServings) {
+        const unit = ingredient.unit.trim() || (ingredient.quantity !== null ? 'each' : '');
+        if (ingredient.quantity !== null && unit && baseServings) {
           quantity = Number(((ingredient.quantity * meal.servings) / baseServings).toFixed(6));
         }
         if (!ingredient.productId) reason = 'Not mapped to a Pantry product.';
         else if (ingredient.quantity === null)
           reason = 'The recipe does not specify an exact quantity.';
-        else if (!ingredient.unit.trim()) reason = 'The recipe does not specify a unit.';
+        else if (!unit) reason = 'The recipe does not specify a unit.';
         else if (!baseServings) reason = 'The recipe serving yield cannot be scaled exactly.';
         return {
           mealPlanEntryId: meal.id,
@@ -491,7 +492,7 @@ export function getProjectedPantryDemand(
           productId: ingredient.productId,
           productName: ingredient.productName,
           quantity,
-          unit: ingredient.unit,
+          unit,
           reason,
         };
       });

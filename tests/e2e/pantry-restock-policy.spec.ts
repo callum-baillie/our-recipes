@@ -145,12 +145,7 @@ test('Always-have and Always-buy policies merge into one accessible Next-shop ro
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/lists/${planned.list.id}`);
-  await expect(
-    page
-      .locator('strong')
-      .filter({ hasText: /^Next shop$/u })
-      .first(),
-  ).toBeVisible();
+  await expect(page.getByText('Next shop', { exact: true }).first()).toBeVisible();
   const eggsRow = page.locator('article').filter({
     has: page.getByText('Policy eggs', { exact: true }),
   });

@@ -887,6 +887,8 @@ export const mealPlanEntries = sqliteTable(
       .notNull()
       .default('{"baseServings":"","ingredients":[]}'),
     kind: text('kind').notNull().default('custom'),
+    options: text('options').notNull().default('[]'),
+    profileIds: text('profile_ids').notNull().default('[]'),
     recipeOverride: text('recipe_override'),
     title: text('title').notNull().default(''),
     servings: integer('servings').notNull(),
@@ -1086,6 +1088,8 @@ export const shoppingListItems = sqliteTable('shopping_list_items', {
   })
     .notNull()
     .default('to_buy'),
+  cartQuantity: real('cart_quantity').notNull().default(0),
+  cartLabel: text('cart_label').notNull().default(''),
   sourceRecipeIds: text('source_recipe_ids').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),

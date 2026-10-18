@@ -7,8 +7,13 @@ import { FormEvent, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
 import { RecipebookNav } from '@/components/recipebook-nav';
+import { ButtonSpinner } from '@/components/skeleton';
 
 type Tag = { name: string; color: string | null; usageCount: number };
+type PendingTagOperation = {
+  type: 'create' | 'update' | 'merge' | 'remove';
+  name?: string;
+};
 
 export function TagManager({ initialTags }: { initialTags: Tag[] }) {
   const router = useRouter();
@@ -18,9 +23,16 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
   const [newColor, setNewColor] = useState('#5B713E');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<PendingTagOperation | null>(null);
 
-  async function request(url: string, method: string, body?: unknown) {
+  async function request(
+    url: string,
+    method: string,
+    body: unknown,
+    operation: PendingTagOperation,
+  ) {
     setPending(true);
+    setPendingOperation(operation);
     setError(null);
     try {
       const response = await fetch(url, {
@@ -41,12 +53,18 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
       return payload;
     } finally {
       setPending(false);
+      setPendingOperation(null);
     }
   }
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    const payload = await request('/api/v1/tags', 'POST', { name: newName, color: newColor });
+    const payload = await request(
+      '/api/v1/tags',
+      'POST',
+      { name: newName, color: newColor },
+      { type: 'create' },
+    );
     if (!payload?.tag) return;
     setTags((current) => [...current, payload.tag!].sort((a, b) => a.name.localeCompare(b.name)));
     setNewName('');
@@ -55,10 +73,12 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
   }
 
   async function update(source: string, name: string, color: string) {
-    const payload = await request(`/api/v1/tags/${encodeURIComponent(source)}`, 'PATCH', {
-      name,
-      color,
-    });
+    const payload = await request(
+      `/api/v1/tags/${encodeURIComponent(source)}`,
+      'PATCH',
+      { name, color },
+      { type: 'update', name: source },
+    );
     if (!payload?.tag) return;
     setTags((current) =>
       current
@@ -70,10 +90,12 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
   }
 
   async function merge(source: string, targetName: string, targetColor: string) {
-    const payload = await request(`/api/v1/tags/${encodeURIComponent(source)}/merge`, 'POST', {
-      targetName,
-      targetColor,
-    });
+    const payload = await request(
+      `/api/v1/tags/${encodeURIComponent(source)}/merge`,
+      'POST',
+      { targetName, targetColor },
+      { type: 'merge', name: source },
+    );
     if (!payload?.tag) return;
     setTags((current) => {
       const withoutSource = current.filter(
@@ -89,7 +111,10 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
 
   async function remove(name: string) {
     if (!window.confirm(`Remove “${name}” from every recipe? This cannot be undone.`)) return;
-    const payload = await request(`/api/v1/tags/${encodeURIComponent(name)}`, 'DELETE');
+    const payload = await request(`/api/v1/tags/${encodeURIComponent(name)}`, 'DELETE', undefined, {
+      type: 'remove',
+      name,
+    });
     if (payload === null) return;
     setTags((current) => current.filter((tag) => tag.name !== name));
     showToast(`${name} removed.`, 'success');
@@ -129,7 +154,8 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
             aria-busy={pending}
             disabled={pending || !newName.trim()}
           >
-            <Plus size={16} /> Add tag
+            {pendingOperation?.type === 'create' ? <ButtonSpinner /> : <Plus size={16} />}{' '}
+            {pendingOperation?.type === 'create' ? 'Adding…' : 'Add tag'}
           </button>
         </form>
       </section>
@@ -145,6 +171,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
               key={tag.name}
               tag={tag}
               pending={pending}
+              pendingOperation={pendingOperation}
               onUpdate={update}
               onMerge={merge}
               onDelete={remove}
@@ -163,12 +190,14 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
 function TagEditor({
   tag,
   pending,
+  pendingOperation,
   onUpdate,
   onMerge,
   onDelete,
 }: {
   tag: Tag;
   pending: boolean;
+  pendingOperation: PendingTagOperation | null;
   onUpdate: (source: string, name: string, color: string) => Promise<void>;
   onMerge: (source: string, targetName: string, targetColor: string) => Promise<void>;
   onDelete: (name: string) => Promise<void>;
@@ -198,9 +227,17 @@ function TagEditor({
           className="text-button"
           type="button"
           disabled={pending || !name.trim()}
+          aria-busy={pendingOperation?.type === 'update' && pendingOperation.name === tag.name}
           onClick={() => onUpdate(tag.name, name, color)}
         >
-          <Save size={15} /> Save
+          {pendingOperation?.type === 'update' && pendingOperation.name === tag.name ? (
+            <ButtonSpinner />
+          ) : (
+            <Save size={15} />
+          )}{' '}
+          {pendingOperation?.type === 'update' && pendingOperation.name === tag.name
+            ? 'Saving…'
+            : 'Save'}
         </button>
       </div>
       <div className="tag-row-merge">
@@ -216,17 +253,33 @@ function TagEditor({
           className="text-button"
           type="button"
           disabled={pending || !mergeTarget.trim()}
+          aria-busy={pendingOperation?.type === 'merge' && pendingOperation.name === tag.name}
           onClick={() => onMerge(tag.name, mergeTarget, color)}
         >
-          <Merge size={15} /> Merge
+          {pendingOperation?.type === 'merge' && pendingOperation.name === tag.name ? (
+            <ButtonSpinner />
+          ) : (
+            <Merge size={15} />
+          )}{' '}
+          {pendingOperation?.type === 'merge' && pendingOperation.name === tag.name
+            ? 'Merging…'
+            : 'Merge'}
         </button>
         <button
           className="text-button danger-text-button"
           type="button"
           disabled={pending}
+          aria-busy={pendingOperation?.type === 'remove' && pendingOperation.name === tag.name}
           onClick={() => onDelete(tag.name)}
         >
-          <Trash2 size={15} /> Remove
+          {pendingOperation?.type === 'remove' && pendingOperation.name === tag.name ? (
+            <ButtonSpinner />
+          ) : (
+            <Trash2 size={15} />
+          )}{' '}
+          {pendingOperation?.type === 'remove' && pendingOperation.name === tag.name
+            ? 'Removing…'
+            : 'Remove'}
         </button>
       </div>
     </article>

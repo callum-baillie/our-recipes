@@ -4,6 +4,84 @@
   backdrop-filter: blur(14px);
 }
 
+.lazyDialogBackdrop,
+.lazyDrawerBackdrop {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: flex;
+  color: var(--ink);
+  background: rgb(28 34 22 / 38%);
+}
+
+.lazyDialogBackdrop {
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.lazyDrawerBackdrop {
+  justify-content: flex-end;
+}
+
+.lazyDialog,
+.lazyDrawer {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.lazyDialog {
+  width: min(100%, 38rem);
+  max-height: min(86dvh, 54rem);
+  border-radius: 1rem;
+}
+
+.lazyDrawer {
+  width: min(440px, 100%);
+  height: 100dvh;
+  border-radius: 0;
+}
+
+.lazySurfaceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.lazyClose {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+}
+
+.lazySurfaceBody {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.lazyField {
+  width: 100%;
+  height: 3rem;
+}
+
+.lazyAction {
+  width: min(100%, 12rem);
+  height: 3rem;
+  margin-top: 0.5rem;
+}
+
 .header.header {
   max-width: 114rem;
   min-height: 5.5rem;

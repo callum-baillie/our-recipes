@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
+import { ButtonSpinner } from '@/components/skeleton';
 import { RecipebookNav } from '@/components/recipebook-nav';
 import type { CollectionDetail } from '@/lib/services/collection-service';
 
@@ -29,6 +30,12 @@ export function CollectionDetailManager({
   const [recipeId, setRecipeId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    | { kind: 'details' | 'add' }
+    | { kind: 'move'; index: number; direction: -1 | 1 }
+    | { kind: 'remove'; recipeId: string }
+    | null
+  >(null);
   const availableRecipes = useMemo(
     () => recipes.filter((recipe) => !collection.recipes.some((member) => member.id === recipe.id)),
     [collection.recipes, recipes],
@@ -37,6 +44,7 @@ export function CollectionDetailManager({
   async function saveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
+    setPendingAction({ kind: 'details' });
     setError(null);
     try {
       const response = await fetch(`/api/v1/collections/${collection.id}`, {
@@ -59,11 +67,16 @@ export function CollectionDetailManager({
       router.refresh();
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
-  async function saveRecipes(recipeIds: string[]) {
+  async function saveRecipes(
+    recipeIds: string[],
+    action: Exclude<typeof pendingAction, null> = { kind: 'add' },
+  ) {
     setPending(true);
+    setPendingAction(action);
     setError(null);
     try {
       const response = await fetch(`/api/v1/collections/${collection.id}/recipes`, {
@@ -87,13 +100,16 @@ export function CollectionDetailManager({
       router.refresh();
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
   function addRecipe(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!recipeId) return;
-    void saveRecipes([...collection.recipes.map((recipe) => recipe.id), recipeId]);
+    void saveRecipes([...collection.recipes.map((recipe) => recipe.id), recipeId], {
+      kind: 'add',
+    });
     setRecipeId('');
   }
 
@@ -102,7 +118,10 @@ export function CollectionDetailManager({
     if (target < 0 || target >= collection.recipes.length) return;
     const next = [...collection.recipes];
     [next[index], next[target]] = [next[target]!, next[index]!];
-    void saveRecipes(next.map((recipe) => recipe.id));
+    void saveRecipes(
+      next.map((recipe) => recipe.id),
+      { kind: 'move', index, direction },
+    );
   }
 
   return (
@@ -158,14 +177,21 @@ export function CollectionDetailManager({
           <p className="muted">
             Choose only from photos already kept safely with a recipe in this collection.
           </p>
-          <button className="text-button" type="submit" disabled={pending || !name.trim()}>
-            <Save size={16} /> Save collection
+          <button
+            className="text-button"
+            type="submit"
+            disabled={pending || !name.trim()}
+            aria-busy={pendingAction?.kind === 'details'}
+          >
+            {pendingAction?.kind === 'details' ? <ButtonSpinner /> : <Save size={16} />}{' '}
+            {pendingAction?.kind === 'details' ? 'Saving…' : 'Save collection'}
           </button>
         </form>
       </section>
       <section
         className="settings-card collection-recipe-manager"
         aria-labelledby="collection-recipes-title"
+        aria-busy={pending && pendingAction?.kind !== 'details'}
       >
         <div className="section-heading-row">
           <div>
@@ -186,55 +212,85 @@ export function CollectionDetailManager({
               ))}
             </select>
           </label>
-          <button className="primary-button compact" type="submit" disabled={pending || !recipeId}>
-            <FolderPlus size={16} /> Add recipe
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={pending || !recipeId}
+            aria-busy={pendingAction?.kind === 'add'}
+          >
+            {pendingAction?.kind === 'add' ? <ButtonSpinner /> : <FolderPlus size={16} />}{' '}
+            {pendingAction?.kind === 'add' ? 'Adding…' : 'Add recipe'}
           </button>
         </form>
         {collection.recipes.length ? (
           <ol className="collection-recipe-list">
-            {collection.recipes.map((recipe, index) => (
-              <li key={recipe.id}>
-                <div>
-                  <Link href={`/recipes/${recipe.id}`}>{recipe.title}</Link>
-                  <span>{recipe.summary || recipe.status}</span>
-                </div>
-                <div className="reorder-actions" aria-label={`${recipe.title} collection order`}>
-                  <button
-                    className="icon-button"
-                    type="button"
-                    disabled={pending || index === 0}
-                    onClick={() => moveRecipe(index, -1)}
-                    aria-label={`Move ${recipe.title} up`}
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    type="button"
-                    disabled={pending || index === collection.recipes.length - 1}
-                    onClick={() => moveRecipe(index, 1)}
-                    aria-label={`Move ${recipe.title} down`}
-                  >
-                    <ChevronDown size={16} />
-                  </button>
-                  <button
-                    className="icon-button danger-icon-button"
-                    type="button"
-                    disabled={pending}
-                    onClick={() =>
-                      void saveRecipes(
-                        collection.recipes
-                          .filter((candidate) => candidate.id !== recipe.id)
-                          .map((candidate) => candidate.id),
-                      )
-                    }
-                    aria-label={`Remove ${recipe.title} from ${collection.name}`}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </li>
-            ))}
+            {collection.recipes.map((recipe, index) => {
+              const movingUp =
+                pendingAction?.kind === 'move' &&
+                pendingAction.index === index &&
+                pendingAction.direction === -1;
+              const movingDown =
+                pendingAction?.kind === 'move' &&
+                pendingAction.index === index &&
+                pendingAction.direction === 1;
+              const removing =
+                pendingAction?.kind === 'remove' && pendingAction.recipeId === recipe.id;
+              return (
+                <li key={recipe.id}>
+                  <div>
+                    <Link href={`/recipes/${recipe.id}`}>{recipe.title}</Link>
+                    <span>{recipe.summary || recipe.status}</span>
+                  </div>
+                  <div className="reorder-actions" aria-label={`${recipe.title} collection order`}>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      disabled={pending || index === 0}
+                      onClick={() => moveRecipe(index, -1)}
+                      aria-label={
+                        movingUp ? `Moving ${recipe.title} up` : `Move ${recipe.title} up`
+                      }
+                      aria-busy={movingUp}
+                    >
+                      {movingUp ? <ButtonSpinner /> : <ChevronUp size={16} />}
+                    </button>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      disabled={pending || index === collection.recipes.length - 1}
+                      onClick={() => moveRecipe(index, 1)}
+                      aria-label={
+                        movingDown ? `Moving ${recipe.title} down` : `Move ${recipe.title} down`
+                      }
+                      aria-busy={movingDown}
+                    >
+                      {movingDown ? <ButtonSpinner /> : <ChevronDown size={16} />}
+                    </button>
+                    <button
+                      className="icon-button danger-icon-button"
+                      type="button"
+                      disabled={pending}
+                      aria-label={
+                        removing
+                          ? `Removing ${recipe.title} from ${collection.name}`
+                          : `Remove ${recipe.title} from ${collection.name}`
+                      }
+                      aria-busy={removing}
+                      onClick={() =>
+                        void saveRecipes(
+                          collection.recipes
+                            .filter((candidate) => candidate.id !== recipe.id)
+                            .map((candidate) => candidate.id),
+                          { kind: 'remove', recipeId: recipe.id },
+                        )
+                      }
+                    >
+                      {removing ? <ButtonSpinner /> : <Trash2 size={16} />}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         ) : (
           <p className="muted">Add a recipe, then order the shelf with the arrow controls.</p>

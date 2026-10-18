@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
+import { ButtonSpinner } from '@/components/skeleton';
 import { RecipebookNav } from '@/components/recipebook-nav';
 import type { CollectionSummary } from '@/lib/services/collection-service';
 
@@ -23,10 +24,17 @@ export function CollectionManager({
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    | { type: 'create' }
+    | { type: 'move'; collectionId: string; direction: -1 | 1 }
+    | { type: 'remove'; collectionId: string }
+    | null
+  >(null);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
+    setPendingAction({ type: 'create' });
     setError(null);
     try {
       const response = await fetch('/api/v1/collections', {
@@ -51,6 +59,7 @@ export function CollectionManager({
       router.refresh();
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -61,6 +70,7 @@ export function CollectionManager({
     const next = [...collections];
     [next[index], next[target]] = [next[target]!, next[index]!];
     setPending(true);
+    setPendingAction({ type: 'move', collectionId, direction });
     setError(null);
     try {
       const response = await fetch('/api/v1/collections/order', {
@@ -82,6 +92,7 @@ export function CollectionManager({
       router.refresh();
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -89,6 +100,7 @@ export function CollectionManager({
     if (!window.confirm(`Remove “${collection.name}”? Its recipes will stay in the cookbook.`))
       return;
     setPending(true);
+    setPendingAction({ type: 'remove', collectionId: collection.id });
     setError(null);
     try {
       const response = await fetch(`/api/v1/collections/${collection.id}`, { method: 'DELETE' });
@@ -106,6 +118,7 @@ export function CollectionManager({
       router.refresh();
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -150,7 +163,8 @@ export function CollectionManager({
               aria-busy={pending}
               disabled={pending || !name.trim()}
             >
-              <FolderPlus size={16} /> Create collection
+              {pendingAction?.type === 'create' ? <ButtonSpinner /> : <FolderPlus size={16} />}{' '}
+              {pendingAction?.type === 'create' ? 'Creating…' : 'Create collection'}
             </button>
           </form>
         </section>
@@ -162,7 +176,11 @@ export function CollectionManager({
         )}
 
         {collections.length ? (
-          <section className="collection-grid" aria-label="Household collections">
+          <section
+            className="collection-grid"
+            aria-label="Household collections"
+            aria-busy={pending}
+          >
             {collections.map((collection, index) => (
               <article className="collection-card" key={collection.id}>
                 {collection.coverImage ? (
@@ -197,27 +215,75 @@ export function CollectionManager({
                       type="button"
                       disabled={pending || index === 0}
                       onClick={() => void move(collection.id, -1)}
-                      aria-label={`Move ${collection.name} up`}
+                      aria-label={
+                        pendingAction?.type === 'move' &&
+                        pendingAction.collectionId === collection.id &&
+                        pendingAction.direction === -1
+                          ? `Moving ${collection.name} up`
+                          : `Move ${collection.name} up`
+                      }
+                      aria-busy={
+                        pendingAction?.type === 'move' &&
+                        pendingAction.collectionId === collection.id &&
+                        pendingAction.direction === -1
+                      }
                     >
-                      <ChevronUp size={16} />
+                      {pendingAction?.type === 'move' &&
+                      pendingAction.collectionId === collection.id &&
+                      pendingAction.direction === -1 ? (
+                        <ButtonSpinner />
+                      ) : (
+                        <ChevronUp size={16} />
+                      )}
                     </button>
                     <button
                       className="icon-button"
                       type="button"
                       disabled={pending || index === collections.length - 1}
                       onClick={() => void move(collection.id, 1)}
-                      aria-label={`Move ${collection.name} down`}
+                      aria-label={
+                        pendingAction?.type === 'move' &&
+                        pendingAction.collectionId === collection.id &&
+                        pendingAction.direction === 1
+                          ? `Moving ${collection.name} down`
+                          : `Move ${collection.name} down`
+                      }
+                      aria-busy={
+                        pendingAction?.type === 'move' &&
+                        pendingAction.collectionId === collection.id &&
+                        pendingAction.direction === 1
+                      }
                     >
-                      <ChevronDown size={16} />
+                      {pendingAction?.type === 'move' &&
+                      pendingAction.collectionId === collection.id &&
+                      pendingAction.direction === 1 ? (
+                        <ButtonSpinner />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
                     </button>
                     <button
                       className="icon-button danger-icon-button"
                       type="button"
                       disabled={pending}
                       onClick={() => void remove(collection)}
-                      aria-label={`Remove ${collection.name}`}
+                      aria-label={
+                        pendingAction?.type === 'remove' &&
+                        pendingAction.collectionId === collection.id
+                          ? `Removing ${collection.name}`
+                          : `Remove ${collection.name}`
+                      }
+                      aria-busy={
+                        pendingAction?.type === 'remove' &&
+                        pendingAction.collectionId === collection.id
+                      }
                     >
-                      <Trash2 size={16} />
+                      {pendingAction?.type === 'remove' &&
+                      pendingAction.collectionId === collection.id ? (
+                        <ButtonSpinner />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
                     </button>
                   </div>
                 </div>

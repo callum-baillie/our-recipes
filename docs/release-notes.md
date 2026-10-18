@@ -1,5 +1,41 @@
 # Release notes
 
+## 1.0.0-rc.11
+
+### Kitchen assistant
+
+- Confirmed image groups run as durable background jobs, with per-recipe results, partial-failure alerts, completion summaries, and retries limited to unfinished work.
+- Fixes groups stopping after four images because each image previously consumed a separate interactive rate-limit allowance.
+- Compact mobile action cards, expandable bulk reviews, a floating background-task viewer, an editable draft tray for revising recipes and meal plans before saving, and conversation settings behind a gear button.
+- Chat content follows the keyboard viewport while the drawer background continues to the device edge.
+- Editable kitchen interviews preserve tastes, snack and dessert habits, and household routines. AI access follows each member's sharing settings; allergies and exclusions take priority over taste preferences.
+
+### Meal planning and cooking
+
+- Alternative recipe/Pantry choices, fasting, and named eating-out entries.
+- Individual household-member assignments allow different meals in the same slot.
+- Refined mobile card menus, move/swap controls, and aligned calendar tabs.
+- Full-recipe and step-by-step cooking views, swipe navigation, a touch toolbar, and elapsed-time-aware timers.
+
+### Shopping and loading
+
+- Mobile shopping toolbar, explicit cart/unavailable actions, substitutes, shopping chat, and unpacking flows.
+- Purchased quantities stay separate from demand; readable fractions and rounded display amounts replace long decimals.
+- Instacart appears only when configured. Counted ingredients without a written unit retain their demand; the example Stovies onion explicitly uses “each”.
+- Page-specific skeletons, async field placeholders, and loading feedback across recipe, pantry, profile, shopping, and settings controls.
+
+### Upgrade
+
+Includes additive migrations 0065 and 0066. Back up household data before upgrading. Background AI work requires the server to remain running, but does not require an open browser. No new paid OpenAI requests were made during validation.
+
+### Validation
+
+- 371 release unit tests passed.
+- 249 integration tests passed; 9 existing environment-dependent tests skipped.
+- Production build and standalone artifact verification passed.
+- Browser coverage includes setup, accessibility, desktop/tablet/mobile recipe layouts, pantry and grocery workflows, meal assignment, cooking confirmation and undo, partial cart quantities, saved kitchen interviews, and simulated mobile keyboard positioning.
+- OpenAPI validation, route coverage, generated-client smoke checks, TypeScript, lint, and formatting checks passed for the release changes.
+
 ## 1.0.0-rc.10
 
 - Refine the profile menu, AI chat composer, recipebook search and bulk actions, pantry intake, Nutrition controls, planner cards, and settings layouts for desktop and mobile.

@@ -674,7 +674,7 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('1:00')).toBeVisible();
   await page.getByRole('button', { name: 'Finish cooking' }).click();
-  await page.getByRole('link', { name: '← Recipe card' }).click();
+  await page.getByRole('link', { name: '← Recipe details' }).click();
   await page.goto('/planner');
   await page.getByRole('button', { name: 'Plan settings', exact: true }).click();
   await page.locator('button[aria-controls="planner-date-range-picker"]').click();
@@ -718,8 +718,13 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(
     page.getByRole('heading', { name: /^Meal Plan \d{2}\/\d{2} - \d{2}\/\d{2}$/u }),
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
   await page.getByLabel('New shopping item', { exact: true }).fill('lemons');
-  await page.getByRole('button', { name: 'Add item', exact: true }).click();
+  await page
+    .locator('form')
+    .filter({ has: page.getByLabel('New shopping item', { exact: true }) })
+    .getByRole('button', { name: 'Add item', exact: true })
+    .click();
   await expect(page.getByRole('article').filter({ hasText: 'lemons' })).toBeVisible();
 
   const manifestResponse = await page.request.get('/manifest.webmanifest');

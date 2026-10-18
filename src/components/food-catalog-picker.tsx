@@ -6,13 +6,17 @@ import { Barcode, Camera, Database, Search, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 
 import styles from '@/components/food-catalog-picker.module.css';
+import { AsyncSkeleton, ButtonSpinner } from '@/components/skeleton';
 import { usePantryRapidScan } from './use-pantry-rapid-scan';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import type { FoodRecord, ProviderStatus } from '@/lib/domain/food-data';
 
 const BarcodeScanner = dynamic(
   () => import('@/components/barcode-scanner').then((module) => module.BarcodeScanner),
-  { ssr: false },
+  {
+    ssr: false,
+    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="panel" />,
+  },
 );
 
 type LocalProduct = { id: string; displayName: string; brand: string; variant?: string };
@@ -477,7 +481,10 @@ export function FoodCatalogPicker({
                         </datalist>
                       ) : null}
                     </label>
-                    <button disabled={busy}>{busy ? 'Searching…' : 'Search'}</button>
+                    <button disabled={busy} aria-busy={busy}>
+                      {busy ? <ButtonSpinner /> : null}
+                      {busy ? 'Searching…' : 'Search'}
+                    </button>
                   </form>
                 ) : null}
                 {rapidQueue.entries.length ? (
@@ -571,8 +578,10 @@ export function FoodCatalogPicker({
                           !rapidLocation ||
                           !rapidQueue.entries.some((entry) => entry.status === 'ready')
                         }
+                        aria-busy={rapidQueue.busy}
                         onClick={() => void rapidQueue.addAll(rapidLocation)}
                       >
+                        {rapidQueue.busy ? <ButtonSpinner /> : null}
                         {rapidQueue.busy ? 'Adding items…' : 'Add matched items'}
                       </button>
                     </div>
@@ -601,37 +610,41 @@ export function FoodCatalogPicker({
                     ))}
                   </div>
                 ) : null}
-                <div className={styles.results}>
-                  {records.map((record) => (
-                    <button
-                      type="button"
-                      className={styles.result}
-                      key={`${record.provider}:${record.providerRecordId}`}
-                      onClick={() => void selectSearchResult(record)}
-                    >
-                      {record.images[0] ? (
-                        <Image src={record.images[0].url} alt="" width={72} height={72} />
-                      ) : (
-                        <span className={styles.placeholder}>
-                          <Barcode />
+                <div className={styles.results} aria-busy={busy} aria-live="polite">
+                  {busy ? (
+                    <AsyncSkeleton label="Loading food search results" variant="rows" />
+                  ) : (
+                    records.map((record) => (
+                      <button
+                        type="button"
+                        className={styles.result}
+                        key={`${record.provider}:${record.providerRecordId}`}
+                        onClick={() => void selectSearchResult(record)}
+                      >
+                        {record.images[0] ? (
+                          <Image src={record.images[0].url} alt="" width={72} height={72} />
+                        ) : (
+                          <span className={styles.placeholder}>
+                            <Barcode />
+                          </span>
+                        )}
+                        <span>
+                          <strong>{record.displayName}</strong>
+                          <small>
+                            {[record.brand, record.quantity, record.dataType]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </small>
+                          <small>
+                            {record.provider === 'open_food_facts'
+                              ? 'Open Food Facts'
+                              : 'USDA FoodData Central'}{' '}
+                            · {Math.round(record.completeness * 100)}% coverage
+                          </small>
                         </span>
-                      )}
-                      <span>
-                        <strong>{record.displayName}</strong>
-                        <small>
-                          {[record.brand, record.quantity, record.dataType]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </small>
-                        <small>
-                          {record.provider === 'open_food_facts'
-                            ? 'Open Food Facts'
-                            : 'USDA FoodData Central'}{' '}
-                          · {Math.round(record.completeness * 100)}% coverage
-                        </small>
-                      </span>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  )}
                 </div>
                 {embedded && tab === 'search' && onManualRequest ? (
                   <div className={styles.embeddedFooter}>
@@ -830,7 +843,8 @@ export function FoodCatalogPicker({
                   {new Date(selected.retrievedAt).toLocaleDateString()} · provider data remains
                   attributed and immutable.
                 </p>
-                <button className={styles.confirmButton} disabled={busy}>
+                <button className={styles.confirmButton} disabled={busy} aria-busy={busy}>
+                  {busy ? <ButtonSpinner /> : null}
                   {busy ? 'Adding…' : context === 'pantry' ? 'Add Item' : 'Create and link product'}
                 </button>
               </form>

@@ -1,10 +1,12 @@
 'use client';
+import { formatShoppingQuantity } from '@/lib/domain/shopping-quantity';
 import { ShoppingListNotes } from './shopping-list-notes';
 import { ShoppingListShortcuts } from './shopping-list-shortcuts';
 import { KitchenPrintDialog } from './kitchen-print-dialog';
 import { DecisionAssistance } from '@/components/decision-assistance';
 
 import { InstacartShopping } from './instacart-shopping';
+import { AiAssistantDrawer } from './ai-assistant-drawer';
 
 import {
   ArrowDown,
@@ -15,6 +17,7 @@ import {
   ChevronDown,
   CircleHelp,
   ClipboardCheck,
+  ListTodo,
   Lightbulb,
   PackageOpen,
   Plus,
@@ -22,8 +25,11 @@ import {
   Search,
   Settings,
   ShoppingCart,
+  StickyNote,
   Store,
+  Sparkles,
   Trash2,
+  Undo2,
   X,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -42,6 +48,7 @@ import {
 
 import { useToast } from '@/components/toast-provider';
 import { createClientUuid } from '@/lib/client/client-uuid';
+import { AsyncSkeleton } from '@/components/skeleton';
 import type { FoodRecord } from '@/lib/domain/food-data';
 import { rankPantryMatches, type PantryMatchCandidate } from '@/lib/domain/pantry-shopping-match';
 import { rankShoppingScanMatches } from '@/lib/domain/shopping-scan-match';
@@ -51,14 +58,13 @@ import styles from './shopping-list-editor.module.css';
 
 type Item = ShoppingListDetail['items'][number];
 type ShoppingState = Item['shoppingState'];
-type Filter = 'all' | 'to_buy' | 'in_cart' | 'cant_find' | 'sourced';
 type SortMode = 'position' | 'alpha' | 'recent';
 type GroupMode = 'aisle' | 'none';
 
 const BarcodeScanner = dynamic(
   () => import('@/components/barcode-scanner').then((module) => module.BarcodeScanner),
   {
-    loading: () => <p role="status">Loading scanner…</p>,
+    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="panel" />,
     ssr: false,
   },
 );
@@ -99,7 +105,7 @@ function emptyIntakeDraft(item: Item, locationId = ''): IntakeDraft {
   return {
     productId: item.pantry?.productId ?? '',
     locationId,
-    quantity: item.quantity === null ? '' : String(item.quantity),
+    quantity: String(item.cartQuantity > 0 ? item.cartQuantity : (item.quantity ?? '')),
     unit: item.unit,
     intakeMode: 'partial',
     packageCount: '',
@@ -364,7 +370,7 @@ function finiteQuantity(value: unknown): number | null {
 }
 
 function formatQuantity(quantity: number, unit: string): string {
-  return `${Number(quantity.toFixed(6))}${unit.trim() ? ` ${unit.trim()}` : ''}`;
+  return formatShoppingQuantity(quantity, unit);
 }
 
 export function shoppingQuantitySummary(
@@ -470,11 +476,18 @@ export function ShoppingListEditor({
   const [newQuantity, setNewQuantity] = useState('');
   const [newUnit, setNewUnit] = useState('');
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
   const [focusedShopping, setFocusedShopping] = useState(true);
   const pendingStateChanges = useRef(new Set<string>());
   const [pendingItems, setPendingItems] = useState<string[]>([]);
-  const [lastChecked, setLastChecked] = useState<{ item: Item; state: ShoppingState } | null>(null);
+  const [lastChecked, setLastChecked] = useState<{
+    item: Item;
+    previous: Item | null;
+  } | null>(null);
+  const [reenteringItem, setReenteringItem] = useState<string | null>(null);
+  const [unpackMode, setUnpackMode] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [cartQuantityItem, setCartQuantityItem] = useState<Item | null>(null);
+  const [cartQuantityDraft, setCartQuantityDraft] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
   const [groupMode, setGroupMode] = useState<GroupMode>('aisle');
   const [selectedSupermarketId, setSelectedSupermarketId] = useState(
@@ -498,6 +511,8 @@ export function ShoppingListEditor({
   const scanDialogRef = useRef<HTMLDialogElement>(null);
   const reviewDialogRef = useRef<HTMLDialogElement>(null);
   const substituteDialogRef = useRef<HTMLDialogElement>(null);
+  const cartQuantityDialogRef = useRef<HTMLDialogElement>(null);
+  const addItemInputRef = useRef<HTMLInputElement>(null);
   const [pantryOptions, setPantryOptions] = useState<PantryOptions>(
     initialPantryOptions ?? { products: [], locations: [] },
   );
@@ -546,6 +561,12 @@ export function ShoppingListEditor({
     if (substituteItem && dialog && !dialog.open) dialog.showModal();
     if (!substituteItem && dialog?.open) dialog.close();
   }, [substituteItem]);
+
+  useEffect(() => {
+    const dialog = cartQuantityDialogRef.current;
+    if (cartQuantityItem && dialog && !dialog.open) dialog.showModal();
+    if (!cartQuantityItem && dialog?.open) dialog.close();
+  }, [cartQuantityItem]);
 
   useEffect(() => {
     let disposed = false;
@@ -629,28 +650,17 @@ export function ShoppingListEditor({
     ['to_buy', 'cant_find'].includes(normalizedState(item)),
   ).length;
   const progress = total ? Math.round((progressCount / total) * 100) : 0;
-  const filterOptions: ReadonlyArray<readonly [Filter, string, number]> = [
-    ['all', 'All', total],
-    ['to_buy', 'To buy', items.filter((item) => normalizedState(item) === 'to_buy').length],
-    ['in_cart', 'In cart', items.filter((item) => normalizedState(item) === 'in_cart').length],
-    [
-      'cant_find',
-      'Can’t find',
-      items.filter((item) => normalizedState(item) === 'cant_find').length,
-    ],
-    ['sourced', 'Done', items.filter((item) => normalizedState(item) === 'sourced').length],
-  ];
   const scanMatches = useMemo(
     () =>
       scanRecord
         ? rankShoppingScanMatches(
             items
-              .filter((item) => !['in_cart', 'sourced'].includes(normalizedState(item)))
+              .filter((item) => unpackMode || normalizedState(item) !== 'sourced')
               .map((item) => ({ id: item.id, item: item.item })),
             scanRecord,
           )
         : [],
-    [items, scanRecord],
+    [items, scanRecord, unpackMode],
   );
   const stockedPantryProducts = useMemo(
     () => pantryOptions.products.filter((product) => product.stock.length > 0),
@@ -679,6 +689,8 @@ export function ShoppingListEditor({
           aisleId: item.aisleId ?? '',
           checked: item.checked,
           shoppingState: item.shoppingState,
+          cartQuantity: item.cartQuantity,
+          cartLabel: item.cartLabel,
         }),
       });
       if (!response.ok) showToast(`Could not save ${item.item}.`, 'error');
@@ -706,12 +718,27 @@ export function ShoppingListEditor({
     return next;
   };
 
-  const setItemState = async (item: Item, state: ShoppingState, undo = false) => {
+  const setItemState = async (
+    item: Item,
+    state: ShoppingState,
+    cartQuantity?: number,
+    cartLabel = item.cartLabel,
+  ) => {
     if (pendingStateChanges.current.has(item.id)) return;
     pendingStateChanges.current.add(item.id);
     setPendingItems((current) => [...current, item.id]);
-    const previous = normalizedState(item);
-    const changed = { ...item, shoppingState: state, checked: state === 'sourced' };
+    const previous = { ...item };
+    const changed = {
+      ...item,
+      cartQuantity:
+        cartQuantity ??
+        (state === 'in_cart'
+          ? (item.quantity ?? Math.max(1, item.cartQuantity))
+          : item.cartQuantity),
+      cartLabel,
+      shoppingState: state,
+      checked: state === 'sourced',
+    };
     const wasDirty = dirtyItems.current.has(item.id);
     updateLocal(item.id, changed);
     const changedVersion = dirtyItems.current.get(item.id);
@@ -722,12 +749,83 @@ export function ShoppingListEditor({
           if (!wasDirty) dirtyItems.current.delete(item.id);
         }
       } else {
-        setLastChecked(undo ? null : { item: changed, state: previous });
+        setLastChecked({ item: changed, previous });
         if (state === 'cant_find') showToast(`${item.item} moved to Can’t Find.`, 'success');
       }
     } finally {
       pendingStateChanges.current.delete(item.id);
       setPendingItems((current) => current.filter((id) => id !== item.id));
+    }
+  };
+
+  const restoreLastAction = async () => {
+    if (!lastChecked) return;
+    const { item, previous } = lastChecked;
+    if (!previous) {
+      try {
+        const response = await fetch(`/api/v1/shopping-lists/${list.id}/items/${item.id}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) throw new Error('Could not remove the scanned item.');
+        setItems((current) => current.filter((row) => row.id !== item.id));
+        setLastChecked(null);
+        showToast(`${item.item} removed from the list.`, 'success');
+      } catch {
+        showToast('Could not undo that scanned item. Check the connection and try again.', 'error');
+      }
+      return;
+    }
+    updateLocal(item.id, previous);
+    const restored = { ...previous };
+    if (await save(restored)) {
+      setLastChecked(null);
+      setReenteringItem(item.id);
+      window.setTimeout(
+        () => setReenteringItem((current) => (current === item.id ? null : current)),
+        550,
+      );
+      showToast(`${item.item} restored to the list.`, 'success');
+    } else {
+      setItems((current) => current.map((row) => (row.id === item.id ? item : row)));
+    }
+  };
+
+  const editCartQuantity = (item: Item) => {
+    setCartQuantityDraft(String(item.cartQuantity || item.quantity || 1));
+    setCartQuantityItem(item);
+  };
+
+  const saveCartQuantity = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!cartQuantityItem) return;
+    const amount = Number(cartQuantityDraft);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 10_000) {
+      showToast('Enter a quantity from 0 to 10,000.', 'error');
+      return;
+    }
+    const previous = { ...cartQuantityItem };
+    const complete = amount > 0 && (previous.quantity === null || amount >= previous.quantity);
+    const changed = {
+      ...previous,
+      cartQuantity: amount,
+      cartLabel: amount ? previous.cartLabel : '',
+      shoppingState: (complete ? 'in_cart' : 'to_buy') as ShoppingState,
+      checked: false,
+    };
+    updateLocal(previous.id, changed);
+    if (await save(changed)) {
+      setLastChecked({ item: changed, previous });
+      showToast(
+        amount && !complete
+          ? `${formatQuantity(amount, previous.unit)} recorded; the remaining amount stays on your list.`
+          : amount
+            ? `${previous.item} marked in cart.`
+            : `${previous.item} remains on your list.`,
+        'success',
+      );
+      setCartQuantityItem(null);
+    } else {
+      setItems((current) => current.map((row) => (row.id === previous.id ? previous : row)));
     }
   };
 
@@ -768,6 +866,9 @@ export function ShoppingListEditor({
   const applyScanMatch = async (item: Item) => {
     if (!scanRecord) return;
     const quantity = Number(scanQuantity);
+    const cartQuantity =
+      item.cartQuantity + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+    const complete = item.quantity === null || cartQuantity >= item.quantity;
     const scanNote = [
       item.note,
       `Scanned ${scanRecord.displayName}${scanRecord.brand ? ` by ${scanRecord.brand}` : ''}`,
@@ -777,15 +878,87 @@ export function ShoppingListEditor({
       .filter(Boolean)
       .join(' · ')
       .slice(0, 240);
-    const changed = { ...item, note: scanNote, shoppingState: 'in_cart' as const, checked: false };
+    const changed = {
+      ...item,
+      note: scanNote,
+      cartLabel: scanRecord.displayName,
+      cartQuantity,
+      shoppingState: (unpackMode && complete
+        ? 'sourced'
+        : complete
+          ? 'in_cart'
+          : 'to_buy') as ShoppingState,
+      checked: unpackMode && complete,
+    };
     updateLocal(item.id, changed);
     if (await save(changed)) {
-      showToast(`${item.item} identified and moved to In cart.`, 'success');
+      setLastChecked({ item: changed, previous: item });
+      if (unpackMode) {
+        const candidate = rankPantryMatches(scanRecord.displayName, stockedPantryProducts)[0];
+        updateIntakeDraft(item, {
+          productId: candidate?.productId ?? item.pantry?.productId ?? '',
+          quantity: String(cartQuantity),
+        });
+      }
+      showToast(
+        !complete
+          ? `${formatQuantity(cartQuantity, item.unit)} recorded; the remainder stays on your list.`
+          : unpackMode
+            ? `${item.item} identified and ready to unpack into Pantry.`
+            : `${item.item} identified and moved to In cart.`,
+        'success',
+      );
       setScanOpen(false);
       setScanRecord(null);
       setBarcode('');
       setScanQuantity('1');
     } else updateLocal(item.id, item);
+  };
+
+  const addScannedItem = async () => {
+    if (!scanRecord) return;
+    const quantity = Number(scanQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10_000) {
+      setScanStatus('Enter a quantity from 0 to 10,000.');
+      return;
+    }
+    setBusy('scan-add');
+    try {
+      const itemName = scanRecord.genericName?.trim() || scanRecord.displayName;
+      const response = await fetch(`/api/v1/shopping-lists/${list.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quantity: '',
+          unit: '',
+          item: itemName,
+          note: [
+            `Scanned ${scanRecord.displayName}${scanRecord.brand ? ` by ${scanRecord.brand}` : ''}`,
+            scanRecord.canonicalGtin ? `GTIN ${scanRecord.canonicalGtin}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+            .slice(0, 240),
+          checked: unpackMode,
+          shoppingState: unpackMode ? 'sourced' : 'in_cart',
+          cartQuantity: quantity,
+          cartLabel: scanRecord.displayName,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as { item?: Item } | null;
+      if (!response.ok || !body?.item) throw new Error('Could not add the scanned item.');
+      setItems((current) => [...current, body.item!]);
+      setLastChecked({ item: body.item, previous: null });
+      setScanOpen(false);
+      setScanRecord(null);
+      setBarcode('');
+      setScanQuantity('1');
+      showToast(`${itemName} added to ${unpackMode ? 'Pantry unpacking' : 'In cart'}.`, 'success');
+    } catch (error) {
+      setScanStatus(error instanceof Error ? error.message : 'Could not add the scanned item.');
+    } finally {
+      setBusy('');
+    }
   };
 
   const openSubstitute = (item: Item) => {
@@ -841,11 +1014,14 @@ export function ShoppingListEditor({
       ...original,
       item: substituteName,
       note,
+      cartLabel: record.displayName,
+      cartQuantity: original.quantity ?? Math.max(1, original.cartQuantity),
       shoppingState: 'in_cart' as const,
       checked: false,
     };
     updateLocal(original.id, changed);
     if (await save(changed)) {
+      setLastChecked({ item: changed, previous: original });
       showToast(`${record.displayName} added as the substitute.`, 'success');
       setSubstituteItem(null);
       setSubstituteResults([]);
@@ -874,6 +1050,8 @@ export function ShoppingListEditor({
           note: '',
           checked: false,
           shoppingState: 'to_buy',
+          cartQuantity: 0,
+          cartLabel: '',
         }),
       });
       const body = (await response.json().catch(() => null)) as { item?: Item } | null;
@@ -910,12 +1088,13 @@ export function ShoppingListEditor({
             body: JSON.stringify({ productId, matchType }),
           },
         );
-        if (!response.ok) throw new Error('Could not save that Pantry match.');
+        const body = (await response.json().catch(() => null)) as {
+          detail?: NonNullable<Item['pantry']>;
+        } | null;
+        if (!response.ok || !body?.detail) throw new Error('Could not save that Pantry match.');
         setItems((current) =>
           current.map((entry) =>
-            entry.id === item.id && entry.pantry
-              ? { ...entry, pantry: { ...entry.pantry, productId } }
-              : entry,
+            entry.id === item.id ? { ...entry, pantry: { ...body.detail!, productId } } : entry,
           ),
         );
         if (announce) {
@@ -1129,6 +1308,7 @@ export function ShoppingListEditor({
       showToast(message, 'error');
       return;
     }
+    if (!item.pantry && productId) await matchPantryProduct(item, productId, 'manual', false);
     const operationKey = operationTracker.begin(item.id);
     updateIntakeDraft(item, { operationKey, status: 'Adding to Pantry…' });
     const result = await runTrackedIntakeOperation(operationTracker, item.id, async (key) => {
@@ -1195,21 +1375,23 @@ export function ShoppingListEditor({
     const aisleName = item.aisleId ? aisleById.get(item.aisleId) : undefined;
     return (
       <article
-        className={`${styles.item} ${state === 'sourced' ? styles.sourcedItem : ''}`}
+        className={`${styles.item} ${state === 'sourced' ? styles.sourcedItem : ''} ${reenteringItem === item.id ? styles.itemReturned : ''}`}
         key={item.id}
       >
-        <label
-          className={`${styles.sourceToggle} ${state === 'sourced' ? styles.sourceToggleActive : ''}`}
-        >
-          <input
-            type="checkbox"
-            checked={state === 'sourced'}
-            aria-label={`Mark ${item.item} complete`}
-            disabled={pendingItems.includes(item.id)}
-            onChange={() => void setItemState(item, state === 'sourced' ? 'to_buy' : 'sourced')}
-          />
-          {state === 'sourced' ? <Check size={18} /> : null}
-        </label>
+        {!focusedShopping ? (
+          <label
+            className={`${styles.sourceToggle} ${state === 'sourced' ? styles.sourceToggleActive : ''}`}
+          >
+            <input
+              type="checkbox"
+              checked={state === 'sourced'}
+              aria-label={`Mark ${item.item} complete`}
+              disabled={pendingItems.includes(item.id)}
+              onChange={() => void setItemState(item, state === 'sourced' ? 'to_buy' : 'sourced')}
+            />
+            {state === 'sourced' ? <Check size={18} /> : null}
+          </label>
+        ) : null}
         <span className={styles.itemThumb}>
           <PackageOpen size={24} aria-hidden="true" />
         </span>
@@ -1218,7 +1400,10 @@ export function ShoppingListEditor({
             groupMode === 'aisle' ? styles.itemIdentityGrouped : ''
           }`}
         >
-          <strong>{item.item}</strong>
+          <strong>{item.cartLabel || item.item}</strong>
+          {item.cartLabel && item.cartLabel !== item.item ? (
+            <small className={styles.requestedItem}>For: {item.item}</small>
+          ) : null}
           <span>
             {pantryContributions(item).length ? (
               <small className={styles.aisleBadge}>Meal plan</small>
@@ -1235,6 +1420,14 @@ export function ShoppingListEditor({
             }`}
           >
             <span className={styles.buyAmount}>{quantitySummary.primary}</span>
+            {item.cartQuantity > 0 ? (
+              <span className={styles.cartAmount}>
+                {formatQuantity(item.cartQuantity, item.unit)} in cart
+                {item.quantity !== null && item.cartQuantity < item.quantity
+                  ? ` · ${formatQuantity(item.quantity - item.cartQuantity, item.unit)} still needed`
+                  : ''}
+              </span>
+            ) : null}
             {matchedProduct ? (
               <span className={styles.pantryAmount}>{pantryStockLabel(matchedProduct)}</span>
             ) : null}
@@ -1254,7 +1447,7 @@ export function ShoppingListEditor({
               className={`${styles.stateButton} ${styles.foundButton}`}
               type="button"
               disabled={pendingItems.includes(item.id)}
-              onClick={() => void setItemState(item, 'in_cart')}
+              onClick={() => void setItemState(item, 'in_cart', item.quantity ?? 1)}
             >
               <CheckCircle2 size={19} /> <span>Found it!</span>
             </button>
@@ -1274,9 +1467,20 @@ export function ShoppingListEditor({
               }`}
               type="button"
               disabled={pendingItems.includes(item.id)}
-              onClick={() => void setItemState(item, state === 'in_cart' ? 'to_buy' : 'in_cart')}
+              onClick={() =>
+                void (state === 'in_cart'
+                  ? setItemState(item, 'to_buy', 0, '')
+                  : setItemState(item, 'in_cart'))
+              }
             >
-              <ShoppingCart size={19} /> <span>In Cart</span>
+              <ShoppingCart size={19} />{' '}
+              <span>
+                {state === 'in_cart'
+                  ? 'Remove from cart'
+                  : item.cartQuantity > 0
+                    ? 'Add remaining'
+                    : 'In cart'}
+              </span>
             </button>
             <button
               className={`${styles.stateButton} ${styles.cantFindButton}`}
@@ -1288,6 +1492,16 @@ export function ShoppingListEditor({
             </button>
           </>
         )}
+        {state !== 'cant_find' && (state === 'in_cart' || item.cartQuantity > 0) ? (
+          <button
+            className={styles.cartQuantityButton}
+            type="button"
+            disabled={pendingItems.includes(item.id)}
+            onClick={() => editCartQuantity(item)}
+          >
+            Change quantity
+          </button>
+        ) : null}
         <details className={styles.itemMenu}>
           <summary aria-label={`Edit ${item.item}`}>•••</summary>
           <div className={styles.itemEditor}>
@@ -1444,7 +1658,7 @@ export function ShoppingListEditor({
               <div className={styles.pantryControlIntro}>
                 <Link href="/pantry">Open Pantry</Link>
                 <span>
-                  Substitution is not available here; use Can’t Find to choose an alternative.
+                  Choose the matching Pantry item after shopping, then record what you bought.
                 </span>
               </div>
               <form
@@ -1531,19 +1745,21 @@ export function ShoppingListEditor({
             </div>
           </details>
         ) : null}
-        {state === 'sourced' && item.pantry ? (
+        {unpackMode && (['in_cart', 'sourced'].includes(state) || item.cartQuantity > 0) ? (
           <details className={styles.intake} open={list.settings.openPantryPurchaseOnCheck}>
-            <summary>Record an actual Pantry purchase</summary>
+            <summary>Unpack into Pantry</summary>
             <div className={styles.intakeGrid}>
-              {!item.pantry.productId ? (
+              {!item.pantry?.productId ? (
                 <select
                   aria-label={`Pantry product for ${item.item}`}
                   value={intakeDraft.productId}
-                  onChange={(event) =>
-                    updateIntakeDraft(item, { productId: event.target.value, status: '' })
-                  }
+                  onChange={(event) => {
+                    const productId = event.target.value;
+                    updateIntakeDraft(item, { productId, status: '' });
+                    if (productId) void matchPantryProduct(item, productId, 'manual', false);
+                  }}
                 >
-                  <option value="">Choose Pantry product</option>
+                  <option value="">Refine item in Pantry</option>
                   {pantryOptions.products.map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.displayName}
@@ -1638,10 +1854,10 @@ export function ShoppingListEditor({
               />
               <button
                 type="button"
-                aria-label="Add purchased to Pantry · Confirm and add to Pantry"
+                aria-label={`Add ${item.item} to Pantry`}
                 onClick={() => void intake(item)}
               >
-                Confirm and add to Pantry
+                Add to Pantry
               </button>
               {intakeDrafts[item.id]?.status ? (
                 <span role="status">{intakeDrafts[item.id]!.status}</span>
@@ -1654,7 +1870,6 @@ export function ShoppingListEditor({
   };
 
   const section = (state: ShoppingState, title: string, sectionItems: Item[], className = '') => {
-    if (filter !== 'all' && filter !== state) return null;
     if (!sectionItems.length && state !== 'to_buy') return null;
     const groupedItems =
       groupMode === 'aisle'
@@ -1674,7 +1889,8 @@ export function ShoppingListEditor({
     return (
       <details
         className={`${styles.listSection} ${className}`}
-        open={state !== 'sourced' || filter === 'sourced'}
+        open={state !== 'sourced'}
+        id={`shopping-items-${list.id}-${state}`}
         key={state}
       >
         <summary>
@@ -1714,6 +1930,31 @@ export function ShoppingListEditor({
     );
   };
 
+  const openNotes = () => {
+    setFocusedShopping(false);
+    window.setTimeout(() => {
+      const details = document.getElementById('shopping-list-notes') as HTMLDetailsElement | null;
+      if (!details) return;
+      details.open = true;
+      details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  };
+
+  const addListItem = () => {
+    if (window.matchMedia('(max-width: 800px)').matches) {
+      setMobileAddOpen((current) => !current);
+      return;
+    }
+    setFocusedShopping(false);
+    window.setTimeout(() => addItemInputRef.current?.focus(), 0);
+  };
+
+  const scrollToRemaining = () => {
+    document
+      .getElementById(`shopping-items-${list.id}-to_buy`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <section className={`${styles.shoppingMode} ${focusedShopping ? styles.focusedShopping : ''}`}>
       <div className={styles.shoppingTaskbar}>
@@ -1722,30 +1963,17 @@ export function ShoppingListEditor({
             {remaining
               ? `${remaining} item${remaining === 1 ? '' : 's'} left to buy`
               : total
-                ? 'Everything is checked off'
+                ? 'Everything is accounted for'
                 : 'Your list is ready'}
           </strong>
           <span>
             {total
-              ? `${progressCount} of ${total} picked up or already available`
+              ? `${progressCount} of ${total} fully covered`
               : 'Add an item or build a list from your meal plan.'}
           </span>
-        </div>
-        <div className={styles.shoppingModeSwitch} aria-label="Shopping list display">
-          <button
-            type="button"
-            aria-pressed={focusedShopping}
-            onClick={() => setFocusedShopping(true)}
-          >
-            Shopping mode
-          </button>
-          <button
-            type="button"
-            aria-pressed={!focusedShopping}
-            onClick={() => setFocusedShopping(false)}
-          >
-            Manage list
-          </button>
+          {list.isAutomaticRestockTarget ? (
+            <small className={styles.nextShopMark}>Next shop</small>
+          ) : null}
         </div>
       </div>
       {lastChecked ? (
@@ -1754,104 +1982,168 @@ export function ShoppingListEditor({
           <button
             type="button"
             disabled={pendingItems.includes(lastChecked.item.id)}
-            onClick={() =>
-              void setItemState(
-                items.find((item) => item.id === lastChecked.item.id) ?? lastChecked.item,
-                lastChecked.state,
-                true,
-              )
-            }
+            onClick={() => void restoreLastAction()}
           >
-            Undo
+            <Undo2 size={16} /> Undo
           </button>
         </div>
       ) : null}
-      <div className={styles.mobileSummary}>
-        <div className={styles.mobileProgressCard}>
-          <span
-            className={styles.progressRing}
-            style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}
+      <div className={styles.toolbar}>
+        <label className={styles.search} aria-label="Search shopping items">
+          <Search size={19} aria-hidden="true" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search items"
+            type="search"
           />
-          <span>
-            <strong>
-              {remaining} of {total} remaining
-            </strong>
-            <small>{progress}% complete</small>
-          </span>
-          {list.isAutomaticRestockTarget ? (
-            <strong className={styles.aisleBadge}>Next shop</strong>
-          ) : null}
+        </label>
+        <div className={styles.quickActions} aria-label="Shopping list tools">
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            aria-label="Scan item"
+            title="Scan item"
+          >
+            <ScanLine aria-hidden="true" />
+            <span>Scan</span>
+          </button>
+          <button type="button" onClick={addListItem} aria-label="Add item" title="Add item">
+            <Plus aria-hidden="true" />
+            <span>Add</span>
+          </button>
+          <button type="button" onClick={openNotes} aria-label="Add note" title="Add note">
+            <StickyNote aria-hidden="true" />
+            <span>Note</span>
+          </button>
+          <button
+            type="button"
+            onClick={scrollToRemaining}
+            aria-label={`${remaining} items remaining`}
+            title="Items remaining"
+          >
+            <ListTodo aria-hidden="true" />
+            <span>{remaining} left</span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={unpackMode}
+            onClick={() => setUnpackMode((current) => !current)}
+            aria-label={unpackMode ? 'Close unpack mode' : 'Unpack groceries into Pantry'}
+            title="Unpack groceries"
+          >
+            <PackageOpen aria-hidden="true" />
+            <span>Unpack</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAssistantOpen(true)}
+            aria-label="Chat with the kitchen assistant"
+            title="Kitchen assistant"
+          >
+            <Sparkles aria-hidden="true" />
+            <span>Assistant</span>
+          </button>
+          <button
+            type="button"
+            disabled={!lastChecked}
+            onClick={() => void restoreLastAction()}
+            aria-label="Undo last shopping action"
+            title="Undo"
+          >
+            <Undo2 aria-hidden="true" />
+            <span>Undo</span>
+          </button>
+        </div>
+        <div className={styles.shoppingModeSwitch} aria-label="Shopping list view">
+          <button
+            type="button"
+            aria-pressed={focusedShopping}
+            onClick={() => setFocusedShopping(true)}
+          >
+            <ShoppingCart size={17} /> Shopping mode
+          </button>
+          <button
+            type="button"
+            aria-pressed={!focusedShopping}
+            onClick={() => setFocusedShopping(false)}
+          >
+            <Settings size={17} /> Manage list
+          </button>
         </div>
       </div>
 
-      <div className={styles.topGrid}>
-        <form
-          className={styles.addItem}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void add();
-          }}
-        >
-          <input
-            value={newItem}
-            onChange={(event) => setNewItem(event.target.value)}
-            placeholder="Add an item..."
-            aria-label="New shopping item"
-          />
-          <input
-            value={newQuantity}
-            onChange={(event) => setNewQuantity(event.target.value)}
-            placeholder="Qty"
-            aria-label="New shopping item quantity"
-            inputMode="decimal"
-          />
-          <input
-            value={newUnit}
-            onChange={(event) => setNewUnit(event.target.value)}
-            placeholder="Unit"
-            aria-label="New shopping item unit"
-          />
-          <button
-            type="submit"
-            aria-busy={busy === 'add'}
-            disabled={busy === 'add' || !newItem.trim()}
+      {!focusedShopping ? (
+        <div className={styles.topGrid}>
+          <form
+            className={styles.addItem}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void add();
+            }}
           >
-            <Plus size={18} aria-hidden="true" /> {busy === 'add' ? 'Adding…' : 'Add item'}
-          </button>
-        </form>
-        <section className={styles.storePanel} aria-label="Supermarket for this list">
-          <label>
-            <span>Shopping at</span>
-            <select
-              value={selectedSupermarketId}
-              disabled={busy === 'store'}
-              onChange={(event) => void switchSupermarket(event.target.value)}
-            >
-              <option value="">No supermarket profile</option>
-              {list.supermarketProfiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                  {profile.locationLabel ? ` · ${profile.locationLabel}` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          {list.isAutomaticRestockTarget ? (
-            <strong className={styles.aisleBadge}>Next shop</strong>
-          ) : (
+            <input
+              ref={addItemInputRef}
+              value={newItem}
+              onChange={(event) => setNewItem(event.target.value)}
+              placeholder="Add an item..."
+              aria-label="New shopping item"
+            />
+            <input
+              value={newQuantity}
+              onChange={(event) => setNewQuantity(event.target.value)}
+              placeholder="Qty"
+              aria-label="New shopping item quantity"
+              inputMode="decimal"
+            />
+            <input
+              value={newUnit}
+              onChange={(event) => setNewUnit(event.target.value)}
+              placeholder="Unit"
+              aria-label="New shopping item unit"
+            />
             <button
-              type="button"
-              disabled={busy === 'next-shop'}
-              onClick={() => void makeNextShop()}
+              type="submit"
+              aria-busy={busy === 'add'}
+              disabled={busy === 'add' || !newItem.trim()}
             >
-              {busy === 'next-shop' ? 'Updating…' : 'Make Next shop'}
+              <Plus size={18} aria-hidden="true" /> {busy === 'add' ? 'Adding…' : 'Add item'}
             </button>
-          )}
-          <Link href="/settings/lists">
-            <Settings size={17} /> List settings
-          </Link>
-        </section>
-      </div>
+          </form>
+          <section className={styles.storePanel} aria-label="Supermarket for this list">
+            <label>
+              <span>Shopping at</span>
+              <select
+                value={selectedSupermarketId}
+                disabled={busy === 'store'}
+                onChange={(event) => void switchSupermarket(event.target.value)}
+              >
+                <option value="">No supermarket profile</option>
+                {list.supermarketProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                    {profile.locationLabel ? ` · ${profile.locationLabel}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {list.isAutomaticRestockTarget ? (
+              <strong className={styles.aisleBadge}>Next shop</strong>
+            ) : (
+              <button
+                type="button"
+                disabled={busy === 'next-shop'}
+                onClick={() => void makeNextShop()}
+              >
+                {busy === 'next-shop' ? 'Updating…' : 'Make Next shop'}
+              </button>
+            )}
+            <Link href="/settings/lists">
+              <Settings size={17} /> List settings
+            </Link>
+          </section>
+        </div>
+      ) : null}
 
       {list.policyReviews.some((review) => review.state === 'needs_review') ? (
         <section className={styles.restoredNotice} role="status">
@@ -1887,91 +2179,58 @@ export function ShoppingListEditor({
           {syncError}
         </p>
       )}
-      <ShoppingListShortcuts
-        listId={list.id}
-        currentNames={items.filter((item) => !item.checked).map((item) => item.item)}
-        onAdded={(added) =>
-          setItems((current) => [
-            ...current,
-            ...added.filter((item) => !current.some((existing) => existing.id === item.id)),
-          ])
-        }
-      />
-      <InstacartShopping listId={list.id} items={items} configured={instacartEnabled} />
-      <div className={styles.utilities}>
-        <KitchenPrintDialog kind="shopping-list" listId={list.id} />
-        <ShoppingListNotes
-          listId={list.id}
-          initialNote={list.notes ?? ''}
-          initialVersion={list.notesVersion ?? 0}
-        />
-      </div>
-      <div className={styles.toolbar}>
-        <div className={styles.mobileSearchRow}>
-          <label className={styles.search} aria-label="Search shopping items">
-            <Search size={19} aria-hidden="true" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search items..."
-              type="search"
+      {!focusedShopping ? (
+        <div className={styles.manageTools}>
+          <ShoppingListShortcuts
+            listId={list.id}
+            currentNames={items.filter((item) => !item.checked).map((item) => item.item)}
+            onAdded={(added) =>
+              setItems((current) => [
+                ...current,
+                ...added.filter((item) => !current.some((existing) => existing.id === item.id)),
+              ])
+            }
+          />
+          {instacartEnabled ? (
+            <InstacartShopping listId={list.id} items={items} configured={instacartEnabled} />
+          ) : null}
+          <div className={styles.utilities}>
+            <KitchenPrintDialog kind="shopping-list" listId={list.id} />
+            <ShoppingListNotes
+              listId={list.id}
+              initialNote={list.notes ?? ''}
+              initialVersion={list.notesVersion ?? 0}
             />
-          </label>
-          <button
-            className={styles.mobileAddButton}
-            type="button"
-            onClick={() => setMobileAddOpen((current) => !current)}
-          >
-            <Plus size={18} />
-            <span>Add item</span>
-          </button>
-          <button className={styles.scanButton} type="button" onClick={() => setScanOpen(true)}>
-            <ScanLine size={18} />
-            <span>Scan mode</span>
-          </button>
+            <div className={styles.desktopSort}>
+              <label>
+                <span>Sort</span>
+                <select
+                  aria-label="Sort shopping items"
+                  value={sortMode}
+                  onChange={(event) => setSortMode(event.target.value as SortMode)}
+                >
+                  <option value="position">List order</option>
+                  <option value="alpha">A to Z</option>
+                  <option value="recent">Recently added</option>
+                </select>
+                <ChevronDown size={16} aria-hidden="true" />
+              </label>
+              <label>
+                <span>Group</span>
+                <select
+                  aria-label="Group shopping items"
+                  value={groupMode}
+                  onChange={(event) => setGroupMode(event.target.value as GroupMode)}
+                >
+                  <option value="aisle">Aisle</option>
+                  <option value="none">None</option>
+                </select>
+                <ChevronDown size={16} aria-hidden="true" />
+              </label>
+            </div>
+          </div>
         </div>
-        <div className={styles.filters} aria-label="Filter shopping items">
-          {filterOptions.map(([value, label, count]) => (
-            <button
-              key={value}
-              className={filter === value ? styles.activeFilter : ''}
-              type="button"
-              aria-pressed={filter === value}
-              onClick={() => setFilter(value)}
-            >
-              <span>{label}</span>
-              <small>{count}</small>
-            </button>
-          ))}
-        </div>
-        <div className={styles.desktopSort}>
-          <label>
-            <span>Sort</span>
-            <select
-              aria-label="Sort shopping items"
-              value={sortMode}
-              onChange={(event) => setSortMode(event.target.value as SortMode)}
-            >
-              <option value="position">List order</option>
-              <option value="alpha">A to Z</option>
-              <option value="recent">Recently added</option>
-            </select>
-            <ChevronDown size={16} aria-hidden="true" />
-          </label>
-          <label>
-            <span>Group</span>
-            <select
-              aria-label="Group shopping items"
-              value={groupMode}
-              onChange={(event) => setGroupMode(event.target.value as GroupMode)}
-            >
-              <option value="aisle">Aisle</option>
-              <option value="none">None</option>
-            </select>
-            <ChevronDown size={16} aria-hidden="true" />
-          </label>
-        </div>
-      </div>
+      ) : null}
       {mobileAddOpen ? (
         <form
           className={styles.mobileAddPanel}
@@ -2125,30 +2384,88 @@ export function ShoppingListEditor({
       </div>
 
       <nav className={styles.mobileDock} aria-label="Shopping list totals">
-        <button
-          className={styles.dockMetric}
-          type="button"
-          aria-pressed={filter === 'in_cart'}
-          onClick={() => setFilter('in_cart')}
-        >
-          <ShoppingCart />
-          <strong>{inCart.length}</strong>
-          <small>In cart</small>
+        <button className={styles.dockMetric} type="button" onClick={scrollToRemaining}>
+          <ListTodo />
+          <strong>{remaining}</strong>
+          <small>Items left</small>
+        </button>
+        <button type="button" onClick={() => setAssistantOpen(true)}>
+          <Sparkles /> Assistant
         </button>
         <button
-          className={styles.dockMetric}
           type="button"
-          aria-pressed={filter === 'cant_find'}
-          onClick={() => setFilter('cant_find')}
+          aria-pressed={unpackMode}
+          onClick={() => setUnpackMode((mode) => !mode)}
         >
-          <CircleHelp />
-          <strong>{cantFind.length}</strong>
-          <small>Can’t Find</small>
+          <PackageOpen /> Unpack
         </button>
         <button type="button" onClick={() => setReviewOpen(true)}>
-          <ClipboardCheck /> I’m done shopping
+          <ClipboardCheck /> Done
         </button>
       </nav>
+
+      <dialog
+        className={`${styles.workflowDialog} ${styles.quantityDialog}`}
+        ref={cartQuantityDialogRef}
+        aria-labelledby="cart-quantity-title"
+        onClose={() => setCartQuantityItem(null)}
+      >
+        <header>
+          <div>
+            <span className={styles.dialogIcon}>
+              <ShoppingCart />
+            </span>
+            <div>
+              <h2 id="cart-quantity-title">Change quantity in cart</h2>
+              <p>{cartQuantityItem?.item}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Close quantity editor"
+            onClick={() => setCartQuantityItem(null)}
+          >
+            <X />
+          </button>
+        </header>
+        <form
+          className={styles.cartQuantityForm}
+          onSubmit={(event) => void saveCartQuantity(event)}
+        >
+          <label>
+            Quantity bought ({cartQuantityItem?.unit || 'units'})
+            <input
+              type="number"
+              min="0"
+              max="10000"
+              step="any"
+              inputMode="decimal"
+              value={cartQuantityDraft}
+              onChange={(event) => setCartQuantityDraft(event.target.value)}
+            />
+          </label>
+          <p>
+            {cartQuantityItem?.quantity !== null && cartQuantityItem?.quantity !== undefined
+              ? `Needed: ${formatQuantity(cartQuantityItem.quantity, cartQuantityItem.unit)}. Any amount left stays on the shopping list.`
+              : 'Record what you found. The item stays on the list when the quantity is zero.'}
+          </p>
+          <footer>
+            <button type="button" onClick={() => setCartQuantityItem(null)}>
+              Cancel
+            </button>
+            <button type="submit">Save quantity</button>
+          </footer>
+        </form>
+      </dialog>
+
+      {assistantOpen ? (
+        <AiAssistantDrawer
+          open
+          onClose={() => setAssistantOpen(false)}
+          startNewThreadOnOpen
+          initialDraft={`I’m shopping from “${list.name}” (list ID ${list.id}). Help me manage this list: add, edit, remove, reorder or substitute items; keep cart quantities and remaining amounts accurate; and preserve unrelated notes. Ask me before proposing changes, then prepare reviewed list actions I can confirm.`}
+        />
+      ) : null}
 
       <dialog
         className={styles.workflowDialog}
@@ -2227,7 +2544,7 @@ export function ShoppingListEditor({
                 </span>
               </div>
               <label>
-                Quantity in cart
+                {unpackMode ? 'Quantity purchased in this scan' : 'Quantity found in this scan'}
                 <input
                   min="1"
                   step="1"
@@ -2236,6 +2553,11 @@ export function ShoppingListEditor({
                   onChange={(event) => setScanQuantity(event.target.value)}
                 />
               </label>
+              <p className={styles.scanQuantityHint}>
+                {scanMatches.length
+                  ? 'This amount adds to the quantity already recorded for the matched item.'
+                  : 'The scanned product name is saved with this quantity.'}
+              </p>
               <div className={styles.matchList}>
                 <h3>{scanMatches.length ? 'Match to your list' : 'No close list match found'}</h3>
                 {scanMatches.length ? (
@@ -2256,7 +2578,23 @@ export function ShoppingListEditor({
                     ) : null;
                   })
                 ) : (
-                  <p>Try a broader list item name, or add this as a new item and scan again.</p>
+                  <div className={styles.scanNoMatch}>
+                    <p>
+                      Add this product as a new list item. Its generic name stays on the list, and
+                      the scanned brand is kept as the item you put in the cart.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={busy === 'scan-add'}
+                      onClick={() => void addScannedItem()}
+                    >
+                      {busy === 'scan-add'
+                        ? 'Adding…'
+                        : unpackMode
+                          ? 'Add scanned item for unpacking'
+                          : 'Add scanned item to cart'}
+                    </button>
+                  </div>
                 )}
               </div>
             </section>
@@ -2378,7 +2716,16 @@ export function ShoppingListEditor({
             <section className={styles.reviewComplete}>
               <CheckCircle2 />
               <h3>Everything is accounted for</h3>
-              <p>Your cart and sourced items are ready to review in Pantry.</p>
+              <p>Open unpack mode to record the products you brought home in Pantry.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setReviewOpen(false);
+                  setUnpackMode(true);
+                }}
+              >
+                <PackageOpen size={17} /> Unpack groceries
+              </button>
               <Link href="/lists">Finish shopping</Link>
             </section>
           ) : (

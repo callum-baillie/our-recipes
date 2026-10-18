@@ -4,6 +4,8 @@ import { ChevronDown, History, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ButtonSpinner } from '@/components/skeleton';
+
 type Revision = {
   revision: number;
   editedByName: string;
@@ -113,7 +115,8 @@ export function RecipeRevisionHistory({
           </p>
           <div>
             <button className="text-button" type="button" disabled={pending} onClick={restore}>
-              Confirm restore
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? 'Restoring…' : 'Confirm restore'}
             </button>
             <button
               className="text-button"

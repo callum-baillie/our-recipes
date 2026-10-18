@@ -1,11 +1,13 @@
 'use client';
 import { SuggestionCard } from '@/components/decision-assistance';
+import { AiJobCard, isActiveJob, type AiJob } from './ai-job-card';
+import { InlineAlert } from './inline-alert';
 import { AiAppActionCard } from '@/components/ai-app-action-card';
 import type { DecisionCard } from '@/lib/domain/decision-assistance';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 
-import { Plus, ArrowUp, Sparkles, SquarePen, X } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState, type RefObject } from 'react';
+import { Plus, ArrowUp, Sparkles, SquarePen, Settings, X } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
 import { createClientUuid } from '@/lib/client/client-uuid';
@@ -23,66 +25,6 @@ type Message = {
   actionId?: string | null;
   attachments?: Attachment[];
 };
-
-type AiJob = {
-  id: string;
-  kind: 'recipe_images' | 'recipe_batch_generation';
-  title: string;
-  status: 'queued' | 'running' | 'submitted' | 'completed' | 'failed' | 'cancelled';
-  executionMode: 'direct' | 'batch';
-  actionId: string | null;
-  totalItems: number;
-  completedItems: number;
-  failedItems: number;
-};
-
-function isActiveJob(job: AiJob) {
-  return job.status === 'queued' || job.status === 'running' || job.status === 'submitted';
-}
-
-function AiJobCard({
-  job,
-  busy,
-  onCommand,
-}: {
-  job: AiJob;
-  busy: boolean;
-  onCommand: (jobId: string, command: 'cancel' | 'retry') => void;
-}) {
-  const complete = job.status === 'completed';
-  const failed = job.status === 'failed' || job.status === 'cancelled';
-  const progress = `${job.completedItems} of ${job.totalItems}`;
-  return (
-    <section className={styles.job} aria-label={`${job.title} background task`}>
-      <div>
-        <strong>{job.title}</strong>
-        <p>
-          {complete
-            ? job.failedItems
-              ? `${progress} completed; ${job.failedItems} could not be completed.`
-              : `${progress} completed.`
-            : failed
-              ? `Could not complete ${job.title.toLocaleLowerCase()}.`
-              : `${job.status === 'submitted' ? 'OpenAI Batch is processing' : 'Working on'} ${progress}.`}
-        </p>
-        {job.executionMode === 'batch' && isActiveJob(job) ? (
-          <small>Batch work may take up to 24 hours. You can safely close this drawer.</small>
-        ) : null}
-      </div>
-      <div className={styles.jobActions}>
-        {isActiveJob(job) ? (
-          <button type="button" disabled={busy} onClick={() => onCommand(job.id, 'cancel')}>
-            Cancel
-          </button>
-        ) : failed ? (
-          <button type="button" disabled={busy} onClick={() => onCommand(job.id, 'retry')}>
-            Retry
-          </button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
 
 function compactProposalMessage(message: Message, action?: AiDrawerAction): string {
   if (!message.actionId || !action) return message.content;
@@ -158,10 +100,14 @@ export function AiAssistantDrawer({
   open,
   onClose,
   returnFocusRef,
+  initialDraft,
+  startNewThreadOnOpen = false,
 }: {
   open: boolean;
   onClose: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
+  initialDraft?: string;
+  startNewThreadOnOpen?: boolean;
 }) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -170,11 +116,16 @@ export function AiAssistantDrawer({
   const [suggestions, setSuggestions] = useState<DecisionCard[]>([]);
   const [appActions, setAppActions] = useState<AppActionReview[]>([]);
   const [allowPaidTools, setAllowPaidTools] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statusError, setStatusError] = useState(false);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
   const [draft, setDraft] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attaching, setAttaching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadingHistory = useRef(false);
+  const turnInFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [pendingDecision, setPendingDecision] = useState<{
@@ -195,6 +146,8 @@ export function AiAssistantDrawer({
         '--assistant-viewport-height',
         `${viewport?.height ?? window.innerHeight}px`,
       );
+      if (stickToBottom.current && messagesRef.current)
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
       drawerRef.current?.style.setProperty(
         '--assistant-viewport-top',
         `${viewport?.offsetTop ?? 0}px`,
@@ -209,7 +162,8 @@ export function AiAssistantDrawer({
     };
   }, [open]);
 
-  async function newThread() {
+  const newThread = useCallback(async () => {
+    setStatusError(false);
     setBusy(true);
     setStatus('Starting a new conversation…');
     try {
@@ -222,7 +176,7 @@ export function AiAssistantDrawer({
       const body = (await response.json()) as { thread: { id: string } };
       setThreadId(body.thread.id);
       setMessages([]);
-      setDraft('');
+      setDraft(initialDraft ?? '');
       setAttachments([]);
       setActions([]);
       setSuggestions([]);
@@ -231,11 +185,12 @@ export function AiAssistantDrawer({
       setJobs([]);
       setStatus('');
     } catch (error) {
+      setStatusError(true);
       setStatus(error instanceof Error ? error.message : 'Could not start a conversation.');
     } finally {
       setBusy(false);
     }
-  }
+  }, [initialDraft]);
 
   useEffect(() => {
     if (!open || !threadId) return;
@@ -255,8 +210,18 @@ export function AiAssistantDrawer({
 
   useEffect(() => {
     if (!open || threadId || loadingHistory.current) return;
+    if (startNewThreadOnOpen) {
+      loadingHistory.current = true;
+      const timer = window.setTimeout(() => {
+        void newThread().finally(() => {
+          loadingHistory.current = false;
+        });
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
     loadingHistory.current = true;
     void (async () => {
+      setStatusError(false);
       setBusy(true);
       setStatus('Loading your conversation…');
       try {
@@ -277,6 +242,7 @@ export function AiAssistantDrawer({
           jobs?: AiJob[];
         };
         setMessages(historyBody.messages);
+        setDraft(historyBody.messages.length ? '' : (initialDraft ?? ''));
         setThreadId(body.threads[0].id);
         setActions(historyBody.actions ?? []);
         setJobs(historyBody.jobs ?? []);
@@ -288,13 +254,22 @@ export function AiAssistantDrawer({
         setBusy(false);
       }
     })();
-  }, [open, threadId]);
+  }, [initialDraft, newThread, open, startNewThreadOnOpen, threadId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    const list = messagesRef.current;
+    if (stickToBottom.current && list) list.scrollTop = list.scrollHeight;
+  }, [messages, actions, jobs, appActions, busy, open]);
+
+  useEffect(() => {
+    const list = messagesRef.current;
+    if (!open || !list || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottom.current) list.scrollTop = list.scrollHeight;
     });
-  }, [messages, actions, jobs]);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [open]);
 
   const activeJobIds = jobs
     .filter(isActiveJob)
@@ -303,9 +278,10 @@ export function AiAssistantDrawer({
     .join(',');
 
   useEffect(() => {
-    if (!open || !threadId || !activeJobIds) return;
+    if (!open || !threadId) return;
     let disposed = false;
     const refresh = async () => {
+      if (turnInFlight.current) return;
       try {
         const response = await fetch(`/api/v1/ai/chat/threads/${threadId}`, { cache: 'no-store' });
         if (!response.ok || disposed) return;
@@ -314,19 +290,26 @@ export function AiAssistantDrawer({
           actions: AiDrawerAction[];
           jobs: AiJob[];
         };
-        if (disposed) return;
+        if (disposed || turnInFlight.current) return;
         setMessages(body.messages);
         setActions(body.actions);
-        setJobs(body.jobs);
+        setJobs(body.jobs ?? []);
+        const proposals = await fetch(
+          `/api/v1/ai/app-actions?threadId=${encodeURIComponent(threadId)}`,
+          { cache: 'no-store' },
+        );
+        if (proposals.ok && !disposed) setAppActions((await proposals.json()).proposals);
       } catch {
         // A background refresh should not interrupt the active conversation.
       }
     };
-    void refresh();
     const timer = window.setInterval(() => void refresh(), 5_000);
+    const changed = () => void refresh();
+    window.addEventListener('bord:ai-jobs-changed', changed);
     return () => {
       disposed = true;
       window.clearInterval(timer);
+      window.removeEventListener('bord:ai-jobs-changed', changed);
     };
   }, [activeJobIds, open, threadId]);
   const modal = useModalSurface({
@@ -386,6 +369,7 @@ export function AiAssistantDrawer({
       setAttachments((current) => [...current, ...next]);
       setStatus('Images attached. They will be sent with your next message.');
     } catch (error) {
+      setStatusError(true);
       setStatus(error instanceof Error ? error.message : 'Could not attach images.');
     } finally {
       setAttaching(false);
@@ -396,6 +380,7 @@ export function AiAssistantDrawer({
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault();
     const message = draft.trim();
+    stickToBottom.current = true;
     if (!threadId || (!message && !attachments.length) || busy || attaching) return;
     const sentAttachments = attachments;
     setAttachments([]);
@@ -409,6 +394,8 @@ export function AiAssistantDrawer({
         content: `${message || 'Please review the attached images.'}${sentAttachments.length ? `\n\nAttached: ${sentAttachments.map((file) => file.name).join(', ')}` : ''}`,
       },
     ]);
+    setStatusError(false);
+    turnInFlight.current = true;
     setBusy(true);
     setStatus('Thinking…');
     try {
@@ -496,6 +483,7 @@ export function AiAssistantDrawer({
       setAttachments(sentAttachments);
       setStatus(error instanceof Error ? error.message : 'The assistant request failed.');
     } finally {
+      turnInFlight.current = false;
       setBusy(false);
     }
   }
@@ -505,6 +493,7 @@ export function AiAssistantDrawer({
     decision: 'confirm' | 'cancel',
     conflictResolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
   ) {
+    setStatusError(false);
     setBusy(true);
     setPendingDecision({ actionId, decision });
     setStatus(decision === 'confirm' ? 'Saving your change…' : 'Cancelling this preview…');
@@ -534,6 +523,7 @@ export function AiAssistantDrawer({
         decision === 'confirm' ? 'Saved successfully.' : 'Preview cancelled. Nothing was saved.',
       );
     } catch (error) {
+      setStatusError(true);
       setStatus(error instanceof Error ? error.message : 'Could not update that proposal.');
     } finally {
       setPendingDecision(null);
@@ -556,6 +546,7 @@ export function AiAssistantDrawer({
         command === 'cancel' ? 'Background task cancelled.' : 'Background task queued again.',
       );
     } catch (error) {
+      setStatusError(true);
       setStatus(error instanceof Error ? error.message : 'Could not update that background task.');
     } finally {
       setPendingJobCommand(null);
@@ -587,241 +578,298 @@ export function AiAssistantDrawer({
         tabIndex={-1}
         onKeyDown={modal.onKeyDown}
       >
-        <header className={styles.header}>
-          <span className={styles.assistantMark} aria-hidden="true">
-            <Sparkles />
-          </span>
-          <div className={styles.headerCopy}>
-            <h2 id="ai-assistant-title">Kitchen assistant</h2>
-          </div>
-          <button
-            type="button"
-            title="New conversation"
-            aria-label="New conversation"
-            onClick={() => void newThread()}
-            disabled={busy}
-          >
-            {busy && status === 'Starting a new conversation…' ? (
-              <InlineSkeleton label="Starting a new conversation" width="1rem" />
-            ) : (
-              <SquarePen />
-            )}
-          </button>
-          <button
-            ref={closeRef}
-            type="button"
-            title="Close"
-            aria-label="Close AI assistant"
-            onClick={onClose}
-          >
-            <X size={19} />
-          </button>
-        </header>
-        <div className={styles.messages} aria-live="polite" aria-busy={busy}>
-          {busy && !messages.length && !actions.length && !jobs.length ? (
-            <AsyncSkeleton
-              className={styles.loadingState}
-              label={status || 'Opening your assistant'}
-              variant="rows"
-            />
-          ) : null}
-          {!messages.length && !actions.length && !jobs.length && !busy ? (
-            <div className={styles.empty}>
-              <h3>What can I help with?</h3>
-              <p>
-                Ask about recipes or nutrition, prepare an update, or generate a meal plan. You will
-                review every change before it is saved.
-              </p>
+        <div className={styles.viewport}>
+          <header className={styles.header}>
+            <span className={styles.assistantMark} aria-hidden="true">
+              <Sparkles />
+            </span>
+            <div className={styles.headerCopy}>
+              <h2 id="ai-assistant-title">Kitchen assistant</h2>
             </div>
-          ) : null}
-          {messages.map((message) => {
-            const linkedAction = message.actionId ? actionsById.get(message.actionId) : undefined;
-            return (
-              <Fragment key={message.id}>
-                <div
-                  className={`${styles.message} ${message.role === 'user' ? styles.user : styles.assistant}`}
-                >
-                  {message.role === 'assistant' ? (
-                    <AssistantMessage content={compactProposalMessage(message, linkedAction)} />
-                  ) : (
-                    <>
-                      {message.content}
-                      {message.attachments?.length ? (
-                        <div className={styles.sentImages}>
-                          {message.attachments.map((image, index) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              key={index}
-                              src={`data:${image.mimeType};base64,${image.dataBase64}`}
-                              alt={image.name}
-                              loading="lazy"
-                            />
-                          ))}
-                        </div>
-                      ) : null}
-                    </>
-                  )}
-                </div>
-                {linkedAction ? (
-                  <AiActionCard
-                    action={linkedAction}
-                    busy={busy}
-                    pendingDecision={
-                      pendingDecision?.actionId === linkedAction.id
-                        ? pendingDecision.decision
-                        : null
-                    }
-                    onDecide={(actionId, decision, resolutions) =>
-                      void decide(actionId, decision, resolutions)
-                    }
+            <button
+              type="button"
+              title="New conversation"
+              aria-label="New conversation"
+              onClick={() => void newThread()}
+              disabled={busy}
+            >
+              {busy && status === 'Starting a new conversation…' ? (
+                <InlineSkeleton label="Starting a new conversation" width="1rem" />
+              ) : (
+                <SquarePen />
+              )}
+            </button>
+            <button
+              type="button"
+              aria-label="Assistant settings"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen(!settingsOpen)}
+            >
+              <Settings size={19} />
+            </button>
+            <button
+              ref={closeRef}
+              type="button"
+              title="Close"
+              aria-label="Close AI assistant"
+              onClick={onClose}
+            >
+              <X size={19} />
+            </button>
+          </header>
+          <div
+            ref={messagesRef}
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 72;
+            }}
+            className={styles.messages}
+            aria-live="polite"
+            aria-busy={busy}
+          >
+            {settingsOpen ? (
+              <section className={styles.settingsPanel} aria-label="Assistant settings">
+                <h3>Assistant settings</h3>
+                <label className={styles.paidTools}>
+                  <input
+                    type="checkbox"
+                    checked={allowPaidTools}
+                    disabled={busy}
+                    onChange={(event) => setAllowPaidTools(event.target.checked)}
                   />
-                ) : null}
-              </Fragment>
-            );
-          })}
-          {actions
-            .filter((action) => !linkedActionIds.has(action.id))
-            .map((action) => (
-              <AiActionCard
-                action={action}
-                busy={busy}
-                key={action.id}
-                pendingDecision={
-                  pendingDecision?.actionId === action.id ? pendingDecision.decision : null
-                }
-                onDecide={(actionId, decision, resolutions) =>
-                  void decide(actionId, decision, resolutions)
+                  <span>Allow additional paid suggestions in this conversation</span>
+                </label>
+                <p>
+                  This lets the assistant request extra AI suggestions when reviewing your kitchen.
+                  Normal chat uses your configured AI provider. Image generation still needs
+                  confirmation.
+                </p>
+                <a href="/settings/ai">All AI settings</a>
+              </section>
+            ) : null}
+            {busy && !messages.length && !actions.length && !jobs.length ? (
+              <AsyncSkeleton
+                className={styles.loadingState}
+                label={status || 'Opening your assistant'}
+                variant="rows"
+              />
+            ) : null}
+            {!messages.length && !actions.length && !jobs.length && !busy ? (
+              <div className={styles.empty}>
+                <h3>What can I help with?</h3>
+                <p>
+                  Ask about recipes or nutrition, prepare an update, or generate a meal plan. You
+                  will review every change before it is saved.
+                </p>
+              </div>
+            ) : null}
+            {messages.map((message) => {
+              const linkedAction = message.actionId ? actionsById.get(message.actionId) : undefined;
+              return (
+                <Fragment key={message.id}>
+                  <div
+                    className={`${styles.message} ${message.role === 'user' ? styles.user : styles.assistant}`}
+                  >
+                    {message.role === 'assistant' ? (
+                      <AssistantMessage content={compactProposalMessage(message, linkedAction)} />
+                    ) : (
+                      <>
+                        {message.content}
+                        {message.attachments?.length ? (
+                          <div className={styles.sentImages}>
+                            {message.attachments.map((image, index) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                key={index}
+                                src={`data:${image.mimeType};base64,${image.dataBase64}`}
+                                alt={image.name}
+                                loading="lazy"
+                              />
+                            ))}
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                  {linkedAction ? (
+                    <AiActionCard
+                      action={linkedAction}
+                      busy={busy}
+                      pendingDecision={
+                        pendingDecision?.actionId === linkedAction.id
+                          ? pendingDecision.decision
+                          : null
+                      }
+                      onDecide={(actionId, decision, resolutions) =>
+                        void decide(actionId, decision, resolutions)
+                      }
+                    />
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            {actions
+              .filter((action) => !linkedActionIds.has(action.id))
+              .map((action) => (
+                <AiActionCard
+                  action={action}
+                  busy={busy}
+                  key={action.id}
+                  pendingDecision={
+                    pendingDecision?.actionId === action.id ? pendingDecision.decision : null
+                  }
+                  onDecide={(actionId, decision, resolutions) =>
+                    void decide(actionId, decision, resolutions)
+                  }
+                />
+              ))}
+            {suggestions.map((card) => (
+              <SuggestionCard
+                key={`${card.id}:${card.evidenceHash}`}
+                card={card}
+                onChange={(id, patch) =>
+                  setSuggestions((current) =>
+                    current.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+                  )
                 }
               />
             ))}
-          {suggestions.map((card) => (
-            <SuggestionCard
-              key={`${card.id}:${card.evidenceHash}`}
-              card={card}
-              onChange={(id, patch) =>
-                setSuggestions((current) =>
-                  current.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-                )
-              }
-            />
-          ))}
-          {appActions.map((proposal) => (
-            <AiAppActionCard key={proposal.id} proposal={proposal} />
-          ))}
-          {jobs.map((job) => (
-            <AiJobCard
-              busy={busy || pendingJobCommand === job.id}
-              job={job}
-              key={job.id}
-              onCommand={(jobId, command) => void commandJob(jobId, command)}
-            />
-          ))}
-          {busy ? (
-            <div role="status" aria-live="polite">
-              <AsyncSkeleton
-                className={`${styles.message} ${styles.assistant} ${styles.typing}`}
-                label={status || 'Working on your request'}
-                variant="message"
+            {appActions.map((proposal) => (
+              <AiAppActionCard key={proposal.id} proposal={proposal} />
+            ))}
+            {jobs.map((job) => (
+              <AiJobCard
+                busy={busy || pendingJobCommand === job.id}
+                job={job}
+                key={job.id}
+                onCommand={(jobId, command) => void commandJob(jobId, command)}
               />
-              <p className={styles.workExplanation}>
-                <strong>{status || 'Working on your request'}</strong>
-                <br />
-                {status.includes('conversation')
-                  ? 'Your saved messages and plans will appear here.'
-                  : pendingDecision
-                    ? 'Saving your confirmed changes.'
-                    : 'Your request is running. Larger recipe and image requests can take a few minutes.'}
+            ))}
+            {busy ? (
+              <div role="status" aria-live="polite">
+                <AsyncSkeleton
+                  className={`${styles.message} ${styles.assistant} ${styles.typing}`}
+                  label={status || 'Working on your request'}
+                  variant="message"
+                />
+                <p className={styles.workExplanation}>
+                  <strong>{status || 'Working on your request'}</strong>
+                  <br />
+                  {status.includes('conversation')
+                    ? 'Your saved messages and plans will appear here.'
+                    : pendingDecision
+                      ? 'Saving your confirmed changes.'
+                      : 'Your request is running. Larger recipe and image requests can take a few minutes.'}
+                </p>
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
+          <div className={styles.composer}>
+            {actions.some((action) => action.status === 'pending') ? (
+              <details className={styles.draftTray}>
+                <summary>
+                  Drafts to review ({actions.filter((action) => action.status === 'pending').length}
+                  )
+                </summary>
+                <p>
+                  These previews are temporary until you confirm them. Ask for changes before
+                  saving.
+                </p>
+                {actions
+                  .filter((action) => action.status === 'pending')
+                  .map((action, index) => (
+                    <button
+                      type="button"
+                      key={action.id}
+                      disabled={busy}
+                      onClick={() => {
+                        setDraft(`Revise draft ${index + 1} (${action.id}): `);
+                        textareaRef.current?.focus();
+                      }}
+                    >
+                      Revise {action.kind.replaceAll('_', ' ')} {index + 1}
+                    </button>
+                  ))}
+              </details>
+            ) : null}
+            {attachments.length ? (
+              <ul className={styles.attachments} aria-label="Attached images">
+                {attachments.map((file, index) => (
+                  <li key={`${file.name}-${index}`}>
+                    {/* Local previews are bounded data URLs, not remote image requests. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`data:${file.mimeType};base64,${file.dataBase64}`} alt={file.name} />
+                    <button
+                      type="button"
+                      aria-label={`Remove ${file.name}`}
+                      onClick={() =>
+                        setAttachments((current) => current.filter((_, i) => i !== index))
+                      }
+                    >
+                      <X size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <input
+              ref={fileInputRef}
+              className="sr-only"
+              type="file"
+              tabIndex={-1}
+              aria-label="Choose chat images"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              onChange={(event) => void attachImages(event.target.files)}
+            />
+            <form onSubmit={sendMessage} aria-label="AI assistant message composer">
+              <button
+                type="button"
+                className={styles.attachButton}
+                aria-label="Attach images"
+                title="Attach images"
+                disabled={busy || attaching || attachments.length >= 4}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus />
+              </button>
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing &&
+                    window.matchMedia('(hover: hover) and (pointer: fine)').matches
+                  ) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Ask about your kitchen…"
+                aria-label="Message the AI assistant"
+                disabled={busy || !threadId}
+              />
+              <button
+                type="submit"
+                aria-label="Send message"
+                title="Send message"
+                disabled={busy || attaching || !threadId || (!draft.trim() && !attachments.length)}
+              >
+                {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <ArrowUp />}
+              </button>
+            </form>
+            <div className={styles.composerMeta}>
+              {status ? (
+                <InlineAlert tone={statusError ? 'error' : 'info'}>{status}</InlineAlert>
+              ) : null}
+              <p className={`${styles.keyboardHint} ${styles.desktopHint}`}>
+                Enter to send · Shift + Enter for a new line
               </p>
             </div>
-          ) : null}
-          <div ref={bottomRef} />
-        </div>
-        <div className={styles.composer}>
-          {attachments.length ? (
-            <ul className={styles.attachments} aria-label="Attached images">
-              {attachments.map((file, index) => (
-                <li key={`${file.name}-${index}`}>
-                  {/* Local previews are bounded data URLs, not remote image requests. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`data:${file.mimeType};base64,${file.dataBase64}`} alt={file.name} />
-                  <button
-                    type="button"
-                    aria-label={`Remove ${file.name}`}
-                    onClick={() =>
-                      setAttachments((current) => current.filter((_, i) => i !== index))
-                    }
-                  >
-                    <X size={16} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <input
-            ref={fileInputRef}
-            className="sr-only"
-            type="file"
-            tabIndex={-1}
-            aria-label="Choose chat images"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            multiple
-            onChange={(event) => void attachImages(event.target.files)}
-          />
-          <form onSubmit={sendMessage} aria-label="AI assistant message composer">
-            <button
-              type="button"
-              className={styles.attachButton}
-              aria-label="Attach images"
-              title="Attach images"
-              disabled={busy || attaching || attachments.length >= 4}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Plus />
-            </button>
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter' &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing &&
-                  window.matchMedia('(hover: hover) and (pointer: fine)').matches
-                ) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              placeholder="Ask about your kitchen…"
-              aria-label="Message the AI assistant"
-              disabled={busy || !threadId}
-            />
-            <button
-              type="submit"
-              aria-label="Send message"
-              title="Send message"
-              disabled={busy || attaching || !threadId || (!draft.trim() && !attachments.length)}
-            >
-              {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <ArrowUp />}
-            </button>
-          </form>
-          <label className={styles.paidTools}>
-            <input
-              type="checkbox"
-              checked={allowPaidTools}
-              disabled={busy}
-              onChange={(event) => setAllowPaidTools(event.target.checked)}
-            />
-            <span>Allow additional paid suggestions</span>
-          </label>
-          <div className={styles.composerMeta}>
-            <p className={styles.status} role="status">
-              {status}
-            </p>
-            <p className={`${styles.keyboardHint} ${styles.desktopHint}`}>
-              Enter to send · Shift + Enter for a new line
-            </p>
           </div>
         </div>
       </aside>

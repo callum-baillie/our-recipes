@@ -54,7 +54,7 @@ export const SCOTTISH_STOVIES_RECIPE: RecipeInput = {
         },
         {
           quantity: 1,
-          unit: '',
+          unit: 'each',
           item: 'large onion',
           note: 'about 200 g, peeled and finely chopped',
         },

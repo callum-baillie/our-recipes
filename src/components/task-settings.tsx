@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { SettingsPageHeader } from './settings-page-header';
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
+import { AsyncSkeleton, ButtonSpinner } from './skeleton';
 import type { TaskSettings as Preferences } from '@/lib/domain/task-settings';
 import styles from './task-settings.module.css';
 type Job = {
@@ -40,7 +41,17 @@ export function TaskSettings({
   const [version, setVersion] = useState(initial.version);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [pendingJobAction, setPendingJobAction] = useState<{
+    id: string;
+    action: 'review' | 'cancel' | 'retry';
+  } | null>(null);
+  const [pendingDecision, setPendingDecision] = useState<{
+    id: string;
+    decision: 'confirm' | 'cancel';
+  } | null>(null);
   const [actions, setActions] = useState<AiDrawerAction[]>([]);
   const [jobError, setJobError] = useState('');
   const [retryTarget, setRetryTarget] = useState<Job | null>(null);
@@ -60,6 +71,8 @@ export function TaskSettings({
         }
       } catch (error) {
         if (active) setJobError(error instanceof Error ? error.message : 'Could not load tasks.');
+      } finally {
+        if (active) setJobsLoading(false);
       }
     };
     void load();
@@ -73,6 +86,7 @@ export function TaskSettings({
   }, []);
   async function save() {
     setBusy(true);
+    setSavingSettings(true);
     setStatus('');
     try {
       const response = await fetch('/api/v1/account/automation', {
@@ -88,10 +102,12 @@ export function TaskSettings({
       setStatus(error instanceof Error ? error.message : 'Unable to save.');
     } finally {
       setBusy(false);
+      setSavingSettings(false);
     }
   }
   async function command(job: Job, command: 'retry' | 'cancel') {
     setBusy(true);
+    setPendingJobAction({ id: job.id, action: command });
     try {
       const response = await fetch(`/api/v1/ai/jobs/${job.id}?personal=true`, {
         method: 'POST',
@@ -109,11 +125,14 @@ export function TaskSettings({
       setJobError(error instanceof Error ? error.message : 'Task update failed.');
     } finally {
       setBusy(false);
+      setPendingJobAction(null);
+      if (command === 'retry') retryDialog.current?.close();
     }
   }
   async function review(job: Job) {
     if (!job.actionId) return;
     setBusy(true);
+    setPendingJobAction({ id: job.id, action: 'review' });
     try {
       const response = await fetch(`/api/v1/ai/actions/${job.actionId}?personal=true`);
       const body = await response.json();
@@ -126,6 +145,7 @@ export function TaskSettings({
       setJobError(error instanceof Error ? error.message : 'Could not open draft.');
     } finally {
       setBusy(false);
+      setPendingJobAction(null);
     }
   }
   async function decide(
@@ -134,6 +154,7 @@ export function TaskSettings({
     conflictResolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
   ) {
     setBusy(true);
+    setPendingDecision({ id, decision });
     try {
       const response = await fetch(`/api/v1/ai/actions/${id}?personal=true`, {
         method: 'PATCH',
@@ -147,6 +168,7 @@ export function TaskSettings({
       setJobError(error instanceof Error ? error.message : 'Draft update failed.');
     } finally {
       setBusy(false);
+      setPendingDecision(null);
     }
   }
   return (
@@ -397,8 +419,9 @@ export function TaskSettings({
           </p>
         </SettingsGroup>
         <SettingsActionBar status={status}>
-          <button className="primary-button" disabled={busy || !canEdit}>
-            {busy ? 'Saving…' : 'Save preferences'}
+          <button className="primary-button" disabled={busy || !canEdit} aria-busy={savingSettings}>
+            {savingSettings ? <ButtonSpinner /> : null}
+            {savingSettings ? 'Saving…' : 'Save preferences'}
           </button>
         </SettingsActionBar>
       </form>
@@ -407,8 +430,14 @@ export function TaskSettings({
         description="Progress refreshes every 10 seconds. Generated drafts can be reviewed and confirmed for 24 hours."
       >
         <SettingsSubsection title="Recent tasks">
-          {jobError && <p role="alert">{jobError}</p>}
-          {!jobs.length && <SettingsEmpty>No background tasks yet.</SettingsEmpty>}
+          {jobsLoading ? (
+            <AsyncSkeleton label="Loading recent background tasks" variant="rows" />
+          ) : (
+            <>
+              {jobError && <p role="alert">{jobError}</p>}
+              {!jobs.length && !jobError && <SettingsEmpty>No background tasks yet.</SettingsEmpty>}
+            </>
+          )}
           {[...jobs].reverse().map((job) => (
             <article className={`settings-item ${styles.job}`} key={job.id}>
               <div>
@@ -449,17 +478,37 @@ export function TaskSettings({
               </div>
               <div className={styles.actions}>
                 {job.actionId && (
-                  <button type="button" disabled={busy} onClick={() => void review(job)}>
-                    Review draft
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-busy={
+                      pendingJobAction?.id === job.id && pendingJobAction.action === 'review'
+                    }
+                    onClick={() => void review(job)}
+                  >
+                    {pendingJobAction?.id === job.id && pendingJobAction.action === 'review' ? (
+                      <ButtonSpinner />
+                    ) : null}
+                    {pendingJobAction?.id === job.id && pendingJobAction.action === 'review'
+                      ? 'Opening draft…'
+                      : 'Review draft'}
                   </button>
                 )}
                 {['queued', 'running', 'submitted'].includes(job.status) ? (
                   <button
                     type="button"
                     disabled={busy || !canEdit}
+                    aria-busy={
+                      pendingJobAction?.id === job.id && pendingJobAction.action === 'cancel'
+                    }
                     onClick={() => void command(job, 'cancel')}
                   >
-                    Cancel
+                    {pendingJobAction?.id === job.id && pendingJobAction.action === 'cancel' ? (
+                      <ButtonSpinner />
+                    ) : null}
+                    {pendingJobAction?.id === job.id && pendingJobAction.action === 'cancel'
+                      ? 'Cancelling…'
+                      : 'Cancel'}
                   </button>
                 ) : ['failed', 'cancelled'].includes(job.status) ? (
                   <button
@@ -483,6 +532,7 @@ export function TaskSettings({
           key={action.id}
           action={action}
           busy={busy}
+          pendingDecision={pendingDecision?.id === action.id ? pendingDecision.decision : null}
           onDecide={(...args) => void decide(...args)}
         />
       ))}
@@ -493,18 +543,25 @@ export function TaskSettings({
           already sent before cancellation may still be billed by the provider.
         </p>
         <div className={styles.actions}>
-          <button type="button" onClick={() => retryDialog.current?.close()}>
+          <button type="button" disabled={busy} onClick={() => retryDialog.current?.close()}>
             Keep current results
           </button>
           <button
             type="button"
             disabled={busy || !canEdit}
+            aria-busy={
+              pendingJobAction?.action === 'retry' && pendingJobAction.id === retryTarget?.id
+            }
             onClick={() => {
-              retryDialog.current?.close();
               if (retryTarget) void command(retryTarget, 'retry');
             }}
           >
-            Retry task
+            {pendingJobAction?.action === 'retry' && pendingJobAction.id === retryTarget?.id ? (
+              <ButtonSpinner />
+            ) : null}
+            {pendingJobAction?.action === 'retry' && pendingJobAction.id === retryTarget?.id
+              ? 'Retrying…'
+              : 'Retry task'}
           </button>
         </div>
       </dialog>

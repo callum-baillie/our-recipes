@@ -4,6 +4,7 @@ import { Archive, Plus, RotateCcw, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { kitchenInterviewQuestions, emptyKitchenInterview } from './kitchen-interview';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import {
   SettingsActionBar,
@@ -54,10 +55,12 @@ export function ProfileSettings({
   initialProfiles,
   initialGuardians,
   activeProfileId,
+  aiEnabled = false,
 }: {
   initialProfiles: Profile[];
   initialGuardians: Array<{ parentProfileId: string; childProfileId: string }>;
   activeProfileId: string | null;
+  aiEnabled?: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -250,6 +253,7 @@ export function ProfileSettings({
       </button>
       {adding ? (
         <ProfileOnboardingDialog
+          aiEnabled={aiEnabled}
           onClose={() => setAdding(false)}
           onProfileCreated={(profile) => {
             setProfiles((current) => [...current, profile]);
@@ -262,11 +266,13 @@ export function ProfileSettings({
 }
 
 function ProfileOnboardingDialog({
+  aiEnabled,
   onClose,
   onProfileCreated,
 }: {
   onClose: () => void;
   onProfileCreated: (profile: Profile) => void;
+  aiEnabled: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -302,6 +308,7 @@ function ProfileOnboardingDialog({
         <X size={20} aria-hidden="true" />
       </button>
       <OnboardingWizard
+        aiEnabled={aiEnabled}
         mode="profile"
         onCancel={closeDialog}
         onProfileCreated={(profile) => {
@@ -575,6 +582,35 @@ export function ProfileEditor({
                 </SettingsField>
               </div>
             </SettingsSubsection>
+            {!personal && (
+              <SettingsSubsection
+                title="Kitchen interview"
+                description="Food preferences are gentle guidance; allergies and exclusions always take priority."
+              >
+                {kitchenInterviewQuestions.map((question) => (
+                  <SettingsField
+                    key={question.key}
+                    title={question.title}
+                    description={question.help}
+                  >
+                    <textarea
+                      rows={2}
+                      maxLength={question.key === 'taste' ? 500 : 800}
+                      value={values.goalContext.kitchenInterview?.[question.key] ?? ''}
+                      onChange={(event) =>
+                        updateGoalContext({
+                          kitchenInterview: {
+                            ...emptyKitchenInterview,
+                            ...values.goalContext.kitchenInterview,
+                            [question.key]: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </SettingsField>
+                ))}
+              </SettingsSubsection>
+            )}
             <SettingsField
               description="Additional context for this profile’s cooking preferences."
               title="Anything else the app should remember (optional)"

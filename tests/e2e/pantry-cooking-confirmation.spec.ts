@@ -115,7 +115,7 @@ test('planned cooking reviews exact FEFO stock and only deducts after literal co
   await page.goto('/planner?view=week&date=2027-04-01');
   await page.locator('summary[aria-label="Actions for Cooking lentil stew"]:visible').click();
   const cookLink = page.getByRole('link', {
-    name: 'Cook Cooking lentil stew from this planned meal',
+    name: 'Make Cooking lentil stew from this planned meal',
   });
   await expect(cookLink).toHaveAttribute(
     'href',
@@ -172,13 +172,17 @@ test('planned cooking reviews exact FEFO stock and only deducts after literal co
   await page.getByRole('button', { name: 'Confirm Pantry changes and finish cooking' }).click();
 
   await page.setViewportSize({ width: 768, height: 900 });
-  await expect(page.getByRole('status')).toContainText('Cooking complete and Pantry updated.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Cooking complete and Pantry updated.' }),
+  ).toBeVisible();
   await expect(page.getByRole('link', { name: 'View updated Pantry' })).toBeVisible();
   await expect(
     page.getByRole('link', { name: 'View updated meal plan and groceries' }),
   ).toBeVisible();
   await capture(page, testInfo, 'pantry-cooking-complete-768');
   await page.getByRole('button', { name: 'Undo Pantry deduction' }).click();
-  await expect(page.getByRole('status')).toContainText('Pantry deductions undone.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Pantry deductions undone.' }),
+  ).toBeVisible();
   expect(browserErrors).toEqual([]);
 });

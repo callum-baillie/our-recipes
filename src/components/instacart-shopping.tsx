@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import { instacartRequestSchema, instacartMeasurement } from '@/lib/domain/instacart';
+import { ButtonSpinner } from '@/components/skeleton';
 import styles from './nutrition-onboarding-flow.module.css';
 type Item = {
   id: string;
@@ -234,8 +235,10 @@ export function InstacartShopping({
               type="button"
               className={styles.primary}
               disabled={busy || !configured || !choices.some((item) => item.included)}
+              aria-busy={busy}
               onClick={() => void createLink()}
             >
+              {busy ? <ButtonSpinner /> : null}
               {busy ? 'Creating shopping link…' : 'Create Instacart list'}
             </button>
           )}

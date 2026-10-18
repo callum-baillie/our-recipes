@@ -206,8 +206,9 @@ function demandContributionIndex(demand: ReturnType<typeof getProjectedPantryDem
       : ingredients.filter((item) => item.recipeId === meal.recipeId);
     for (const ingredient of mealIngredients) {
       if (ingredient.isOptional) continue;
+      const ingredientUnit = ingredient.unit.trim() || (ingredient.quantity !== null ? 'each' : '');
       const requiredQuantity =
-        ingredient.quantity !== null && ingredient.unit.trim() && baseServings
+        ingredient.quantity !== null && ingredientUnit && baseServings
           ? Number(((ingredient.quantity * meal.servings) / baseServings).toFixed(6))
           : null;
       const contribution: DemandContribution = {
@@ -221,9 +222,9 @@ function demandContributionIndex(demand: ReturnType<typeof getProjectedPantryDem
         ingredientName: ingredient.ingredientName,
         productId: ingredient.productId,
         requiredQuantity,
-        sourceUnit: ingredient.unit,
+        sourceUnit: ingredientUnit,
         contributionQuantity: requiredQuantity,
-        contributionUnit: ingredient.unit,
+        contributionUnit: ingredientUnit,
       };
       result.set(meal.id, [...(result.get(meal.id) ?? []), contribution]);
     }
@@ -1733,7 +1734,7 @@ export function matchShoppingItemToPantryProduct(
     const row = transaction
       .select({ item: shoppingListItems, detail: pantryShoppingItemDetails })
       .from(shoppingListItems)
-      .innerJoin(
+      .leftJoin(
         pantryShoppingItemDetails,
         eq(pantryShoppingItemDetails.shoppingListItemId, shoppingListItems.id),
       )
@@ -1752,12 +1753,12 @@ export function matchShoppingItemToPantryProduct(
     let formulaInputs: Record<string, unknown> = {};
     let provenance: { contributions?: Array<{ ingredientId?: unknown }> } = {};
     try {
-      formulaInputs = JSON.parse(row.detail.formulaInputs) as Record<string, unknown>;
+      formulaInputs = JSON.parse(row.detail?.formulaInputs ?? '{}') as Record<string, unknown>;
     } catch {
       formulaInputs = {};
     }
     try {
-      provenance = JSON.parse(row.detail.provenance) as typeof provenance;
+      provenance = JSON.parse(row.detail?.provenance ?? '{}') as typeof provenance;
     } catch {
       provenance = {};
     }
@@ -1803,16 +1804,49 @@ export function matchShoppingItemToPantryProduct(
         })
         .run();
     }
-    transaction
-      .update(pantryShoppingItemDetails)
-      .set({
-        productId: product.id,
-        formulaInputs: JSON.stringify({ ...formulaInputs, productId: product.id }),
-        uncertaintyReason: null,
-        updatedAt: now,
-      })
-      .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
-      .run();
+    if (row.detail) {
+      transaction
+        .update(pantryShoppingItemDetails)
+        .set({
+          productId: product.id,
+          formulaInputs: JSON.stringify({ ...formulaInputs, productId: product.id }),
+          uncertaintyReason: null,
+          updatedAt: now,
+        })
+        .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
+        .run();
+    } else {
+      transaction
+        .insert(pantryShoppingItemDetails)
+        .values({
+          shoppingListItemId: itemId,
+          productId: product.id,
+          demandState: 'manual',
+          generatedQuantity: row.item.quantity,
+          generatedUnit: row.item.unit,
+          shortageQuantity: row.item.quantity,
+          uncertaintyReason: null,
+          formulaInputs: JSON.stringify({ source: 'shopping_unpack', productId: product.id }),
+          provenance: JSON.stringify({ source: 'shopping_unpack', actorProfileId }),
+          generationKey: `shopping-unpack:${itemId}`,
+          manualQuantityOverride: false,
+          manualUnitOverride: false,
+          manualItemOverride: false,
+          manualNoteOverride: false,
+          generationMode: 'all',
+          coverageState: 'active',
+          manualExtraQuantity: 0,
+          manualExtraUnit: '',
+          coveredQuantity: 0,
+          coveredUnit: '',
+          purchasedQuantity: 0,
+          purchasedUnit: '',
+          controlNote: '',
+          generatedAt: now,
+          updatedAt: now,
+        })
+        .run();
+    }
     return transaction
       .select()
       .from(pantryShoppingItemDetails)

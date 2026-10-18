@@ -11,6 +11,7 @@ export function PersonalProfileSettings({ profile }: { profile: Profile }) {
       {message && <p role="status">{message}</p>}
       <fieldset disabled={busy} className="personal-profile-fields">
         <ProfileEditor
+          key={JSON.stringify(profile.goalContext)}
           profile={profile}
           active
           personal

@@ -1,0 +1,30 @@
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.alert > svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+.alert > div {
+  min-width: 0;
+}
+.alert[data-tone='success'] {
+  border-color: var(--leaf);
+  background: var(--leaf-pale);
+}
+.alert[data-tone='warning'] {
+  border-left: 4px solid #b98520;
+}
+.alert[data-tone='error'] {
+  border-left: 4px solid #c34f47;
+}

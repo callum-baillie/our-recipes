@@ -1,4 +1,5 @@
 import 'server-only';
+import { kitchenContextUpdateSchema } from '@/lib/domain/profile-goals';
 import { z } from 'zod';
 import { shoppingListManageSchema, shoppingListReorderSchema } from '@/lib/domain/planning';
 import { createTagSchema as validator0 } from '@/lib/domain/tag';
@@ -67,6 +68,23 @@ export type AppOperation = {
   validator?: z.ZodType;
 };
 export const APP_OPERATIONS: AppOperation[] = [
+  {
+    id: 'readMyKitchenContext',
+    path: '/account/kitchen-context',
+    method: 'GET',
+    summary: 'Read your own saved kitchen interview and revision.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'updateMyKitchenContext',
+    path: '/account/kitchen-context',
+    method: 'PATCH',
+    summary: 'Save your reviewed food preferences and routines.',
+    parameters: [],
+    body: null,
+    validator: kitchenContextUpdateSchema,
+  },
   {
     id: 'generateRecipeImage',
     path: '/recipes/{recipeId}/images/generate',
@@ -1787,6 +1805,8 @@ export const APP_OPERATIONS: AppOperation[] = [
   },
 ];
 export const APP_ROUTE_LOADERS = {
+  readMyKitchenContext: () => import('@/app/api/v1/account/kitchen-context/route'),
+  updateMyKitchenContext: () => import('@/app/api/v1/account/kitchen-context/route'),
   generateRecipeImage: () => import('@/app/api/v1/recipes/[recipeId]/images/generate/route'),
   listRecentShoppingItems: () => import('@/app/api/v1/shopping-lists/recent-items/route'),
   addShoppingListNamesBulk: () => import('@/app/api/v1/shopping-lists/[listId]/items/bulk/route'),

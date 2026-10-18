@@ -9,11 +9,35 @@ export const isoDateSchema = z.iso.date();
 export const mealPlanStatusSchema = z.enum(['planned', 'skipped', 'cancelled']);
 export type MealPlanStatus = z.output<typeof mealPlanStatusSchema>;
 
+export const mealPlanOptionSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('recipe'),
+      recipeId: z.string().uuid(),
+      label: z.string().trim().min(1).max(160),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('pantry'),
+      productId: z.string().uuid(),
+      label: z.string().trim().min(1).max(160),
+    })
+    .strict(),
+]);
+export type MealPlanOptionInput = z.output<typeof mealPlanOptionSchema>;
+
 export const mealPlanStatusUpdateSchema = z.object({ status: mealPlanStatusSchema }).strict();
 
 export const mealPlanEntrySchema = z
   .object({
-    kind: z.enum(['recipe', 'item', 'takeout', 'leftover', 'custom']).optional(),
+    kind: z.enum(['recipe', 'item', 'takeout', 'leftover', 'custom', 'fast', 'options']).optional(),
+    profileIds: z
+      .array(z.string().uuid())
+      .max(50)
+      .refine((ids) => new Set(ids).size === ids.length, 'Choose each person once.')
+      .optional(),
+    options: z.array(mealPlanOptionSchema).min(2).max(12).optional(),
     leftoverSourceId: z.string().uuid().nullable().optional(),
     foodItem: recipeIngredientSchema.nullable().optional(),
     recipeOverride: recipeInputSchema
@@ -34,6 +58,18 @@ export const mealPlanEntrySchema = z
     note: z.string().trim().max(240),
   })
   .superRefine((value, context) => {
+    if (value.kind === 'options' && (value.options?.length ?? 0) < 2)
+      context.addIssue({
+        code: 'custom',
+        path: ['options'],
+        message: 'Add at least two meal options.',
+      });
+    if (value.kind !== 'options' && value.options?.length)
+      context.addIssue({
+        code: 'custom',
+        path: ['options'],
+        message: 'Options can only be added to an options meal.',
+      });
     if (value.kind === 'leftover' && !value.leftoverSourceId)
       context.addIssue({
         code: 'custom',
@@ -54,13 +90,21 @@ export const mealPlanEntrySchema = z
       });
     if (value.kind === 'recipe' && !value.recipeId)
       context.addIssue({ code: 'custom', path: ['recipeId'], message: 'Choose a recipe.' });
-    if (['item', 'takeout', 'custom'].includes(value.kind ?? '') && value.recipeId)
+    if (
+      ['item', 'takeout', 'custom', 'fast', 'options'].includes(value.kind ?? '') &&
+      value.recipeId
+    )
       context.addIssue({
         code: 'custom',
         path: ['recipeId'],
         message: 'This meal type does not use a recipe.',
       });
-    if (!value.recipeId && !value.title && !value.leftoverSourceId) {
+    if (
+      !value.recipeId &&
+      !value.title &&
+      !value.leftoverSourceId &&
+      !['fast', 'options'].includes(value.kind ?? '')
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['title'],
@@ -151,6 +195,8 @@ export const shoppingListItemSchema = z.object({
   aisleId: z.union([z.literal(''), z.string().uuid()]).optional(),
   checked: z.boolean().default(false),
   shoppingState: shoppingListItemStateSchema.default('to_buy'),
+  cartQuantity: z.coerce.number().min(0).max(10_000).optional(),
+  cartLabel: z.string().trim().max(160).optional(),
   productId: z.string().uuid().optional(),
   recipeId: z.string().uuid().optional(),
   recommendationKey: z.string().trim().max(240).optional(),
@@ -201,9 +247,11 @@ export type MealPlanEntryInput = Omit<
 };
 export type ShoppingListItemInput = Omit<
   z.output<typeof shoppingListItemSchema>,
-  'shoppingState'
+  'shoppingState' | 'cartQuantity' | 'cartLabel'
 > & {
   shoppingState?: z.output<typeof shoppingListItemStateSchema>;
+  cartQuantity?: number;
+  cartLabel?: string;
 };
 export type DuplicateWeekInput = z.output<typeof duplicateWeekSchema>;
 export type MealPlanBatchInput = z.output<typeof mealPlanBatchSchema>;

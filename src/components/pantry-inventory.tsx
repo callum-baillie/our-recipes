@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Minus, Plus, Save, Trash2, Search, Check } from 'lucide-react';
+import { ButtonSpinner } from '@/components/skeleton';
 import { PageHeader } from './page-header';
 import { KitchenPrintDialog } from './kitchen-print-dialog';
 import styles from './pantry-inventory.module.css';
@@ -24,12 +25,16 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  const [pendingBatchIds, setPendingBatchIds] = useState<string[]>([]);
+  const [pendingOperation, setPendingOperation] = useState<'save' | 'bulk' | 'remove' | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [saved, setSaved] = useState<Record<string, number>>({});
-  async function save(items: Stock[], remove = false) {
+  async function save(items: Stock[], remove = false, bulk = false) {
     if (pending || !canEdit) return;
     setPending(true);
+    setPendingBatchIds(items.map((item) => item.id));
+    setPendingOperation(remove ? 'remove' : bulk ? 'bulk' : 'save');
     setMessage('');
     let count = 0;
     try {
@@ -99,6 +104,8 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
       router.refresh();
     } finally {
       setPending(false);
+      setPendingBatchIds([]);
+      setPendingOperation(null);
     }
   }
   const visible = batches.filter(
@@ -218,10 +225,17 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
             <div className={styles.actions}>
               <button
                 disabled={pending || !canEdit || drafts[batch.id] === undefined}
+                aria-busy={pendingOperation === 'save' && pendingBatchIds.includes(batch.id)}
                 onClick={() => void save([batch])}
               >
-                <Save size={17} />
-                Save count
+                {pendingOperation === 'save' && pendingBatchIds.includes(batch.id) ? (
+                  <ButtonSpinner />
+                ) : (
+                  <Save size={17} />
+                )}{' '}
+                {pendingOperation === 'save' && pendingBatchIds.includes(batch.id)
+                  ? 'Saving…'
+                  : 'Save count'}
               </button>
               <button
                 disabled={pending || !canEdit}
@@ -234,8 +248,13 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
             {confirmRemove === batch.id && (
               <div className={styles.confirm}>
                 <p>Remove this batch from active stock? Its inventory history is kept.</p>
-                <button disabled={pending || !canEdit} onClick={() => void save([batch], true)}>
-                  Remove batch
+                <button
+                  disabled={pending || !canEdit}
+                  aria-busy={pendingOperation === 'remove' && pendingBatchIds.includes(batch.id)}
+                  onClick={() => void save([batch], true)}
+                >
+                  {pendingOperation === 'remove' ? <ButtonSpinner /> : null}
+                  {pendingOperation === 'remove' ? 'Removing…' : 'Remove batch'}
                 </button>
                 <button disabled={pending || !canEdit} onClick={() => setConfirmRemove(null)}>
                   Keep it
@@ -258,10 +277,17 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
         </span>
         <button
           disabled={pending || !canEdit || !Object.keys(drafts).length}
-          onClick={() => void save(batches.filter((batch) => drafts[batch.id] !== undefined))}
+          aria-busy={pendingOperation === 'bulk'}
+          onClick={() =>
+            void save(
+              batches.filter((batch) => drafts[batch.id] !== undefined),
+              false,
+              true,
+            )
+          }
         >
-          <Save size={18} />
-          {pending ? 'Saving…' : 'Save all counts'}
+          {pendingOperation === 'bulk' ? <ButtonSpinner /> : <Save size={18} />}{' '}
+          {pendingOperation === 'bulk' ? 'Saving…' : 'Save all counts'}
         </button>
       </footer>
     </main>

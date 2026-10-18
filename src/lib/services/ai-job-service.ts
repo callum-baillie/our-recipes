@@ -146,6 +146,16 @@ function publicJob(job: AiJobRow, items: AiJobItemRow[]) {
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
     completedAt: job.completedAt,
+    items: items.map((item) => {
+      const payload = parseJson(item.payload) as { recipeTitle?: string };
+      return {
+        id: item.id,
+        recipeId: item.recipeId,
+        label: payload.recipeTitle ?? `Recipe ${item.position + 1}`,
+        status: item.status,
+        errorCode: item.errorCode,
+      };
+    }),
   };
 }
 
@@ -734,6 +744,27 @@ async function finishJob(job: AiJobRow) {
       .set({ status: 'cancelled', decidedAt: now })
       .where(and(eq(aiActionProposals.id, proposal.id), eq(aiActionProposals.status, 'pending')))
       .run();
+  if (finished.changes && job.threadId && job.kind === 'recipe_images') {
+    const failedNames = latest
+      .filter((item) => item.status === 'failed')
+      .map((item) => (parseJson(item.payload) as { recipeTitle: string }).recipeTitle);
+    getDatabase()
+      .insert(aiChatMessages)
+      .values({
+        id: randomUUID(),
+        threadId: job.threadId,
+        role: 'assistant',
+        model: job.model,
+        content: `${counts.completedItems} of ${counts.totalItems} recipe images saved.${failedNames.length ? ` Could not generate: ${failedNames.join(', ')}. Review the task details and retry only the unfinished items; retrying may incur charges.` : ' The new images are now visible on your recipes.'}`,
+        createdAt: now,
+      })
+      .run();
+    getDatabase()
+      .update(aiChatThreads)
+      .set({ updatedAt: now })
+      .where(eq(aiChatThreads.id, job.threadId))
+      .run();
+  }
 }
 
 async function runDirectJob(job: AiJobRow, items: AiJobItemRow[]) {

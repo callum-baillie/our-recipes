@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, Plus, Trash2 } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
+import { AsyncSkeleton, ButtonSpinner } from './skeleton';
 import {
   SettingsPane,
   SettingsRow,
@@ -96,9 +97,10 @@ export function PasskeySettings() {
           className="secondary-button"
           type="button"
           disabled={loading || pending !== null}
+          aria-busy={pending === 'add'}
           onClick={() => void add()}
         >
-          <Plus size={17} />
+          {pending === 'add' ? <ButtonSpinner /> : <Plus size={17} />}
           {pending === 'add' ? 'Adding…' : 'Add passkey'}
         </button>
       </SettingsRow>
@@ -110,16 +112,15 @@ export function PasskeySettings() {
             className="text-button"
             type="button"
             disabled={loading || pending !== null}
+            aria-busy={loading}
             onClick={() => void load()}
           >
-            Refresh
+            {loading ? 'Refreshing…' : 'Refresh'}
           </button>
         }
       >
         {loading ? (
-          <p role="status" className="settings-empty">
-            Loading passkeys…
-          </p>
+          <AsyncSkeleton label="Loading saved passkeys" variant="rows" />
         ) : !keys.length && !error ? (
           <SettingsEmpty>
             No passkeys yet. Add one above to enable passwordless sign-in.
@@ -149,8 +150,10 @@ export function PasskeySettings() {
                       className="danger-button"
                       type="button"
                       disabled={pending !== null}
+                      aria-busy={pending === key.id}
                       onClick={() => void remove(key.id)}
                     >
+                      {pending === key.id ? <ButtonSpinner /> : null}
                       {pending === key.id ? 'Removing…' : 'Confirm removal'}
                     </button>
                   </>

@@ -28,9 +28,10 @@ type RecipeSelectorProps = {
   collectionMemberships: CollectionMembership[];
   servings: number;
   profileNames: string[];
+  profileIds?: string[];
   initialDate?: string;
   initialMealType?: MealType;
-  onOtherKind?: (kind: 'item' | 'takeout' | 'leftover') => void;
+  onOtherKind?: (kind: 'item' | 'takeout' | 'leftover' | 'fast' | 'options') => void;
   onClose: () => void;
   onSaved: (count: number, meals: PlannedMeal[]) => void;
 };
@@ -119,6 +120,7 @@ export function MealPlanRecipeSelector({
   collectionMemberships,
   servings,
   profileNames,
+  profileIds = [],
   initialDate,
   initialMealType,
   onClose,
@@ -237,6 +239,7 @@ export function MealPlanRecipeSelector({
       return [
         {
           plannedFor,
+          profileIds,
           meal,
           recipeId,
           title: '',
@@ -297,13 +300,17 @@ export function MealPlanRecipeSelector({
         {onOtherKind ? (
           <div className={styles.collectionRow} aria-label="Other meal options">
             <span>Plan something else</span>
-            {(['item', 'leftover', 'takeout'] as const).map((kind) => (
+            {(['item', 'options', 'fast', 'leftover', 'takeout'] as const).map((kind) => (
               <button type="button" key={kind} onClick={() => onOtherKind(kind)}>
-                {kind === 'item'
-                  ? 'Single food or drink'
-                  : kind === 'leftover'
-                    ? 'Leftovers'
-                    : 'Takeout'}
+                {
+                  {
+                    item: 'Single food or drink',
+                    options: 'Options',
+                    fast: 'Fast',
+                    leftover: 'Leftovers',
+                    takeout: 'Eating out',
+                  }[kind]
+                }
               </button>
             ))}
           </div>

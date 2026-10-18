@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { StickyNote } from 'lucide-react';
+import { ButtonSpinner } from '@/components/skeleton';
 export function ShoppingListNotes({
   listId,
   initialNote,
@@ -35,12 +36,13 @@ export function ShoppingListNotes({
     }
   }
   return (
-    <details className="shopping-shared-notes">
+    <details id="shopping-list-notes" className="shopping-shared-notes">
       <summary>
         <StickyNote size={17} />
         Shared notes{note !== savedNote ? ' · unsaved' : savedNote ? ' · saved' : ''}
       </summary>
       <form
+        aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
           void save();
@@ -55,7 +57,8 @@ export function ShoppingListNotes({
           maxLength={2000}
           placeholder="Brands, budget reminders, or instructions for anyone shopping."
         />
-        <button type="submit" disabled={busy || note === savedNote}>
+        <button type="submit" disabled={busy || note === savedNote} aria-busy={busy}>
+          {busy ? <ButtonSpinner /> : null}
           {busy ? 'Saving…' : 'Save notes'}
         </button>
         <p role="status">{message}</p>

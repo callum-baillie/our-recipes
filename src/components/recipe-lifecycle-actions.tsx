@@ -4,6 +4,8 @@ import { Archive, Copy, Heart, Star, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ButtonSpinner } from '@/components/skeleton';
+
 type RecipeLifecycleActionsProps = {
   recipeId: string;
   status: 'active' | 'archived' | 'trash';
@@ -20,7 +22,9 @@ export function RecipeLifecycleActions({
   initialFavorite,
 }: RecipeLifecycleActionsProps) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    'duplicate' | 'archive' | 'restore' | 'trash' | 'favorite' | 'preference' | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [rating, setRating] = useState<number | null>(personalPreference?.rating ?? null);
@@ -29,7 +33,7 @@ export function RecipeLifecycleActions({
   const [favorite, setFavorite] = useState(initialFavorite);
 
   async function duplicate() {
-    setPending(true);
+    setPendingAction('duplicate');
     setError(null);
     try {
       const response = await fetch(`/api/v1/recipes/${recipeId}/duplicate`, { method: 'POST' });
@@ -44,12 +48,14 @@ export function RecipeLifecycleActions({
       router.push(`/recipes/${body.recipe.id}/edit`);
       router.refresh();
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
   async function updateStatus(nextStatus: 'active' | 'archived' | 'trash') {
-    setPending(true);
+    setPendingAction(
+      nextStatus === 'archived' ? 'archive' : nextStatus === 'trash' ? 'trash' : 'restore',
+    );
     setError(null);
     try {
       const response = await fetch(`/api/v1/recipes/${recipeId}/status`, {
@@ -66,12 +72,12 @@ export function RecipeLifecycleActions({
       }
       router.refresh();
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
   async function savePersonalPreference(nextRating = rating) {
-    setPending(true);
+    setPendingAction('preference');
     setError(null);
     setPreferenceSaved(false);
     try {
@@ -95,14 +101,14 @@ export function RecipeLifecycleActions({
     } catch {
       setError('Your rating or note could not be saved. Please try again.');
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
   async function toggleFavorite() {
     if (favorite === null) return;
     const nextFavorite = !favorite;
-    setPending(true);
+    setPendingAction('favorite');
     setError(null);
     try {
       const response = await fetch(`/api/v1/recipes/${recipeId}/favorite`, {
@@ -121,55 +127,73 @@ export function RecipeLifecycleActions({
       setFavorite(body.favorite);
       router.refresh();
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
   return (
     <div className="recipe-lifecycle-actions">
       <div className="recipe-maintenance-actions" aria-label="Recipe maintenance actions">
-        <button className="text-button" type="button" disabled={pending} onClick={duplicate}>
-          <Copy size={15} /> Duplicate
+        <button
+          className="text-button"
+          type="button"
+          disabled={pendingAction !== null}
+          aria-busy={pendingAction === 'duplicate'}
+          onClick={duplicate}
+        >
+          {pendingAction === 'duplicate' ? <ButtonSpinner /> : <Copy size={15} />}{' '}
+          {pendingAction === 'duplicate' ? 'Duplicating…' : 'Duplicate'}
         </button>
         {favorite !== null && (
           <button
             className="text-button"
             type="button"
-            disabled={pending}
+            disabled={pendingAction !== null}
+            aria-busy={pendingAction === 'favorite'}
             onClick={toggleFavorite}
             aria-pressed={favorite}
           >
-            <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />{' '}
-            {favorite ? 'Favorite' : 'Save favorite'}
+            {pendingAction === 'favorite' ? (
+              <ButtonSpinner />
+            ) : (
+              <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />
+            )}{' '}
+            {pendingAction === 'favorite' ? 'Saving…' : favorite ? 'Favorite' : 'Save favorite'}
           </button>
         )}
         {status === 'active' ? (
           <button
             className="text-button"
             type="button"
-            disabled={pending}
+            disabled={pendingAction !== null}
+            aria-busy={pendingAction === 'archive'}
             onClick={() => updateStatus('archived')}
           >
-            <Archive size={15} /> Archive
+            {pendingAction === 'archive' ? <ButtonSpinner /> : <Archive size={15} />}{' '}
+            {pendingAction === 'archive' ? 'Archiving…' : 'Archive'}
           </button>
         ) : (
           <button
             className="text-button"
             type="button"
-            disabled={pending}
+            disabled={pendingAction !== null}
+            aria-busy={pendingAction === 'restore'}
             onClick={() => updateStatus('active')}
           >
-            <RotateCcw size={15} /> Restore to library
+            {pendingAction === 'restore' ? <ButtonSpinner /> : <RotateCcw size={15} />}{' '}
+            {pendingAction === 'restore' ? 'Restoring…' : 'Restore to library'}
           </button>
         )}
         {status !== 'trash' && (
           <button
             className="text-button danger-text-button"
             type="button"
-            disabled={pending}
+            disabled={pendingAction !== null}
+            aria-busy={pendingAction === 'trash'}
             onClick={() => updateStatus('trash')}
           >
-            <Trash2 size={15} /> Move to trash
+            {pendingAction === 'trash' ? <ButtonSpinner /> : <Trash2 size={15} />}{' '}
+            {pendingAction === 'trash' ? 'Moving…' : 'Move to trash'}
           </button>
         )}
       </div>
@@ -193,7 +217,7 @@ export function RecipeLifecycleActions({
               <button
                 key={value}
                 type="button"
-                disabled={pending}
+                disabled={pendingAction !== null}
                 aria-label={`Rate ${value} out of 5 stars`}
                 aria-pressed={rating === value}
                 onMouseEnter={() => setHoverRating(value)}
@@ -216,14 +240,20 @@ export function RecipeLifecycleActions({
               rows={3}
               maxLength={2000}
               value={note}
-              disabled={pending}
+              disabled={pendingAction !== null}
               onChange={(event) => setNote(event.target.value)}
               placeholder="What would you change next time?"
             />
           </label>
           <div>
-            <button className="text-button" type="submit" disabled={pending}>
-              Save note
+            <button
+              className="text-button"
+              type="submit"
+              disabled={pendingAction !== null}
+              aria-busy={pendingAction === 'preference'}
+            >
+              {pendingAction === 'preference' ? <ButtonSpinner /> : null}
+              {pendingAction === 'preference' ? 'Saving…' : 'Save note'}
             </button>
             {preferenceSaved && <span role="status">Saved for your profile.</span>}
           </div>

@@ -134,6 +134,8 @@ export function buildAiProfileContext(actorProfileId: string, principal?: Reques
         };
       }
       if (policy.shareDietaryPreferences) {
+        if (householdProfile?.goalContext.kitchenInterview)
+          context.kitchenInterview = householdProfile.goalContext.kitchenInterview;
         context.dietaryPreferences = JSON.parse(profile.dietaryPreferences);
         context.foodAllergies = JSON.parse(profile.foodAllergies);
         context.dietaryExclusions = JSON.parse(profile.dietaryExclusions);

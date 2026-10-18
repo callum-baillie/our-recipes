@@ -1,3 +1,6 @@
+import { appRoleCan } from '@/lib/domain/permissions';
+import { getAiReadiness } from '@/lib/services/ai-readiness-service';
+import { KitchenInterview } from '@/components/kitchen-interview';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
@@ -24,6 +27,40 @@ export default async function AccountPage() {
           profile={{ ...profile, role: principal.role, isLastAdmin: false }}
         />
       )}
+      {profile && (
+        <KitchenInterview
+          aiEnabled={getAiReadiness().enabled}
+          profile={{ ...profile, role: principal.role, isLastAdmin: false }}
+        />
+      )}
+      {appRoleCan(principal.accountRole, 'shared.update') &&
+        appRoleCan(principal.role, 'shared.update') && (
+          <section className="settings-card">
+            <h2>Your household’s kitchen context</h2>
+            <p>
+              Food preferences help with shared meals. Each member’s AI sharing settings still
+              control what the assistant can read.
+            </p>
+            {getHouseholdState()
+              .profiles.filter(
+                (member) =>
+                  member.id !== principal.linkedProfileId && member.goalContext.kitchenInterview,
+              )
+              .map((member) => (
+                <details key={member.id}>
+                  <summary>{member.displayName}</summary>
+                  <dl>
+                    {Object.entries(member.goalContext.kitchenInterview!).map(([key, value]) => (
+                      <div key={key}>
+                        <dt>{key}</dt>
+                        <dd>{value || 'Not answered'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              ))}
+          </section>
+        )}
       <AppearanceSettings />
     </main>
   );

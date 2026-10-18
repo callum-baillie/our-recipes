@@ -4,6 +4,7 @@ import { BookmarkCheck, Heart, ThumbsDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ButtonSpinner } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
 import { RECIPE_REACTION_SCORES, type RecipeReactionScore } from '@/lib/domain/recipe-reaction';
 
@@ -38,14 +39,14 @@ export function RecipeReactionButtons({
   const router = useRouter();
   const { showToast } = useToast();
   const [score, setScore] = useState<number | null>(initialScore);
-  const [pending, setPending] = useState(false);
+  const [pendingReaction, setPendingReaction] = useState<RecipeReactionScore | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function chooseReaction(nextReaction: RecipeReactionScore) {
     const previousScore = score;
     const nextScore = score === nextReaction ? null : nextReaction;
     setScore(nextScore);
-    setPending(true);
+    setPendingReaction(nextReaction);
     setError(null);
     try {
       const response = await fetch(`/api/v1/recipes/${recipeId}/preference`, {
@@ -78,7 +79,7 @@ export function RecipeReactionButtons({
       setError(message);
       showToast(message, 'error');
     } finally {
-      setPending(false);
+      setPendingReaction(null);
     }
   }
 
@@ -92,13 +93,23 @@ export function RecipeReactionButtons({
             key={reactionScore}
             aria-label={`${label} (score ${reactionScore})`}
             aria-pressed={selected}
-            disabled={pending}
+            disabled={pendingReaction !== null}
+            aria-busy={pendingReaction === reactionScore}
             onClick={() => void chooseReaction(reactionScore)}
           >
-            <Icon size={17} fill={selected ? 'currentColor' : 'none'} aria-hidden="true" />
+            {pendingReaction === reactionScore ? (
+              <ButtonSpinner />
+            ) : (
+              <Icon size={17} fill={selected ? 'currentColor' : 'none'} aria-hidden="true" />
+            )}
           </button>
         );
       })}
+      {pendingReaction !== null ? (
+        <span className="sr-only" role="status">
+          Saving recipe reaction…
+        </span>
+      ) : null}
       {error ? (
         <span className="sr-only" role="alert">
           {error}

@@ -281,7 +281,8 @@ function GenericProposalCard({
         </p>
       </div>
       {entries.length ? (
-        <div className={styles.planPreview} aria-label="Meal plan preview">
+        <details className={styles.planPreview} aria-label="Meal plan preview">
+          <summary>Review {entries.length} planned meals</summary>
           {[...new Set(entries.map((entry) => text(object(entry)?.plannedFor)))]
             .sort()
             .map((date) => (
@@ -325,7 +326,7 @@ function GenericProposalCard({
             Confirming also creates or updates a shopping list for this plan, accounting for your
             pantry stock.
           </p>
-        </div>
+        </details>
       ) : null}
       {conflicts.length ? (
         <section className={styles.planPreview} aria-label="Existing meal choices">
@@ -439,12 +440,22 @@ function RecipeBatchProposalCard({
       <div>
         <h3>{recipes.length} new recipes</h3>
         <ul>
-          {recipes.map((recipe, index) => (
+          {recipes.slice(0, 4).map((recipe, index) => (
             <li key={`${text(recipe?.title)}-${index}`}>
               {text(recipe?.title) || 'Untitled recipe'}
             </li>
           ))}
         </ul>
+        {recipes.length > 4 && (
+          <details>
+            <summary>View all {recipes.length} recipes</summary>
+            <ul>
+              {recipes.slice(4).map((recipe, index) => (
+                <li key={index}>{text(recipe?.title) || 'Untitled recipe'}</li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
       {action.status === 'pending' ? (
         <div className={styles.actions}>
@@ -471,7 +482,11 @@ function RecipeBatchProposalCard({
           </button>
         </div>
       ) : (
-        <p className={styles.genericStatus}>{action.status}</p>
+        <p className={styles.genericStatus}>
+          {action.status === 'confirmed'
+            ? `${recipes.length} recipes saved to My Recipes.`
+            : action.status}
+        </p>
       )}
     </article>
   );

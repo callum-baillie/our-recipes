@@ -368,5 +368,15 @@
     "method": "GET",
     "path": "/ai/actions/{actionId}",
     "reason": "First-party reviewed assistant and scheduled meal-plan draft preview."
+  },
+  {
+    "method": "GET",
+    "path": "/account/kitchen-context",
+    "reason": "Session-owned kitchen interview with revision-checked updates and no provider calls."
+  },
+  {
+    "method": "PATCH",
+    "path": "/account/kitchen-context",
+    "reason": "Session-owned kitchen interview with revision-checked updates and no provider calls."
   }
 ]

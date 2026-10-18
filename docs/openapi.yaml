@@ -1673,6 +1673,11 @@ paths:
       x-api-key-scope: shoppingLists.create
       operationId: addShoppingListItem
       summary: Add a bounded manual item with an optional household aisle assignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShoppingCartItemInput' }
       responses:
         '201': { description: Shopping item created }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -1727,6 +1732,11 @@ paths:
       x-api-key-scope: shoppingLists.update
       operationId: updateShoppingListItem
       summary: Edit, check, or reassign one shopping-list item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShoppingCartItemInput' }
       responses:
         '200': { description: Shopping item saved }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -3763,14 +3773,54 @@ components:
             - category
             - values
           additionalProperties: false
+    ShoppingCartItemInput:
+      type: object
+      required: [item, quantity, unit, note]
+      properties:
+        item: { type: string, minLength: 1, maxLength: 160 }
+        quantity:
+          description: Required amount. Changing cartQuantity does not reduce this demand.
+          oneOf:
+            - { type: number, exclusiveMinimum: 0, maximum: 10000 }
+            - { type: string, const: '' }
+        unit: { type: string, maxLength: 30 }
+        note: { type: string, maxLength: 240 }
+        checked: { type: boolean, default: false }
+        shoppingState:
+          { type: string, enum: [to_buy, in_cart, cant_find, sourced], default: to_buy }
+        cartQuantity: { type: number, minimum: 0, maximum: 10000 }
+        cartLabel:
+          { type: string, maxLength: 160, description: Scanned brand or chosen substitute label. }
+        aisleId: { type: string }
+        productId: { type: string, format: uuid }
+        recipeId: { type: string, format: uuid }
+        recommendationKey: { type: string, maxLength: 240 }
     MealPlanEntryInput:
       type: object
       required: [plannedFor, meal, servings, note]
       description: A recipe or named meal. Item meals require foodItem with an amount per serving. Leftovers require an existing source meal on or before this date, and do not create new grocery demand. Source servings must include leftover portions. Omitted kind, foodItem, and recipeOverride preserve existing metadata during updates; send the complete planned date, slot, recipe or title, servings, and note.
       properties:
+        profileIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          description: Household profile UUIDs for this meal. Empty means shared by the household.
+          items: { type: string, format: uuid }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 12
+          items:
+            type: object
+            required: [kind, label]
+            properties:
+              kind: { type: string, enum: [recipe, pantry] }
+              label: { type: string }
+              recipeId: { type: string, format: uuid }
+              productId: { type: string, format: uuid }
         plannedFor: { type: string, format: date }
         meal: { type: string, minLength: 1, maxLength: 48, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
-        kind: { type: string, enum: [recipe, item, takeout, leftover, custom] }
+        kind: { type: string, enum: [recipe, item, takeout, leftover, custom, fast, options] }
         recipeId: { type: string, description: 'Recipe UUID, or empty for non-recipe meals.' }
         title: { type: string, maxLength: 160, default: '' }
         servings: { type: integer, minimum: 1, maximum: 100 }

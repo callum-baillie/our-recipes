@@ -6,21 +6,50 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { AiBackgroundTasks } from './ai-background-tasks';
 import { BordHeaderLockup } from '@/components/bord-brand';
 import { BrandIcon } from '@/components/brand-icon';
 import { DismissibleDetails } from '@/components/dismissible-details';
 import { ProfileSwitcher, type HeaderProfile } from '@/components/profile-switcher';
+import { Skeleton } from '@/components/skeleton';
 import { parseBrandIcon } from '@/lib/appearance';
 import { hasCustomKitchenIdentity, PRODUCT_NAME } from '@/lib/brand';
 import type { AppRole } from '@/lib/domain/permissions';
 
 import styles from './app-header.module.css';
 
-const AddRecipeDialog = dynamic(() =>
-  import('@/components/add-recipe-dialog').then((module) => module.AddRecipeDialog),
+function LazySurface({ label, drawer = false }: { label: string; drawer?: boolean }) {
+  return (
+    <div className={drawer ? styles.lazyDrawerBackdrop : styles.lazyDialogBackdrop}>
+      <section
+        className={drawer ? styles.lazyDrawer : styles.lazyDialog}
+        role="status"
+        aria-busy="true"
+        aria-label={label}
+      >
+        <div className={styles.lazySurfaceHeader}>
+          <Skeleton height="1.4rem" width="52%" />
+          <Skeleton className={styles.lazyClose} />
+        </div>
+        <div className={styles.lazySurfaceBody}>
+          <Skeleton width="86%" />
+          <Skeleton width="68%" />
+          <Skeleton className={styles.lazyField} />
+          <Skeleton className={styles.lazyField} />
+          <Skeleton className={styles.lazyAction} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+const AddRecipeDialog = dynamic(
+  () => import('@/components/add-recipe-dialog').then((module) => module.AddRecipeDialog),
+  { loading: () => <LazySurface label="Opening recipe form" /> },
 );
-const AiAssistantDrawer = dynamic(() =>
-  import('@/components/ai-assistant-drawer').then((module) => module.AiAssistantDrawer),
+const AiAssistantDrawer = dynamic(
+  () => import('@/components/ai-assistant-drawer').then((module) => module.AiAssistantDrawer),
+  { loading: () => <LazySurface drawer label="Opening AI assistant" /> },
 );
 
 type AppHeaderProps = {
@@ -63,6 +92,9 @@ export function AppHeader({
 
   return (
     <>
+      {activeProfileId && role !== 'child' && (
+        <AiBackgroundTasks key={activeProfileId} profileId={activeProfileId} />
+      )}
       <div className={`app-header-shell ${styles.shell}`}>
         <header className={`app-header ${styles.header}`}>
           <Link

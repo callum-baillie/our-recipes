@@ -16,6 +16,11 @@ import {
 } from './decision-cache-service';
 import { DecisionError } from '@/lib/providers/decisions-provider';
 import { readAiKitchenContext } from './ai-kitchen-context-service';
+import { getRecipe } from './recipe-service';
+import { enqueueRecipeImageJob, getAiJob } from './ai-job-service';
+import { getAiReadiness } from './ai-readiness-service';
+import { getAiWorkloadSetting } from './ai-settings-service';
+import { appRoleCan } from '@/lib/domain/permissions';
 
 const focusedListOperations = new Set([
   'listShoppingLists',
@@ -54,13 +59,25 @@ export type AppActionReview = {
     path: string;
     parameters: Record<string, string>;
     body: unknown;
+    recordLabel?: string;
+    changeLabel?: string;
   }[];
   status: string;
+  results?: { summary: string; ok: boolean; message: string }[];
+  jobId?: string;
 };
 function operation(p: RequestPrincipal, id: string) {
   const op = APP_OPERATIONS.find((candidate) => candidate.id === id);
   if (!op) throw new DecisionError('This app operation is not available to chat.');
   const policy = getAiDataPolicy(p.profileId);
+  if (id === 'readMyKitchenContext' || id === 'updateMyKitchenContext') {
+    if (p.profileId !== p.linkedProfileId || !policy.shareDietaryPreferences)
+      throw new DecisionError(
+        'Use your own profile and enable dietary preference sharing before using kitchen memory in chat.',
+        403,
+      );
+    return op;
+  }
   if (focusedListOperations.has(id)) {
     if (!policy.shareShoppingLists)
       throw new DecisionError('Enable shopping-list sharing to use this tool.', 403);
@@ -237,17 +254,40 @@ export function listPendingAppActions(p: RequestPrincipal, threadId: string): Ap
     .limit(100)
     .all()
     .filter((row) => JSON.parse(row.resultJson).threadId === threadId)
-    .map((row) => ({
-      id: row.id,
-      version: row.version,
-      title: JSON.parse(row.resultJson).title,
-      actions: JSON.parse(row.evidenceJson),
-      status: row.correctionJson
-        ? JSON.parse(row.correctionJson).status
-        : row.expiresAt.getTime() < Date.now()
-          ? 'expired'
-          : 'pending',
-    }));
+    .map((row) => {
+      const correction = row.correctionJson ? JSON.parse(row.correctionJson) : null;
+      const job = correction?.jobId ? getAiJob(correction.jobId, p.profileId) : null;
+      return {
+        id: row.id,
+        version: row.version,
+        title: JSON.parse(row.resultJson).title,
+        actions: JSON.parse(row.evidenceJson),
+        results: job
+          ? job.items.map((item) => ({
+              summary: item.label,
+              ok: item.status === 'succeeded',
+              message:
+                item.status === 'succeeded'
+                  ? 'Image saved.'
+                  : item.status === 'failed'
+                    ? `Image failed (${item.errorCode ?? 'unknown error'}).`
+                    : 'Waiting for generation.',
+            }))
+          : correction?.results,
+        jobId: correction?.jobId,
+        status: job
+          ? job.status === 'completed'
+            ? 'applied'
+            : job.status === 'failed' || job.status === 'cancelled'
+              ? 'partial'
+              : 'queued'
+          : row.correctionJson
+            ? JSON.parse(row.correctionJson).status
+            : row.expiresAt.getTime() < Date.now()
+              ? 'expired'
+              : 'pending',
+      };
+    });
 }
 export async function prepareAppActions(
   p: RequestPrincipal,
@@ -256,15 +296,30 @@ export async function prepareAppActions(
   input: unknown,
 ) {
   const parsed = appActionRequestSchema.parse(input);
+  if (
+    parsed.actions.some((action) => action.operationId === 'generateRecipeImage') &&
+    !parsed.actions.every((action) => action.operationId === 'generateRecipeImage')
+  )
+    throw new DecisionError(
+      'Prepare image generation as its own group so it can run in the background.',
+    );
   const previews = parsed.actions.map((action) => {
     const { op, parameters, body } = parseAction(p, action);
     if (op.method === 'GET') throw new DecisionError('Read operations do not need a proposal.');
+    const recipe = parameters.recipeId ? getRecipe(parameters.recipeId, p.profileId) : null;
     return {
       summary: op.summary,
       method: op.method,
       path: op.path,
       parameters,
       body: body ?? null,
+      recordLabel: recipe?.title,
+      changeLabel:
+        op.id === 'generateRecipeImage'
+          ? recipe?.images.length
+            ? 'Replace cover image'
+            : 'Create image'
+          : undefined,
     };
   });
   const snapshots: Snapshot[] = [];
@@ -307,7 +362,54 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
       'This proposal is expired or has already been handled. Prepare a new review.',
       409,
     );
-  const value = JSON.parse(row.resultJson) as { actions: Action[]; snapshots?: Snapshot[] };
+  const value = JSON.parse(row.resultJson) as {
+    actions: Action[];
+    snapshots?: Snapshot[];
+    threadId: string;
+  };
+  const imageGroup = value.actions.every((action) => action.operationId === 'generateRecipeImage');
+  if (decision === 'apply' && imageGroup) {
+    if (!appRoleCan(p.role, 'shared.update') || !appRoleCan(p.accountRole, 'shared.update'))
+      throw new DecisionError('This account cannot change shared recipe images.', 403);
+    if (!getAiReadiness().enabled || !getAiWorkloadSetting(p.profileId, 'image_generation').enabled)
+      throw new DecisionError(
+        'Enable and configure recipe image generation before starting this request.',
+        409,
+      );
+    const images = value.actions.map((action) => {
+      const { parameters } = parseAction(p, action);
+      const recipe = getRecipe(parameters.recipeId, p.profileId);
+      if (!recipe)
+        throw new DecisionError('A recipe no longer exists. Prepare a fresh review.', 409);
+      return {
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        recipeSummary: recipe.summary,
+        ingredientNames: recipe.ingredientGroups.flatMap((group) =>
+          group.ingredients.map((ingredient) => ingredient.item),
+        ),
+      };
+    });
+    return getDatabase().transaction(() => {
+      saveDecisionCorrection(p, id, version, 'app_action_started', { status: 'running' });
+      const job = enqueueRecipeImageJob({
+        profileId: p.profileId,
+        threadId: value.threadId,
+        images,
+      });
+      const results = images.map((image) => ({
+        summary: image.recipeTitle,
+        ok: true,
+        message: 'Queued for image generation.',
+      }));
+      saveDecisionCorrection(p, id, version + 1, 'app_action_completed', {
+        status: 'queued',
+        jobId: job!.id,
+        results,
+      });
+      return { status: 'queued', results, jobId: job!.id, skipped: 0 };
+    });
+  }
   if (decision === 'apply')
     for (const saved of value.snapshots ?? []) {
       const op = operation(p, saved.operationId);

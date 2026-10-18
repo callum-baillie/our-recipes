@@ -1,0 +1,113 @@
+.card {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--field);
+  color: var(--ink);
+}
+.card h3 {
+  margin: 0.3rem 0;
+  font-size: 1rem;
+}
+.card small,
+.row span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--leaf);
+}
+.rows,
+.results {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.row > svg {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+  color: var(--leaf);
+}
+.row > div {
+  min-width: 0;
+  flex: 1;
+}
+.row strong,
+.row span,
+.results span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.row strong {
+  font-size: 0.83rem;
+}
+.card summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.actions button:first-child {
+  background: var(--leaf);
+  color: var(--on-primary);
+  border-color: var(--leaf);
+  flex: 1;
+}
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.results li {
+  padding: 0.5rem 0;
+  font-size: 0.78rem;
+}
+.reviewValues {
+  margin: 0;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.reviewValues div {
+  padding: 0.3rem 0;
+}
+.reviewValues dt {
+  font-weight: 700;
+}
+.reviewValues dd {
+  margin: 0.2rem 0 0.2rem 0.5rem;
+}

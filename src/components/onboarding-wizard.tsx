@@ -1,4 +1,5 @@
 'use client';
+import { emptyKitchenInterview, kitchenInterviewQuestions } from './kitchen-interview';
 
 import {
   ArrowLeft,
@@ -448,8 +449,10 @@ export function OnboardingWizard({
   mode,
   onCancel,
   onProfileCreated,
+  aiEnabled = false,
 }: {
   mode: 'initial' | 'profile';
+  aiEnabled?: boolean;
   onCancel?: () => void;
   onProfileCreated?: (profile: ProfileRecord) => void;
 }) {
@@ -459,6 +462,7 @@ export function OnboardingWizard({
     mode === 'initial'
       ? ['app', 'appearance', 'profile', 'nutrition', 'goals', 'recipe', 'review']
       : ['profile', 'nutrition', 'goals', 'review'];
+  const [interviewStep, setInterviewStep] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [kitchenName, setKitchenName] = useState(DEFAULT_KITCHEN_NAME);
   const [brandIcon, setBrandIcon] = useState<BrandIconId>(parseBrandIcon(null));
@@ -1244,6 +1248,65 @@ export function OnboardingWizard({
                 </small>
               </label>
 
+              {aiEnabled && (
+                <section className="onboarding-goal-section">
+                  <h3>Meet your Kitchen Assistant</h3>
+                  <p>
+                    A few food questions help make your plans personal. You can revisit this
+                    interview in your profile.
+                  </p>
+                  {kitchenInterviewQuestions
+                    .filter((_, index) => index === interviewStep)
+                    .map((question) => (
+                      <div key={question.key}>
+                        <label>
+                          <strong>{question.title}</strong>
+                          <p>{question.help}</p>
+                          <textarea
+                            rows={3}
+                            maxLength={question.key === 'taste' ? 500 : 800}
+                            value={goalContext.kitchenInterview?.[question.key] ?? ''}
+                            onChange={(event) =>
+                              setGoalContext({
+                                kitchenInterview: {
+                                  ...emptyKitchenInterview,
+                                  ...goalContext.kitchenInterview,
+                                  [question.key]: event.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                        {question.key === 'desserts' &&
+                          /sweet/i.test(goalContext.kitchenInterview?.taste ?? '') && (
+                            <p>
+                              Which sweet treats do you enjoy, and how often would you like them
+                              suggested?
+                            </p>
+                          )}
+                      </div>
+                    ))}
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      disabled={interviewStep === 0}
+                      onClick={() => setInterviewStep((step) => step - 1)}
+                    >
+                      Previous question
+                    </button>
+                    <span>
+                      {interviewStep + 1} / {kitchenInterviewQuestions.length}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={interviewStep === kitchenInterviewQuestions.length - 1}
+                      onClick={() => setInterviewStep((step) => step + 1)}
+                    >
+                      Next question
+                    </button>
+                  </div>
+                </section>
+              )}
               <p className="onboarding-goal-privacy-note">
                 <ShieldCheck size={16} aria-hidden="true" />
                 These answers personalize this household profile; profiles are not separate private

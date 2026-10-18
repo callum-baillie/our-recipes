@@ -25,26 +25,33 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
   const generate = async () => {
     setGenerating(true);
     setError('');
-    const response = await fetch('/api/v1/shopping-lists/pantry-shortages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        weekStart: demand.weekStart,
-        weekEnd: demand.weekEnd,
-        mode,
-        ...(listId ? { listId } : {}),
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      listId?: string;
-      restored?: boolean;
-      error?: { message?: string };
-    } | null;
-    if (response.ok && body?.listId) {
-      setListId(body.listId);
-      setRestored(Boolean(body.restored));
-    } else setError(body?.error?.message ?? 'The Pantry shortage list could not be generated.');
-    setGenerating(false);
+    try {
+      const response = await fetch('/api/v1/shopping-lists/pantry-shortages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekStart: demand.weekStart,
+          weekEnd: demand.weekEnd,
+          mode,
+          ...(listId ? { listId } : {}),
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        listId?: string;
+        restored?: boolean;
+        error?: { message?: string };
+      } | null;
+      if (response.ok && body?.listId) {
+        setListId(body.listId);
+        setRestored(Boolean(body.restored));
+      } else setError(body?.error?.message ?? 'The Pantry shortage list could not be generated.');
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'The Pantry shortage list could not be generated.',
+      );
+    } finally {
+      setGenerating(false);
+    }
   };
   return (
     <section className={styles.panel} aria-labelledby="pantry-demand-title">
@@ -110,15 +117,20 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
         </details>
       )}
       <div className={styles.actions}>
-        <label>
+        <label aria-busy={generating}>
           Grocery view
-          <select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
+          <select
+            value={mode}
+            disabled={generating}
+            onChange={(event) => setMode(event.target.value as typeof mode)}
+          >
             <option value="missing">Missing items only</option>
             <option value="all">All demand, including covered</option>
           </select>
         </label>
         <button
           type="button"
+          aria-busy={generating}
           aria-label={
             !generating && !listId && mode === 'missing'
               ? 'Make shortage list · Make missing-items list'

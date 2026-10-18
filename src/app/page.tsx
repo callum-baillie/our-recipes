@@ -1,3 +1,4 @@
+import { getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { cookies } from 'next/headers';
 
 import { HouseholdHome } from '@/components/household-home';
@@ -49,7 +50,7 @@ function toCardRecipe(recipe: NonNullable<ReturnType<typeof getRecipe>>): Recipe
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const state = getHouseholdState();
-  if (!state.household) return <SetupWizard />;
+  if (!state.household) return <SetupWizard aiEnabled={getAiReadiness().enabled} />;
 
   const rawSearch = await searchParams;
   const recipePreferences = getAppPreferences().recipes;

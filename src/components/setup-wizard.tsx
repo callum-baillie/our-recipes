@@ -3,7 +3,7 @@
 import { BordLockup } from '@/components/bord-brand';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 
-export function SetupWizard() {
+export function SetupWizard({ aiEnabled = false }: { aiEnabled?: boolean }) {
   return (
     <main className="setup-page onboarding-page">
       <section className="setup-intro bord-intro" aria-labelledby="setup-title">
@@ -31,7 +31,7 @@ export function SetupWizard() {
           <p>Our goal is to make it easier to bring families around the table.</p>
         </div>
       </section>
-      <OnboardingWizard mode="initial" />
+      <OnboardingWizard mode="initial" aiEnabled={aiEnabled} />
     </main>
   );
 }

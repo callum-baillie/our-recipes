@@ -4,7 +4,7 @@ import { FolderPlus, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useRef, useState } from 'react';
 
-import { AsyncSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, ButtonSpinner } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
 
 type CollectionOption = {
@@ -28,6 +28,7 @@ export function RecipeCollectionButton({
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'existing' | 'create' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dialogId = `recipe-collection-${recipeId}`;
 
@@ -83,6 +84,7 @@ export function RecipeCollectionButton({
     const collection = collections.find((candidate) => candidate.id === collectionId);
     if (!collection) return;
     setPending(true);
+    setPendingAction('existing');
     setError(null);
     try {
       const result = await requestAssignment(collection.id);
@@ -102,6 +104,7 @@ export function RecipeCollectionButton({
       );
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -110,6 +113,7 @@ export function RecipeCollectionButton({
     const name = newName.trim();
     if (!name) return;
     setPending(true);
+    setPendingAction('create');
     setError(null);
     try {
       const createResponse = await fetch('/api/v1/collections', {
@@ -148,6 +152,7 @@ export function RecipeCollectionButton({
       setError('We could not reach the recipe server. Try again.');
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -194,9 +199,12 @@ export function RecipeCollectionButton({
               <select
                 value={collectionId}
                 disabled={loading || pending || collections.length === 0}
+                aria-busy={loading}
                 onChange={(event) => setCollectionId(event.target.value)}
               >
-                {collections.length ? (
+                {loading ? (
+                  <option value="">Loading collections…</option>
+                ) : collections.length ? (
                   collections.map((collection) => (
                     <option value={collection.id} key={collection.id}>
                       {collection.name} · {collection.recipeCount} recipe
@@ -212,8 +220,14 @@ export function RecipeCollectionButton({
               className="primary-button compact"
               type="submit"
               disabled={loading || pending || !collectionId}
+              aria-busy={pendingAction === 'existing'}
             >
-              <FolderPlus size={16} aria-hidden="true" /> Add recipe
+              {pendingAction === 'existing' ? (
+                <ButtonSpinner />
+              ) : (
+                <FolderPlus size={16} aria-hidden="true" />
+              )}{' '}
+              {pendingAction === 'existing' ? 'Adding…' : 'Add recipe'}
             </button>
           </form>
 
@@ -232,8 +246,18 @@ export function RecipeCollectionButton({
                 onChange={(event) => setNewName(event.target.value)}
               />
             </label>
-            <button className="text-button" type="submit" disabled={pending || !newName.trim()}>
-              <Plus size={16} aria-hidden="true" /> Create and add
+            <button
+              className="text-button"
+              type="submit"
+              disabled={pending || !newName.trim()}
+              aria-busy={pendingAction === 'create'}
+            >
+              {pendingAction === 'create' ? (
+                <ButtonSpinner />
+              ) : (
+                <Plus size={16} aria-hidden="true" />
+              )}{' '}
+              {pendingAction === 'create' ? 'Creating…' : 'Create and add'}
             </button>
           </form>
 

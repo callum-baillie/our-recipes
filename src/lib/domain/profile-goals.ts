@@ -16,8 +16,26 @@ export const profileGoalFocusValues = [
 export const profileGoalFocusSchema = z.enum(profileGoalFocusValues);
 export type ProfileGoalFocus = z.infer<typeof profileGoalFocusSchema>;
 
+export const kitchenInterviewSchema = z
+  .object({
+    taste: z.string().trim().max(500),
+    snacks: z.string().trim().max(800),
+    desserts: z.string().trim().max(800),
+    routine: z.string().trim().max(800),
+    favorites: z.string().trim().max(800),
+    avoid: z.string().trim().max(800),
+  })
+  .strict();
+export const kitchenContextUpdateSchema = z
+  .object({
+    interview: kitchenInterviewSchema,
+    expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
 export const profileGoalContextSchema = z
   .object({
+    kitchenInterview: kitchenInterviewSchema.optional(),
     focusAreas: z
       .array(profileGoalFocusSchema)
       .max(8)

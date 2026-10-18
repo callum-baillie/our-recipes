@@ -1,5 +1,5 @@
 import { PageSkeleton } from '@/components/skeleton';
 
 export default function Loading() {
-  return <PageSkeleton variant="library" />;
+  return <PageSkeleton variant="library" label="Loading recipe library" />;
 }

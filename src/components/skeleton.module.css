@@ -40,6 +40,18 @@
   height: 0.82rem;
 }
 
+.buttonSpinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  border: 0.13em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: buttonSpin 0.72s linear infinite;
+}
+
 .async {
   color: var(--ink);
 }
@@ -227,6 +239,293 @@
   border-radius: 0.9rem;
 }
 
+.authPage {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1.5rem;
+  min-height: calc(100dvh - 8rem);
+  padding: clamp(2rem, 8vw, 6rem) 1rem;
+  background:
+    radial-gradient(
+      ellipse at 50% 25%,
+      color-mix(in srgb, var(--leaf-pale) 80%, transparent),
+      transparent 42%
+    ),
+    var(--page);
+}
+
+.authBrand {
+  width: min(12rem, 48vw);
+  height: 3rem;
+  border-radius: 0.5rem;
+}
+
+.authCard {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 29rem);
+  padding: clamp(1.25rem, 5vw, 2rem);
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.upgradePage {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(2rem, 8vw, 7rem);
+  min-height: calc(100dvh - 8rem);
+  padding: clamp(2rem, 7vw, 6rem) 0;
+}
+
+.upgradeIntro {
+  display: grid;
+  justify-items: start;
+  gap: 1.2rem;
+}
+
+.upgradeIntro .heading {
+  width: 100%;
+}
+
+.upgradeForm {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.accountGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
+  gap: 1rem;
+}
+
+.apiKeyLayout {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.apiKeyPanel {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  background: color-mix(in srgb, var(--linen) 84%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+}
+
+.apiKeyHeading {
+  display: grid;
+  flex: 1;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.apiPermissionGrid {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1.3fr) repeat(4, minmax(3rem, 0.55fr));
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 0.25rem 0;
+}
+
+.apiPermissionRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(8rem, 1.3fr) repeat(4, minmax(3rem, 0.55fr));
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 0.75rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.assistantPanel {
+  display: grid;
+  grid-template-rows: minmax(24rem, 1fr) auto;
+  min-height: min(72dvh, 50rem);
+  overflow: hidden;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.assistantMessages {
+  display: grid;
+  align-content: end;
+  gap: 1.25rem;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.assistantMessage {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: min(88%, 42rem);
+  padding: 1rem;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.assistantMessageUser {
+  justify-self: end;
+  width: min(72%, 32rem);
+  background: color-mix(in srgb, var(--leaf-pale) 72%, var(--linen));
+}
+
+.assistantComposer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.assistantComposer .input {
+  flex: 1;
+  height: 3.25rem;
+}
+
+.suggestionsPanel,
+.suggestionCard {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  background: color-mix(in srgb, var(--linen) 84%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+}
+
+.suggestionsFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 1rem;
+}
+
+.suggestionsConsent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.checkbox {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.suggestionsConsentCopy {
+  display: grid;
+  flex: 1;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.suggestionsResults {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  gap: 1rem;
+}
+
+.inventoryMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.inventoryMetrics .metric {
+  align-content: start;
+  min-height: 7.5rem;
+}
+
+.printGrid {
+  display: grid;
+  grid-template-columns: minmax(19rem, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.printGrid > .panel {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.printPreview {
+  min-height: 34rem;
+  padding: clamp(1rem, 3vw, 2rem);
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+}
+
+.cookHero {
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: clamp(1rem, 4vw, 3rem);
+}
+
+.cookRecipeCopy {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.cookProgress {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 0.55rem;
+  border-radius: 999px;
+}
+
+.cookStep {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 54rem);
+  margin: 0 auto;
+}
+
+.cookStep > .panel {
+  display: grid;
+  gap: 1rem;
+  min-height: 17rem;
+}
+
+.instructionLine,
+.instructionShort {
+  width: 100%;
+  height: 1rem;
+}
+
+.instructionShort {
+  width: 62%;
+}
+
+.page[data-skeleton-page='planner'] {
+  padding: 0 1rem 2rem;
+}
+
+.page[data-skeleton-page='planner'] .pageInner {
+  width: min(100%, 94rem);
+  padding-top: 1.5rem;
+}
+
 .card {
   overflow: hidden;
 }
@@ -247,11 +546,24 @@
 .plannerGrid,
 .workspaceGrid,
 .editorGrid,
-.detailGrid {
+.detailGrid,
+.collectionLayout,
+.shoppingListsLayout {
   display: grid;
   grid-template-columns: minmax(19rem, 22rem) minmax(0, 1fr);
   gap: clamp(1rem, 2.4vw, 2rem);
   min-width: 0;
+}
+
+.shoppingListsMain {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.collectionLayout > .cardGrid {
+  align-content: start;
 }
 
 .setupPanel,
@@ -371,16 +683,32 @@
   }
 }
 
+@keyframes buttonSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 900px) {
   .plannerGrid,
   .workspaceGrid,
   .editorGrid,
   .detailGrid,
-  .settingsPanel {
+  .settingsPanel,
+  .accountGrid,
+  .cookHero,
+  .printGrid,
+  .upgradePage,
+  .collectionLayout,
+  .shoppingListsLayout {
     grid-template-columns: 1fr;
   }
 
   .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inventoryMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -422,6 +750,55 @@
     grid-template-columns: 1fr;
   }
 
+  .inventoryMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .assistantPanel {
+    grid-template-rows: minmax(22rem, 1fr) auto;
+    min-height: 65dvh;
+  }
+
+  .assistantMessage,
+  .assistantMessageUser {
+    width: 100%;
+  }
+
+  .assistantComposer {
+    align-items: stretch;
+  }
+
+  .apiPermissionGrid {
+    grid-template-columns: minmax(0, 1fr) repeat(4, 1.5rem);
+    gap: 0.55rem;
+  }
+
+  .apiPermissionGrid > .skeleton:nth-child(n + 2):nth-child(-n + 5) {
+    max-width: 100%;
+  }
+
+  .apiPermissionRow {
+    grid-template-columns: minmax(0, 1fr) repeat(4, 1.5rem);
+    gap: 0.55rem;
+  }
+
+  .suggestionsPanel > .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .printPreview {
+    min-height: 24rem;
+  }
+
+  .cookHero .stepMedia {
+    height: 13rem;
+  }
+
+  .cookStep > .panel {
+    min-height: 14rem;
+  }
+
   .calendarGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -445,5 +822,11 @@
   .skeleton {
     animation: none;
     background-position: 50% 0;
+  }
+
+  .buttonSpinner {
+    animation: none;
+    border-right-color: currentColor;
+    border-top-color: transparent;
   }
 }

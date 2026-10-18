@@ -171,7 +171,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
   await page.getByText('Demand and policy breakdown', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('link', { name: 'Open Pantry' })).toBeVisible();
-  await expect(page.getByText(/Substitution is not available here/u)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Can’t Find', exact: true })).toBeVisible();
   await expect(page.getByText('Record an actual Pantry purchase')).toHaveCount(0);
   await page.getByLabel('Extra quantity for Grocery lentils').fill('50');
   await page.getByLabel('Extra unit for Grocery lentils').fill('g');
@@ -211,10 +211,10 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
     (response) =>
       response.url().endsWith(`/items/${itemId}`) && response.request().method() === 'PATCH',
   );
-  await page.getByLabel('Mark Grocery lentils complete').check();
+  await page.getByRole('button', { name: 'In cart', exact: true }).click();
   expect((await checkedResponse).status()).toBe(200);
-  await page.getByRole('button', { name: 'Done 1', exact: true }).click();
-  await expect(page.getByText('Record an actual Pantry purchase')).toBeVisible();
+  await page.getByRole('button', { name: 'Unpack groceries into Pantry' }).click();
+  await expect(page.getByText('Unpack into Pantry', { exact: true })).toBeVisible();
   await page.getByLabel('Purchased quantity for Grocery lentils').fill('100');
   await page.getByLabel('Purchased unit for Grocery lentils').fill('g');
   await page.getByLabel('Coverage mode for Grocery lentils').selectOption('partial');
@@ -228,7 +228,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
   await page.getByLabel('Purchase price in cents for Grocery lentils').fill('499');
   await page.getByLabel('Store for Grocery lentils').fill('Market');
   await page.getByLabel('Purchase notes for Grocery lentils').fill('Two bags');
-  await page.getByRole('button', { name: 'Confirm and add to Pantry' }).click();
+  await page.getByRole('button', { name: 'Add Grocery lentils to Pantry' }).click();
   await expect(
     page.getByText('Added to Pantry. A later purchase can be added separately.', { exact: true }),
   ).toBeVisible();
@@ -274,7 +274,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/lists/${listId}`);
-  await page.getByRole('button', { name: 'Done 1', exact: true }).click();
+  await page.locator('details[id$="-sourced"] > summary').click();
   await page.getByText('Demand and policy breakdown', { exact: true }).click();
   await expect(page.getByText(/Covered · no purchase currently needed/u)).toBeVisible();
   await expectCleanResponsivePage(page);
