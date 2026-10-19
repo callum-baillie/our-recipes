@@ -3,7 +3,7 @@
 import { Plus, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton } from '@/components/skeleton';
 
 type RecipeTagSelectorProps = {
   value: string[];
@@ -101,9 +101,7 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
         </button>
       </div>
       {loadingTags ? (
-        <span className="recipe-tag-empty" role="status" aria-label="Loading saved tag suggestions">
-          Loading saved tags <InlineSkeleton label="Loading saved tag suggestions" width="4rem" />
-        </span>
+        <AsyncSkeleton label="Loading saved tag suggestions" variant="choices" />
       ) : suggestions.length > 0 ? (
         <div className="recipe-tag-suggestions" aria-label="Available tags">
           {suggestions.map((tag) => (

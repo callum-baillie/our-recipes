@@ -14,7 +14,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 import {
   AI_PRICING_AS_OF,
   estimateAiMealPlanCost,
@@ -265,7 +265,9 @@ function ModeOptions({
         onClick={onGenerate}
       >
         {busy ? (
-          <InlineSkeleton label="Generating plan" width="7rem" />
+          <>
+            <LoadingIndicator label="Generating plan" /> Generating…
+          </>
         ) : recipebook ? (
           'Generate from recipebook'
         ) : (
@@ -669,7 +671,13 @@ export function AiMealPlanGenerator({
                   disabled={busy || unresolvedConflicts.length > 0}
                   onClick={() => void decide('confirm')}
                 >
-                  {busy ? <InlineSkeleton label="Saving plan" width="5rem" /> : 'Confirm and save'}
+                  {busy ? (
+                    <>
+                      <LoadingIndicator label="Saving plan" /> Saving…
+                    </>
+                  ) : (
+                    'Confirm and save'
+                  )}
                 </button>
               </div>
             </div>

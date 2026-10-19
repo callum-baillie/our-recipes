@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type RefObject } from 'react';
 
-import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 
 export type ImportPreparationPhase = 'idle' | 'preparing' | 'ready' | 'error' | 'submitting';
 
@@ -236,7 +236,7 @@ function SelectedFiles({
             </span>
             <span className={`import-file-state ${phase}`}>
               {phase === 'preparing' ? (
-                <InlineSkeleton label={`Preparing ${item.sourceName}`} width="1rem" />
+                <LoadingIndicator label={`Preparing ${item.sourceName}`} />
               ) : phase === 'error' ? (
                 <Circle size={16} aria-hidden="true" />
               ) : (
@@ -450,7 +450,7 @@ export function ImportUploadPanel({
           disabled={busy}
         >
           {busy ? (
-            <InlineSkeleton label={actionLabel} width="1.2rem" />
+            <LoadingIndicator label={actionLabel} />
           ) : phase === 'error' && canRetryPreparation ? (
             <RefreshCw size={19} aria-hidden="true" />
           ) : phase === 'error' ? (

@@ -4,6 +4,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ButtonSpinner } from './skeleton';
 import { useToast } from '@/components/toast-provider';
 
 type UpgradeProfile = {
@@ -199,7 +200,8 @@ export function SecurityUpgradeForm({ profiles }: { profiles: UpgradeProfile[] }
           {error}
         </p>
       ) : null}
-      <button className="primary-button" type="submit" disabled={submitting}>
+      <button className="primary-button" type="submit" disabled={submitting} aria-busy={submitting}>
+        {submitting ? <ButtonSpinner /> : null}
         {submitting ? 'Securing profiles…' : 'Complete security upgrade'}
       </button>
     </form>

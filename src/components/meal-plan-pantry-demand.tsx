@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import type { PantryProjectedDemand } from '@/lib/domain/pantry-availability';
 
 import styles from './meal-plan-pantry-demand.module.css';
@@ -140,7 +140,9 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
           onClick={() => void generate()}
         >
           {generating ? (
-            <InlineSkeleton label="Calculating grocery list" width="7rem" />
+            <>
+              <LoadingIndicator label="Calculating grocery list" /> Calculating…
+            </>
           ) : listId ? (
             'Regenerate without losing edits'
           ) : mode === 'missing' ? (

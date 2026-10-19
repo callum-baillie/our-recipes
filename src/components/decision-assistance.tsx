@@ -8,6 +8,7 @@ import {
   type DecisionTask,
 } from '@/lib/domain/decision-assistance';
 import styles from './decision-assistance.module.css';
+import { AsyncSkeleton, ButtonSpinner } from './skeleton';
 
 type Workspace = {
   recipes: { id: string; title: string }[];
@@ -236,6 +237,8 @@ export function DecisionAssistance({
   }
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
+  const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
   const [task, setTask] = useState<DecisionTask>(initialTask);
   const [query, setQuery] = useState('');
   const [recipeId, setRecipeId] = useState(fixedRecipeId ?? '');
@@ -257,11 +260,14 @@ export function DecisionAssistance({
       })
       .catch((e: Error) => {
         if (active) setMessage(e.message);
+      })
+      .finally(() => {
+        if (active) setWorkspaceLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [expanded]);
+  }, [expanded, workspaceAttempt]);
   function clearResults() {
     setCards([]);
     setSelected([]);
@@ -368,7 +374,14 @@ export function DecisionAssistance({
             <ContextHeading>{title ?? DECISION_TASKS[initialTask].label}</ContextHeading>
             <p>{description ?? DECISION_TASKS[initialTask].help}</p>
           </div>
-          <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => {
+              if (!expanded && !workspace) setWorkspaceLoading(true);
+              setExpanded(!expanded);
+            }}
+          >
             {expanded ? 'Close review' : 'Review here'}
           </button>
         </div>
@@ -416,65 +429,77 @@ export function DecisionAssistance({
               {needsRecipe && !fixedRecipeId && (
                 <label className={styles.field}>
                   Recipe
-                  <select
-                    disabled={pending}
-                    value={recipeId}
-                    onChange={(e) => {
-                      setRecipeId(e.target.value);
-                      clearResults();
-                    }}
-                  >
-                    <option value="">
-                      {['meal_rank', 'cleanup', 'recipe_review'].includes(task)
-                        ? 'Review saved recipes'
-                        : 'Choose a recipe'}
-                    </option>
-                    {workspace?.recipes.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.title}
+                  {workspaceLoading ? (
+                    <AsyncSkeleton label="Loading recipes" variant="select" />
+                  ) : (
+                    <select
+                      disabled={pending || !workspace}
+                      value={recipeId}
+                      onChange={(e) => {
+                        setRecipeId(e.target.value);
+                        clearResults();
+                      }}
+                    >
+                      <option value="">
+                        {['meal_rank', 'cleanup', 'recipe_review'].includes(task)
+                          ? 'Review saved recipes'
+                          : 'Choose a recipe'}
                       </option>
-                    ))}
-                  </select>
+                      {workspace?.recipes.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </label>
               )}
               {needsList && !fixedListId && (
                 <label className={styles.field}>
                   Shopping list
-                  <select
-                    disabled={pending}
-                    value={listId}
-                    onChange={(e) => {
-                      setListId(e.target.value);
-                      clearResults();
-                    }}
-                  >
-                    <option value="">Choose a list</option>
-                    {workspace?.lists.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
+                  {workspaceLoading ? (
+                    <AsyncSkeleton label="Loading shopping lists" variant="select" />
+                  ) : (
+                    <select
+                      disabled={pending || !workspace}
+                      value={listId}
+                      onChange={(e) => {
+                        setListId(e.target.value);
+                        clearResults();
+                      }}
+                    >
+                      <option value="">Choose a list</option>
+                      {workspace?.lists.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </label>
               )}
               {task === 'aisles' && !fixedListId && (
                 <label className={styles.field}>
                   Store
-                  <select
-                    disabled={pending}
-                    value={storeId}
-                    onChange={(e) => {
-                      setStoreId(e.target.value);
-                      clearResults();
-                    }}
-                  >
-                    <option value="">Use the list’s store</option>
-                    {workspace?.stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  {workspaceLoading ? (
+                    <AsyncSkeleton label="Loading stores" variant="select" />
+                  ) : (
+                    <select
+                      disabled={pending || !workspace}
+                      value={storeId}
+                      onChange={(e) => {
+                        setStoreId(e.target.value);
+                        clearResults();
+                      }}
+                    >
+                      <option value="">Use the list’s store</option>
+                      {workspace?.stores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </label>
               )}
             </div>
@@ -528,7 +553,13 @@ export function DecisionAssistance({
                 }
                 onClick={() => run()}
               >
-                {pending ? 'Reviewing…' : 'Review suggestions'}
+                {pending ? (
+                  <>
+                    <ButtonSpinner /> Reviewing…
+                  </>
+                ) : (
+                  'Review suggestions'
+                )}
               </button>
               {task === 'aisles' && (
                 <Link href="/settings/lists">Edit store route or upload a map</Link>
@@ -540,6 +571,19 @@ export function DecisionAssistance({
               </small>
             )}
           </section>
+          {!workspace && !workspaceLoading ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage('');
+                setWorkspaceLoading(true);
+                setWorkspaceAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Retry loading choices
+            </button>
+          ) : null}
+          {pending ? <AsyncSkeleton label="Reviewing your kitchen" variant="rows" /> : null}
           {message && (
             <p className={styles.notice} role="status">
               {message}

@@ -11,7 +11,7 @@ import {
   type MealType,
 } from '@/components/meal-planner-types';
 import styles from '@/components/meal-planner.module.css';
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import type { PlannedMeal } from '@/lib/services/planning-service';
 import type { RecipeListItem } from '@/lib/services/recipe-service';
 
@@ -61,14 +61,17 @@ function RecipeChoiceCard({
   recipe,
   selected,
   onSelect,
+  disabled = false,
 }: {
   recipe: RecipeListItem;
   selected: boolean;
   onSelect: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       aria-pressed={selected}
       onClick={onSelect}
       className={`${styles.recipeChoice}${selected ? ` ${styles.selectedRecipe}` : ''}`}
@@ -394,18 +397,13 @@ export function MealPlanRecipeSelector({
             aria-label={`${activeMeal} recipes`}
             aria-busy={busy}
           >
-            {busy ? (
-              <div className={styles.recipeLoading}>
-                <InlineSkeleton label="Updating recipe plan" width="100%" />
-                <InlineSkeleton label="Updating recipe plan" width="88%" />
-                <InlineSkeleton label="Updating recipe plan" width="94%" />
-              </div>
-            ) : filteredRecipes.length ? (
+            {filteredRecipes.length ? (
               filteredRecipes.map((recipe) => (
                 <RecipeChoiceCard
                   key={recipe.id}
                   recipe={recipe}
                   selected={assignments[activeSlot] === recipe.id}
+                  disabled={busy}
                   onSelect={() => chooseRecipe(recipe.id)}
                 />
               ))
@@ -470,6 +468,7 @@ export function MealPlanRecipeSelector({
               disabled={busy || !filledCount}
               onClick={addRecipesToPlan}
             >
+              {busy ? <LoadingIndicator label="Adding recipes to plan" /> : null}
               {busy
                 ? 'Adding recipes…'
                 : `Add ${filledCount} ${filledCount === 1 ? 'recipe' : 'recipes'} to plan`}

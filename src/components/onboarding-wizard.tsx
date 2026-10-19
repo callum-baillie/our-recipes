@@ -31,7 +31,7 @@ import { createPortal } from 'react-dom';
 
 import { NutritionOnboardingFlow } from './nutrition-onboarding-flow';
 import { BrandIconPicker } from '@/components/brand-icon-picker';
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { AppearanceSettings } from '@/components/theme-toggle';
 import { useToast } from '@/components/toast-provider';
 import { parseBrandIcon, type BrandIconId } from '@/lib/appearance';
@@ -1617,7 +1617,7 @@ export function OnboardingWizard({
               onClick={() => void submit()}
             >
               {submitting ? (
-                <InlineSkeleton label="Completing onboarding" width="1rem" />
+                <LoadingIndicator label="Completing onboarding" />
               ) : (
                 <Check size={17} />
               )}

@@ -4,7 +4,7 @@ import { ArchiveRestore, Download, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import {
   SettingsPane,
   SettingsRow,
@@ -162,7 +162,7 @@ export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
           disabled={pending !== null}
         >
           {pending === 'create' ? (
-            <InlineSkeleton label="Creating backup" width="1rem" />
+            <LoadingIndicator label="Creating backup" />
           ) : (
             <ArchiveRestore size={17} />
           )}

@@ -1,6 +1,7 @@
 'use client';
 
 import type { BodyMetrics } from '@/lib/domain/body-metrics';
+import { ButtonSpinner } from './skeleton';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 
@@ -766,7 +767,13 @@ export function NutritionProfileSettings({
         </details>
 
         <SettingsActionBar status={status}>
-          <button className="primary-button compact" type="submit" disabled={saving}>
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={saving}
+            aria-busy={saving}
+          >
+            {saving ? <ButtonSpinner /> : null}
             {saving ? 'Saving…' : 'Save preferences'}
           </button>
         </SettingsActionBar>

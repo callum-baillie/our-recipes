@@ -14,6 +14,8 @@ import {
   SettingsSubsection,
   SettingsRow,
 } from '@/components/settings-primitives';
+import { ButtonSpinner } from './skeleton';
+import { usePendingAction } from './use-pending-action';
 import { useToast } from '@/components/toast-provider';
 import {
   defaultProfileGoalContext,
@@ -67,6 +69,7 @@ export function ProfileSettings({
   const [profiles, setProfiles] = useState(initialProfiles);
   const [adding, setAdding] = useState(false);
   const [guardians, setGuardians] = useState(initialGuardians);
+  const [pendingGuardian, setPendingGuardian] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function saveProfile(profile: Profile, data: ProfileValues) {
@@ -218,10 +221,18 @@ export function ProfileSettings({
                           role="switch"
                           type="checkbox"
                           checked={enabled}
-                          onChange={(event) =>
+                          disabled={pendingGuardian !== null}
+                          aria-busy={pendingGuardian === `${parent.id}:${child.id}`}
+                          onChange={(event) => {
+                            setPendingGuardian(`${parent.id}:${child.id}`);
                             void setGuardian(parent.id, child.id, event.target.checked)
-                          }
+                              .catch(() =>
+                                setError('Could not save the guardian assignment. Try again.'),
+                              )
+                              .finally(() => setPendingGuardian(null));
+                          }}
                         />
+                        {pendingGuardian === `${parent.id}:${child.id}` ? <ButtonSpinner /> : null}
                       </SettingsField>
                     );
                   })}
@@ -335,6 +346,8 @@ export function ProfileEditor({
   onArchive: (profile: Profile, archived: boolean) => Promise<void>;
   onRoleChange: (profile: Profile, role: AppRole) => Promise<boolean>;
 }) {
+  const [actionError, setActionError] = useState('');
+  const { pending, run } = usePendingAction(setActionError);
   const [values, setValues] = useState({
     displayName: profile.displayName,
     color: profile.color,
@@ -395,13 +408,13 @@ export function ProfileEditor({
           <button
             className="text-button"
             type="button"
-            disabled={profile.isLastAdmin && !archived}
+            disabled={pending || (profile.isLastAdmin && !archived)}
             title={
               profile.isLastAdmin && !archived
                 ? 'Promote another active profile to Admin before archiving this one.'
                 : undefined
             }
-            onClick={() => onArchive(profile, !archived)}
+            onClick={() => void run(() => onArchive(profile, !archived))}
           >
             {archived ? (
               <>
@@ -432,10 +445,12 @@ export function ProfileEditor({
           >
             <select
               value={role}
+              disabled={pending}
+              aria-busy={pending}
               onChange={async (event) => {
                 const nextRole = event.target.value as AppRole;
                 setRole(nextRole);
-                if (!(await onRoleChange(profile, nextRole))) setRole(profile.role);
+                if (!(await run(() => onRoleChange(profile, nextRole)))) setRole(profile.role);
               }}
             >
               <option value="admin">Admin</option>
@@ -624,14 +639,16 @@ export function ProfileEditor({
           </>
         )}
       </div>
+      {actionError ? <p role="alert">{actionError}</p> : null}
       <SettingsActionBar>
         <button
           className="primary-button compact"
           type="button"
-          disabled={archived || !values.displayName.trim()}
-          onClick={() => onSave(profile, values)}
+          disabled={pending || archived || !values.displayName.trim()}
+          aria-busy={pending}
+          onClick={() => void run(() => onSave(profile, values))}
         >
-          <Save size={16} /> Save profile
+          {pending ? <ButtonSpinner /> : <Save size={16} />} {pending ? 'Saving…' : 'Save profile'}
         </button>
       </SettingsActionBar>
     </SettingsPane>

@@ -204,3 +204,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.loading {
+  display: grid;
+  gap: 0.8rem;
+  min-height: 5.5rem;
+}

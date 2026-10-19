@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { ButtonSpinner } from './skeleton';
+import { usePendingAction } from './use-pending-action';
 import { useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-prepared-workspace.module.css';
@@ -54,6 +56,7 @@ export function NutritionPreparedWorkspace({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState('');
+  const { pending, run } = usePendingAction(setStatus);
   const [commandKeys, setCommandKeys] = useState<Record<string, string>>(() => ({
     ...createKeys(workspace, 'eat'),
     ...createKeys(workspace, 'serve'),
@@ -84,36 +87,38 @@ export function NutritionPreparedWorkspace({
     allocation: PreparedServingWorkspace[number]['ownAllocations'][number] | null,
   ) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const portionBasis = data.get('portionBasis');
-    const servingCount = Number(data.get('servingCount'));
-    const portionWeightGrams = Number(data.get('portionWeightGrams'));
-    const keyName = allocation ? `eat:${allocation.id}` : `eat:${preparedId}`;
-    setStatus('Confirming eaten portion…');
-    const response = await fetch(
-      `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes/${preparedId}/consume`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          idempotencyKey: stableKey(keyName),
-          servingCount: portionBasis === 'servings' ? servingCount : null,
-          portionWeightGrams: portionBasis === 'weight' ? portionWeightGrams : null,
-          occurredAt: new Date(String(data.get('occurredAt'))).toISOString(),
-          mealSlot: data.get('mealSlot'),
-          allocationSeriesId: allocation?.seriesId,
-          supersedesAllocationVersionId: allocation?.id ?? null,
-          note: data.get('note'),
-        }),
-      },
-    );
-    if (!response.ok) {
-      setStatus(await responseError(response));
-      return;
-    }
-    rotateKey(keyName);
-    setStatus('Eaten portion confirmed with an immutable Nutrition snapshot.');
-    router.refresh();
+    return run(async () => {
+      const data = new FormData(event.currentTarget);
+      const portionBasis = data.get('portionBasis');
+      const servingCount = Number(data.get('servingCount'));
+      const portionWeightGrams = Number(data.get('portionWeightGrams'));
+      const keyName = allocation ? `eat:${allocation.id}` : `eat:${preparedId}`;
+      setStatus('Confirming eaten portion…');
+      const response = await fetch(
+        `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes/${preparedId}/consume`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            idempotencyKey: stableKey(keyName),
+            servingCount: portionBasis === 'servings' ? servingCount : null,
+            portionWeightGrams: portionBasis === 'weight' ? portionWeightGrams : null,
+            occurredAt: new Date(String(data.get('occurredAt'))).toISOString(),
+            mealSlot: data.get('mealSlot'),
+            allocationSeriesId: allocation?.seriesId,
+            supersedesAllocationVersionId: allocation?.id ?? null,
+            note: data.get('note'),
+          }),
+        },
+      );
+      if (!response.ok) {
+        setStatus(await responseError(response));
+        return;
+      }
+      rotateKey(keyName);
+      setStatus('Eaten portion confirmed with an immutable Nutrition snapshot.');
+      router.refresh();
+    });
   }
 
   function remainingWeight(prepared: PreparedServingWorkspace[number]) {
@@ -128,35 +133,41 @@ export function NutritionPreparedWorkspace({
     allocation: PreparedServingWorkspace[number]['ownAllocations'][number] | null,
   ) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const keyName = allocation ? `state:${allocation.id}` : `serve:${preparedId}`;
-    const allocationSeriesId = allocation?.seriesId ?? stableKey(keyName);
-    setStatus('Saving prepared portion state…');
-    const response = await fetch(
-      `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes/${preparedId}/allocations`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          allocationSeriesId,
-          supersedesAllocationVersionId: allocation?.id ?? null,
-          state: data.get('state'),
-          servingCount: Number(data.get('servingCount')),
-          note: data.get('note'),
-        }),
-      },
-    );
-    if (!response.ok) {
-      setStatus(await responseError(response));
-      return;
-    }
-    rotateKey(keyName);
-    setStatus('Prepared portion state saved. No food was recorded as eaten.');
-    router.refresh();
+    return run(async () => {
+      const data = new FormData(event.currentTarget);
+      const keyName = allocation ? `state:${allocation.id}` : `serve:${preparedId}`;
+      const allocationSeriesId = allocation?.seriesId ?? stableKey(keyName);
+      setStatus('Saving prepared portion state…');
+      const response = await fetch(
+        `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes/${preparedId}/allocations`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            allocationSeriesId,
+            supersedesAllocationVersionId: allocation?.id ?? null,
+            state: data.get('state'),
+            servingCount: Number(data.get('servingCount')),
+            note: data.get('note'),
+          }),
+        },
+      );
+      if (!response.ok) {
+        setStatus(await responseError(response));
+        return;
+      }
+      rotateKey(keyName);
+      setStatus('Prepared portion state saved. No food was recorded as eaten.');
+      router.refresh();
+    });
   }
 
   return (
-    <section className={styles.panel} aria-labelledby="prepared-serving-heading">
+    <section
+      className={styles.panel}
+      aria-busy={pending}
+      aria-labelledby="prepared-serving-heading"
+    >
       <header>
         <div>
           <h2 id="prepared-serving-heading">Prepared servings</h2>
@@ -244,8 +255,8 @@ export function NutritionPreparedWorkspace({
                             Note
                             <input name="note" maxLength={500} defaultValue={allocation.note} />
                           </label>
-                          <button type="submit" disabled={!canManageProfile}>
-                            Save state revision
+                          <button type="submit" disabled={pending || !canManageProfile}>
+                            {pending ? <ButtonSpinner /> : null} Save state revision
                           </button>
                         </form>
                         {prepared.calculationAlignment === 'as_calculated' ? (
@@ -312,8 +323,8 @@ export function NutritionPreparedWorkspace({
                               Note
                               <input name="note" maxLength={500} />
                             </label>
-                            <button type="submit" disabled={!canManageProfile}>
-                              Confirm eaten
+                            <button type="submit" disabled={pending || !canManageProfile}>
+                              {pending ? <ButtonSpinner /> : null} Confirm eaten
                             </button>
                           </form>
                         ) : null}
@@ -354,8 +365,8 @@ export function NutritionPreparedWorkspace({
                       Note
                       <input name="note" maxLength={500} />
                     </label>
-                    <button type="submit" disabled={!canManageProfile}>
-                      Save portion
+                    <button type="submit" disabled={pending || !canManageProfile}>
+                      {pending ? <ButtonSpinner /> : null} Save portion
                     </button>
                   </form>
                   {prepared.calculationAlignment === 'as_calculated' ? (
@@ -421,8 +432,8 @@ export function NutritionPreparedWorkspace({
                         Note
                         <input name="note" maxLength={500} />
                       </label>
-                      <button type="submit" disabled={!canManageProfile}>
-                        Confirm eaten
+                      <button type="submit" disabled={pending || !canManageProfile}>
+                        {pending ? <ButtonSpinner /> : null} Confirm eaten
                       </button>
                     </form>
                   ) : null}

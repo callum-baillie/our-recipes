@@ -4,7 +4,7 @@ import { ChevronLeft, FileText, Link2, ShieldCheck, Sparkles } from 'lucide-reac
 import { useState } from 'react';
 
 import { RecipeForm } from '@/components/recipe-form';
-import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
 import type { AiRecipeCandidate } from '@/lib/domain/ai';
 import type { CaptureCandidate, CaptureDraft } from '@/lib/domain/capture';
@@ -194,11 +194,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
                 onClick={() => void createDraft(candidate.index)}
                 disabled={pending}
               >
-                {pending ? (
-                  <InlineSkeleton label="Preparing recipe" width="1.1rem" />
-                ) : (
-                  <Sparkles size={17} />
-                )}
+                {pending ? <LoadingIndicator label="Preparing recipe" /> : <Sparkles size={17} />}
                 {pending ? 'Preparing recipe…' : 'Review with AI'}
               </button>
             </article>
@@ -310,11 +306,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
           onClick={() => void createDraft()}
           disabled={pending || value.trim().length < (kind === 'text' ? 20 : 1)}
         >
-          {pending ? (
-            <InlineSkeleton label="Preparing recipe" width="1.1rem" />
-          ) : (
-            <Sparkles size={17} />
-          )}
+          {pending ? <LoadingIndicator label="Preparing recipe" /> : <Sparkles size={17} />}
           {pending
             ? kind === 'url'
               ? 'Reading recipe page…'

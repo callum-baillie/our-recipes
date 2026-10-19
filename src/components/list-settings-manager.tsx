@@ -19,7 +19,7 @@ import { createClientUuid } from '@/lib/client/client-uuid';
 import { CatalogStoreLink } from '@/components/catalog-store-link';
 import { StoreMapUpload } from '@/components/store-map-upload';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import {
   SettingsActionBar,
   SettingsPane,
@@ -691,7 +691,9 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
               {statusArea === 'store' && (
                 <p className={styles.status} role="status">
                   {isPending ? (
-                    <InlineSkeleton label="Saving list settings" width="7rem" />
+                    <>
+                      <LoadingIndicator label="Saving list settings" /> Saving…
+                    </>
                   ) : (
                     message
                   )}

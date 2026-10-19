@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { ButtonSpinner } from './skeleton';
+import { usePendingAction } from './use-pending-action';
 import { useMemo, useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-data-workspace.module.css';
@@ -107,6 +109,7 @@ export function NutritionDataWorkspace({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState('');
+  const { pending, run } = usePendingAction(setStatus);
   const [productId, setProductId] = useState(workspace.products[0]?.id ?? '');
   const [recipeId, setRecipeId] = useState(workspace.recipes[0]?.id ?? '');
   const selectedProduct = workspace.products.find((item) => item.id === productId) ?? null;
@@ -117,19 +120,21 @@ export function NutritionDataWorkspace({
   );
 
   async function submit(url: string, body: unknown) {
-    setStatus('Saving…');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+    return run(async () => {
+      setStatus('Saving…');
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        setStatus(await responseMessage(response));
+        return false;
+      }
+      setStatus('Saved.');
+      router.refresh();
+      return true;
     });
-    if (!response.ok) {
-      setStatus(await responseMessage(response));
-      return false;
-    }
-    setStatus('Saved.');
-    router.refresh();
-    return true;
   }
 
   async function saveFoodRecord(event: FormEvent<HTMLFormElement>) {
@@ -253,7 +258,11 @@ export function NutritionDataWorkspace({
   const calculation = selectedRecipe?.calculation ?? null;
 
   return (
-    <section className={styles.workspace} aria-labelledby="nutrition-data-heading">
+    <section
+      className={styles.workspace}
+      aria-busy={pending}
+      aria-labelledby="nutrition-data-heading"
+    >
       <header>
         <p className={styles.eyebrow}>Recipe nutrition workspace</p>
         <h2 id="nutrition-data-heading">Source, calculate, then confirm</h2>
@@ -269,7 +278,7 @@ export function NutritionDataWorkspace({
           <h3>1. Product nutrition record</h3>
           <FoodCatalogPicker
             context="nutrition"
-            disabled={!canManageProfile}
+            disabled={pending || !canManageProfile}
             onImported={(product) => {
               setProductId(product.id);
               setStatus('Provider product added. Set a portion before confirming intake.');
@@ -388,7 +397,8 @@ export function NutritionDataWorkspace({
               Assumptions or notes
               <textarea name="notes" maxLength={2000} />
             </label>
-            <button type="submit" disabled={!selectedProduct}>
+            <button type="submit" disabled={pending || !selectedProduct}>
+              {pending ? <ButtonSpinner /> : null}{' '}
               {selectedProduct?.record ? 'Save corrected revision' : 'Save nutrition record'}
             </button>
           </form>
@@ -418,8 +428,11 @@ export function NutritionDataWorkspace({
                 </select>
               </label>
             </div>
-            <button type="submit" disabled={!canManageProfile || !selectedProduct?.record}>
-              Confirm product portion
+            <button
+              type="submit"
+              disabled={pending || !canManageProfile || !selectedProduct?.record}
+            >
+              {pending ? <ButtonSpinner /> : null} Confirm product portion
             </button>
           </form>
         </section>
@@ -511,8 +524,8 @@ export function NutritionDataWorkspace({
               Final cooked weight (g)
               <input name="finalWeightGrams" type="number" min="0.000001" step="any" />
             </label>
-            <button type="submit" disabled={!selectedRecipe}>
-              Calculate current recipe revision
+            <button type="submit" disabled={pending || !selectedRecipe}>
+              {pending ? <ButtonSpinner /> : null} Calculate current recipe revision
             </button>
           </form>
 
@@ -607,11 +620,12 @@ export function NutritionDataWorkspace({
                 <button
                   type="submit"
                   disabled={
+                    pending ||
                     !canManageProfile ||
                     (calculation.servingCount === null && calculation.finalWeightGrams == null)
                   }
                 >
-                  Confirm recipe in Food Diary
+                  {pending ? <ButtonSpinner /> : null} Confirm recipe in Food Diary
                 </button>
               </form>
             </div>
@@ -673,8 +687,8 @@ export function NutritionDataWorkspace({
                 );
               })}
             </div>
-            <button type="submit" disabled={!canManageProfile}>
-              Save manual consumed portion
+            <button type="submit" disabled={pending || !canManageProfile}>
+              {pending ? <ButtonSpinner /> : null} Save manual consumed portion
             </button>
           </form>
         </section>

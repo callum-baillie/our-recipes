@@ -1,14 +1,16 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-const InterviewChat = dynamic(() =>
-  import('./ai-assistant-drawer').then((module) => module.AiAssistantDrawer),
+const InterviewChat = dynamic(
+  () => import('./ai-assistant-drawer').then((module) => module.AiAssistantDrawer),
+  { loading: () => <AssistantLoadingSurface /> },
 );
 import { useRouter } from 'next/navigation';
 import type { Profile } from './profile-settings';
 import type { ProfileGoalContext } from '@/lib/domain/profile-goals';
 import { InlineAlert } from './inline-alert';
 import { ButtonSpinner } from './skeleton';
+import { AssistantLoadingSurface } from './assistant-loading-surface';
 
 type Answers = NonNullable<ProfileGoalContext['kitchenInterview']>;
 export const emptyKitchenInterview: Answers = {

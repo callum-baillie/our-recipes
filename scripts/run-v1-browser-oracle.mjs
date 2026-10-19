@@ -15,6 +15,7 @@ const specs = [
   'tests/e2e/mobile-refinements.spec.ts',
   'tests/e2e/search-facets.spec.ts',
   'tests/e2e/ai-preferences-bulk.spec.ts',
+  'tests/e2e/loading-keyboard.spec.ts',
 ];
 const tsxCli = fileURLToPath(import.meta.resolve('tsx/cli'));
 const playwrightCli = fileURLToPath(import.meta.resolve('@playwright/test/cli'));

@@ -3,7 +3,7 @@
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { SettingsPane, SettingsRow, SettingsField } from '@/components/settings-primitives';
 import { useToast } from '@/components/toast-provider';
 
@@ -111,7 +111,7 @@ export function FreshInstallPanel() {
               disabled={confirmation !== CONFIRMATION || pending}
               aria-busy={pending}
             >
-              {pending ? <InlineSkeleton label="Resetting database" width="1rem" /> : null}
+              {pending ? <LoadingIndicator label="Resetting database" /> : null}
               Erase app data and start fresh
             </button>
           </div>

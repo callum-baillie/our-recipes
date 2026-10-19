@@ -9,7 +9,7 @@ import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 import { Plus, ArrowUp, Sparkles, SquarePen, Settings, X } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
-import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import { useModalSurface } from '@/components/use-modal-surface';
 
@@ -119,6 +119,7 @@ export function AiAssistantDrawer({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statusError, setStatusError] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const messageContentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [draft, setDraft] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -135,30 +136,53 @@ export function AiAssistantDrawer({
   const [pendingJobCommand, setPendingJobCommand] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const drawerRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const adjustingViewport = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     const viewport = window.visualViewport;
+    let frame = 0;
+    let settledFrame = 0;
     const resize = () => {
-      drawerRef.current?.style.setProperty(
-        '--assistant-viewport-height',
-        `${viewport?.height ?? window.innerHeight}px`,
-      );
-      if (stickToBottom.current && messagesRef.current)
-        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-      drawerRef.current?.style.setProperty(
-        '--assistant-viewport-top',
-        `${viewport?.offsetTop ?? 0}px`,
-      );
+      adjustingViewport.current = true;
+      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(settledFrame);
+      frame = window.requestAnimationFrame(() => {
+        const drawer = drawerRef.current;
+        if (!drawer) return;
+        const height = viewport?.height ?? window.innerHeight;
+        const top = viewport?.offsetTop ?? 0;
+        const layoutHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+        drawer.style.setProperty('--assistant-viewport-height', `${height}px`);
+        drawer.style.setProperty('--assistant-viewport-top', `${top}px`);
+        drawer.style.setProperty(
+          '--assistant-layout-height',
+          `${Math.max(layoutHeight, top + height)}px`,
+        );
+        // Safari retains the home-indicator inset while the keyboard is visible.
+        drawer.dataset.keyboardOpen = String(
+          layoutHeight - height > 150 && (viewport?.scale ?? 1) === 1,
+        );
+        if (stickToBottom.current && messagesRef.current)
+          messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+        settledFrame = window.requestAnimationFrame(() => {
+          adjustingViewport.current = false;
+        });
+      });
     };
     resize();
     viewport?.addEventListener('resize', resize);
     viewport?.addEventListener('scroll', resize);
+    window.addEventListener('resize', resize);
     return () => {
+      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(settledFrame);
+      adjustingViewport.current = false;
       viewport?.removeEventListener('resize', resize);
       viewport?.removeEventListener('scroll', resize);
+      window.removeEventListener('resize', resize);
     };
   }, [open]);
 
@@ -174,6 +198,7 @@ export function AiAssistantDrawer({
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const body = (await response.json()) as { thread: { id: string } };
+      stickToBottom.current = true;
       setThreadId(body.thread.id);
       setMessages([]);
       setDraft(initialDraft ?? '');
@@ -248,6 +273,7 @@ export function AiAssistantDrawer({
         setJobs(historyBody.jobs ?? []);
         setStatus('');
       } catch (error) {
+        setStatusError(true);
         setStatus(error instanceof Error ? error.message : 'Could not load the assistant.');
       } finally {
         loadingHistory.current = false;
@@ -268,6 +294,7 @@ export function AiAssistantDrawer({
       if (stickToBottom.current) list.scrollTop = list.scrollHeight;
     });
     observer.observe(list);
+    if (messageContentRef.current) observer.observe(messageContentRef.current);
     return () => observer.disconnect();
   }, [open]);
 
@@ -318,6 +345,7 @@ export function AiAssistantDrawer({
     panelRef: drawerRef,
     initialFocusRef: closeRef,
     returnFocusRef,
+    freezePage: true,
   });
 
   useEffect(() => {
@@ -558,6 +586,7 @@ export function AiAssistantDrawer({
     messages.flatMap((message) => (message.actionId ? [message.actionId] : [])),
   );
   const isThinking = busy && status === 'Thinking…';
+  const openingConversation = busy && !messages.length && !actions.length && !jobs.length;
 
   if (!open) return null;
   return (
@@ -568,7 +597,7 @@ export function AiAssistantDrawer({
         aria-label="Close AI assistant"
         onClick={onClose}
       />
-      <aside
+      <div
         ref={drawerRef}
         className={styles.drawer}
         role="dialog"
@@ -579,7 +608,7 @@ export function AiAssistantDrawer({
         onKeyDown={modal.onKeyDown}
       >
         <div className={styles.viewport}>
-          <header className={styles.header}>
+          <div className={styles.header}>
             <span className={styles.assistantMark} aria-hidden="true">
               <Sparkles />
             </span>
@@ -594,7 +623,7 @@ export function AiAssistantDrawer({
               disabled={busy}
             >
               {busy && status === 'Starting a new conversation…' ? (
-                <InlineSkeleton label="Starting a new conversation" width="1rem" />
+                <LoadingIndicator label="Starting a new conversation" />
               ) : (
                 <SquarePen />
               )}
@@ -616,154 +645,162 @@ export function AiAssistantDrawer({
             >
               <X size={19} />
             </button>
-          </header>
+          </div>
           <div
             ref={messagesRef}
             onScroll={(event) => {
+              if (adjustingViewport.current) return;
               const el = event.currentTarget;
               stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 72;
             }}
             className={styles.messages}
+            role="log"
+            aria-label="Conversation"
+            tabIndex={0}
             aria-live="polite"
             aria-busy={busy}
           >
-            {settingsOpen ? (
-              <section className={styles.settingsPanel} aria-label="Assistant settings">
-                <h3>Assistant settings</h3>
-                <label className={styles.paidTools}>
-                  <input
-                    type="checkbox"
-                    checked={allowPaidTools}
-                    disabled={busy}
-                    onChange={(event) => setAllowPaidTools(event.target.checked)}
-                  />
-                  <span>Allow additional paid suggestions in this conversation</span>
-                </label>
-                <p>
-                  This lets the assistant request extra AI suggestions when reviewing your kitchen.
-                  Normal chat uses your configured AI provider. Image generation still needs
-                  confirmation.
-                </p>
-                <a href="/settings/ai">All AI settings</a>
-              </section>
-            ) : null}
-            {busy && !messages.length && !actions.length && !jobs.length ? (
-              <AsyncSkeleton
-                className={styles.loadingState}
-                label={status || 'Opening your assistant'}
-                variant="rows"
-              />
-            ) : null}
-            {!messages.length && !actions.length && !jobs.length && !busy ? (
-              <div className={styles.empty}>
-                <h3>What can I help with?</h3>
-                <p>
-                  Ask about recipes or nutrition, prepare an update, or generate a meal plan. You
-                  will review every change before it is saved.
-                </p>
-              </div>
-            ) : null}
-            {messages.map((message) => {
-              const linkedAction = message.actionId ? actionsById.get(message.actionId) : undefined;
-              return (
-                <Fragment key={message.id}>
-                  <div
-                    className={`${styles.message} ${message.role === 'user' ? styles.user : styles.assistant}`}
-                  >
-                    {message.role === 'assistant' ? (
-                      <AssistantMessage content={compactProposalMessage(message, linkedAction)} />
-                    ) : (
-                      <>
-                        {message.content}
-                        {message.attachments?.length ? (
-                          <div className={styles.sentImages}>
-                            {message.attachments.map((image, index) => (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                key={index}
-                                src={`data:${image.mimeType};base64,${image.dataBase64}`}
-                                alt={image.name}
-                                loading="lazy"
-                              />
-                            ))}
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                  {linkedAction ? (
-                    <AiActionCard
-                      action={linkedAction}
-                      busy={busy}
-                      pendingDecision={
-                        pendingDecision?.actionId === linkedAction.id
-                          ? pendingDecision.decision
-                          : null
-                      }
-                      onDecide={(actionId, decision, resolutions) =>
-                        void decide(actionId, decision, resolutions)
-                      }
+            <div ref={messageContentRef} className={styles.messageStack}>
+              {settingsOpen ? (
+                <section className={styles.settingsPanel} aria-label="Assistant settings">
+                  <h3>Assistant settings</h3>
+                  <label className={styles.paidTools}>
+                    <input
+                      type="checkbox"
+                      checked={allowPaidTools}
+                      disabled={busy}
+                      onChange={(event) => setAllowPaidTools(event.target.checked)}
                     />
-                  ) : null}
-                </Fragment>
-              );
-            })}
-            {actions
-              .filter((action) => !linkedActionIds.has(action.id))
-              .map((action) => (
-                <AiActionCard
-                  action={action}
-                  busy={busy}
-                  key={action.id}
-                  pendingDecision={
-                    pendingDecision?.actionId === action.id ? pendingDecision.decision : null
-                  }
-                  onDecide={(actionId, decision, resolutions) =>
-                    void decide(actionId, decision, resolutions)
+                    <span>Allow additional paid suggestions in this conversation</span>
+                  </label>
+                  <p>
+                    This lets the assistant request extra AI suggestions when reviewing your
+                    kitchen. Normal chat uses your configured AI provider. Image generation still
+                    needs confirmation.
+                  </p>
+                  <a href="/settings/ai">All AI settings</a>
+                </section>
+              ) : null}
+              {openingConversation ? (
+                <AsyncSkeleton
+                  className={styles.loadingState}
+                  label={status || 'Opening your assistant'}
+                  variant="chat"
+                />
+              ) : null}
+              {!messages.length && !actions.length && !jobs.length && !busy ? (
+                <div className={styles.empty}>
+                  <h3>What can I help with?</h3>
+                  <p>
+                    Ask about recipes or nutrition, prepare an update, or generate a meal plan. You
+                    will review every change before it is saved.
+                  </p>
+                </div>
+              ) : null}
+              {messages.map((message) => {
+                const linkedAction = message.actionId
+                  ? actionsById.get(message.actionId)
+                  : undefined;
+                return (
+                  <Fragment key={message.id}>
+                    <div
+                      className={`${styles.message} ${message.role === 'user' ? styles.user : styles.assistant}`}
+                    >
+                      {message.role === 'assistant' ? (
+                        <AssistantMessage content={compactProposalMessage(message, linkedAction)} />
+                      ) : (
+                        <>
+                          {message.content}
+                          {message.attachments?.length ? (
+                            <div className={styles.sentImages}>
+                              {message.attachments.map((image, index) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={index}
+                                  src={`data:${image.mimeType};base64,${image.dataBase64}`}
+                                  alt={image.name}
+                                  loading="lazy"
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                    {linkedAction ? (
+                      <AiActionCard
+                        action={linkedAction}
+                        busy={busy}
+                        pendingDecision={
+                          pendingDecision?.actionId === linkedAction.id
+                            ? pendingDecision.decision
+                            : null
+                        }
+                        onDecide={(actionId, decision, resolutions) =>
+                          void decide(actionId, decision, resolutions)
+                        }
+                      />
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+              {actions
+                .filter((action) => !linkedActionIds.has(action.id))
+                .map((action) => (
+                  <AiActionCard
+                    action={action}
+                    busy={busy}
+                    key={action.id}
+                    pendingDecision={
+                      pendingDecision?.actionId === action.id ? pendingDecision.decision : null
+                    }
+                    onDecide={(actionId, decision, resolutions) =>
+                      void decide(actionId, decision, resolutions)
+                    }
+                  />
+                ))}
+              {suggestions.map((card) => (
+                <SuggestionCard
+                  key={`${card.id}:${card.evidenceHash}`}
+                  card={card}
+                  onChange={(id, patch) =>
+                    setSuggestions((current) =>
+                      current.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+                    )
                   }
                 />
               ))}
-            {suggestions.map((card) => (
-              <SuggestionCard
-                key={`${card.id}:${card.evidenceHash}`}
-                card={card}
-                onChange={(id, patch) =>
-                  setSuggestions((current) =>
-                    current.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-                  )
-                }
-              />
-            ))}
-            {appActions.map((proposal) => (
-              <AiAppActionCard key={proposal.id} proposal={proposal} />
-            ))}
-            {jobs.map((job) => (
-              <AiJobCard
-                busy={busy || pendingJobCommand === job.id}
-                job={job}
-                key={job.id}
-                onCommand={(jobId, command) => void commandJob(jobId, command)}
-              />
-            ))}
-            {busy ? (
-              <div role="status" aria-live="polite">
-                <AsyncSkeleton
-                  className={`${styles.message} ${styles.assistant} ${styles.typing}`}
-                  label={status || 'Working on your request'}
-                  variant="message"
+              {appActions.map((proposal) => (
+                <AiAppActionCard key={proposal.id} proposal={proposal} />
+              ))}
+              {jobs.map((job) => (
+                <AiJobCard
+                  busy={busy || pendingJobCommand === job.id}
+                  job={job}
+                  key={job.id}
+                  onCommand={(jobId, command) => void commandJob(jobId, command)}
                 />
-                <p className={styles.workExplanation}>
-                  <strong>{status || 'Working on your request'}</strong>
-                  <br />
-                  {status.includes('conversation')
-                    ? 'Your saved messages and plans will appear here.'
-                    : pendingDecision
-                      ? 'Saving your confirmed changes.'
-                      : 'Your request is running. Larger recipe and image requests can take a few minutes.'}
-                </p>
-              </div>
-            ) : null}
-            <div ref={bottomRef} />
+              ))}
+              {busy && !openingConversation ? (
+                <div>
+                  <AsyncSkeleton
+                    className={`${styles.message} ${styles.assistant} ${styles.typing}`}
+                    label={status || 'Working on your request'}
+                    variant="message"
+                  />
+                  <p className={styles.workExplanation}>
+                    <strong>{status || 'Working on your request'}</strong>
+                    <br />
+                    {status.includes('conversation')
+                      ? 'Your saved messages and plans will appear here.'
+                      : pendingDecision
+                        ? 'Saving your confirmed changes.'
+                        : 'Your request is running. Larger recipe and image requests can take a few minutes.'}
+                  </p>
+                </div>
+              ) : null}
+              <div ref={bottomRef} />
+            </div>
           </div>
           <div className={styles.composer}>
             {actions.some((action) => action.status === 'pending') ? (
@@ -859,7 +896,7 @@ export function AiAssistantDrawer({
                 title="Send message"
                 disabled={busy || attaching || !threadId || (!draft.trim() && !attachments.length)}
               >
-                {isThinking ? <InlineSkeleton label="Sending message" width="1rem" /> : <ArrowUp />}
+                {isThinking ? <LoadingIndicator label="Sending message" /> : <ArrowUp />}
               </button>
             </form>
             <div className={styles.composerMeta}>
@@ -872,7 +909,7 @@ export function AiAssistantDrawer({
             </div>
           </div>
         </div>
-      </aside>
+      </div>
     </>
   );
 }

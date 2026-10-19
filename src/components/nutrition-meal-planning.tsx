@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { ButtonSpinner } from './skeleton';
+import { usePendingAction } from './use-pending-action';
 import { useState, type FormEvent } from 'react';
 
 import styles from '@/components/nutrition-meal-planning.module.css';
@@ -64,6 +66,7 @@ export function NutritionMealPlanning({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState('');
+  const { pending, run } = usePendingAction(setStatus);
   const [preparedIds, setPreparedIds] = useState<Record<string, string>>(() =>
     Object.fromEntries(projection.meals.map((meal) => [meal.mealPlanEntryId, createClientUuid()])),
   );
@@ -75,32 +78,34 @@ export function NutritionMealPlanning({
     current: Allocation | null,
   ) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    setStatus('Saving planned portion…');
-    const response = await fetch(`/api/v1/nutrition/profiles/${activeProfileId}/allocations`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        seriesId: current?.seriesId,
-        supersedesAllocationVersionId: current?.id ?? null,
-        mealPlanEntryId,
-        cookSessionId: null,
-        state: data.get('state'),
-        servings: Number(data.get('servings')),
-        portionWeightGrams: null,
-        intakeSeriesId: null,
-        note: data.get('note'),
-      }),
+    return run(async () => {
+      const data = new FormData(event.currentTarget);
+      setStatus('Saving planned portion…');
+      const response = await fetch(`/api/v1/nutrition/profiles/${activeProfileId}/allocations`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          seriesId: current?.seriesId,
+          supersedesAllocationVersionId: current?.id ?? null,
+          mealPlanEntryId,
+          cookSessionId: null,
+          state: data.get('state'),
+          servings: Number(data.get('servings')),
+          portionWeightGrams: null,
+          intakeSeriesId: null,
+          note: data.get('note'),
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        setStatus(body?.error?.message ?? 'The planned portion could not be saved.');
+        return;
+      }
+      setStatus('Planned portion saved. Nothing was recorded as eaten.');
+      router.refresh();
     });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setStatus(body?.error?.message ?? 'The planned portion could not be saved.');
-      return;
-    }
-    setStatus('Planned portion saved. Nothing was recorded as eaten.');
-    router.refresh();
   }
 
   async function recordPreparedBatch(
@@ -108,42 +113,51 @@ export function NutritionMealPlanning({
     meal: NutritionMealProjectionView['meals'][number],
   ) {
     event.preventDefault();
-    if (!meal.calculationId) return;
-    const data = new FormData(event.currentTarget);
-    const preparedInstanceId = preparedIds[meal.mealPlanEntryId] ?? createClientUuid();
-    const finalWeight = String(data.get('finalWeightGrams') ?? '').trim();
-    setStatus('Saving prepared batch…');
-    const response = await fetch(`/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        preparedInstanceId,
-        recipeCalculationId: meal.calculationId,
-        mealPlanEntryId: meal.mealPlanEntryId,
-        cookSessionId: null,
-        actualServings: Number(data.get('actualServings')),
-        finalWeightGrams: finalWeight ? Number(finalWeight) : null,
-        preparationMatchesCalculation: data.get('preparationMatchesCalculation') === 'yes',
-        note: data.get('note'),
-      }),
+    return run(async () => {
+      if (!meal.calculationId) return;
+      const data = new FormData(event.currentTarget);
+      const preparedInstanceId = preparedIds[meal.mealPlanEntryId] ?? createClientUuid();
+      const finalWeight = String(data.get('finalWeightGrams') ?? '').trim();
+      setStatus('Saving prepared batch…');
+      const response = await fetch(
+        `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            preparedInstanceId,
+            recipeCalculationId: meal.calculationId,
+            mealPlanEntryId: meal.mealPlanEntryId,
+            cookSessionId: null,
+            actualServings: Number(data.get('actualServings')),
+            finalWeightGrams: finalWeight ? Number(finalWeight) : null,
+            preparationMatchesCalculation: data.get('preparationMatchesCalculation') === 'yes',
+            note: data.get('note'),
+          }),
+        },
+      );
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        setStatus(body?.error?.message ?? 'The prepared batch could not be saved.');
+        return;
+      }
+      setPreparedIds((current) => ({
+        ...current,
+        [meal.mealPlanEntryId]: createClientUuid(),
+      }));
+      setStatus('Prepared batch saved. No food was recorded as eaten.');
+      router.refresh();
     });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setStatus(body?.error?.message ?? 'The prepared batch could not be saved.');
-      return;
-    }
-    setPreparedIds((current) => ({
-      ...current,
-      [meal.mealPlanEntryId]: createClientUuid(),
-    }));
-    setStatus('Prepared batch saved. No food was recorded as eaten.');
-    router.refresh();
   }
 
   return (
-    <section className={styles.panel} aria-labelledby="planned-nutrition-heading">
+    <section
+      className={styles.panel}
+      aria-busy={pending}
+      aria-labelledby="planned-nutrition-heading"
+    >
       <header className={styles.heading}>
         <div>
           <h2 id="planned-nutrition-heading">Planned nutrition and portions</h2>
@@ -279,8 +293,8 @@ export function NutritionMealPlanning({
                         Note
                         <input name="note" maxLength={500} defaultValue={allocation.note} />
                       </label>
-                      <button type="submit" disabled={!canManageProfile}>
-                        Save revision
+                      <button type="submit" disabled={pending || !canManageProfile}>
+                        {pending ? <ButtonSpinner /> : null} Save revision
                       </button>
                     </form>
                   ))}
@@ -314,8 +328,8 @@ export function NutritionMealPlanning({
                         Note
                         <input name="note" maxLength={500} />
                       </label>
-                      <button type="submit" disabled={!canManageProfile}>
-                        Assign portion
+                      <button type="submit" disabled={pending || !canManageProfile}>
+                        {pending ? <ButtonSpinner /> : null} Assign portion
                       </button>
                     </form>
                   ) : null}
@@ -365,8 +379,8 @@ export function NutritionMealPlanning({
                         Preparation note
                         <input name="note" maxLength={1000} />
                       </label>
-                      <button type="submit" disabled={!canManageProfile}>
-                        Save prepared batch
+                      <button type="submit" disabled={pending || !canManageProfile}>
+                        {pending ? <ButtonSpinner /> : null} Save prepared batch
                       </button>
                     </form>
                   ) : null}

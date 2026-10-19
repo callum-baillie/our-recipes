@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 
 import styles from './ai-action-card.module.css';
 
@@ -188,7 +188,7 @@ function RecipeProposalCard({
               disabled={busy}
             >
               {pendingDecision === 'confirm' ? (
-                <InlineSkeleton label="Saving changes" width="1rem" />
+                <LoadingIndicator label="Saving changes" />
               ) : (
                 <Check aria-hidden="true" />
               )}
@@ -208,7 +208,7 @@ function RecipeProposalCard({
             >
               {pendingDecision === 'cancel' ? (
                 <>
-                  <InlineSkeleton label="Cancelling preview" width="1rem" /> Cancelling…
+                  <LoadingIndicator label="Cancelling preview" /> Cancelling…
                 </>
               ) : (
                 'Cancel'
@@ -387,7 +387,7 @@ function GenericProposalCard({
             disabled={busy || unresolved}
           >
             {pendingDecision === 'confirm' ? (
-              <InlineSkeleton label="Saving changes" width="1rem" />
+              <LoadingIndicator label="Saving changes" />
             ) : (
               <Check aria-hidden="true" />
             )}{' '}
@@ -401,7 +401,7 @@ function GenericProposalCard({
           >
             {pendingDecision === 'cancel' ? (
               <>
-                <InlineSkeleton label="Cancelling preview" width="1rem" /> Cancelling…
+                <LoadingIndicator label="Cancelling preview" /> Cancelling…
               </>
             ) : (
               'Cancel'
@@ -466,7 +466,7 @@ function RecipeBatchProposalCard({
             disabled={busy}
           >
             {pendingDecision === 'confirm' ? (
-              <InlineSkeleton label="Adding recipes" width="1rem" />
+              <LoadingIndicator label="Adding recipes" />
             ) : (
               <Check aria-hidden="true" />
             )}

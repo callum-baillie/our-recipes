@@ -82,7 +82,11 @@ test('first-run setup and household organization have no automatically detectabl
   })
     .png()
     .toBuffer();
-  await page.getByLabel('Recipe document or scan').setInputFiles({
+  const fileChooser = page.waitForEvent('filechooser');
+  await page.locator('label[for="recipe-import-files"]').click();
+  await (
+    await fileChooser
+  ).setFiles({
     name: 'grandmas-lemon-pasta.png',
     mimeType: 'image/png',
     buffer: handwrittenRecipe,

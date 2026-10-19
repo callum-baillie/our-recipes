@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { authClient } from '@/lib/auth/client';
 
 import { DismissibleDetails } from '@/components/dismissible-details';
@@ -160,7 +160,7 @@ export function ProfileSwitcher({
             </span>
             <span className="profile-name">{activeProfile.displayName}</span>
             {pending ? (
-              <InlineSkeleton label="Switching profile" width="0.95rem" />
+              <LoadingIndicator label="Switching profile" />
             ) : (
               <ChevronDown size={16} aria-hidden="true" />
             )}

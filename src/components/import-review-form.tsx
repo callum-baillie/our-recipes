@@ -4,7 +4,7 @@ import { Minus, Plus, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 
 import { useToast } from '@/components/toast-provider';
@@ -541,7 +541,7 @@ export function ImportReviewForm({
       )}
       <button className="primary-button" type="submit" disabled={pending}>
         {pending ? (
-          <InlineSkeleton label="Saving recipe" width="1.1rem" />
+          <LoadingIndicator label="Saving recipe" />
         ) : (
           <Save size={17} aria-hidden="true" />
         )}

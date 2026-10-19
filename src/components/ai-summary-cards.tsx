@@ -15,7 +15,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { Skeleton, SkeletonStatus } from '@/components/skeleton';
 import type { AiSummaryDomain } from '@/lib/domain/ai-assistant';
 
 import styles from './ai-summary-cards.module.css';
@@ -89,9 +89,11 @@ export function AiSummaryCards({
         data-placement={placement}
         aria-label={`Loading ${DOMAIN_META[domain].label}`}
       >
-        <InlineSkeleton label="Loading AI insight" width="42%" />
-        <InlineSkeleton label="Loading AI insight" width="86%" />
-        <InlineSkeleton label="Loading AI insight" width="68%" />
+        <SkeletonStatus className={styles.loading} label="Loading AI insight">
+          <Skeleton width="42%" />
+          <Skeleton width="86%" />
+          <Skeleton width="68%" />
+        </SkeletonStatus>
       </section>
     );
   }

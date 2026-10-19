@@ -11,7 +11,7 @@ import { BordHeaderLockup } from '@/components/bord-brand';
 import { BrandIcon } from '@/components/brand-icon';
 import { DismissibleDetails } from '@/components/dismissible-details';
 import { ProfileSwitcher, type HeaderProfile } from '@/components/profile-switcher';
-import { Skeleton } from '@/components/skeleton';
+import { DialogSkeleton, Skeleton } from '@/components/skeleton';
 import { parseBrandIcon } from '@/lib/appearance';
 import { hasCustomKitchenIdentity, PRODUCT_NAME } from '@/lib/brand';
 import type { AppRole } from '@/lib/domain/permissions';
@@ -31,13 +31,7 @@ function LazySurface({ label, drawer = false }: { label: string; drawer?: boolea
           <Skeleton height="1.4rem" width="52%" />
           <Skeleton className={styles.lazyClose} />
         </div>
-        <div className={styles.lazySurfaceBody}>
-          <Skeleton width="86%" />
-          <Skeleton width="68%" />
-          <Skeleton className={styles.lazyField} />
-          <Skeleton className={styles.lazyField} />
-          <Skeleton className={styles.lazyAction} />
-        </div>
+        <DialogSkeleton label={label} variant={drawer ? 'assistant' : 'recipeOptions'} />
       </section>
     </div>
   );

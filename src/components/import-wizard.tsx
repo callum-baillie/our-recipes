@@ -5,7 +5,7 @@ import { useRef, useState, type FormEvent } from 'react';
 
 import { ImportReviewForm } from '@/components/import-review-form';
 import { JsonLdImportWizard } from '@/components/import-jsonld-wizard';
-import { AsyncSkeleton, InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
 import {
   ImportUploadPanel,
@@ -582,7 +582,7 @@ export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' 
                     }
                   >
                     {aiPending ? (
-                      <InlineSkeleton label="OpenAI is reading the recipe" width="1rem" />
+                      <LoadingIndicator label="OpenAI is reading the recipe" />
                     ) : (
                       <Sparkles size={16} />
                     )}

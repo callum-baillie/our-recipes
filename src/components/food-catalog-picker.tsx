@@ -17,7 +17,7 @@ const BarcodeScanner = dynamic(
   () => import('@/components/barcode-scanner').then((module) => module.BarcodeScanner),
   {
     ssr: false,
-    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="panel" />,
+    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="scanner" />,
   },
 );
 

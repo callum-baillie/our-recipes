@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { BrandIconPicker } from '@/components/brand-icon-picker';
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import {
   SettingsActionBar,
   SettingsPane,
@@ -87,11 +87,7 @@ export function AppSettingsForm({
             type="submit"
             disabled={pending || !kitchenName.trim()}
           >
-            {pending ? (
-              <InlineSkeleton label="Saving kitchen identity" width="1rem" />
-            ) : (
-              <Save size={16} />
-            )}
+            {pending ? <LoadingIndicator label="Saving kitchen identity" /> : <Save size={16} />}
             {pending ? 'Saving…' : 'Save kitchen identity'}
           </button>
         </SettingsActionBar>

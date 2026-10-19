@@ -3,7 +3,7 @@
 import { Braces, ChevronDown, ChevronLeft, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 
 import { ImportReviewForm } from '@/components/import-review-form';
 import type { RecipePayload } from '@/lib/domain/recipe';
@@ -157,7 +157,7 @@ export function JsonLdImportWizard({
             disabled={!source.trim() || pending}
           >
             {pending ? (
-              <InlineSkeleton label="Finding recipe candidates" width="1.1rem" />
+              <LoadingIndicator label="Finding recipe candidates" />
             ) : (
               <ShieldCheck size={17} />
             )}
@@ -188,7 +188,7 @@ export function JsonLdImportWizard({
                 disabled={pending}
               >
                 {pending ? (
-                  <InlineSkeleton label="Preparing recipe review" width="1.1rem" />
+                  <LoadingIndicator label="Preparing recipe review" />
                 ) : (
                   <ShieldCheck size={17} />
                 )}

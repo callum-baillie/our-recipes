@@ -50,7 +50,7 @@ import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react
 import { AiMealPlanGenerator } from '@/components/ai-meal-plan-generator';
 import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import { MealPlanRecipeSelector } from '@/components/meal-plan-recipe-selector';
-import { ButtonSpinner, InlineSkeleton } from '@/components/skeleton';
+import { ButtonSpinner, InlineSkeleton, LoadingIndicator } from '@/components/skeleton';
 import { InlineAlert } from '@/components/inline-alert';
 import {
   addPlannerDays,
@@ -2241,7 +2241,7 @@ export function MealPlanner({
               onClick={generateList}
             >
               {busyAction === 'shopping-list' ? (
-                <InlineSkeleton label="Generating shopping list" width="1.1rem" />
+                <LoadingIndicator label="Generating shopping list" />
               ) : (
                 <ShoppingBasket size={17} aria-hidden="true" />
               )}

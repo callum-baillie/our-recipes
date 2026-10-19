@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { InlineSkeleton } from '@/components/skeleton';
+import { AsyncSkeleton } from '@/components/skeleton';
 import type { CatalogReference } from '@/lib/domain/food-data';
 import styles from './catalog-store-link.module.css';
 
@@ -50,7 +50,7 @@ export function CatalogRetailEvidence({ reference }: { reference: CatalogReferen
         item to your cart or pantry.
       </p>
       {!stores ? (
-        <InlineSkeleton label="Loading saved branches" width="100%" />
+        <AsyncSkeleton label="Loading saved branches" variant="select" />
       ) : (
         <label>
           Branch

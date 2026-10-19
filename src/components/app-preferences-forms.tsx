@@ -3,7 +3,7 @@
 import { Save } from 'lucide-react';
 import { useState } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import {
   SettingsActionBar,
   SettingsPane,
@@ -42,7 +42,7 @@ function SaveButton({
 }) {
   return (
     <button className="primary-button compact" type="submit" disabled={pending || disabled}>
-      {pending ? <InlineSkeleton label={label} width="1rem" /> : <Save size={16} />}
+      {pending ? <LoadingIndicator label={label} /> : <Save size={16} />}
       {pending ? 'Saving…' : label}
     </button>
   );

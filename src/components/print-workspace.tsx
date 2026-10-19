@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { AsyncSkeleton, ButtonSpinner } from './skeleton';
 import {
   BookOpen,
   CalendarDays,
@@ -424,7 +425,7 @@ export function PrintWorkspace({
             disabled={busy || !valid}
             onClick={() => void generate()}
           >
-            <RefreshCw size={17} />
+            {busy ? <ButtonSpinner /> : <RefreshCw size={17} />}
             {busy ? 'Preparing PDF…' : stale ? 'Update preview' : 'Refresh preview'}
           </button>
         </aside>
@@ -482,19 +483,28 @@ export function PrintWorkspace({
               {error}
             </p>
           )}
-          {preview ? (
-            <iframe ref={frame} src={preview.url} title="Your printable PDF" />
-          ) : (
-            <div className={styles.empty}>
-              <Printer size={44} />
-              <h2>{busy ? 'Preparing your preview' : 'Your print preview'}</h2>
-              <p>
-                {valid
-                  ? 'Your document will appear here.'
-                  : 'Choose at least one recipe or a shopping list to begin.'}
-              </p>
-            </div>
-          )}
+          <div className={styles.previewDocument}>
+            {busy ? (
+              <AsyncSkeleton
+                className={styles.documentLoading}
+                label="Preparing printable document"
+                variant="panel"
+              />
+            ) : null}
+            {preview ? (
+              <iframe ref={frame} src={preview.url} title="Your printable PDF" />
+            ) : (
+              <div className={styles.empty}>
+                <Printer size={44} />
+                <h2>{busy ? 'Preparing your preview' : 'Your print preview'}</h2>
+                <p>
+                  {valid
+                    ? 'Your document will appear here.'
+                    : 'Choose at least one recipe or a shopping list to begin.'}
+                </p>
+              </div>
+            )}
+          </div>
           <p className={styles.hint}>
             If your mobile browser cannot display or print the embedded PDF, use Open PDF and its
             share/print menu.

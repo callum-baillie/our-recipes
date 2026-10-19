@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Minus, Plus, Save, Sparkles } from 'lucide-reac
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
@@ -697,7 +697,7 @@ export function RecipeForm({
                 title="Uses one paid OpenAI request and keeps ingredients unchanged"
               >
                 {aiImproving ? (
-                  <InlineSkeleton label="Improving recipe" width="1rem" />
+                  <LoadingIndicator label="Improving recipe" />
                 ) : (
                   <Sparkles size={16} aria-hidden="true" />
                 )}
@@ -849,7 +849,7 @@ export function RecipeForm({
       )}
       <button className="primary-button" type="submit" disabled={form.formState.isSubmitting}>
         {form.formState.isSubmitting ? (
-          <InlineSkeleton label="Saving recipe" width="1.1rem" />
+          <LoadingIndicator label="Saving recipe" />
         ) : (
           <Save size={17} aria-hidden="true" />
         )}{' '}

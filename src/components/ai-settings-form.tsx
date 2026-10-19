@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { AI_WORKLOAD_DEFAULTS, aiWorkloadSchema } from '@/lib/domain/ai-assistant';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import {
   SettingsPane,
   SettingsField,
@@ -376,7 +376,13 @@ export function AiSettingsForm({
           disabled={saving || refreshing}
           onClick={() => void save()}
         >
-          {saving ? <InlineSkeleton label="Saving AI settings" width="6rem" /> : 'Save AI settings'}
+          {saving ? (
+            <>
+              <LoadingIndicator label="Saving AI settings" /> Saving…
+            </>
+          ) : (
+            'Save AI settings'
+          )}
         </button>
       </SettingsActionBar>
     </div>

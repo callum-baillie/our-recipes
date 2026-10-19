@@ -4,7 +4,7 @@ import { Clock3, Minus, Plus, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { type ReactNode, useMemo, useState } from 'react';
 
 import { RecipeClassificationToolbar } from '@/components/recipe-classification-toolbar';
@@ -253,7 +253,7 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
             title="Uses one paid OpenAI request"
           >
             {estimatingNutrition ? (
-              <InlineSkeleton label="Estimating nutrition" width="1rem" />
+              <LoadingIndicator label="Estimating nutrition" />
             ) : (
               <Sparkles size={16} aria-hidden="true" />
             )}

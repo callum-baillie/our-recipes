@@ -4,7 +4,7 @@ import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
-import { InlineSkeleton } from '@/components/skeleton';
+import { LoadingIndicator } from '@/components/skeleton';
 import { FormEvent, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
@@ -232,7 +232,7 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
         )}
         <button className="text-button" type="submit" disabled={pending || converting || !file}>
           {pending || converting ? (
-            <InlineSkeleton label="Preparing image" width="1rem" />
+            <LoadingIndicator label="Preparing image" />
           ) : (
             <ImagePlus size={16} />
           )}
@@ -244,11 +244,7 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
           onClick={() => void generateWithOpenAi()}
           disabled={generating || pending || converting}
         >
-          {generating ? (
-            <InlineSkeleton label="Generating image" width="1rem" />
-          ) : (
-            <Sparkles size={16} />
-          )}
+          {generating ? <LoadingIndicator label="Generating image" /> : <Sparkles size={16} />}
           Generate serving image with OpenAI
         </button>
       </form>

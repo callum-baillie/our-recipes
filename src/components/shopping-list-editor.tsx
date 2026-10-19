@@ -64,7 +64,7 @@ type GroupMode = 'aisle' | 'none';
 const BarcodeScanner = dynamic(
   () => import('@/components/barcode-scanner').then((module) => module.BarcodeScanner),
   {
-    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="panel" />,
+    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="scanner" />,
     ssr: false,
   },
 );

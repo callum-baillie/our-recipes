@@ -59,6 +59,16 @@ export function ButtonSpinner() {
   return <span aria-hidden="true" className={styles.buttonSpinner} />;
 }
 
+/** Compact activity for actions; keeps the icon slot stable while work is in flight. */
+export function LoadingIndicator({ label }: { label: string }) {
+  return (
+    <span className={styles.inlineStatus} role="status" aria-label={label}>
+      <ButtonSpinner />
+      <span className={styles.srOnly}>{label}</span>
+    </span>
+  );
+}
+
 export function AsyncSkeleton({
   className = '',
   label,
@@ -66,11 +76,45 @@ export function AsyncSkeleton({
 }: {
   className?: string;
   label: string;
-  variant?: 'image' | 'message' | 'panel' | 'rows';
+  variant?: 'image' | 'message' | 'panel' | 'rows' | 'select' | 'choices' | 'chat' | 'scanner';
 }) {
   return (
-    <SkeletonStatus className={`${styles.async} ${styles[variant]} ${className}`} label={label}>
+    <SkeletonStatus
+      className={`${styles.async} ${styles[variant] ?? ''} ${className}`}
+      label={label}
+    >
       {variant === 'image' ? <Skeleton className={styles.imageBlock} /> : null}
+      {variant === 'select' ? (
+        <span className={styles.selectControl}>
+          <Skeleton width="58%" />
+          <Skeleton className={styles.selectChevron} />
+        </span>
+      ) : null}
+      {variant === 'choices' ? (
+        <span className={styles.choiceRail}>
+          {[5.5, 7, 4.5, 6].map((width) => (
+            <Skeleton key={width} width={`${width}rem`} height="2rem" />
+          ))}
+        </span>
+      ) : null}
+      {variant === 'chat' ? (
+        <div className={styles.chatHistory}>
+          {[false, true, false].map((user, index) => (
+            <div className={`${styles.chatBubble} ${user ? styles.chatUser : ''}`} key={index}>
+              <Skeleton width={user ? '78%' : '92%'} />
+              <Skeleton width={user ? '52%' : '74%'} />
+              {!user ? <Skeleton width="48%" /> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {variant === 'scanner' ? (
+        <div className={styles.scannerFrame}>
+          <Skeleton className={styles.scanTarget} />
+          <Skeleton width="62%" />
+          <Skeleton width="42%" />
+        </div>
+      ) : null}
       {variant === 'message' ? (
         <>
           <Skeleton className={styles.avatar} />
@@ -112,6 +156,8 @@ export type PageSkeletonVariant =
   | 'auth'
   | 'collectionDetail'
   | 'collections'
+  | 'capture'
+  | 'bulkImport'
   | 'cook'
   | 'dashboard'
   | 'detail'
@@ -129,6 +175,49 @@ export type PageSkeletonVariant =
   | 'shoppingLists'
   | 'tags'
   | 'workspace';
+
+/** Content-only fallback: the caller keeps the dialog's frame and close control available. */
+export function DialogSkeleton({
+  label,
+  variant = 'form',
+}: {
+  label: string;
+  variant?: 'form' | 'recipeOptions' | 'assistant';
+}) {
+  return (
+    <SkeletonStatus className={styles.dialogBody} label={label}>
+      {variant === 'assistant' ? (
+        <>
+          <div className={styles.dialogHistory}>
+            <AsyncSkeleton label={label} variant="chat" />
+          </div>
+          <div className={styles.composerPlaceholder}>
+            <Skeleton width="68%" />
+            <div className={styles.toolbar}>
+              <Skeleton className={styles.button} />
+              <Skeleton className={styles.button} />
+            </div>
+          </div>
+        </>
+      ) : variant === 'recipeOptions' ? (
+        <>
+          <Skeleton width="90%" />
+          <Skeleton width="66%" />
+          <div className={styles.optionGrid}>
+            {Array.from({ length: 5 }, (_, index) => (
+              <div className={styles.optionTile} key={index}>
+                <Skeleton className={styles.rowIcon} />
+                <Skeleton width="72%" />
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <FormSkeleton />
+      )}
+    </SkeletonStatus>
+  );
+}
 
 function HeadingSkeleton({ compact = false }: { compact?: boolean }) {
   return (
@@ -183,6 +272,22 @@ function RowList({ count = 5 }: { count?: number }) {
           <Skeleton className={styles.rowAction} />
         </div>
       ))}
+    </div>
+  );
+}
+
+function SearchSkeleton() {
+  return (
+    <div className={styles.searchSurface}>
+      <div className={styles.toolbar}>
+        <Skeleton className={styles.search} />
+        <Skeleton className={styles.button} />
+      </div>
+      <div className={styles.choiceRail}>
+        {[5, 7, 6, 5.5, 8].map((width) => (
+          <Skeleton key={width} width={`${width}rem`} height="1.8rem" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -374,10 +479,7 @@ export function PageSkeleton({
           <HeadingSkeleton />
           <Skeleton className={styles.heroMedia} />
         </div>
-        <div className={styles.toolbar}>
-          <Skeleton className={styles.search} />
-          <Skeleton className={styles.button} />
-        </div>
+        <SearchSkeleton />
         <CardGrid />
       </>
     );
@@ -385,25 +487,62 @@ export function PageSkeleton({
     body = (
       <>
         <div className={styles.headingAction}>
-          <HeadingSkeleton />
+          <HeadingSkeleton compact />
           <Skeleton className={styles.buttonWide} />
         </div>
-        <div className={styles.plannerGrid}>
-          <div className={styles.setupPanel}>
-            <Skeleton height="1.8rem" width="72%" />
-            <FormSkeleton />
+        <div className={styles.plannerToolbar}>
+          <Skeleton height="2.75rem" width="15rem" />
+          <div className={styles.tabs}>
+            {[0, 1, 2].map((index) => (
+              <Skeleton className={styles.tab} key={index} />
+            ))}
           </div>
-          <div className={styles.calendarPanel}>
-            <div className={styles.calendarHeader}>
-              <Skeleton height="2rem" width="38%" />
-              <Skeleton className={styles.buttonWide} />
-            </div>
-            <div className={styles.calendarGrid}>
-              {Array.from({ length: 21 }, (_, index) => (
-                <Skeleton className={styles.calendarCell} key={index} />
+          <Skeleton className={styles.button} />
+        </div>
+        <div className={styles.plannerDays}>
+          {Array.from({ length: 7 }, (_, day) => (
+            <div className={styles.plannerDay} key={day}>
+              <Skeleton width="55%" height="1.2rem" />
+              <Skeleton width="36%" />
+              {[0, 1, 2].map((meal) => (
+                <div className={styles.plannerMeal} key={meal}>
+                  <Skeleton width="48%" height="0.7rem" />
+                  <div className={styles.mealPreview}>
+                    <Skeleton className={styles.mealThumbnail} />
+                    <span className={styles.rowCopy}>
+                      <Skeleton width="92%" />
+                      <Skeleton width="64%" height="0.65rem" />
+                    </span>
+                    <Skeleton className={styles.mealMenu} />
+                  </div>
+                </div>
               ))}
             </div>
+          ))}
+        </div>
+      </>
+    );
+  } else if (variant === 'capture' || variant === 'bulkImport') {
+    body = (
+      <>
+        <HeadingSkeleton compact />
+        <div className={styles.capturePanel}>
+          <div className={styles.tabs}>
+            {[0, 1, 2].map((index) => (
+              <Skeleton className={styles.tab} key={index} />
+            ))}
           </div>
+          <div className={styles.formField}>
+            <Skeleton width="10rem" />
+            <Skeleton className={styles.captureInput} />
+            <Skeleton width="76%" height="0.7rem" />
+          </div>
+          {variant === 'bulkImport' ? <RowList count={3} /> : <Skeleton className={styles.input} />}
+          <div className={styles.toolbar}>
+            <Skeleton className={styles.checkbox} />
+            <Skeleton width="74%" />
+          </div>
+          <Skeleton className={styles.buttonWide} />
         </div>
       </>
     );
@@ -651,21 +790,33 @@ export function PageSkeleton({
   } else if (variant === 'shoppingList') {
     body = (
       <>
-        <div className={styles.headingAction}>
+        <div className={styles.shoppingHeader}>
           <HeadingSkeleton compact />
-          <div className={styles.toolbar}>
-            <Skeleton className={styles.buttonWide} />
-            <Skeleton className={styles.buttonWide} />
+          <div className={styles.modeSwitch}>
+            <Skeleton height="2.75rem" width="100%" />
+            <Skeleton height="2.75rem" width="100%" />
           </div>
-        </div>
-        <div className={styles.toolbar}>
           <Skeleton className={styles.search} />
-          <Skeleton className={styles.button} />
-          <Skeleton className={styles.button} />
-          <Skeleton className={styles.button} />
+          <div className={styles.shoppingActions}>
+            {Array.from({ length: 6 }, (_, index) => (
+              <Skeleton className={styles.button} key={index} />
+            ))}
+          </div>
+          <Skeleton width="10rem" height="0.6rem" />
         </div>
         <div className={styles.panel}>
-          <RowList count={7} />
+          {Array.from({ length: 6 }, (_, index) => (
+            <div className={styles.shoppingRow} key={index}>
+              <div className={styles.rowCopy}>
+                <Skeleton height="1.1rem" width={`${54 + (index % 3) * 10}%`} />
+                <Skeleton width="32%" />
+              </div>
+              <div className={styles.cartActions}>
+                <Skeleton height="2.75rem" width="6rem" />
+                <Skeleton height="2.75rem" width="6rem" />
+              </div>
+            </div>
+          ))}
         </div>
       </>
     );
@@ -681,9 +832,10 @@ export function PageSkeleton({
     body = (
       <>
         <HeadingSkeleton />
+        <SearchSkeleton />
         <div className={styles.toolbar}>
-          <Skeleton className={styles.search} />
-          <Skeleton className={styles.buttonWide} />
+          <Skeleton width="8rem" />
+          <Skeleton className={styles.resultsSort} />
         </div>
         <CardGrid count={variant === 'library' ? 6 : 3} />
       </>
