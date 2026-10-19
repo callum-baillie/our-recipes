@@ -49,7 +49,7 @@ describe('Pantry recipe and planner presentation', () => {
       }),
     );
     expect(markup).toContain('/recipes/recipe-1/cook?mealPlanEntryId=meal-1');
-    expect(markup).toContain('Make Lentil soup from this planned meal');
+    expect(markup).toContain('aria-label="Make Lentil soup"');
   });
 
   it('keeps plan totals in the insights rail without the former calendar footer', () => {
@@ -73,7 +73,7 @@ describe('Pantry recipe and planner presentation', () => {
     expect(markup).toContain('Total servings');
     expect(markup).not.toContain('Your plan at a glance');
     expect(markup).toContain('aria-label="Mobile planner controls"');
-    expect(markup).toContain('aria-label="Show nutrition and Pantry details"');
+    expect(markup).toContain('aria-label="Show plan overview"');
     expect(markup).toContain('aria-controls="mobile-nutrition-panel"');
     expect(markup).not.toContain('id="mobile-nutrition-panel"');
     expect(markup).not.toContain('Your daily meal plan');

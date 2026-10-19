@@ -48,7 +48,7 @@ export function NutritionChartPanels({
     return (
       <section className={styles.panel} aria-labelledby="nutrient-coverage-chart-title">
         <header>
-          <h2 id="nutrient-coverage-chart-title">Today&apos;s configured nutrient coverage</h2>
+          <h2 id="nutrient-coverage-chart-title">Current nutrient goals</h2>
           <p>
             Target, minimum, range, and limit rows keep their own meanings. Missing values are
             unknown, not zero.
@@ -92,14 +92,16 @@ export function NutritionChartPanels({
                       </small>
                     </span>
                   </div>
-                  <div className={styles.track} aria-hidden="true">
-                    <span
-                      style={{
-                        width: `${row.visualPercent}%`,
-                        background: resolveNutritionVisual(row.nutrientCode).color,
-                      }}
-                    />
-                  </div>
+                  {row.amount !== null && (row.kind === 'target' || row.kind === 'minimum') ? (
+                    <div className={styles.track} aria-hidden="true">
+                      <span
+                        style={{
+                          width: `${row.visualPercent}%`,
+                          background: resolveNutritionVisual(row.nutrientCode).color,
+                        }}
+                      />
+                    </div>
+                  ) : null}
                   <p>{row.comparison}</p>
                 </article>
               ))}
@@ -108,7 +110,7 @@ export function NutritionChartPanels({
               <summary>View exact nutrient values</summary>
               <div className={styles.tableScroller}>
                 <table className={styles.table}>
-                  <caption>Table equivalent for today&apos;s configured nutrient coverage</caption>
+                  <caption>Current nutrient comparisons</caption>
                   <thead>
                     <tr>
                       <th scope="col">Nutrient</th>
@@ -155,67 +157,32 @@ export function NutritionChartPanels({
   const { calorie, macroComposition } = datasets;
   return (
     <div className={styles.grid}>
-      <section className={styles.panel} aria-labelledby="daily-calorie-chart-title">
-        <header>
-          <h2 id="daily-calorie-chart-title">Daily calorie progress</h2>
-          <p>{calorie.takeaway}</p>
-          <small>
-            {calorie.profileLabel} · {calorie.date} · recent completeness{' '}
-            {calorie.recentCompleteness === null
-              ? 'unknown'
-              : `${Math.round(calorie.recentCompleteness * 100)}%`}
-          </small>
-        </header>
-        <div
-          className={styles.bullet}
-          aria-label={
-            calorie.showPlannedNutrition
-              ? 'Confirmed and separately planned calories'
-              : 'Confirmed calories'
-          }
-        >
-          <div>
-            <span>Confirmed</span>
-            <div className={styles.track} aria-hidden="true">
-              <span style={{ width: `${calorie.confirmedVisualPercent}%` }} />
-            </div>
-            <b>
-              {calorie.confirmedEnergy === null ? 'No data' : `${calorie.confirmedEnergy} kcal`}
-            </b>
-          </div>
-          {calorie.showPlannedNutrition ? (
-            <div>
-              <span>Planned separately</span>
-              <div className={`${styles.track} ${styles.planned}`} aria-hidden="true">
-                <span style={{ width: `${calorie.plannedVisualPercent}%` }} />
-              </div>
-              <b>{calorie.plannedEnergy === null ? 'No data' : `${calorie.plannedEnergy} kcal`}</b>
-            </div>
-          ) : null}
-        </div>
+      <section className={styles.panel} aria-label="Daily calorie details">
         <table className={styles.table}>
-          <caption>Table equivalent for daily calorie progress</caption>
+          <caption>
+            Daily calorie details · {calorie.profileLabel} · {calorie.date}
+          </caption>
           <tbody>
             <tr>
               <th scope="row">Confirmed calories</th>
               <td>
-                {calorie.confirmedEnergy === null ? 'No data' : `${calorie.confirmedEnergy} kcal`}
+                {calorie.confirmedEnergy === null ? 'Unknown' : `${calorie.confirmedEnergy} kcal`}
               </td>
             </tr>
-            {calorie.showPlannedNutrition ? (
+            {calorie.showPlannedNutrition && (
               <tr>
-                <th scope="row">Planned calories, not counted as consumed</th>
+                <th scope="row">Planned separately, not consumed</th>
                 <td>
-                  {calorie.plannedEnergy === null ? 'No data' : `${calorie.plannedEnergy} kcal`}
+                  {calorie.plannedEnergy === null ? 'Unknown' : `${calorie.plannedEnergy} kcal`}
                 </td>
               </tr>
-            ) : null}
+            )}
             <tr>
               <th scope="row">Configured goal</th>
               <td>{calorieGoalLabel(datasets)}</td>
             </tr>
             <tr>
-              <th scope="row">Goal comparison</th>
+              <th scope="row">Comparison using confirmed food</th>
               <td>{calorie.takeaway}</td>
             </tr>
           </tbody>
@@ -225,7 +192,7 @@ export function NutritionChartPanels({
       <section className={styles.panel} aria-labelledby="macro-composition-chart-title">
         <header>
           <h2 id="macro-composition-chart-title">Confirmed macro composition</h2>
-          <p>{macroComposition.takeaway}</p>
+          {macroComposition.status === 'ready' ? <p>{macroComposition.takeaway}</p> : null}
           <small>
             {macroComposition.profileLabel} · {macroComposition.date}
           </small>
@@ -256,7 +223,7 @@ export function NutritionChartPanels({
               <summary>View exact macro values</summary>
               <div className={styles.tableScroller}>
                 <table className={styles.table}>
-                  <caption>Table equivalent for confirmed macro composition</caption>
+                  <caption>Recorded macro values</caption>
                   <thead>
                     <tr>
                       <th scope="col">Macro</th>

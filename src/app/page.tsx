@@ -73,7 +73,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     actor.profileId,
     4,
   ).recipes;
-  const library = listRecipeLibrary(query, actor.profileId, 48);
+  const library = listRecipeLibrary(query, actor.profileId, 6);
   const now = new Date();
   const timeZone = activeProfile?.timezone ?? 'UTC';
   const today = localIsoDate(now, timeZone);

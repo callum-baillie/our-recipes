@@ -42,7 +42,16 @@ export function AssistedReviewButton({
         <header>
           <div>
             <h2 id={`review-${task}`}>{title}</h2>
-            <p>Review the evidence and choose what to apply.</p>
+            <p>
+              {task === 'pantry_review' || task === 'restock' ? (
+                'Review household stock and restock policies. Pantry search and filters do not limit this review.'
+              ) : (
+                <>
+                  Review {query ? `recipes matching “${query}”` : 'saved recipes'}. Other library
+                  filters and selected recipes do not limit this review.
+                </>
+              )}
+            </p>
           </div>
           <button
             type="button"

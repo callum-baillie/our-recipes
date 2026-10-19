@@ -23,6 +23,7 @@ export function SearchFacetBar({
   placeholder = 'Search',
   label = 'Search',
   advancedActive = false,
+  advancedLabel = 'Advanced search',
 }: {
   query: string;
   onQueryChange: (value: string) => void;
@@ -33,6 +34,7 @@ export function SearchFacetBar({
   placeholder?: string;
   label?: string;
   advancedActive?: boolean;
+  advancedLabel?: string;
 }) {
   const shelfId = useId();
   const shelf = useRef<HTMLDivElement>(null);
@@ -115,8 +117,8 @@ export function SearchFacetBar({
         {onAdvanced ? (
           <button
             type="button"
-            aria-label="Advanced search"
-            title="Advanced search"
+            aria-label={advancedLabel}
+            title={advancedLabel}
             aria-haspopup="dialog"
             data-active={advancedActive || undefined}
             onClick={onAdvanced}
@@ -190,7 +192,9 @@ export function ResultsToolbar({
   sort,
   onSortChange,
   options,
+  density = 'normal',
 }: {
+  density?: 'normal' | 'compact';
   summary: ReactNode;
   actions?: ReactNode;
   sort: string;
@@ -198,7 +202,7 @@ export function ResultsToolbar({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <div className={styles.results}>
+    <div className={styles.results} data-density={density}>
       <div className={styles.summary}>{summary}</div>
       <div className={styles.actions}>{actions}</div>
       <label className={styles.sort}>

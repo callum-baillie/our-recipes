@@ -251,8 +251,8 @@ export const emptyRecipeInput: RecipeInput = {
   summary: '',
   status: 'active',
   servings: '4 servings',
-  prepMinutes: 10,
-  cookMinutes: 25,
+  prepMinutes: '',
+  cookMinutes: '',
   restMinutes: 0,
   difficulty: '',
   cuisine: '',
@@ -276,7 +276,16 @@ export const emptyRecipeInput: RecipeInput = {
   ingredientGroups: [
     {
       name: '',
-      ingredients: [{ quantity: '', unit: '', item: '', note: '' }],
+      ingredients: [
+        {
+          quantity: '',
+          unit: '',
+          item: '',
+          note: '',
+          shoppingCategory: 'Other',
+          pantryProductId: '',
+        },
+      ],
     },
   ],
   instructionSections: [{ title: '', steps: [''] }],

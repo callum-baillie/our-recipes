@@ -7,6 +7,7 @@ const InterviewChat = dynamic(
 );
 import { useRouter } from 'next/navigation';
 import type { Profile } from './profile-settings';
+import { SettingsPane } from './settings-primitives';
 import type { ProfileGoalContext } from '@/lib/domain/profile-goals';
 import { InlineAlert } from './inline-alert';
 import { ButtonSpinner } from './skeleton';
@@ -99,20 +100,19 @@ export function KitchenInterview({
     }
   }
   return (
-    <section className="settings-card" aria-busy={busy}>
-      <h2>Let your Kitchen Assistant get to know you more</h2>
+    <SettingsPane
+      title="Kitchen interview"
+      description="A guided questionnaire or a conversation with Kitchen Assistant. Review answers before saving."
+      aria-busy={busy}
+    >
       <p>
         A short interview about your tastes and routine. Your answers stay editable, and AI sharing
         follows your dietary preference settings.
       </p>
       {aiEnabled && (
         <>
-          <button
-            className="button button-secondary"
-            type="button"
-            onClick={() => setChatOpen(true)}
-          >
-            Interview me in chat
+          <button className="secondary-button" type="button" onClick={() => setChatOpen(true)}>
+            Chat with Kitchen Assistant
           </button>
           <p>
             Uses your configured AI chat provider. Your assistant will ask follow-up questions and
@@ -132,13 +132,15 @@ export function KitchenInterview({
       {step === null ? (
         <>
           <button
-            className="button button-secondary"
+            className="secondary-button"
             onClick={() => {
               setStep(0);
               setMessage('');
             }}
           >
-            {profile.goalContext.kitchenInterview ? 'Redo my interview' : 'Start my interview'}
+            {profile.goalContext.kitchenInterview
+              ? 'Redo my interview'
+              : 'Start guided questionnaire'}
           </button>
           {profile.goalContext.kitchenInterview && (
             <details>
@@ -203,20 +205,20 @@ export function KitchenInterview({
               Back
             </button>
             {question ? (
-              <button type="button" onClick={() => setStep(step + 1)}>
+              <button className="secondary-button" type="button" onClick={() => setStep(step + 1)}>
                 Continue
               </button>
             ) : (
-              <button type="button" onClick={() => void save()}>
+              <button className="primary-button" type="button" onClick={() => void save()}>
                 {busy && <ButtonSpinner />}Save context
               </button>
             )}
-            <button type="button" onClick={() => setStep(null)}>
+            <button className="text-button" type="button" onClick={() => setStep(null)}>
               Close
             </button>
           </div>
         </fieldset>
       )}
-    </section>
+    </SettingsPane>
   );
 }

@@ -1,3 +1,7 @@
+import { useResource } from '@/hooks/use-resource';
+import type { AppPreferences } from '@/components/server-preferences';
+import { useScreenAwake } from '@/hooks/use-screen-awake';
+import { RecipeTools } from '@/components/recipe-tools';
 import * as React from 'react';
 import {
   Alert,
@@ -28,6 +32,7 @@ import {
   IconButton,
   NativeToggle,
   Screen,
+  SyncNotice,
   StatusPill,
   Surface,
   TopActions,
@@ -91,6 +96,10 @@ export function RecipeLibraryScreen() {
   const { state } = useBord();
   const { refreshing, refresh } = useSync();
   const recipes = state.recipes;
+  const preferences = useResource<{ preferences: AppPreferences }>('/api/v1/settings/preferences');
+  const [chosenSort, setSort] = React.useState<string | null>(null);
+  const sort =
+    chosenSort ?? preferences.data?.preferences.recipes.defaultSort ?? 'recently-updated';
   const { filters } = useRecipeFilters();
   const filter = filters.scope;
   const category = filters.category;
@@ -99,42 +108,90 @@ export function RecipeLibraryScreen() {
   const params = useLocalSearchParams<{ query?: string }>();
   const [query, setQuery] = React.useState(typeof params.query === 'string' ? params.query : '');
   const { width } = useWindowDimensions();
-  const filtered = recipes.filter((recipe, index) => {
-    const matchesQuery = `${recipe.title} ${recipe.tags.join(' ')} ${recipe.ingredients.join(' ')}`
-      .toLowerCase()
-      .includes(query.toLowerCase());
-    if (!matchesQuery) return false;
-    if (category !== 'all' && recipe.meal !== category) return false;
-    if (
-      selectedTags.length &&
-      !selectedTags.every((tag) => recipe.tags.some((candidate) => candidate.toLowerCase() === tag))
-    )
-      return false;
-    if (selectedCollection) {
-      const collection = state.collections.find((entry) => entry.id === selectedCollection);
-      if (!collection) return false;
-      if (collection.recipes && !collection.recipes.some((entry) => entry.id === recipe.id)) {
-        return false;
-      }
-    }
-    if (filter === 'favorites') return state.favorites.includes(recipe.id);
-    if (filter === 'recent') return index < 6;
-    return true;
-  });
-  const columns = width >= 700 ? 3 : width >= 375 ? 2 : 1;
+  const deferredQuery = React.useDeferredValue(query.trim().toLowerCase());
+  const filtered = React.useMemo(
+    () =>
+      recipes.filter((recipe, index) => {
+        const matchesQuery =
+          `${recipe.title} ${recipe.tags.join(' ')} ${recipe.ingredients.join(' ')}`
+            .toLowerCase()
+            .includes(deferredQuery);
+        if (!matchesQuery) return false;
+        if (
+          category !== 'all' &&
+          !recipe.meal.split(/[,;]/u).some((value) => value.trim() === category)
+        )
+          return false;
+        if (
+          selectedTags.length &&
+          !selectedTags.every((tag) =>
+            recipe.tags.some((candidate) => candidate.toLowerCase() === tag),
+          )
+        )
+          return false;
+        if (selectedCollection) {
+          const collection = state.collections.find((entry) => entry.id === selectedCollection);
+          if (!collection) return false;
+          if (!collection.recipes?.some((entry) => entry.id === recipe.id)) {
+            return false;
+          }
+        }
+        if (filter === 'favorites') return state.favorites.includes(recipe.id);
+        if (filter === 'recent') return index < 6;
+        return true;
+      }),
+    [
+      recipes,
+      deferredQuery,
+      category,
+      selectedTags,
+      selectedCollection,
+      state.collections,
+      state.favorites,
+      filter,
+    ],
+  );
+  const sorted = React.useMemo(() => {
+    const time = (value?: string | null) => (value ? new Date(value).getTime() || 0 : 0);
+    return [...filtered].sort((a, b) => {
+      if (sort === 'alphabetical') return a.title.localeCompare(b.title);
+      if (sort === 'shortest-time') return a.minutes - b.minutes || a.title.localeCompare(b.title);
+      if (sort === 'highest-rated')
+        return (b.personalRating ?? 0) - (a.personalRating ?? 0) || a.title.localeCompare(b.title);
+      const key =
+        sort === 'recently-added'
+          ? 'createdAt'
+          : sort === 'most-recently-cooked'
+            ? 'lastCookedAt'
+            : 'updatedAt';
+      return time(b[key]) - time(a[key]);
+    });
+  }, [filtered, sort]);
+  const columns = Math.min(width, tokens.layout.maxWidth) >= 375 ? 2 : 1;
   const bottomInset = useBottomContentInset();
   return (
     <View style={{ flex: 1, backgroundColor: tokens.color.paper }}>
       <AppHeader title="Recipes" actions={<RecipeCreateMenu />} />
       <FlatList
         contentInsetAdjustmentBehavior="automatic"
-        data={filtered}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        data={sorted}
         numColumns={columns}
         key={columns}
         keyExtractor={(recipe) => recipe.id}
         ListHeaderComponent={
           <View style={{ gap: tokens.space.sm, paddingBottom: tokens.space.md }}>
+            <SyncNotice />
             <Eyebrow>THE SHARED COOKBOOK</Eyebrow>
+            <Button
+              label="Archive & trash"
+              tone="quiet"
+              onPress={() => router.push('/(app)/(recipes)/archive')}
+            />
             <EditorialText variant="display">Recipes</EditorialText>
             <Body muted>{recipes.length} recipes ready for the kitchen.</Body>
             <Search
@@ -149,6 +206,41 @@ export function RecipeLibraryScreen() {
                 Boolean(selectedCollection)
               }
             />
+            <Button
+              label="Advanced filters & bulk export"
+              tone="secondary"
+              onPress={() => router.push('/(app)/(recipes)/explore')}
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {(
+                [
+                  ['recently-updated', 'Updated'],
+                  ['recently-added', 'Newest'],
+                  ['alphabetical', 'A–Z'],
+                  ['shortest-time', 'Quickest'],
+                  ['highest-rated', 'Top rated'],
+                  ['most-recently-cooked', 'Last cooked'],
+                ] as const
+              ).map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: sort === value }}
+                  onPress={() => setSort(value)}
+                  style={{
+                    minHeight: 44,
+                    paddingHorizontal: 16,
+                    justifyContent: 'center',
+                    borderRadius: 22,
+                    backgroundColor: sort === value ? tokens.color.dark : tokens.color.surface,
+                  }}
+                >
+                  <Text style={{ color: sort === value ? tokens.color.inverse : tokens.color.ink }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
               {filtered.length} {filtered.length === 1 ? 'recipe' : 'recipes'} match your filters.
             </Text>
@@ -157,8 +249,12 @@ export function RecipeLibraryScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="magnifyingglass"
-            title="No recipes found"
-            detail="Try another ingredient, title, or tag."
+            title={recipes.length ? 'No recipes found' : 'Your cookbook starts here'}
+            detail={
+              recipes.length
+                ? 'Try another ingredient, title, or tag.'
+                : 'Tap + to write a recipe, import a link, or capture a favourite.'
+            }
           />
         }
         renderItem={({ item }) => (
@@ -837,10 +933,15 @@ export function CaptureScreen() {
     </Screen>
   );
 }
-export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
+export function RecipeFormScreen({ recipe }: { recipe?: Recipe }) {
+  const existing = React.useRef(recipe).current;
   const params = useLocalSearchParams<{ draft?: string }>();
   const { state, dispatch } = useBord();
   const captured = existing ? null : state.recipeDraft;
+  const recipeDefaults = useResource<{ preferences: AppPreferences }>(
+    '/api/v1/settings/preferences',
+  );
+  const servingsEdited = React.useRef(false);
   const actions = useServerActions();
   const { request } = useAuth();
   const { refresh } = useSync();
@@ -854,8 +955,12 @@ export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
       (typeof params.draft === 'string' ? params.draft : ''),
   );
   const [serves, setServes] = React.useState(
-    existing ? String(existing.servings) : (captured?.servings.match(/\d+/u)?.[0] ?? '4'),
+    existing ? (existing.servingsLabel ?? String(existing.servings)) : (captured?.servings ?? '4'),
   );
+  React.useEffect(() => {
+    if (!existing && !captured && !servingsEdited.current && recipeDefaults.data)
+      setServes(String(recipeDefaults.data.preferences.recipes.defaultServings));
+  }, [existing, captured, recipeDefaults.data]);
   const [prepMinutes, setPrepMinutes] = React.useState(
     String(
       existing?.prepMinutes ??
@@ -895,10 +1000,9 @@ export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
     }
   };
   const save = async () => {
-    const parsedServings = Number.parseInt(serves, 10);
-    const parsedPrep = Number.parseInt(prepMinutes, 10);
-    const parsedCook = Number.parseInt(cookMinutes, 10);
-    const parsedRest = Number.parseInt(restMinutes, 10);
+    const parsedPrep = Number(prepMinutes);
+    const parsedCook = Number(cookMinutes);
+    const parsedRest = Number(restMinutes);
     const ingredientLines = ingredients
       .split('\n')
       .map((line) => line.trim())
@@ -907,8 +1011,16 @@ export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean);
-    if (!title.trim() || !Number.isFinite(parsedServings) || parsedServings < 1) {
+    if (!title.trim() || !serves.trim() || serves.trim().length > 80) {
       Alert.alert('Check the recipe', 'Add a recipe name and a valid serving count.');
+      return;
+    }
+    if (
+      ![parsedPrep, parsedCook, parsedRest].every(
+        (value) => Number.isInteger(value) && value >= 0 && value <= 10080,
+      )
+    ) {
+      Alert.alert('Check cooking times', 'Use whole minutes between 0 and 10,080.');
       return;
     }
     if (!ingredientLines.length || !stepLines.length) {
@@ -921,7 +1033,7 @@ export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
         {
           title: title.trim(),
           summary: note.trim(),
-          servings: String(parsedServings),
+          servings: serves.trim(),
           prepMinutes: Number.isFinite(parsedPrep) ? Math.max(0, parsedPrep) : 0,
           cookMinutes: Number.isFinite(parsedCook) ? Math.max(0, parsedCook) : 0,
           restMinutes: Number.isFinite(parsedRest) ? Math.max(0, parsedRest) : 0,
@@ -1011,7 +1123,10 @@ export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
                 <FormField
                   label="Serves"
                   value={serves}
-                  onChangeText={setServes}
+                  onChangeText={(value) => {
+                    servingsEdited.current = true;
+                    setServes(value);
+                  }}
                   keyboardType="number-pad"
                 />
               </View>
@@ -1073,27 +1188,29 @@ export function RecipeFormScreen({ recipe: existing }: { recipe?: Recipe }) {
   );
 }
 export function RecipeDetailScreen({ recipe }: { recipe: Recipe }) {
-  const { state, dispatch } = useBord();
+  const { state } = useBord();
   const { request } = useAuth();
   const { refresh } = useSync();
   const actions = useServerActions();
   const favorite = state.favorites.includes(recipe.id);
   const [moreOpen, setMoreOpen] = React.useState(false);
-  const duplicate = () => {
-    dispatch({
-      type: 'set-recipe-draft',
-      draft: {
-        title: `${recipe.title} copy`,
-        summary: recipe.subtitle,
-        servings: String(recipe.servings),
-        prepMinutes: recipe.prepMinutes ?? 0,
-        cookMinutes: recipe.cookMinutes ?? recipe.minutes,
-        restMinutes: recipe.restMinutes ?? 0,
-        ingredients: recipe.ingredients,
-        steps: recipe.steps,
-      },
-    });
-    router.push('/(app)/(recipes)/new');
+  const [duplicating, setDuplicating] = React.useState(false);
+  const duplicate = async () => {
+    if (duplicating || state.offline) return;
+    setDuplicating(true);
+    try {
+      const result = await request<{ recipe: { id: string } }>(
+        `/api/v1/recipes/${encodeURIComponent(recipe.id)}/duplicate`,
+        { method: 'POST' },
+      );
+      setMoreOpen(false);
+      await refresh();
+      router.push(`/(app)/(recipes)/${result.recipe.id}/edit`);
+    } catch (error) {
+      Alert.alert('Recipe not duplicated', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setDuplicating(false);
+    }
   };
   const addToCollection = async (collectionId: string) => {
     setMoreOpen(false);
@@ -1160,7 +1277,11 @@ export function RecipeDetailScreen({ recipe }: { recipe: Recipe }) {
                 icon="pencil"
                 onPress={() => router.push(`/(app)/(recipes)/${recipe.id}/edit`)}
               />
-              <RecipeMenuRow label="Duplicate as draft" icon="doc.on.doc" onPress={duplicate} />
+              <RecipeMenuRow
+                label={duplicating ? 'Duplicating…' : 'Duplicate recipe'}
+                icon="doc.on.doc"
+                onPress={() => void duplicate()}
+              />
               {state.collections.map((collection) => (
                 <RecipeMenuRow
                   key={collection.id}
@@ -1205,12 +1326,14 @@ export function RecipeDetailScreen({ recipe }: { recipe: Recipe }) {
                 label="Add to plan"
                 tone="secondary"
                 icon="calendar"
-                onPress={() => router.push('/(app)/(plan)')}
+                onPress={() =>
+                  router.push({ pathname: '/(app)/(plan)', params: { recipeId: recipe.id } })
+                }
               />
             </View>
             <View style={{ flex: 1 }}>
               <Button
-                label="Add to list"
+                label="Shopping lists"
                 tone="secondary"
                 icon="list.bullet"
                 onPress={() => router.push('/(app)/(lists)')}
@@ -1331,6 +1454,7 @@ export function RecipeDetailScreen({ recipe }: { recipe: Recipe }) {
             );
           })}
         </Surface>
+        <RecipeTools recipe={recipe} />
       </Screen>
     </View>
   );
@@ -1368,8 +1492,15 @@ function RecipeMenuRow({
     </Pressable>
   );
 }
-export function CookScreen({ recipe }: { recipe: Recipe }) {
+export function CookScreen({
+  recipe,
+  mealPlanEntryId,
+}: {
+  recipe: Recipe;
+  mealPlanEntryId?: string;
+}) {
   const { state, dispatch } = useBord();
+  useScreenAwake(Boolean(state.settings['recipe.keepAwake']));
   const { request } = useAuth();
   const { refresh } = useSync();
   const [cookSession, setCookSession] = React.useState<{
@@ -1392,7 +1523,11 @@ export function CookScreen({ recipe }: { recipe: Recipe }) {
       };
     }>('/api/v1/cook-sessions', {
       method: 'POST',
-      body: JSON.stringify({ recipeId: recipe.id, targetServings: recipe.servings }),
+      body: JSON.stringify({
+        recipeId: recipe.id,
+        targetServings: recipe.servings,
+        mealPlanEntryId,
+      }),
     })
       .then((result) => {
         if (!cancelled)
@@ -1408,7 +1543,7 @@ export function CookScreen({ recipe }: { recipe: Recipe }) {
     return () => {
       cancelled = true;
     };
-  }, [recipe.id, recipe.servings, request]);
+  }, [recipe.id, recipe.servings, request, mealPlanEntryId]);
   const complete = (usePantry: boolean) => {
     if (!cookSession) {
       Alert.alert('Cook session is not ready', sessionError ?? 'Wait a moment and try again.');

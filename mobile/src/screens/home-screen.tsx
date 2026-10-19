@@ -1,3 +1,4 @@
+import { localDate } from '@/data/planner';
 import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
@@ -24,7 +25,10 @@ export function HomeScreen() {
   const { refresh, refreshing } = useSync();
   const { width } = useWindowDimensions();
   const recipes = state.recipes;
-  const next = recipes.find((recipe) => recipe.id === state.mealPlan[0]?.recipeId) ?? recipes[0];
+  const nextMeal = state.mealPlan
+    .filter((meal) => meal.date && meal.date >= localDate(new Date()))
+    .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))[0];
+  const next = recipes.find((recipe) => recipe.id === nextMeal?.recipeId) ?? recipes[0];
   return (
     <Screen>
       <AppHeader title="Home" />
@@ -42,7 +46,7 @@ export function HomeScreen() {
         <Surface elevated style={{ gap: tokens.space.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm }}>
             <View style={{ flex: 1, gap: 3 }}>
-              <Eyebrow>UP NEXT</Eyebrow>
+              <Eyebrow>{nextMeal?.recipeId === next.id ? 'UP NEXT' : 'FROM YOUR COOKBOOK'}</Eyebrow>
               <EditorialText variant="section">{next.title}</EditorialText>
               <Text selectable style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
                 {next.minutes} min · {next.meal.toLowerCase()}

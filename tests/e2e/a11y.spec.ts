@@ -52,12 +52,17 @@ test('first-run setup and household organization have no automatically detectabl
   await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
 
   await page.goto('/recipes/new');
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await page.getByLabel('Recipe name').fill('Accessible rich soup');
   await page.getByLabel('Ingredient 1-1 item').fill('tomatoes');
   await page.getByLabel('Method section 1, step 1').fill('Simmer.');
   await page.getByLabel('Equipment (one item per line, optional)').fill('Large pot');
   await page.getByLabel('Calories (kcal)').fill('180');
-  await page.getByRole('button', { name: 'Add to the cookbook' }).click();
+  await page.getByRole('button', { name: 'Add recipe', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Accessible rich soup' })).toBeVisible();
   const recipeDetailResults = await axe(page).analyze();
   expect(recipeDetailResults.violations).toEqual([]);
@@ -136,9 +141,9 @@ test('first-run setup and household organization have no automatically detectabl
       }),
     });
   });
-  await page.getByRole('tab', { name: 'From URL' }).click();
+  await page.getByRole('button', { name: 'Recipe link', exact: true }).click();
   await page.getByLabel('Public recipe URL').fill('https://recipes.example.test/soup');
-  await page.getByRole('button', { name: 'Find and normalize with AI' }).click();
+  await page.getByRole('button', { name: 'Import recipe with AI' }).click();
   const urlCandidateResults = await axe(page).analyze();
   expect(urlCandidateResults.violations).toEqual([]);
 });

@@ -1,0 +1,81 @@
+.panel {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--field);
+  min-width: 0;
+}
+.panel > header {
+  display: grid;
+  gap: 0.75rem;
+}
+.panel h2 {
+  margin: 0;
+  font:
+    500 var(--panel-title-size)/1.25 var(--font-display, Georgia),
+    serif;
+}
+.panel p {
+  margin: 0;
+  line-height: 1.5;
+}
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.inlineActions button {
+  min-height: 44px;
+  box-shadow: none;
+}
+.currentWeight {
+  display: grid;
+  gap: 0.4rem;
+}
+.currentWeight > strong {
+  font-size: 1.7rem;
+}
+.currentWeight > strong > small {
+  font-size: 1rem;
+  font-weight: 400;
+}
+.currentWeight > span,
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.hint {
+  margin: 0.5rem 0;
+}
+.hint > p {
+  margin-bottom: 0.5rem;
+}
+.hint > a {
+  display: inline-block;
+  margin: 0.4rem 0;
+}
+.review {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  gap: 0.65rem;
+  margin: 0.75rem 0;
+}
+.review > div {
+  min-width: 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.review dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.review dd {
+  margin: 0.3rem 0 0;
+  font-weight: 600;
+  font-size: 1rem;
+}

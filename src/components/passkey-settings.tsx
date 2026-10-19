@@ -5,8 +5,6 @@ import { authClient } from '@/lib/auth/client';
 import { AsyncSkeleton, ButtonSpinner } from './skeleton';
 import {
   SettingsPane,
-  SettingsRow,
-  SettingsField,
   SettingsSubsection,
   SettingsItem,
   SettingsEmpty,
@@ -65,6 +63,7 @@ export function PasskeySettings() {
       setKeys((current) => current.filter((key) => key.id !== id));
       setRemoveId(null);
       setMessage('Passkey removed.');
+      requestAnimationFrame(() => document.getElementById('saved-passkeys')?.focus());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Passkey could not be removed.');
     } finally {
@@ -77,22 +76,17 @@ export function PasskeySettings() {
       description="Use a device or password manager to sign in to your account without entering your password."
       icon={<KeyRound size={20} />}
     >
-      <SettingsField
-        title="Passkey name"
-        description="Choose a name that helps you recognize this device or password manager."
-      >
-        <input
-          value={name}
-          maxLength={64}
-          placeholder="For example, my laptop"
-          disabled={loading || pending !== null}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </SettingsField>
-      <SettingsRow
-        title="Add a passkey"
-        description="Your browser will guide you through the device’s sign-in confirmation."
-      >
+      <div className="settings-passkey-create">
+        <label>
+          Passkey name (optional)
+          <input
+            value={name}
+            maxLength={64}
+            placeholder="For example, my laptop"
+            disabled={loading || pending !== null}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
         <button
           className="secondary-button"
           type="button"
@@ -103,8 +97,11 @@ export function PasskeySettings() {
           {pending === 'add' ? <ButtonSpinner /> : <Plus size={17} />}
           {pending === 'add' ? 'Adding…' : 'Add passkey'}
         </button>
-      </SettingsRow>
+      </div>
+      <p>Your browser or password manager will confirm registration.</p>
       <SettingsSubsection
+        id="saved-passkeys"
+        tabIndex={-1}
         title="Saved passkeys"
         description="These sign-in methods belong to the account you are signed in to."
         actions={
@@ -142,7 +139,14 @@ export function PasskeySettings() {
                       className="text-button"
                       type="button"
                       disabled={pending !== null}
-                      onClick={() => setRemoveId(null)}
+                      onClick={() => {
+                        setRemoveId(null);
+                        requestAnimationFrame(() =>
+                          document
+                            .querySelector<HTMLButtonElement>(`[data-passkey-id="${key.id}"]`)
+                            ?.focus(),
+                        );
+                      }}
                     >
                       Keep passkey
                     </button>
@@ -162,6 +166,7 @@ export function PasskeySettings() {
                     className="text-button"
                     type="button"
                     disabled={pending !== null}
+                    data-passkey-id={key.id}
                     onClick={() => setRemoveId(key.id)}
                     aria-label={`Remove ${key.name || 'passkey'}`}
                   >

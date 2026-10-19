@@ -1,6 +1,7 @@
 'use client';
 
-import { Archive, Copy, List, MoreHorizontal, Settings } from 'lucide-react';
+import { DismissibleDetails } from './dismissible-details';
+import { Archive, Copy, List, MoreHorizontal, Settings, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
@@ -39,7 +40,10 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
     setBusy('rename');
     try {
       await request({ action: 'rename', name: name.trim() });
-      detailsRef.current?.removeAttribute('open');
+      if (detailsRef.current) {
+        detailsRef.current.open = false;
+        detailsRef.current.querySelector('summary')?.focus();
+      }
       showToast('List renamed.', 'success');
       router.refresh();
     } catch (error) {
@@ -58,7 +62,10 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
     setBusy(action);
     try {
       const result = await request({ action });
-      detailsRef.current?.removeAttribute('open');
+      if (detailsRef.current) {
+        detailsRef.current.open = false;
+        detailsRef.current.querySelector('summary')?.focus();
+      }
       if (action === 'duplicate') router.push(`/lists/${result.id}`);
       else router.push('/lists');
     } catch (error) {
@@ -71,10 +78,15 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
   }
 
   return (
-    <details className={styles.mobileListMenu} ref={detailsRef}>
-      <summary aria-label="More list options">
-        <MoreHorizontal />
-      </summary>
+    <DismissibleDetails
+      className={styles.mobileListMenu}
+      detailsRef={detailsRef}
+      viewportPanel
+      summaryAriaLabel="More list options"
+      expandedSummaryAriaLabel="Close list options"
+      summary={<MoreHorizontal />}
+      expandedSummary={<X />}
+    >
       <div className={styles.mobileListMenuPanel}>
         <strong>List options</strong>
         <form onSubmit={(event) => void rename(event)}>
@@ -86,10 +98,7 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
               maxLength={120}
               onChange={(event) => setName(event.target.value)}
             />
-            <button
-              type="submit"
-              disabled={busy === 'rename' || !name.trim() || name.trim() === listName}
-            >
+            <button type="submit" disabled={!!busy || !name.trim() || name.trim() === listName}>
               Save
             </button>
           </div>
@@ -116,6 +125,6 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
           Archive list
         </button>
       </div>
-    </details>
+    </DismissibleDetails>
   );
 }

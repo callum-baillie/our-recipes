@@ -6,26 +6,42 @@ export const NASEM_EER_SOURCE_URL = 'https://www.nationalacademies.org/read/2681
 
 export const adultPalCategorySchema = z.enum(['inactive', 'low_active', 'active', 'very_active']);
 
-export const nutritionEnergyEstimateRequestSchema = z.discriminatedUnion('action', [
-  z
-    .object({
-      action: z.literal('preview'),
-      expectedProfileVersion: z.number().int().positive(),
-      effectiveOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
-      palCategory: adultPalCategorySchema,
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal('apply'),
-      expectedProfileVersion: z.number().int().positive(),
-      effectiveOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
-      palCategory: adultPalCategorySchema,
-      operationId: z.string().uuid(),
-      supersedesGoalVersionId: z.string().uuid().nullable().default(null),
-    })
-    .strict(),
-]);
+export const nutritionEnergyEstimateRequestSchema = z
+  .discriminatedUnion('action', [
+    z
+      .object({
+        action: z.literal('preview'),
+        expectedProfileVersion: z.number().int().positive(),
+        effectiveOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        palCategory: adultPalCategorySchema,
+      })
+      .strict(),
+    z
+      .object({
+        action: z.literal('apply'),
+        expectedProfileVersion: z.number().int().positive(),
+        effectiveOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        palCategory: adultPalCategorySchema,
+        operationId: z.string().uuid(),
+        supersedesGoalVersionId: z.string().uuid().nullable().default(null),
+        planningAdjustmentKcal: z
+          .union([z.literal(-500), z.literal(-250), z.literal(250), z.literal(500)])
+          .optional(),
+        reviewedTargetKcal: z.number().finite().positive().max(1_000_000).optional(),
+      })
+      .strict(),
+  ])
+  .superRefine((input, context) => {
+    if (
+      input.action === 'apply' &&
+      (input.planningAdjustmentKcal === undefined) !== (input.reviewedTargetKcal === undefined)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['reviewedTargetKcal'],
+        message: 'An adjusted estimate must include the reviewed target and adjustment together.',
+      });
+  });
 
 export type AdultPalCategory = z.infer<typeof adultPalCategorySchema>;
 export type NutritionEnergyEstimateRequest = z.infer<typeof nutritionEnergyEstimateRequestSchema>;

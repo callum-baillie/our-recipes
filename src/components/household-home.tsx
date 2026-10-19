@@ -48,6 +48,9 @@ export function HouseholdHome({
   filters,
   nextMeal,
 }: HouseholdHomeProps) {
+  const libraryParams = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
+  const libraryHref = `/recipes?${libraryParams}`;
+  const hasFilters = Boolean(filters.q || filters.tag || filters.category);
   const eagerRecentRecipeId = recentRecipes.find((recipe) => recipe.image)?.id;
 
   return (
@@ -56,13 +59,11 @@ export function HouseholdHome({
         <div>
           <p className="eyebrow">{household.kitchenName.toUpperCase()} · THE SHARED COOKBOOK</p>
           <h1 id="home-title">Welcome to the kitchen, {activeProfileName}.</h1>
-          <p>
-            Keep the recipes you actually cook, plan the week around them, and share one calm
-            kitchen notebook with your household.
-          </p>
+          <p>Your saved recipes and a little help planning what comes next.</p>
           <div className="home-actions">
             <AddRecipeTrigger open={addRecipeOpen} />
           </div>
+          <HomeRecipeFilters filters={filters} tags={tags} />
         </div>
 
         <aside className="home-plan-card" aria-label="Upcoming meal plan">
@@ -75,6 +76,7 @@ export function HouseholdHome({
                 <div>
                   <span>Up next in your meal plan</span>
                   <strong>{displayMealDate(nextMeal.plannedFor)}</strong>
+                  <span>{nextMeal.meal}</span>
                 </div>
               </div>
               {nextMeal.recipe ? (
@@ -108,7 +110,6 @@ export function HouseholdHome({
                 <>
                   <h2>Start with one recipe.</h2>
                   <p>Add something you already cook, then plan it when you are ready.</p>
-                  <AddRecipeTrigger open={addRecipeOpen} />
                 </>
               )}
             </div>
@@ -127,7 +128,11 @@ export function HouseholdHome({
           </Link>
         </div>
         {recentRecipes.length ? (
-          <div className="home-recipe-grid recent-grid">
+          <div
+            className="home-recipe-grid recent-grid"
+            tabIndex={0}
+            aria-label={`${recentRecipes.length} recent recipes. Scroll for more.`}
+          >
             {recentRecipes.map((recipe) => (
               <RecipeSummaryCard
                 recipe={recipe}
@@ -145,21 +150,21 @@ export function HouseholdHome({
         )}
       </section>
 
-      {recipeTotal > 0 ? (
+      {recipeTotal > 0 || hasFilters ? (
         <section className="home-library-section all-recipes" aria-labelledby="all-recipes-title">
           <div className="home-section-heading">
             <div>
               <p className="eyebrow">THE SHARED COOKBOOK</p>
               <h2 id="all-recipes-title">All recipes</h2>
               <span>
-                {recipeTotal} recipe{recipeTotal === 1 ? '' : 's'} found
+                Showing {recipes.length} of {recipeTotal} matching recipe
+                {recipeTotal === 1 ? '' : 's'}
               </span>
             </div>
-            <Link className="text-button" href="/recipes">
-              Advanced filters <ChevronRight size={16} aria-hidden="true" />
+            <Link className="text-button" href={libraryHref}>
+              Search in library <ChevronRight size={16} aria-hidden="true" />
             </Link>
           </div>
-          <HomeRecipeFilters filters={filters} tags={tags} />
           {recipes.length ? (
             <div className="home-recipe-grid all-recipes-grid">
               {recipes.map((recipe) => (
@@ -175,11 +180,9 @@ export function HouseholdHome({
               </Link>
             </div>
           )}
-          {recipeTotal > recipes.length ? (
-            <Link className="home-view-all primary-button" href="/recipes">
-              View all {recipeTotal} recipes
-            </Link>
-          ) : null}
+          <Link className="home-view-all text-button" href={libraryHref}>
+            View all recipes <ChevronRight size={16} aria-hidden="true" />
+          </Link>
         </section>
       ) : null}
 

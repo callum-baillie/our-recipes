@@ -1,242 +1,76 @@
 .panel {
-  padding: 0;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 0.7rem;
-  box-shadow: none;
+  min-width: 0;
 }
-
-.panel :global(.settings-pane-body) {
-  padding: 0;
+.form {
+  display: grid;
+  gap: 1rem;
 }
-
-.panel header {
-  max-width: 54rem;
-  margin-bottom: 0.8rem;
-}
-
-.eyebrow {
-  color: var(--leaf);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-@media (prefers-color-scheme: dark) {
-  :global(html:not([data-theme='light'])) .eyebrow {
-    color: var(--accent-text);
-  }
-}
-
-:global(html[data-theme='dark']) .eyebrow {
-  color: var(--accent-text);
-}
-
-.form,
 .form fieldset {
+  min-width: 0;
+}
+.grid {
+  display: block;
+}
+.grid textarea {
+  min-height: 5rem;
+}
+.checks {
+  display: grid;
+}
+.notice {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin-block: 0.5rem;
+}
+.warning {
+  padding: 0.75rem;
+  border-left: 3px solid var(--warning-border);
+  background: var(--linen);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.disclosure {
+  min-width: 0;
+}
+.estimateBox {
+  padding-block: 1rem;
   display: grid;
   gap: 0.75rem;
 }
-
-.form > :global(.settings-action-bar) {
-  margin-inline: 0;
+.estimateBox > h3,
+.estimateResult > h4 {
+  margin: 0;
+  font: 650 1rem/1.4 inherit;
 }
-
-.disclosure {
-  min-width: 0;
+.estimateBox p {
+  margin-block: 0.4rem;
+  line-height: 1.55;
+}
+.estimateBox li {
+  margin-block: 0.75rem;
+}
+.estimateResult {
+  padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 0.65rem;
-  background: color-mix(in srgb, var(--field) 72%, transparent);
+  background: var(--linen);
+  border-radius: 0.6rem;
 }
-
-.disclosure > summary {
-  padding: 0.7rem 0.8rem;
-  cursor: pointer;
-  color: var(--ink);
-  font-weight: 800;
-}
-
-.disclosure[open] > summary {
-  border-bottom: 1px solid var(--line);
-}
-
-.disclosure > fieldset {
-  border: 0;
-  border-radius: 0;
-}
-
-.form fieldset {
-  min-width: 0;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 0.65rem;
-}
-
-.form legend {
-  padding: 0 0.4rem;
-  font-weight: 800;
-}
-
-.grid {
+.heightGroup {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  border: 0;
+  margin: 0;
+  padding: 0;
 }
-
-.grid label,
-.checks,
-.inlineCheck {
-  display: grid;
-  gap: 0.4rem;
-  font-weight: 700;
-}
-
-.grid label span {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.grid input,
-.grid select,
-.grid textarea {
-  width: 100%;
-}
-
-.grid textarea {
-  min-height: 5.5rem;
-  resize: vertical;
-}
-
-.checks label,
-.inlineCheck {
-  grid-template-columns: auto 1fr;
-  align-items: start;
+.heightGroup legend {
+  font-size: 0.9rem;
   font-weight: 650;
+  padding-block: 0.75rem;
 }
-
-.checks input,
-.inlineCheck input {
-  margin-top: 0.25rem;
-}
-
-.notice,
-.warning {
-  margin: 0;
-  padding: 0.8rem;
-  background: var(--paper);
-  border-left: 0.25rem solid var(--tomato);
-  border-radius: 0.25rem;
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.warning {
-  border-left-color: var(--warning-border);
-}
-
-.status {
-  min-height: 1.5rem;
-  margin: 0;
-  color: var(--muted);
-}
-
-.estimateBox,
-.estimateResult {
+.heightGroup :global(.settings-field) {
   display: grid;
-  gap: 0.65rem;
-  padding: 0.75rem;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 0.6rem;
-}
-
-.estimateBox label,
-.estimateResult label {
-  display: grid;
-  gap: 0.4rem;
-  font-weight: 700;
-}
-
-.estimateBox h3,
-.estimateResult h4,
-.estimateBox p,
-.estimateResult p {
-  margin: 0;
-}
-
-.estimateResult {
-  background: var(--leaf-pale);
-}
-
-.choiceGroup {
-  grid-column: 1 / -1;
-  padding: 0.85rem !important;
-  background: var(--paper);
-}
-
-.choiceGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.5rem;
-}
-
-.choiceGrid label {
-  display: flex;
-  align-items: start;
-  gap: 0.55rem;
-  min-width: 0;
-  padding: 0.5rem;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-}
-
-.choiceGrid input {
-  width: auto;
-  margin-top: 0.15rem;
-}
-
-.choiceGrid span {
-  display: grid;
-  gap: 0.1rem;
-  color: var(--ink) !important;
-}
-
-.choiceGrid small,
-.choiceGroup > p {
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 600;
-}
-
-.choiceGroup > p {
-  margin: 0;
-}
-
-@media (max-width: 720px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.grid > *,
-.grid label {
-  min-width: 0;
-}
-.grid input:not([type='checkbox']):not([type='radio']),
-.grid select,
-.grid textarea {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-.choiceGrid {
-  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
-}
-@media (max-width: 700px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  grid-template-columns: 1fr;
+  border: 0 !important;
 }

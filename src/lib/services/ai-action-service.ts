@@ -98,7 +98,7 @@ const generatedPlanPayloadSchema = z
           })
           .strict(),
       )
-      .max(35)
+      .max(280)
       .default([]),
   })
   .strict();

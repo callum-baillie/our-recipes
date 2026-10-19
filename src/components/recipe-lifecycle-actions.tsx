@@ -28,6 +28,13 @@ export function RecipeLifecycleActions({
   const [rating, setRating] = useState<number | null>(personalPreference?.rating ?? null);
   const [note, setNote] = useState(personalPreference?.note ?? '');
   const [preferenceSaved, setPreferenceSaved] = useState(false);
+  const [ratingDirty, setRatingDirty] = useState(false);
+  const serverRating = personalPreference?.rating ?? null;
+  const [previousServerRating, setPreviousServerRating] = useState(serverRating);
+  if (previousServerRating !== serverRating) {
+    setPreviousServerRating(serverRating);
+    if (!ratingDirty) setRating(serverRating);
+  }
 
   async function duplicate() {
     setPendingAction('duplicate');
@@ -92,6 +99,7 @@ export function RecipeLifecycleActions({
         return;
       }
       setRating(body.preference.rating);
+      setRatingDirty(false);
       setNote(body.preference.note);
       setPreferenceSaved(true);
       router.refresh();
@@ -163,7 +171,8 @@ export function RecipeLifecycleActions({
           <div>
             <strong>Your kitchen notes</strong>
             <p>
-              Only this profile can see these notes and rating. They are not exported or versioned.
+              Your rating and Like/Staple reflect the same personal preference. Save the rating and
+              private note together; neither is exported or versioned.
             </p>
           </div>
           <div className="recipe-star-rating" role="group" aria-label="Your rating">
@@ -178,7 +187,11 @@ export function RecipeLifecycleActions({
                 onMouseLeave={() => setHoverRating(null)}
                 onFocus={() => setHoverRating(value)}
                 onBlur={() => setHoverRating(null)}
-                onClick={() => void savePersonalPreference(value)}
+                onClick={() => {
+                  setRating(value);
+                  setRatingDirty(true);
+                  setPreferenceSaved(false);
+                }}
               >
                 <Star
                   size={25}
@@ -207,7 +220,7 @@ export function RecipeLifecycleActions({
               aria-busy={pendingAction === 'preference'}
             >
               {pendingAction === 'preference' ? <ButtonSpinner /> : null}
-              {pendingAction === 'preference' ? 'Saving…' : 'Save note'}
+              {pendingAction === 'preference' ? 'Saving…' : 'Save rating and note'}
             </button>
             {preferenceSaved && <span role="status">Saved for your profile.</span>}
           </div>

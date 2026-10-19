@@ -1,0 +1,93 @@
+/* Header and footer never share the body's scroll layer. */
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  height: min(48rem, calc(var(--dialog-viewport-height, 100dvh) - 1.5rem));
+  padding: 0;
+  overflow: hidden;
+}
+.dialog > :first-child {
+  flex: 0 0 auto;
+}
+.form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem;
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+  scroll-padding-block: 1rem;
+}
+.form :global(.library-dialog-actions) {
+  flex: 0 0 auto;
+  padding: 1rem 1.25rem max(1rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--linen);
+}
+.group {
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+.group h3 {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+.group summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+.group summary::after {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid;
+  border-bottom: 1.5px solid;
+  transform: rotate(45deg);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.group[open] summary::after {
+  transform: rotate(225deg);
+}
+.group summary > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  max-width: 75%;
+}
+.groupBody {
+  padding-top: 0.75rem;
+}
+.groupBody p {
+  font-size: 0.85rem;
+  margin: 0 0 0.8rem;
+}
+.activeSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+  margin-top: 0.75rem;
+  color: var(--muted);
+}
+@media (max-width: 650px) {
+  .body {
+    padding: 1rem;
+  }
+}

@@ -3,6 +3,10 @@ import type { ImageSourcePropType } from 'react-native';
 export type Recipe = {
   id: string;
   revision?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  lastCookedAt?: string | null;
+  personalRating?: number | null;
   title: string;
   subtitle: string;
   minutes: number;
@@ -10,6 +14,7 @@ export type Recipe = {
   cookMinutes?: number;
   restMinutes?: number;
   servings: number;
+  servingsLabel?: string;
   meal: string;
   image: ImageSourcePropType;
   tags: string[];
@@ -117,6 +122,11 @@ export type ShoppingItem = {
   policyBreakdown?: ShoppingPolicyBreakdown | null;
 };
 export type ShoppingList = {
+  settings?: {
+    keepScreenAwake: boolean;
+    openPantryPurchaseOnCheck: boolean;
+    completedItemsBehavior: string;
+  };
   id: string;
   name: string;
   status: 'active' | 'planned' | 'completed';

@@ -1,8 +1,8 @@
 import 'server-only';
-import { getEffectiveAiPolicy, getUserAiPolicy } from './ai-access-service';
+import { getEffectiveAiPolicy } from './ai-access-service';
 import { eq } from 'drizzle-orm';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
-import { taskPreferences, aiUserSettings } from '@/lib/db/schema';
+import { taskPreferences } from '@/lib/db/schema';
 import { taskSettingsSchema, type TaskSettings } from '@/lib/domain/task-settings';
 import type { RequestPrincipal } from './auth-service';
 export function getTaskSettings(profileId: string) {
@@ -48,30 +48,10 @@ export function saveTaskSettings(
       .get();
     if ((current?.version ?? 0) !== expectedVersion)
       throw new Error('These settings changed. Reload before saving.');
+    // Scheduling owns only scheduling. Compatibility fields cannot overwrite AI preferences.
     const effective = getEffectiveAiPolicy(profileId);
-    if (
-      parsed.executionMode !== effective.executionMode ||
-      parsed.batchMinItems !== effective.batchMinItems
-    ) {
-      const account = getUserAiPolicy(principal.userId);
-      const preferences = {
-        ...account.preferences,
-        processing: { executionMode: parsed.executionMode, batchMinItems: parsed.batchMinItems },
-      };
-      transaction
-        .insert(aiUserSettings)
-        .values({
-          userId: principal.userId,
-          enabled: account.enabled,
-          preferences: JSON.stringify(preferences),
-          version: account.version + 1,
-        })
-        .onConflictDoUpdate({
-          target: aiUserSettings.userId,
-          set: { preferences: JSON.stringify(preferences), version: account.version + 1 },
-        })
-        .run();
-    }
+    parsed.executionMode = effective.executionMode;
+    parsed.batchMinItems = effective.batchMinItems;
     transaction
       .insert(taskPreferences)
       .values({

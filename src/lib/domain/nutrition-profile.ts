@@ -1,3 +1,4 @@
+import { validTimeZone } from './regional';
 import { bodyMetricsSchema, bodyMetricsError } from './body-metrics';
 import { z } from 'zod';
 
@@ -81,7 +82,13 @@ const nutritionProfileSettingsShape = {
   estimatedTargetConsent: z.boolean().default(false),
   weightTrackingEnabled: z.boolean().default(false),
   preferredEnergyUnit: z.enum(['kcal', 'kJ']).default('kcal'),
-  dailyResetTimezone: z.string().trim().min(1).max(100).default('UTC'),
+  dailyResetTimezone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .refine(validTimeZone, 'Choose a valid Nutrition time zone.')
+    .default('UTC'),
   weekStartsOn: z.number().int().min(0).max(6).default(1),
   referenceJurisdiction: z.string().trim().min(2).max(20).default('US'),
   visibleNutrientCodes: nutritionVisibleNutrientCodesSchema.default([

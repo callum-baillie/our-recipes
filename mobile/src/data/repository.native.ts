@@ -7,13 +7,16 @@ export interface BordRepository {
 }
 
 export function createExpoRepository(): BordRepository {
-  const database = SQLite.openDatabaseSync('bord-mobile.db');
-  database.execSync(
-    'CREATE TABLE IF NOT EXISTS app_state (id TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)',
-  );
+  const ready = SQLite.openDatabaseAsync('bord-mobile.db').then(async (database) => {
+    await database.execAsync(
+      'CREATE TABLE IF NOT EXISTS app_state (id TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)',
+    );
+    return database;
+  });
   return {
     async read(scope) {
-      const row = database.getFirstSync<{ value: string }>(
+      const database = await ready;
+      const row = await database.getFirstAsync<{ value: string }>(
         'SELECT value FROM app_state WHERE id = ?',
         [scope],
       );
@@ -21,12 +24,13 @@ export function createExpoRepository(): BordRepository {
       try {
         return JSON.parse(row.value) as BordState;
       } catch {
-        database.runSync('DELETE FROM app_state WHERE id = ?', [scope]);
+        await database.runAsync('DELETE FROM app_state WHERE id = ?', [scope]);
         return null;
       }
     },
     async write(scope, state) {
-      database.runSync('INSERT OR REPLACE INTO app_state (id, value) VALUES (?, ?)', [
+      const database = await ready;
+      await database.runAsync('INSERT OR REPLACE INTO app_state (id, value) VALUES (?, ?)', [
         scope,
         JSON.stringify(state),
       ]);

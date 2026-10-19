@@ -1,4 +1,6 @@
 .dialog {
+  --dialog-overflow: hidden;
+  --dialog-bottom-padding: 0;
   box-sizing: border-box;
   width: min(42rem, calc(100vw - 2rem));
   max-height: calc(var(--dialog-viewport-height, 100dvh) - 2rem);
@@ -21,6 +23,8 @@
 }
 @media (max-width: 600px) {
   .dialog {
+    --dialog-overflow: hidden;
+    --dialog-bottom-padding: 0;
     width: calc(100vw - 1rem);
     max-height: calc(var(--dialog-viewport-height, 100dvh) - 1rem);
     border-radius: 1rem;

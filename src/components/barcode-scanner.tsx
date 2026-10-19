@@ -12,12 +12,14 @@ type ScannerProps = {
   rapid?: boolean;
   onRapidChange?: (value: boolean) => void;
   disabled?: boolean;
+  onSearchRequest?: () => void;
 };
 export function BarcodeScanner({
   onDetected,
   rapid = false,
   onRapidChange,
   disabled = false,
+  onSearchRequest,
 }: ScannerProps) {
   const [active, setActive] = useState(false);
   const [secure] = useState(
@@ -30,7 +32,12 @@ export function BarcodeScanner({
     return (
       <div className={styles.cameraFallback} role="status">
         <CameraOff aria-hidden="true" />
-        <p>Camera scanning needs a trusted HTTPS connection. Enter the barcode instead.</p>
+        <p>Camera scanning needs a trusted HTTPS connection.</p>
+        {onSearchRequest && (
+          <button type="button" onClick={onSearchRequest}>
+            Search / Enter barcode
+          </button>
+        )}
       </div>
     );
 
@@ -52,7 +59,13 @@ export function BarcodeScanner({
               checked={rapid}
               onChange={(event) => onRapidChange(event.target.checked)}
             />{' '}
-            Rapid scan
+            <span>
+              Scan several items
+              <small>
+                Queue packages for review. Stock is added only after confirmation; expiry stays
+                unknown.
+              </small>
+            </span>
           </label>
         ) : null}
       </div>
@@ -64,6 +77,7 @@ export function BarcodeScanner({
       rapid={rapid}
       onRapidChange={onRapidChange}
       disabled={disabled}
+      onSearchRequest={onSearchRequest}
       onStop={() => setActive(false)}
     />
   );
@@ -74,6 +88,7 @@ function ActiveBarcodeScanner({
   rapid = false,
   onRapidChange,
   disabled = false,
+  onSearchRequest,
   onStop,
 }: ScannerProps & { onStop: () => void }) {
   const lastAccepted = useRef(-Infinity);
@@ -129,7 +144,13 @@ function ActiveBarcodeScanner({
                 onRapidChange(event.target.checked);
               }}
             />{' '}
-            Rapid scan
+            <span>
+              Scan several items
+              <small>
+                Queue packages for review. Stock is added only after confirmation; expiry stays
+                unknown.
+              </small>
+            </span>
           </label>
         ) : null}
         <button type="button" onClick={onStop}>
@@ -144,6 +165,11 @@ function ActiveBarcodeScanner({
       {error ? (
         <p className={styles.error} role="alert">
           {error} Enter the barcode manually instead.
+          {onSearchRequest && (
+            <button type="button" onClick={onSearchRequest}>
+              Search / Enter barcode
+            </button>
+          )}
         </p>
       ) : null}
     </div>

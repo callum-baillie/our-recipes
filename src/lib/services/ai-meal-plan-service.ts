@@ -136,18 +136,16 @@ function recipebookCandidate(
       selected.ingredients.forEach((ingredient) => usedIngredients.add(ingredient));
     }
   }
-  const requestedCount = dates.length * request.mealSlots.length;
+  const requestedCount = dates
+    .flatMap((date) => request.mealSlots.map((meal) => `${date}:${meal}`))
+    .filter((key) => request.occupiedSlotMode !== 'keep' || !occupiedSlots.has(key)).length;
   if (entries.length < requestedCount) {
     warnings.push(
       `${requestedCount - entries.length} meal slot${requestedCount - entries.length === 1 ? '' : 's'} could not be filled from the recipebook.`,
     );
   }
-  if (!entries.length) {
-    throw new AiMealPlanValidationError(
-      'Add matching recipes to the recipebook or enable AI fallback.',
-    );
-  }
-  return aiMealPlanCandidateSchema.parse({
+  // An empty saved candidate is valid input to an explicitly permitted fallback.
+  return {
     newRecipes: [],
     entries,
     allocations: [],
@@ -158,7 +156,7 @@ function recipebookCandidate(
         ? 'Saved recipes were ranked by meal fit, household preference, and ingredient overlap.'
         : 'Saved recipes were ranked by meal fit and household preference.',
     ],
-  });
+  };
 }
 
 function normalizeCandidate(
@@ -285,8 +283,9 @@ export async function generateAiMealPlanProposal(input: {
   let rawCandidate: AiMealPlanCandidate;
   if (request.mode === 'recipebook') {
     rawCandidate = recipebookCandidate(request, keptSlots);
-    const expectedSlots =
-      dateRange(request.startDate, request.endDate).size * request.mealSlots.length;
+    const expectedSlots = [...dateRange(request.startDate, request.endDate)]
+      .flatMap((date) => request.mealSlots.map((meal) => `${date}:${meal}`))
+      .filter((key) => request.occupiedSlotMode !== 'keep' || !keptSlots.has(key)).length;
     if (request.options.generateMissingRecipes && rawCandidate.entries.length < expectedSlots) {
       if (!setting.enabled)
         throw new AiMealPlanValidationError(
@@ -361,7 +360,9 @@ export async function generateAiMealPlanProposal(input: {
     );
   if (!rawCandidate.entries.length)
     throw new AiMealPlanValidationError(
-      'All requested slots are already planned. Choose missing meals or explicitly replace existing ones.',
+      request.mode === 'recipebook' && !request.options.generateMissingRecipes
+        ? 'No saved recipes can fill these slots. Allow repeats, add recipes, or choose the AI route.'
+        : 'All requested slots are already planned. Choose missing meals or explicitly replace existing ones.',
     );
   const candidate = normalizeCandidate(rawCandidate, request, selectedProfileIds);
   const dates = dateRange(request.startDate, request.endDate);
@@ -425,14 +426,27 @@ export async function generateAiMealPlanProposal(input: {
   const existingCount = candidate.entries.filter((entry) => entry.existingRecipeId).length;
   const generatedCount = candidate.entries.filter((entry) => entry.newRecipeKey).length;
   if (
-    (request.sourceMode === 'existing' && generatedCount > 0) ||
+    (request.sourceMode === 'existing' &&
+      generatedCount > 0 &&
+      !(request.mode === 'recipebook' && request.options.generateMissingRecipes)) ||
     (request.sourceMode === 'new' && existingCount > 0) ||
-    (request.sourceMode === 'mix' &&
+    (request.mode !== 'recipebook' &&
+      request.sourceMode === 'mix' &&
       candidate.entries.length > 1 &&
       (!existingCount || !generatedCount))
   ) {
     throw new AiMealPlanValidationError('OpenAI did not follow the selected recipe source mode.');
   }
+  const expectedKeys = [...dates]
+    .flatMap((date) => [...slots].map((meal) => `${date}:${meal}`))
+    .filter((key) => request.occupiedSlotMode !== 'keep' || !occupiedSlots.has(key));
+  const unfilled = expectedKeys.filter((key) => !seenSlots.has(key)).length;
+  candidate.assumptions = [
+    ...candidate.assumptions.slice(0, 19),
+    unfilled
+      ? `${unfilled} requested meal slot${unfilled === 1 ? '' : 's'} remain unfilled in this proposal.`
+      : 'Every requested open meal slot is included in this proposal.',
+  ];
   const currentMeals = listPlannedMeals(request.startDate, request.endDate);
   const targetKeys = new Set(candidate.entries.map((entry) => entry.entryKey ?? entryKey(entry)));
   const conflicts = currentMeals

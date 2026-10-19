@@ -35,7 +35,11 @@ function currentEnergyGoals(profileId: string, requesterPrincipalId: string, eff
   );
 }
 
-function noteFor(estimate: ReturnType<typeof estimateAdultEnergy>, expectedProfileVersion: number) {
+function noteFor(
+  estimate: ReturnType<typeof estimateAdultEnergy>,
+  expectedProfileVersion: number,
+  adjustment?: number,
+) {
   return JSON.stringify({
     method: NASEM_EER_SOURCE_ID,
     doi: estimate.doi,
@@ -49,6 +53,12 @@ function noteFor(estimate: ReturnType<typeof estimateAdultEnergy>, expectedProfi
     exactKcal: Number(estimate.exactKcal.toFixed(4)),
     roundedKcal: estimate.roundedKcal,
     rounding: 'nearest_whole_kcal',
+    ...(adjustment === undefined
+      ? {}
+      : {
+          planningAdjustmentKcal: adjustment,
+          reviewedTargetKcal: estimate.roundedKcal + adjustment,
+        }),
   });
 }
 
@@ -64,12 +74,14 @@ function sameOperation(
       existing.unit === 'kcal' &&
       existing.sourceType === 'reference' &&
       existing.kind === 'target' &&
-      existing.value === note.roundedKcal &&
+      existing.value === (note.reviewedTargetKcal ?? note.roundedKcal) &&
       existing.startsOn === input.effectiveOn &&
       existing.supersedesGoalVersionId === input.supersedesGoalVersionId &&
       note.profileVersion === input.expectedProfileVersion &&
       note.effectiveOn === input.effectiveOn &&
-      note.pal === input.palCategory
+      note.pal === input.palCategory &&
+      note.planningAdjustmentKcal === input.planningAdjustmentKcal &&
+      note.reviewedTargetKcal === input.reviewedTargetKcal
     );
   } catch {
     return false;
@@ -142,6 +154,21 @@ export function previewOrApplyNutritionEnergyEstimate(
   }));
   if (input.action === 'preview')
     return { action: 'previewed' as const, estimate, currentEnergyGoals: visibleGoals, goal: null };
+  const adjustment = input.planningAdjustmentKcal;
+  const reviewedTarget = estimate.roundedKcal + (adjustment ?? 0);
+  if (adjustment !== undefined) {
+    if (
+      (profile.nutritionGoalType !== 'loss' && profile.nutritionGoalType !== 'gain') ||
+      (profile.nutritionGoalType === 'loss' ? adjustment >= 0 : adjustment <= 0)
+    )
+      throw new NutritionProfileConflictError(
+        'The saved weight direction changed. Review a new estimate.',
+      );
+    if (input.reviewedTargetKcal !== reviewedTarget || reviewedTarget < 1200)
+      throw new NutritionProfileConflictError(
+        'The reviewed target no longer matches these inputs. Review a new estimate.',
+      );
+  }
   if (goals.length > 0) {
     const selected = goals.find((goal) => goal.id === input.supersedesGoalVersionId);
     if (!selected)
@@ -164,8 +191,8 @@ export function previewOrApplyNutritionEnergyEstimate(
       endsOn: null,
       state: 'active',
       kind: 'target',
-      value: estimate.roundedKcal,
-      note: noteFor(estimate, input.expectedProfileVersion),
+      value: reviewedTarget,
+      note: noteFor(estimate, input.expectedProfileVersion, adjustment),
     },
     { supersedesGoalVersionId: input.supersedesGoalVersionId },
   );

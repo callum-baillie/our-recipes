@@ -26,6 +26,7 @@ import './globals.css';
 import './themes.css';
 import './refinements.css';
 import './settings-layout.css';
+import './auth-pages.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,8 +101,6 @@ export async function generateViewport(): Promise<Viewport> {
   return {
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
     viewportFit: 'cover',
     themeColor:
       mode === 'system'
@@ -124,6 +123,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     '/reset-password',
     '/security-upgrade',
   ].includes(pathname);
+  const usesNormalPageShell =
+    !isSecuritySurface &&
+    pathname !== '/print' &&
+    pathname !== '/planner' &&
+    !/^\/recipes\/[^/]+\/cook(?:\/|$)/u.test(pathname);
   const authConfigured = isAuthenticationConfigured();
   const authSession = authConfigured
     ? await auth.api.getSession({ headers: requestHeaders })
@@ -152,7 +156,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           {`(function(){try{var r=document.documentElement,p=localStorage.getItem('bord-palette')||localStorage.getItem('our-recipes-palette'),t=localStorage.getItem('bord-theme')||localStorage.getItem('our-recipes-theme');if(/^(green|orange|blue|purple|grayscale)$/.test(p||'')){r.dataset.palette=p;localStorage.setItem('bord-palette',p);document.cookie='bord-palette='+p+'; Path=/; Max-Age=31536000; SameSite=Lax'}if(t==='light'||t==='dark'){r.dataset.theme=t;r.style.colorScheme=t;localStorage.setItem('bord-theme',t);document.cookie='bord-mode='+t+'; Path=/; Max-Age=31536000; SameSite=Lax'}else{delete r.dataset.theme;r.style.colorScheme='light dark';document.cookie='bord-mode=system; Path=/; Max-Age=31536000; SameSite=Lax'}}catch(e){}})();`}
         </Script>
       </head>
-      <body>
+      <body
+        data-app-shell={Boolean(
+          state.household && usesNormalPageShell && (!authConfigured || authSession),
+        )}
+      >
         <ToastProvider>
           <DialogViewport />
           {state.household && !isSecuritySurface && (!authConfigured || authSession) ? (

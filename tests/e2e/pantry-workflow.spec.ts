@@ -107,10 +107,17 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string) {
 }
 
 async function clickPantryCardAction(card: ReturnType<Page['locator']>, name: string) {
-  const summary = card.locator('summary[aria-label^="Manage "]').first();
-  const menu = summary.locator('..');
-  if ((await menu.getAttribute('open')) === null) await summary.click();
-  await menu.getByRole('button', { name, exact: true }).click();
+  const dialog = card.getByRole('dialog');
+  if (!(await dialog.isVisible())) {
+    const close = card.page().getByRole('button', { name: 'Close batch management' });
+    if (await close.isVisible()) await close.click();
+    await card.getByRole('button', { name: /^Manage / }).click();
+  }
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name, exact: true }).click();
+  const close = dialog.getByRole('button', { name: 'Close batch management' });
+  await expect(close).toBeEnabled();
+  await close.click();
 }
 
 test('rendered Pantry workflow remains explainable, explicit, persistent, accessible, and responsive', async ({
@@ -207,7 +214,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     has: page.getByRole('heading', { name: 'Red lentils', exact: true }),
   });
   await expect(lentilCards).toHaveCount(2);
-  await clickPantryCardAction(lentilCards.first(), 'Open');
+  await clickPantryCardAction(lentilCards.first(), 'Open package');
   await expect(
     page.getByRole('status').filter({ hasText: 'Package opened.' }).last(),
   ).toBeVisible();
@@ -375,7 +382,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
       response.request().method() === 'PATCH' &&
       response.url().includes(`/items/${persistedItem.id}`),
   );
-  await shoppingRow.getByRole('button', { name: 'In cart', exact: true }).click();
+  await shoppingRow.getByRole('button', { name: 'Add to cart', exact: true }).click();
   expect((await checkedSave).ok()).toBe(true);
   await page.getByRole('button', { name: 'Unpack groceries into Pantry' }).click();
   const unpack = shoppingRow.locator('details', {
@@ -403,8 +410,10 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
 
   await page.goto(`/recipes/${recipe.id}/cook`);
   await page.getByRole('button', { name: 'Start cooking' }).click();
-  await expect(page.getByRole('button', { name: 'Finish cooking' })).toBeVisible();
-  await page.getByRole('button', { name: 'Finish cooking' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Finish cooking', exact: true }).last(),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Finish cooking', exact: true }).last().click();
   const confirmation = page.getByRole('region', { name: 'Confirm Pantry changes' });
   await expect(confirmation.getByLabel('Deduction 1 quantity')).toHaveValue('200');
   await screenshot(page, testInfo, 'cooking-explicit-confirmation');

@@ -25,6 +25,11 @@ export function RecipeDetailToolbar({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const busy = useRef(false);
+  const [previousFavorite, setPreviousFavorite] = useState(initialFavorite);
+  if (previousFavorite !== initialFavorite) {
+    setPreviousFavorite(initialFavorite);
+    if (!pending) setFavorite(initialFavorite);
+  }
 
   async function toggleFavorite() {
     if (busy.current || favorite === null) return;
@@ -81,17 +86,17 @@ export function RecipeDetailToolbar({
           title="Cook this recipe"
         >
           <ChefHat size={20} aria-hidden="true" />
-          <span className="recipe-toolbar-label">Cook this recipe</span>
+          <span className="recipe-toolbar-label">Cook</span>
         </Link>
         <button
           className="recipe-toolbar-button"
           type="button"
-          aria-label={favorite ? 'Remove favorite' : 'Like this recipe'}
+          aria-label={favorite ? 'Clear positive reaction' : 'Like this recipe'}
           title={
             favorite === null
               ? 'Choose a profile to save favorites'
               : favorite
-                ? 'Remove favorite'
+                ? 'Clear positive reaction'
                 : 'Like this recipe'
           }
           aria-pressed={favorite ?? false}

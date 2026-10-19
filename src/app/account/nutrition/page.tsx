@@ -6,6 +6,7 @@ import {
 } from '@/components/nutrition-profile-settings';
 import { SettingsPageHeader } from '@/components/settings-page-header';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { validTimeZone } from '@/lib/domain/regional';
 import { nutritionLocalDateKey } from '@/lib/domain/nutrition-view';
 import { listNutrientDefinitions } from '@/lib/services/nutrition-foundation-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
@@ -70,6 +71,7 @@ export default async function NutritionSettingsPage() {
     code: item.code,
     displayName: item.displayName,
     category: item.category,
+    canonicalUnit: item.canonicalUnit,
   }));
 
   return (
@@ -79,14 +81,19 @@ export default async function NutritionSettingsPage() {
         title={`${household.activeNutritionProfile.displayName}'s Nutrition`}
         description={
           <>
-            These preferences follow the active household profile in the app header. Everyone in the
-            household can still view shared Nutrition summaries.
+            These preferences follow the active household Nutrition profile. Access to another
+            person’s data follows your account role and guardian permissions.
           </>
         }
       />
       <NutritionProfileSettings
+        key={profile.id}
+        personName={household.activeNutritionProfile.displayName}
         profile={settingsValue(profile)}
-        effectiveOn={nutritionLocalDateKey(new Date(), profile.dailyResetTimezone)}
+        effectiveOn={nutritionLocalDateKey(
+          new Date(),
+          validTimeZone(profile.dailyResetTimezone) ? profile.dailyResetTimezone : 'UTC',
+        )}
         nutrientDefinitions={definitions}
       />
     </main>

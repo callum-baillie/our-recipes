@@ -102,12 +102,14 @@ export function AiAssistantDrawer({
   returnFocusRef,
   initialDraft,
   startNewThreadOnOpen = false,
+  canManageAiSettings = false,
 }: {
   open: boolean;
   onClose: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
   initialDraft?: string;
   startNewThreadOnOpen?: boolean;
+  canManageAiSettings?: boolean;
 }) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -671,14 +673,28 @@ export function AiAssistantDrawer({
                       disabled={busy}
                       onChange={(event) => setAllowPaidTools(event.target.checked)}
                     />
-                    <span>Allow additional paid suggestions in this conversation</span>
+                    <span>
+                      <strong>Allow additional paid suggestions</strong>
+                      <small>
+                        Applies to this conversation. Image generation requires its own
+                        confirmation.
+                      </small>
+                    </span>
                   </label>
                   <p>
-                    This lets the assistant request extra AI suggestions when reviewing your
-                    kitchen. Normal chat uses your configured AI provider. Image generation still
-                    needs confirmation.
+                    The assistant may request extra paid suggestions while reviewing your kitchen.
+                    Normal chat uses your configured AI provider.
                   </p>
-                  <a href="/settings/ai">All AI settings</a>
+                  <div className={styles.settingsLinks}>
+                    <a className="inline-link" href="/account/ai">
+                      Personal AI settings
+                    </a>
+                    {canManageAiSettings ? (
+                      <a className="inline-link" href="/settings/ai">
+                        Global AI settings
+                      </a>
+                    ) : null}
+                  </div>
                 </section>
               ) : null}
               {openingConversation ? (

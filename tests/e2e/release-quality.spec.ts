@@ -58,6 +58,11 @@ async function homeThemeContrast(page: import('@playwright/test').Page): Promise
 async function createRecipeForReview(page: import('@playwright/test').Page): Promise<void> {
   await completeInitialOnboarding(page, 'The Release Table', 'Maya');
   await page.goto('/recipes/new');
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await page.getByLabel('Recipe name').fill('Print-ready tomato soup');
   await page.getByLabel('Serves').fill('4 servings');
   const categoryInput = page.getByRole('combobox', { name: 'Categories (optional)' });
@@ -82,7 +87,7 @@ async function createRecipeForReview(page: import('@playwright/test').Page): Pro
   await page.getByLabel('Fiber (g)').fill('6');
   await page.getByLabel('Sugar (g)').fill('9');
   await page.getByLabel('Sodium (mg)').fill('410');
-  await page.getByRole('button', { name: 'Add to the cookbook' }).click();
+  await page.getByRole('button', { name: 'Add recipe', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Print-ready tomato soup' })).toBeVisible();
 }
 
@@ -102,7 +107,8 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   const viewportContent = await page.locator('meta[name="viewport"]').getAttribute('content');
   expect(viewportContent).toContain('width=device-width');
   expect(viewportContent).toContain('viewport-fit=cover');
-  expect(viewportContent).toMatch(/user-scalable=no|maximum-scale=1/u);
+  expect(viewportContent).not.toContain('user-scalable=no');
+  expect(viewportContent).not.toContain('maximum-scale=1');
   const addRecipeTrigger = page.getByRole('link', { name: 'Add a recipe' });
   await expect(page.locator('.profile-switcher summary .profile-dot')).toHaveText('M');
   await expect(page.locator('.app-footer')).toContainText('The Release Table · Powered by Bòrd.');
@@ -111,21 +117,21 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   expect(touchTarget?.height).toBeGreaterThanOrEqual(44);
   await addRecipeTrigger.click();
   await expect(page).toHaveURL(/\?add=recipe$/u);
-  const addRecipeDialog = page.getByRole('dialog', { name: 'How would you like to add it?' });
+  const addRecipeDialog = page.getByRole('dialog', { name: 'Add a recipe' });
   await expect(addRecipeDialog).toBeVisible();
-  await expect(addRecipeDialog.getByRole('link', { name: 'From scratch' })).toHaveAttribute(
+  await expect(addRecipeDialog.getByRole('link', { name: 'Write a recipe' })).toHaveAttribute(
     'href',
     '/recipes/new',
   );
-  await expect(addRecipeDialog.getByRole('link', { name: 'Paste/AI Recipe' })).toHaveAttribute(
+  await expect(addRecipeDialog.getByRole('link', { name: 'Paste or describe' })).toHaveAttribute(
     'href',
     '/capture?mode=text',
   );
-  await expect(addRecipeDialog.getByRole('link', { name: 'From URL' })).toHaveAttribute(
+  await expect(addRecipeDialog.getByRole('link', { name: 'Import a link' })).toHaveAttribute(
     'href',
     '/capture?mode=url',
   );
-  await expect(addRecipeDialog.getByRole('link', { name: 'From Image' })).toHaveAttribute(
+  await expect(addRecipeDialog.getByRole('link', { name: 'Photos or PDF' })).toHaveAttribute(
     'href',
     '/import',
   );
@@ -151,17 +157,16 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(addRecipeDialog).toBeHidden();
   await expect(page).toHaveURL('/');
 
-  const mobileFilterToggle = page.getByRole('button', {
-    name: 'Show recipe search and filters',
-  });
-  const homeRecipeFilters = page.locator('.home-recipe-filters');
-  await expect(mobileFilterToggle).toBeVisible();
-  await expect(homeRecipeFilters).toBeHidden();
+  const homeRecipeFilters = page.locator('#home-search');
+  await expect(homeRecipeFilters.getByRole('searchbox', { name: 'Search recipes' })).toBeVisible();
+  const mobileFilterToggle = homeRecipeFilters.locator('summary');
+  const secondaryFilters = homeRecipeFilters.locator('details');
+  await expect(secondaryFilters).not.toHaveAttribute('open');
   expect((await mobileFilterToggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   await mobileFilterToggle.click();
-  await expect(homeRecipeFilters).toBeVisible();
-  await page.mouse.click(8, 500);
-  await expect(homeRecipeFilters).toBeHidden();
+  await expect(secondaryFilters).toHaveAttribute('open');
+  await mobileFilterToggle.click();
+  await expect(secondaryFilters).not.toHaveAttribute('open');
 
   const profileMenu = page.locator('.profile-switcher');
   await expect(profileMenu).toHaveAttribute('data-dismissible-ready', 'true');
@@ -196,7 +201,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(mobileNavigation).toHaveJSProperty('open', false);
 
   await page.setViewportSize(surfaces[0].viewport);
-  await expect(mobileFilterToggle).toBeHidden();
+  await expect(mobileFilterToggle).toBeVisible();
   await expect(homeRecipeFilters).toBeVisible();
   const primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
   await expect(primaryNavigation.locator(':scope > a')).toHaveText([
@@ -298,6 +303,11 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
 
   await page.setViewportSize(surfaces[0].viewport);
   await page.goto('/recipes/new');
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await expect(page.getByLabel('Recipe name')).toBeVisible();
   await expect(page.locator('.editor-form-layout > .editor-card-column')).toHaveCSS(
     'display',
@@ -308,21 +318,21 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     const card = form.querySelector(':scope > .editor-card-column');
     const workingSection = form.querySelector(':scope > .recipe-form-section');
     const ingredientInput = form.querySelector('.ingredient-row input');
-    const ingredientButton = form.querySelector('.ingredient-row .icon-button');
+    const ingredientButton = form.querySelector('.ingredient-row button');
     if (!intro || !card || !workingSection || !ingredientInput || !ingredientButton) {
       throw new Error('Recipe editor layout targets are missing.');
     }
     return {
       formWidth: form.getBoundingClientRect().width,
       introWidth: intro.getBoundingClientRect().width,
-      introRight: intro.getBoundingClientRect().right,
+      introLeft: intro.getBoundingClientRect().left,
       cardLeft: card.getBoundingClientRect().left,
       workingSectionWidth: workingSection.getBoundingClientRect().width,
       ingredientInputHeight: ingredientInput.getBoundingClientRect().height,
       ingredientButtonHeight: ingredientButton.getBoundingClientRect().height,
     };
   });
-  expect(editorDesktop.cardLeft).toBeGreaterThan(editorDesktop.introRight);
+  expect(Math.abs(editorDesktop.cardLeft - editorDesktop.introLeft)).toBeLessThan(2);
   expect(editorDesktop.workingSectionWidth / editorDesktop.formWidth).toBeGreaterThan(0.95);
   expect(editorDesktop.ingredientButtonHeight).toBeGreaterThanOrEqual(44);
   expect(
@@ -335,6 +345,11 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     'mobile recipe editor should not horizontally overflow',
   ).toBe(true);
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   const mobileCategoryToggle = page.getByRole('button', { name: 'Open categories options' });
   expect((await mobileCategoryToggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   await mobileCategoryToggle.click();
@@ -403,9 +418,9 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     /\/export\/markdown$/u,
   );
   await page.goto(recipeUrl);
-  await page.getByText('Nutrition information', { exact: true }).click();
+  await page.getByText('Recipe-source nutrition', { exact: true }).click();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Update nutrition estimate' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Update estimate' })).toBeVisible();
   const classificationToolbar = page.getByRole('region', { name: 'Recipe details and tags' });
   await expect(classificationToolbar.getByText('Dinner', { exact: true })).toBeVisible();
   await expect(classificationToolbar.getByText('Main Dish', { exact: true })).toBeVisible();
@@ -425,7 +440,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   })
     .png()
     .toBuffer();
-  await page.getByRole('button', { name: 'Add/manage photos' }).click();
+  await page.getByRole('button', { name: 'Manage photos' }).click();
   await imageUpload.setInputFiles({
     name: 'tomato.png',
     mimeType: 'image/png',
@@ -435,10 +450,11 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(page.locator('.toast').filter({ hasText: 'Recipe photo added.' })).toBeVisible();
   await expect(page.locator('.recipe-image-grid img')).toBeVisible();
   await expect(page.locator('#recipe-image-editor')).toBeHidden();
-  const imageEditButton = page.getByRole('button', { name: 'Edit recipe photos from photo 1' });
+  const imageEditButton = page.getByRole('button', { name: 'Manage photos' });
   await expect(imageEditButton).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remove photo 1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove photo 1' })).toBeHidden();
   await imageEditButton.click();
+  await expect(page.getByRole('button', { name: 'Remove photo 1' })).toBeVisible();
   await expect(page.locator('#recipe-image-editor')).toBeVisible();
   await imageEditButton.click();
   await expect(page.locator('#recipe-image-editor')).toBeHidden();
@@ -498,12 +514,17 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await page.emulateMedia({ media: 'screen', colorScheme: 'light' });
   await page.setViewportSize(surfaces[2].viewport);
   await page.goto('/recipes/new');
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await page.getByLabel('Recipe name').fill('Nutrition estimate test soup');
   await page.getByLabel('Serves').fill('4 servings');
   await page.getByLabel('Ingredient 1-1 quantity').fill('2');
   await page.getByLabel('Ingredient 1-1 item').fill('tomatoes');
   await page.getByLabel('Method section 1, step 1').fill('Simmer gently.');
-  await page.getByRole('button', { name: 'Add to the cookbook' }).click();
+  await page.getByRole('button', { name: 'Add recipe', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Nutrition estimate test soup' })).toBeVisible();
 
   let estimateRequestStarted = false;
@@ -522,8 +543,8 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     });
   });
 
-  await page.getByText('Nutrition information', { exact: true }).click();
-  const estimateButton = page.getByRole('button', { name: 'Update nutrition estimate' });
+  await page.getByText('Recipe-source nutrition', { exact: true }).click();
+  const estimateButton = page.getByRole('button', { name: 'Estimate nutrition', exact: true });
   await expect(estimateButton).toBeVisible();
   expect((await estimateButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   expect(
@@ -546,6 +567,11 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   // A missing convenience cookie must not discard the authenticated account session.
   await page.context().clearCookies({ name: /^(bord|our_recipes)_active_profile$/u });
   await page.goto(`${nutritionRecipeUrl}/edit`);
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await expect(page.locator('.profile-switcher summary .profile-dot')).toHaveText('M');
   const editCategoryInput = page.getByRole('combobox', { name: 'Categories (optional)' });
   await editCategoryInput.fill('Weeknight favorite');
@@ -633,7 +659,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     contentType: 'image/png',
   });
 
-  await page.getByRole('button', { name: 'Save a new revision' }).click();
+  await page.getByRole('button', { name: 'Save changes' }).last().click();
   await expect(page.getByRole('heading', { name: 'Nutrition estimate test soup' })).toBeVisible();
   await expect(page.locator('.recipe-revision-badge')).toHaveText('Revision 2');
   await expect(page.getByText('Choose a household profile before editing a recipe.')).toHaveCount(

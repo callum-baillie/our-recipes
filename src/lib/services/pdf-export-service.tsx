@@ -1,6 +1,10 @@
 import 'server-only';
 
 import sharp from 'sharp';
+import { getAppPreferences } from './app-preferences-service';
+import { plannerMealOptions } from '@/lib/domain/planner-workflow';
+import { mealTypeLabel } from '@/lib/domain/meal-types';
+import { printedPantryDate, printedShoppingItem } from '@/lib/domain/print-presentation';
 import { readRegularRecipeImage } from '@/lib/storage/recipe-image-storage';
 import { getPantryDashboard } from './pantry-service';
 import { getShoppingList } from './planning-service';
@@ -75,14 +79,14 @@ function recipeCard(recipeId: string, revision?: number, servings?: number): Rec
       .get();
     if (!saved)
       throw new PdfExportError(
-        'A planned recipe revision is unavailable. Refresh that meal’s recipe before exporting.',
+        `Saved revision ${requestedRevision} of “${detail.title}” is unavailable. Review that meal in Planner, or export the schedule only.`,
         409,
       );
     try {
       recipe = recipeInputSchema.parse(JSON.parse(saved.snapshot));
     } catch {
       throw new PdfExportError(
-        'A planned recipe revision cannot be printed safely. Refresh that meal’s recipe before exporting.',
+        `Saved revision ${requestedRevision} of “${detail.title}” cannot be printed safely. Review it in Planner, or export the schedule only.`,
         409,
       );
     }
@@ -164,6 +168,10 @@ export function exportMealPlanPdf(input: MealPlanPdfExportInput) {
         'Choose a smaller date range: this plan contains more than 500 meals.',
         413,
       );
+    const types = plannerMealOptions(
+      getAppPreferences().mealPlan,
+      meals.map((meal) => meal.meal),
+    );
     const cards = new Map<string, RecipePrintCard>();
     const schedule: MealPrintSchedule = {
       start: input.start,
@@ -174,41 +182,60 @@ export function exportMealPlanPdf(input: MealPlanPdfExportInput) {
           cardKey = meal.recipeOverride
             ? `adapted-${meal.id}`
             : `${meal.recipeId}-${meal.recipeRevision ?? 'current'}-${meal.servings}`;
-          if (!cards.has(cardKey))
-            cards.set(
-              cardKey,
-              meal.recipeOverride
-                ? {
-                    key: cardKey,
-                    recipeId: meal.recipeId,
-                    revision: meal.recipeRevision ?? 1,
-                    recipe: recipePayloadFromDetail(
-                      getRecipeForPlannedMeal(meal.recipeId, meal.id)!,
-                    ),
-                    servings: meal.servings,
-                  }
-                : recipeCard(meal.recipeId, meal.recipeRevision ?? undefined, meal.servings),
-            );
+          if (!cards.has(cardKey)) {
+            let card: RecipePrintCard;
+            if (meal.recipeOverride) {
+              try {
+                const adapted = getRecipeForPlannedMeal(meal.recipeId, meal.id);
+                if (!adapted) throw new Error('Missing planned recipe');
+                card = {
+                  key: cardKey,
+                  recipeId: meal.recipeId,
+                  revision: meal.recipeRevision ?? 1,
+                  recipe: recipePayloadFromDetail(adapted),
+                  servings: meal.servings,
+                  adapted: true,
+                };
+              } catch {
+                throw new PdfExportError(
+                  `The adapted recipe “${meal.recipeTitle}” on ${exportDateLabel(meal.plannedFor)} cannot be printed safely. Review it in Planner, or export the schedule only.`,
+                  409,
+                );
+              }
+            } else
+              card = recipeCard(meal.recipeId, meal.recipeRevision ?? undefined, meal.servings);
+            cards.set(cardKey, card);
+          }
           const card = cards.get(cardKey)!;
-          (card.occasions ??= []).push(`${exportDateLabel(meal.plannedFor)} ${meal.meal}`);
+          (card.occasions ??= []).push(
+            `${exportDateLabel(meal.plannedFor)} ${mealTypeLabel(meal.meal, types)}`,
+          );
         }
         return {
           id: meal.id,
           date: meal.plannedFor,
           slot: meal.meal,
+          slotLabel: mealTypeLabel(meal.meal, types),
+          slotOrder: types.findIndex((type) => type.value === meal.meal),
           title: meal.recipeTitle,
           servings: meal.servings,
-          note: [
+          context: [
             meal.kind === 'leftover'
               ? 'Leftovers from an earlier meal'
               : meal.kind === 'takeout'
-                ? 'Takeout'
-                : '',
+                ? 'Eating out / takeaway'
+                : meal.kind === 'fast'
+                  ? 'Fasting / no meal'
+                  : meal.kind === 'options'
+                    ? 'Meal alternatives'
+                    : meal.kind === 'item'
+                      ? 'Single food / drink'
+                      : '',
             meal.recipeOverride ? 'Recipe adapted for this meal' : '',
-            meal.note,
           ]
             .filter(Boolean)
             .join(' · '),
+          note: meal.note,
           status: meal.effectiveStatus,
           cardKey,
         };
@@ -238,28 +265,35 @@ async function prepareCards(cards: RecipePrintCard[], options: PdfExportOptions)
     throw new PdfExportError('Choose an available store for aisle ordering.');
   for (const card of cards) {
     if (store) {
-      const groups = new Map<
-        string,
-        RecipePrintCard['recipe']['ingredientGroups'][number]['ingredients']
-      >();
-      for (const ingredient of card.recipe.ingredientGroups.flatMap((group) => group.ingredients)) {
-        const aisle = resolveShoppingAisle(store.id, { item: ingredient.item }) ?? 'unassigned';
-        const items = groups.get(aisle) ?? [];
-        items.push(ingredient);
-        groups.set(aisle, items);
+      const groups = new Map<string, RecipePrintCard['recipe']['ingredientGroups']>();
+      for (const original of card.recipe.ingredientGroups) {
+        for (const ingredient of original.ingredients) {
+          const aisle = resolveShoppingAisle(store.id, { item: ingredient.item }) ?? 'unassigned';
+          const aisleGroups = groups.get(aisle) ?? [];
+          let group = aisleGroups.find((group) => group.name === original.name);
+          if (!group) {
+            group = { name: original.name, ingredients: [] };
+            aisleGroups.push(group);
+          }
+          group.ingredients.push(ingredient);
+          groups.set(aisle, aisleGroups);
+        }
       }
+      const ordered = [
+        ...store.sections.map((section) => ({ id: section.aisleId, name: section.name })),
+        { id: 'unassigned', name: 'Other / aisle not assigned' },
+      ];
       card.recipe = {
         ...card.recipe,
-        ingredientGroups: [
-          ...store.sections
-            .filter((section) => groups.has(section.aisleId))
-            .map((section) => ({ name: section.name, ingredients: groups.get(section.aisleId)! })),
-          ...(groups.has('unassigned')
-            ? [{ name: 'Other / aisle not assigned', ingredients: groups.get('unassigned')! }]
-            : []),
-        ],
+        ingredientGroups: ordered.flatMap((aisle) =>
+          (groups.get(aisle.id) ?? []).map((group) => ({
+            ...group,
+            name: [aisle.name, group.name].filter(Boolean).join(' / '),
+          })),
+        ),
       };
     }
+
     if (options.includeImage) {
       const image = getDatabase()
         .select()
@@ -282,7 +316,7 @@ async function prepareCards(cards: RecipePrintCard[], options: PdfExportOptions)
   }
 }
 function groupedInventory(
-  rows: Array<{ group: string; label: string; quantity: string; detail?: string; note?: string }>,
+  rows: Array<InventoryPrintGroup['rows'][number] & { group: string }>,
 ): InventoryPrintGroup[] {
   const groups = new Map<string, InventoryPrintGroup>();
   for (const { group, ...row } of rows) {
@@ -316,11 +350,20 @@ export function exportPantryPdf(options: InventoryPdfExportInput) {
       .map((batch) => ({
         group: batch.location.path,
         label: batch.product.displayName,
-        quantity: batch.quantityLabel,
-        detail:
-          options.includeDates && batch.expiry.date
-            ? `${batch.expiry.kind.replaceAll('_', ' ')}: ${batch.expiry.date}`
-            : '',
+        quantityCaption: 'Recorded',
+        quantity:
+          batch.approximateState && batch.approximateState !== 'unknown'
+            ? `Approx. ${batch.quantityLabel}`
+            : batch.quantityLabel,
+        detail: [
+          `Batch ${batch.id.slice(0, 8)}`,
+          ...(batch.sublocation ? [batch.sublocation] : []),
+          batch.openedDate ? `Opened ${batch.openedDate}` : 'Unopened',
+          `Added ${batch.createdAt.toISOString().slice(0, 10)}`,
+          options.includeDates ? printedPantryDate(batch) : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
         note: batch.notes,
       }));
     return inventoryExport('Pantry inventory', groupedInventory(rows), options);
@@ -349,14 +392,7 @@ export function exportShoppingListPdf(listId: string, options: InventoryPdfExpor
           group:
             sections.find((section) => section.aisleId === aisle)?.name ??
             'Other / aisle not assigned',
-          label: item.item,
-          quantity: [
-            item.quantity === null ? 'Quantity not recorded' : String(item.quantity),
-            item.unit,
-          ]
-            .filter(Boolean)
-            .join(' '),
-          note: item.note,
+          ...printedShoppingItem(item),
         };
       })
       .sort((a, b) => {

@@ -1,7 +1,8 @@
 'use client';
 import { bodyMetricFields } from '@/lib/domain/body-metrics';
 import type { CompositionEstimate } from '@/lib/domain/qn-body-composition';
-import styles from './nutrition-onboarding-flow.module.css';
+import styles from './nutrition-measurements.module.css';
+import { ChevronDown } from 'lucide-react';
 export function BodyCompositionEstimatePanel({
   estimate,
   measuredAt,
@@ -14,12 +15,14 @@ export function BodyCompositionEstimatePanel({
   if (!estimate) return null;
   return (
     <details>
-      <summary>View calculated body composition</summary>
+      <summary className="recipe-disclosure-summary">
+        Calculated estimates
+        <ChevronDown size={18} />
+      </summary>
       <p className={styles.hint}>
-        Estimated with qn-scale-ble
-        {measuredAt ? ` from the weigh-in on ${new Date(measuredAt).toLocaleDateString()}` : ''}.
-        These values can differ substantially from VeSync, especially BMR. Imported and manually
-        entered readings are kept separately. These estimates do not set your calorie targets.
+        Calculated estimates
+        {measuredAt ? ` from the observation on ${new Date(measuredAt).toLocaleDateString()}` : ''}.
+        These can differ from imported or recorded measurements. They do not set calorie goals.
       </p>
       <dl className={styles.review}>
         <div>
@@ -41,6 +44,16 @@ export function BodyCompositionEstimatePanel({
           );
         })}
       </dl>
+      <details>
+        <summary className="recipe-disclosure-summary">
+          Calculation method
+          <ChevronDown size={16} />
+        </summary>
+        <p className={styles.hint}>
+          Calculated with qn-scale-ble from saved observation inputs. Device and calculated
+          estimates can differ substantially, especially BMR.
+        </p>
+      </details>
     </details>
   );
 }

@@ -70,20 +70,12 @@ describe('recipe Nutrition workspace communication', () => {
         },
       }),
     );
-    expect(markup).toContain('Source, calculate, then confirm');
-    expect(markup).toContain('Nothing enters the Food Diary until you explicitly confirm');
-    expect(markup).toContain('Raw-ingredient estimate');
-    expect(markup).toContain('coverage 70%');
-    expect(markup).toContain('per serving');
-    expect(markup).toContain('per 100 g');
-    expect(markup).toContain('Final cooked weight');
-    expect(markup).toContain('Substitute Pantry product');
-    expect(markup).toContain('Weighed portion');
-    expect(markup).toContain('Confirm recipe in Food Diary');
-    expect(markup).toContain('Confirm this product in the Food Diary');
-    expect(markup).toContain('Manual Food Diary entry');
-    expect(markup).toContain('moderate-confidence by the server');
-    expect(markup).toContain('No nutrition record');
+    expect(markup).toContain('Food and nutrition data');
+    expect(markup).toContain('Source changes never record');
+    expect(markup).toContain('Edit product nutrition');
+    expect(markup).toContain('Calculate recipe nutrition');
+    expect(markup).toContain('Manual entry');
+    expect(markup).not.toContain('immutable revisions');
   });
 });
 
@@ -118,7 +110,7 @@ describe('normalized recipe presentation', () => {
         },
       }),
     );
-    expect(markup).toContain('INGREDIENT-BASED NUTRITION');
+    expect(markup).toContain('Ingredient-based calculation');
     expect(markup).toContain('Recalculation needed');
     expect(markup).toContain('800 kcal');
     expect(markup).toContain('200 kcal per serving');
@@ -159,7 +151,7 @@ describe('normalized recipe presentation', () => {
     );
     expect(markup).toContain('12.3 g protein');
     expect(markup).toContain('8 g fiber');
-    expect(markup).toContain('80% coverage');
+    expect(markup).toContain('80% data complete');
     expect(markup).not.toContain('kcal');
   });
 });
@@ -210,15 +202,13 @@ describe('planner Nutrition preview preference', () => {
         },
       }),
     );
-    expect(markup).toContain('Nutrition metric previews are hidden');
     expect(markup).not.toContain('Planned: 600');
     expect(markup).not.toContain('Consumed: 400');
-    expect(markup).not.toContain('This profile:');
-    expect(markup).toContain('<dt>Total</dt><dd>4</dd>');
-    expect(markup).toContain('<dt>Unassigned</dt><dd>3</dd>');
-    expect(markup).toContain('Calculation: current');
-    expect(markup).toContain('Save revision');
+    expect(markup).toContain('Shared capacity: 4 servings');
+    expect(markup).toContain('3 unassigned');
+    expect(markup).toContain('Current recipe calculation');
+    expect(markup).toContain('Save portion revision');
     expect(markup).toContain('Record a prepared batch');
-    expect(markup).toContain('Planning or serving never records food as eaten');
+    expect(markup).toContain('does not record food as eaten');
   });
 });

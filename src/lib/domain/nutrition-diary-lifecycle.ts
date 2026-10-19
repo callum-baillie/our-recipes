@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { isNutritionDate, nutritionEventCandidates, nutritionWallTime } from './nutrition-ui';
 
 const uuid = z.string().uuid();
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const isoDate = z.string().refine(isNutritionDate, 'Enter a valid calendar date.');
 const occurredAt = z.string().datetime({ offset: true });
 const mealSlot = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'other']);
 const reason = z.string().trim().min(1).max(500);
@@ -86,45 +87,14 @@ export function moveNutritionLocalTimeToDate(
   sourceTimeZone: string,
   targetTimeZone: string,
 ): Date {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: sourceTimeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-  const parts = formatter.formatToParts(source);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((candidate) => candidate.type === type)?.value ?? '0');
-  const [year, month, day] = targetDate.split('-').map(Number) as [number, number, number];
-  const wanted = Date.UTC(year, month - 1, day, part('hour'), part('minute'), part('second'));
-  let candidate = wanted;
-  const targetFormatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: targetTimeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const actual = targetFormatter.formatToParts(new Date(candidate));
-    const get = (type: Intl.DateTimeFormatPartTypes) =>
-      Number(actual.find((item) => item.type === type)?.value ?? '0');
-    const represented = Date.UTC(
-      get('year'),
-      get('month') - 1,
-      get('day'),
-      get('hour'),
-      get('minute'),
-      get('second'),
+  const local = nutritionWallTime(source, sourceTimeZone);
+  const candidates = nutritionEventCandidates(`${targetDate}T${local.slice(11)}`, targetTimeZone);
+  if (!candidates.length)
+    throw new RangeError(
+      `The copied ${local.slice(11)} time does not exist on ${targetDate} in ${targetTimeZone}. Choose another date or copy entries individually.`,
     );
-    candidate += wanted - represented;
-  }
-  return new Date(candidate);
+  // A copied repeated clock time uses its earlier occurrence; the UI explains this rule.
+  return new Date(
+    Date.parse(candidates[0]!) + source.getUTCSeconds() * 1000 + source.getUTCMilliseconds(),
+  );
 }

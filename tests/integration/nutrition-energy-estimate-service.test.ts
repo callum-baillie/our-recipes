@@ -86,6 +86,72 @@ describe('adult Nutrition energy estimate service', () => {
     ).toThrow(/different evidence/iu);
   });
 
+  it('saves the reviewed adjusted target with its exact basis and rejects mismatched or replayed evidence', () => {
+    const owner = createNutritionIdentity('adjusted target fixture', {
+      displayName: 'Adjusted target',
+      activityLevel: 'moderate',
+      dateOfBirth: '1990-04-03',
+      heightCentimeters: 170,
+      currentWeightKilograms: 70,
+      referenceSexCategory: 'female',
+      nutritionGoalType: 'loss',
+      estimatedTargetsEnabled: true,
+      estimatedTargetConsent: true,
+      dailyResetTimezone: 'UTC',
+    });
+    const preview = previewOrApplyNutritionEnergyEstimate(owner.profile.id, owner.principal.id, {
+      action: 'preview',
+      expectedProfileVersion: 1,
+      effectiveOn: '2026-07-19',
+      palCategory: 'active',
+    });
+    const request = {
+      action: 'apply' as const,
+      expectedProfileVersion: 1,
+      effectiveOn: '2026-07-19',
+      palCategory: 'active' as const,
+      operationId: '55555555-5555-4555-8555-555555555555',
+      supersedesGoalVersionId: null,
+      planningAdjustmentKcal: -250 as const,
+      reviewedTargetKcal: preview.estimate!.roundedKcal - 250,
+    };
+    expect(() =>
+      previewOrApplyNutritionEnergyEstimate(owner.profile.id, owner.principal.id, {
+        ...request,
+        reviewedTargetKcal: request.reviewedTargetKcal + 1,
+      }),
+    ).toThrow(/no longer matches/);
+    expect(() =>
+      previewOrApplyNutritionEnergyEstimate(owner.profile.id, owner.principal.id, {
+        ...request,
+        expectedProfileVersion: 2,
+      }),
+    ).toThrow(NutritionProfileConflictError);
+    const applied = previewOrApplyNutritionEnergyEstimate(
+      owner.profile.id,
+      owner.principal.id,
+      request,
+    );
+    expect(applied.goal!.value).toBe(request.reviewedTargetKcal);
+    expect(JSON.parse(applied.goal!.note)).toMatchObject({
+      planningAdjustmentKcal: -250,
+      reviewedTargetKcal: request.reviewedTargetKcal,
+      profileVersion: 1,
+      pal: 'active',
+    });
+    expect(
+      previewOrApplyNutritionEnergyEstimate(owner.profile.id, owner.principal.id, request).goal!.id,
+    ).toBe(applied.goal!.id);
+    expect(() =>
+      previewOrApplyNutritionEnergyEstimate(owner.profile.id, owner.principal.id, {
+        ...request,
+        planningAdjustmentKcal: -500,
+        reviewedTargetKcal: request.reviewedTargetKcal - 250,
+      }),
+    ).toThrow(/different evidence/);
+    expect(listNutritionGoalVersions(owner.profile.id, owner.principal.id)).toHaveLength(1);
+  });
+
   it('requires explicit latest-goal supersession and denies an unrelated principal', () => {
     const owner = identity();
     const manual = appendNutritionGoalVersion(owner.profile.id, owner.principal.id, {

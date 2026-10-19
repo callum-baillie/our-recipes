@@ -33,6 +33,9 @@ export function RecipeTaxonomySelector({
   const rootRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState('');
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const [placement, setPlacement] = useState({ above: false, height: 300 });
+  const anchorRef = useRef<HTMLDivElement>(null);
   const normalizedValue = useMemo(
     () =>
       normalizeRecipeTaxonomyValues(value).map(
@@ -52,6 +55,35 @@ export function RecipeTaxonomySelector({
         !input.trim() || option.toLocaleLowerCase().includes(input.trim().toLocaleLowerCase()),
     );
 
+  const custom =
+    input.trim() &&
+    !options.some((option) => option.toLocaleLowerCase() === input.trim().toLocaleLowerCase()) &&
+    !selectedKeys.has(input.trim().toLocaleLowerCase())
+      ? input.trim()
+      : null;
+  const choices = [...suggestions, ...(custom ? [custom] : [])];
+  const atLimit = normalizedValue.length >= MAX_RECIPE_TAXONOMY_VALUES;
+  useEffect(() => {
+    if (!open) return;
+    function place() {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const viewport = window.visualViewport;
+      const top = viewport?.offsetTop ?? 0;
+      const bottom = top + (viewport?.height ?? innerHeight);
+      const below = bottom - rect.bottom - 12;
+      const above = rect.top - top - 12;
+      const flip = below < 240 && above > below;
+      setPlacement({ above: flip, height: Math.max(60, Math.min(320, flip ? above : below)) });
+    }
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
   useEffect(() => {
     function closeOnOutsidePointer(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
@@ -74,6 +106,7 @@ export function RecipeTaxonomySelector({
     onChange([...normalizedValue, nextValue]);
     setInput('');
     setOpen(false);
+    setActive(-1);
   }
 
   return (
@@ -106,29 +139,52 @@ export function RecipeTaxonomySelector({
           ))}
         </div>
       ) : null}
-      <div className="recipe-taxonomy-combobox">
+      <div className="recipe-taxonomy-combobox" ref={anchorRef}>
         <input
           id={inputId}
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
+          aria-activedescendant={
+            open && active >= 0 && choices[active] ? `${listId}-${active}` : undefined
+          }
           aria-invalid={Boolean(error)}
           value={input}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
           onChange={(event) => {
             setInput(event.target.value);
+            setActive(-1);
             setOpen(true);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') {
+            if (event.key === 'Tab') {
               setOpen(false);
+              return;
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              setOpen(false);
+              setActive(-1);
+              return;
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              setOpen(true);
+              const next = choices.length
+                ? (active + (event.key === 'ArrowDown' ? 1 : -1) + choices.length) % choices.length
+                : -1;
+              setActive(next);
+              requestAnimationFrame(() =>
+                document.getElementById(`${listId}-${next}`)?.scrollIntoView({ block: 'nearest' }),
+              );
               return;
             }
             if (event.key !== 'Enter' && event.key !== ',' && event.key !== ';') return;
             event.preventDefault();
-            addValue();
+            addValue(open && active >= 0 ? choices[active] : input);
+            setActive(-1);
           }}
           placeholder={`Add ${label.toLocaleLowerCase()}`}
           maxLength={MAX_RECIPE_TAXONOMY_VALUE_LENGTH}
@@ -144,43 +200,41 @@ export function RecipeTaxonomySelector({
         >
           <ChevronDown size={18} aria-hidden="true" />
         </button>
-        <button
-          className="recipe-taxonomy-add"
-          type="button"
-          onClick={() => addValue()}
-          disabled={!input.trim() || normalizedValue.length >= MAX_RECIPE_TAXONOMY_VALUES}
-          aria-label={`Add ${label.toLocaleLowerCase()}`}
-        >
-          <Plus size={17} aria-hidden="true" />
-        </button>
         {open ? (
           <div
             className="recipe-taxonomy-menu"
+            style={{
+              maxHeight: placement.height,
+              top: placement.above ? 'auto' : 'calc(100% + .25rem)',
+              bottom: placement.above ? 'calc(100% + .25rem)' : 'auto',
+            }}
             id={listId}
             role="listbox"
             aria-label={`${label} options`}
           >
-            {suggestions.length > 0 ? (
-              suggestions.map((option) => (
+            {atLimit ? (
+              <span className="recipe-taxonomy-menu-empty">
+                Limit reached: choose up to {MAX_RECIPE_TAXONOMY_VALUES} values.
+              </span>
+            ) : choices.length ? (
+              choices.map((option, index) => (
                 <button
                   type="button"
                   role="option"
-                  aria-selected="false"
+                  id={`${listId}-${index}`}
+                  aria-selected={active === index}
                   key={option}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => addValue(option)}
                 >
-                  <span>{option}</span>
+                  <span>{option === custom ? `Add “${option}”` : option}</span>
                   <Plus size={15} aria-hidden="true" />
                 </button>
               ))
-            ) : input.trim() && normalizedValue.length < MAX_RECIPE_TAXONOMY_VALUES ? (
-              <button type="button" role="option" aria-selected="false" onClick={() => addValue()}>
-                <span>Add “{input.trim()}”</span>
-                <Plus size={15} aria-hidden="true" />
-              </button>
             ) : (
               <span className="recipe-taxonomy-menu-empty">
-                <Check size={15} aria-hidden="true" /> All available options are selected.
+                <Check size={15} aria-hidden="true" /> No unselected suggestions. Type a custom
+                value.
               </span>
             )}
           </div>

@@ -26,7 +26,7 @@ export default async function ApiSettingsPage() {
               <ShieldCheck size={15} aria-hidden="true" /> Keys are hashed at rest
             </span>
             <span>
-              <ShieldCheck size={15} aria-hidden="true" /> New keys begin read-only
+              <ShieldCheck size={15} aria-hidden="true" /> Editor starts with read permissions
             </span>
           </div>
         }

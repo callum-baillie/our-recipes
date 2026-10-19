@@ -1,3 +1,4 @@
+import { isNutritionDate } from '@/lib/domain/nutrition-ui';
 import { bodyMetricsSchema } from '@/lib/domain/body-metrics';
 import { parseCompositionEstimate } from '@/lib/domain/qn-body-composition';
 import { cookies } from 'next/headers';
@@ -51,7 +52,17 @@ const VIEWS = new Set<NutritionView>(['overview', 'diary', 'nutrients', 'trends'
 export default async function NutritionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ member?: string; range?: string; view?: string }>;
+  searchParams: Promise<{
+    member?: string;
+    range?: string;
+    view?: string;
+    date?: string;
+    task?: string;
+    log?: string;
+    returnLog?: string;
+    recipe?: string;
+    portions?: string;
+  }>;
 }) {
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
   const household = resolveNutritionHouseholdContext(actor);
@@ -221,6 +232,34 @@ export default async function NutritionPage({
   return (
     <>
       <NutritionDashboard
+        key={`${activeProfile.id}:${view}`}
+        initialDiaryDate={
+          requested.date && isNutritionDate(requested.date) && requested.date <= today
+            ? requested.date
+            : today
+        }
+        initialLogMode={
+          requested.log === 'product' ||
+          requested.log === 'recipe' ||
+          requested.log === 'manual' ||
+          requested.log === 'weight'
+            ? requested.log
+            : undefined
+        }
+        initialTask={
+          ['product', 'calculate'].includes(requested.task ?? '') ? requested.task : undefined
+        }
+        initialRecipeId={
+          dataWorkspace.recipes.some((recipe) => recipe.id === requested.recipe)
+            ? requested.recipe
+            : undefined
+        }
+        returnLogMode={
+          ['product', 'recipe'].includes(requested.returnLog ?? '')
+            ? requested.returnLog
+            : undefined
+        }
+        initialOpenPortions={requested.portions === '1'}
         latestWeighIn={
           latestMeasurement
             ? {
@@ -253,6 +292,8 @@ export default async function NutritionPage({
               quantity: full.quantity,
               unit: full.unit,
               servingCount: full.servingCount,
+              portionWeightGrams: full.portionWeightGrams,
+              revisionReason: full.revisionReason,
               values: full.values.map((value) => ({
                 nutrientCode: value.nutrientCode,
                 amount: value.amount,

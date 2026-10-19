@@ -132,7 +132,7 @@ test('planned cooking reviews exact FEFO stock and only deducts after literal co
   const startCooking = page.getByRole('button', { name: 'Start cooking' });
   await expect(startCooking).toBeVisible();
   await startCooking.click();
-  await page.getByRole('button', { name: 'Finish cooking' }).click();
+  await page.getByRole('button', { name: 'Finish cooking', exact: true }).last().click();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(

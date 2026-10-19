@@ -3,6 +3,9 @@
 import { CatalogRetailEvidence } from '@/components/catalog-retail-evidence';
 
 import dynamic from 'next/dynamic';
+import { createPortal } from 'react-dom';
+import { useModalSurface } from './use-modal-surface';
+import { DialogViewport } from './dialog-viewport';
 import Image from 'next/image';
 import { Barcode, Camera, Database, Search, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
@@ -85,6 +88,18 @@ export function FoodCatalogPicker({
   const [busy, setBusy] = useState(false);
   const [savingImport, setSavingImport] = useState(false);
   const [error, setError] = useState('');
+  const [searched, setSearched] = useState(false);
+  const readVersion = useRef(0);
+  const readController = useRef<AbortController | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const modal = useModalSurface({ open: open && !embedded, onClose: close, panelRef });
+  useEffect(
+    () => () => {
+      readController.current?.abort();
+      readVersion.current++;
+    },
+    [],
+  );
 
   const [rapid, setRapid] = useState(false);
   const [rapidLocation, setRapidLocation] = useState(locations[0]?.id ?? '');
@@ -107,7 +122,11 @@ export function FoodCatalogPicker({
   }, [embedded, open]);
 
   function close() {
-    if (busy || rapidQueue.busy) return;
+    if (savingImport || rapidQueue.busy) return;
+    readController.current?.abort();
+    readVersion.current++;
+    setBusy(false);
+    setSearched(false);
     setOpen(false);
     setTab(initialTab === 'barcode' ? 'search' : initialTab);
     setRecords([]);
@@ -121,6 +140,7 @@ export function FoodCatalogPicker({
   function handleDialogKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       close();
       return;
     }
@@ -135,15 +155,27 @@ export function FoodCatalogPicker({
     const last = focusable.at(-1)!;
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
+      event.stopPropagation();
       last.focus();
     } else if (!event.shiftKey && document.activeElement === last) {
       event.preventDefault();
+      event.stopPropagation();
       first.focus();
     }
   }
 
   async function post(url: string, body: unknown) {
+    const readOnly = [
+      '/api/v1/food-data/searches',
+      '/api/v1/food-data/barcode-lookups',
+      '/api/v1/food-data/details',
+    ].includes(url);
+    if (readOnly) {
+      readController.current?.abort();
+      readController.current = new AbortController();
+    }
     const response = await fetch(url, {
+      signal: readOnly ? readController.current?.signal : undefined,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -155,6 +187,7 @@ export function FoodCatalogPicker({
   }
 
   async function lookup(value: string) {
+    const version = ++readVersion.current;
     setBusy(true);
     setError('');
     setRecords([]);
@@ -171,6 +204,8 @@ export function FoodCatalogPicker({
         providerStatuses?: ProviderStatus[];
         localProduct?: LocalProduct | null;
       };
+      if (version !== readVersion.current) return;
+      setSearched(true);
       setStatuses(result.providerStatuses ?? []);
       setLocalProducts(result.localProduct ? [result.localProduct] : []);
       setSelectedLocal(result.localProduct ?? null);
@@ -180,14 +215,17 @@ export function FoodCatalogPicker({
       setRecords(next);
       if (next.length === 1 && !result.localProduct) setSelected(next[0]);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Barcode lookup failed.');
+      if (version === readVersion.current)
+        setError(value instanceof Error ? value.message : 'Barcode lookup failed.');
     } finally {
-      setBusy(false);
+      if (version === readVersion.current) setBusy(false);
     }
   }
 
   async function search(event: FormEvent) {
+    const version = ++readVersion.current;
     event.preventDefault();
+    event.stopPropagation();
     const normalized = query.replace(/[\s-]/g, '');
     if (/^\d{8,14}$/.test(normalized)) {
       await lookup(normalized);
@@ -208,17 +246,23 @@ export function FoodCatalogPicker({
         localProducts?: LocalProduct[];
         providerStatuses?: ProviderStatus[];
       };
+      if (version !== readVersion.current) return;
+      setSearched(true);
       setRecords(result.records ?? []);
       setLocalProducts(result.localProducts ?? []);
+      if (version !== readVersion.current) return;
+      setSearched(true);
       setStatuses(result.providerStatuses ?? []);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Food search failed.');
+      if (version === readVersion.current)
+        setError(value instanceof Error ? value.message : 'Food search failed.');
     } finally {
-      setBusy(false);
+      if (version === readVersion.current) setBusy(false);
     }
   }
 
   async function selectSearchResult(record: FoodRecord) {
+    const version = ++readVersion.current;
     setBusy(true);
     setError('');
     try {
@@ -228,16 +272,19 @@ export function FoodCatalogPicker({
         catalogRef: record.catalogRef,
         language: navigator.language.slice(0, 2),
       })) as { record: FoodRecord };
+      if (version !== readVersion.current) return;
       setSelected(result.record);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Food details could not be loaded.');
+      if (version === readVersion.current)
+        setError(value instanceof Error ? value.message : 'Food details could not be loaded.');
     } finally {
-      setBusy(false);
+      if (version === readVersion.current) setBusy(false);
     }
   }
 
   async function importRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    event.stopPropagation();
     if (!selected) return;
     setBusy(true);
     setSavingImport(true);
@@ -328,6 +375,7 @@ export function FoodCatalogPicker({
 
   async function useLocalProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    event.stopPropagation();
     if (!selectedLocal) return;
     if (context !== 'pantry') {
       onImported?.(selectedLocal);
@@ -387,295 +435,486 @@ export function FoodCatalogPicker({
           className={styles.launchButton}
           type="button"
           disabled={disabled}
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setQuery(defaultQuery);
+            setSearched(false);
+            setOpen(true);
+          }}
         >
           <Barcode size={17} /> {launchLabel}
         </button>
       ) : null}
-      {embedded || open ? (
-        <div
-          className={embedded ? styles.embeddedHost : styles.backdrop}
-          role="presentation"
-          onMouseDown={(event) => {
-            if (!embedded && event.target === event.currentTarget) close();
-          }}
-        >
-          <section
-            className={embedded ? styles.embedded : styles.dialog}
-            role={embedded ? 'region' : 'dialog'}
-            aria-modal={embedded ? undefined : true}
-            aria-label={embedded ? 'Find a pantry product' : undefined}
-            aria-labelledby={embedded ? undefined : titleId}
-            onKeyDown={embedded ? undefined : handleDialogKeyDown}
-          >
-            {!embedded ? (
-              <header className={styles.dialogHeader}>
-                <div>
-                  <h2 id={titleId}>Find food data</h2>
-                  <p>Review provider data before adding it to Bòrd.</p>
-                </div>
-                <button
-                  ref={closeButtonRef}
-                  type="button"
-                  className={styles.closeButton}
-                  onClick={close}
-                  aria-label="Close food data picker"
-                >
-                  <X />
-                </button>
-              </header>
-            ) : null}
-            {!selected && !selectedLocal ? (
+      {embedded || open
+        ? embedded
+          ? renderPicker()
+          : createPortal(
               <>
-                <div className={styles.tabs} role="tablist" aria-label="Food lookup method">
-                  {(
-                    [
-                      ['scan', Camera, 'Scan'],
-                      ['search', Search, 'Search'],
-                    ] as const
-                  ).map(([value, Icon, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={tab === value}
-                      onClick={() => setTab(value)}
-                    >
-                      <Icon size={16} />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {tab === 'scan' ? (
-                  <BarcodeScanner
-                    rapid={rapid}
-                    onRapidChange={context === 'pantry' ? setRapid : undefined}
-                    disabled={rapidQueue.busy}
-                    onDetected={(value) => {
-                      if (rapid && context === 'pantry') {
-                        void rapidQueue.scan(value);
-                        return;
-                      }
-                      setQuery(value);
-                      setTab('search');
-                      void lookup(value);
-                    }}
-                  />
-                ) : null}
-                {tab === 'search' ? (
-                  <form className={styles.lookupForm} onSubmit={search}>
-                    <label>
-                      Product name / barcode
-                      <input
-                        type="search"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        autoComplete="off"
-                        list={searchSuggestions.length ? searchSuggestionsId : undefined}
-                        minLength={2}
-                        maxLength={120}
-                        placeholder="Bananas or 012345678905"
-                        required
-                      />
-                      {searchSuggestions.length ? (
-                        <datalist id={searchSuggestionsId}>
-                          {searchSuggestions.map((suggestion) => (
-                            <option key={suggestion} value={suggestion} />
-                          ))}
-                        </datalist>
-                      ) : null}
-                    </label>
-                    <button disabled={busy} aria-busy={busy}>
-                      {busy ? <ButtonSpinner /> : null}
-                      {busy ? 'Searching…' : 'Search'}
-                    </button>
-                  </form>
-                ) : null}
-                {rapidQueue.entries.length ? (
-                  <section className={styles.rapidQueue} aria-label="Scanned items to review">
-                    <header>
-                      <h3>Scanned items</h3>
-                      <span>
-                        {rapidQueue.entries.reduce((sum, entry) => sum + entry.count, 0)} items
-                      </span>
-                    </header>
-                    <p>
-                      Review the matches below. Quantities count scanned items or packages; expiry
-                      dates remain unknown.
-                    </p>
-                    <ul>
-                      {rapidQueue.entries.map((entry) => (
-                        <li key={entry.barcode}>
-                          {entry.record?.images[0] ? (
-                            <Image src={entry.record.images[0].url} alt="" width={48} height={48} />
-                          ) : (
-                            <span className={styles.scanPlaceholder}>
-                              <Barcode />
-                            </span>
-                          )}
-                          <div>
-                            <strong>
-                              {entry.local?.displayName ??
-                                entry.record?.displayName ??
-                                entry.barcode}
-                            </strong>
-                            <small>
-                              {entry.status === 'loading'
-                                ? 'Looking up product…'
-                                : entry.status === 'unknown'
-                                  ? 'No match found — enter this item manually'
-                                  : (entry.error ??
-                                    entry.record?.brand ??
-                                    entry.local?.brand ??
-                                    entry.barcode)}
-                            </small>
-                            {entry.status === 'unknown' || entry.status === 'error' ? (
-                              <button type="button" onClick={onManualRequest}>
-                                Enter manually
-                              </button>
-                            ) : null}
-                          </div>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10000"
-                            aria-label={`Quantity for ${entry.local?.displayName ?? entry.record?.displayName ?? entry.barcode}`}
-                            value={entry.count}
-                            disabled={rapidQueue.busy || entry.saveAttempted}
-                            onChange={(event) =>
-                              rapidQueue.quantity(entry.barcode, Number(event.target.value))
-                            }
-                          />
-                          <button
-                            type="button"
-                            aria-label={`Remove scan ${entry.barcode}`}
-                            disabled={rapidQueue.busy}
-                            onClick={() => rapidQueue.remove(entry.barcode)}
-                          >
-                            <X size={16} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className={styles.rapidSave}>
-                      <label>
-                        Pantry location
-                        <select
-                          value={rapidLocation}
-                          disabled={
-                            rapidQueue.busy ||
-                            rapidQueue.entries.some((entry) => entry.saveAttempted)
-                          }
-                          onChange={(event) => setRapidLocation(event.target.value)}
-                        >
-                          {locations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.path}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        disabled={
-                          rapidQueue.busy ||
-                          !rapidLocation ||
-                          !rapidQueue.entries.some((entry) => entry.status === 'ready')
-                        }
-                        aria-busy={rapidQueue.busy}
-                        onClick={() => void rapidQueue.addAll(rapidLocation)}
-                      >
-                        {rapidQueue.busy ? <ButtonSpinner /> : null}
-                        {rapidQueue.busy ? 'Adding items…' : 'Add matched items'}
-                      </button>
-                    </div>
-                    {rapidQueue.message ? <p role="status">{rapidQueue.message}</p> : null}
-                  </section>
-                ) : rapidQueue.message ? (
-                  <p role="status" className={styles.providerNotice}>
-                    {rapidQueue.message}
+                <DialogViewport />
+                {renderPicker()}
+              </>,
+              document.body,
+            )
+        : null}
+    </>
+  );
+
+  function renderPicker() {
+    return (
+      <div
+        className={embedded ? styles.embeddedHost : styles.backdrop}
+        role="presentation"
+        onMouseDown={(event) => {
+          if (!embedded && event.target === event.currentTarget) close();
+        }}
+      >
+        <section
+          ref={panelRef}
+          onSubmit={(event) => event.stopPropagation()}
+          className={embedded ? styles.embedded : styles.dialog}
+          role={embedded ? 'region' : 'dialog'}
+          aria-modal={embedded ? undefined : true}
+          aria-label={embedded ? 'Find a pantry product' : undefined}
+          aria-labelledby={embedded ? undefined : titleId}
+          onKeyDown={
+            embedded
+              ? undefined
+              : (event) => {
+                  handleDialogKeyDown(event);
+                  if (!event.defaultPrevented) modal.onKeyDown(event);
+                }
+          }
+        >
+          {!embedded ? (
+            <header className={styles.dialogHeader}>
+              <div>
+                <h2 id={titleId}>Find food data</h2>
+                <p>
+                  {context === 'recipe'
+                    ? `Choose food data for “${defaultQuery || 'this ingredient'}”. Linking keeps its recipe quantity, unit and note; no stock is added.`
+                    : 'Review provider data before adding it to Bòrd.'}
+                </p>
+              </div>
+              <button
+                ref={closeButtonRef}
+                type="button"
+                className={styles.closeButton}
+                onClick={close}
+                disabled={savingImport || rapidQueue.busy}
+                aria-label="Close food data picker"
+              >
+                <X />
+              </button>
+            </header>
+          ) : null}
+          {savingImport && (
+            <p className={styles.providerNotice} role="status">
+              Saving this food record. Please wait before closing.
+            </p>
+          )}
+          {!selected && !selectedLocal ? (
+            <>
+              <div className={styles.tabs} role="tablist" aria-label="Food lookup method">
+                {(
+                  [
+                    ['scan', Camera, 'Scan'],
+                    ['search', Search, 'Search'],
+                  ] as const
+                ).map(([value, Icon, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === value}
+                    onClick={() => setTab(value)}
+                  >
+                    <Icon size={16} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {tab === 'scan' ? (
+                <BarcodeScanner
+                  onSearchRequest={() => {
+                    setTab('search');
+                    requestAnimationFrame(() =>
+                      panelRef.current
+                        ?.querySelector<HTMLInputElement>(
+                          'input[name="query"], input[type="search"], input[placeholder*="barcode"]',
+                        )
+                        ?.focus(),
+                    );
+                  }}
+                  rapid={rapid}
+                  onRapidChange={context === 'pantry' ? setRapid : undefined}
+                  disabled={rapidQueue.busy}
+                  onDetected={(value) => {
+                    if (rapid && context === 'pantry') {
+                      void rapidQueue.scan(value);
+                      return;
+                    }
+                    setQuery(value);
+                    setTab('search');
+                    void lookup(value);
+                  }}
+                />
+              ) : null}
+              {tab === 'search' ? (
+                <form className={styles.lookupForm} onSubmit={search}>
+                  <label>
+                    Product name / barcode
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      autoComplete="off"
+                      list={searchSuggestions.length ? searchSuggestionsId : undefined}
+                      minLength={2}
+                      maxLength={120}
+                      placeholder="Bananas or 012345678905"
+                      required
+                    />
+                    {searchSuggestions.length ? (
+                      <datalist id={searchSuggestionsId}>
+                        {searchSuggestions.map((suggestion) => (
+                          <option key={suggestion} value={suggestion} />
+                        ))}
+                      </datalist>
+                    ) : null}
+                  </label>
+                  <button disabled={busy} aria-busy={busy}>
+                    {busy ? <ButtonSpinner /> : null}
+                    {busy ? 'Searching…' : 'Search'}
+                  </button>
+                </form>
+              ) : null}
+              {rapidQueue.entries.length ? (
+                <section className={styles.rapidQueue} aria-label="Scanned items to review">
+                  <header>
+                    <h3>Scanned items</h3>
+                    <span>
+                      {rapidQueue.entries.reduce((sum, entry) => sum + entry.count, 0)} items
+                    </span>
+                  </header>
+                  <p>
+                    Review the matches below. Quantities count scanned items or packages; expiry
+                    dates remain unknown.
                   </p>
-                ) : null}
-                <ProviderNotice statuses={statuses} />
-                {localProducts.length ? (
-                  <div className={styles.localResults}>
-                    <h3>Already in Pantry</h3>
-                    {localProducts.map((product) => (
-                      <button
-                        type="button"
-                        className={styles.localResult}
-                        key={product.id}
-                        onClick={() => setSelectedLocal(product)}
-                      >
-                        <Database size={15} />
-                        <strong>{product.displayName}</strong>
-                        {product.brand ? ` · ${product.brand}` : ''}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <div className={styles.results} aria-busy={busy} aria-live="polite">
-                  {busy ? (
-                    <AsyncSkeleton label="Loading food search results" variant="rows" />
-                  ) : (
-                    records.map((record) => (
-                      <button
-                        type="button"
-                        className={styles.result}
-                        key={`${record.provider}:${record.providerRecordId}`}
-                        onClick={() => void selectSearchResult(record)}
-                      >
-                        {record.images[0] ? (
-                          <Image src={record.images[0].url} alt="" width={72} height={72} />
+                  <ul>
+                    {rapidQueue.entries.map((entry) => (
+                      <li key={entry.barcode}>
+                        {entry.record?.images[0] ? (
+                          <Image src={entry.record.images[0].url} alt="" width={48} height={48} />
                         ) : (
-                          <span className={styles.placeholder}>
+                          <span className={styles.scanPlaceholder}>
                             <Barcode />
                           </span>
                         )}
-                        <span>
-                          <strong>{record.displayName}</strong>
+                        <div>
+                          <strong>
+                            {entry.local?.displayName ?? entry.record?.displayName ?? entry.barcode}
+                          </strong>
                           <small>
-                            {[record.brand, record.quantity, record.dataType]
-                              .filter(Boolean)
-                              .join(' · ')}
+                            {entry.status === 'loading'
+                              ? 'Looking up product…'
+                              : entry.status === 'unknown'
+                                ? 'No match found — enter this item manually'
+                                : (entry.error ??
+                                  entry.record?.brand ??
+                                  entry.local?.brand ??
+                                  entry.barcode)}
                           </small>
-                          <small>
-                            {record.provider === 'open_food_facts'
-                              ? 'Open Food Facts'
-                              : 'USDA FoodData Central'}{' '}
-                            · {Math.round(record.completeness * 100)}% coverage
-                          </small>
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-                {embedded && tab === 'search' && onManualRequest ? (
-                  <div className={styles.embeddedFooter}>
-                    <button type="button" onClick={onManualRequest}>
-                      Enter details manually
+                          {entry.status === 'unknown' || entry.status === 'error' ? (
+                            <button type="button" onClick={onManualRequest}>
+                              Enter manually
+                            </button>
+                          ) : null}
+                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10000"
+                          aria-label={`Quantity for ${entry.local?.displayName ?? entry.record?.displayName ?? entry.barcode}`}
+                          value={entry.count}
+                          disabled={rapidQueue.busy || entry.saveAttempted}
+                          onChange={(event) =>
+                            rapidQueue.quantity(entry.barcode, Number(event.target.value))
+                          }
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Remove scan ${entry.barcode}`}
+                          disabled={rapidQueue.busy}
+                          onClick={() => rapidQueue.remove(entry.barcode)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className={styles.rapidSave}>
+                    <label>
+                      Pantry location
+                      <select
+                        value={rapidLocation}
+                        disabled={
+                          rapidQueue.busy || rapidQueue.entries.some((entry) => entry.saveAttempted)
+                        }
+                        onChange={(event) => setRapidLocation(event.target.value)}
+                      >
+                        {locations.map((location) => (
+                          <option key={location.id} value={location.id}>
+                            {location.path}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={
+                        rapidQueue.busy ||
+                        !rapidLocation ||
+                        !rapidQueue.entries.some((entry) => entry.status === 'ready')
+                      }
+                      aria-busy={rapidQueue.busy}
+                      onClick={() => void rapidQueue.addAll(rapidLocation)}
+                    >
+                      {rapidQueue.busy ? <ButtonSpinner /> : null}
+                      {rapidQueue.busy ? 'Adding items…' : 'Add matched items'}
                     </button>
                   </div>
-                ) : null}
-              </>
-            ) : selectedLocal ? (
-              <form className={styles.review} onSubmit={useLocalProduct}>
-                <button
-                  className={styles.backButton}
-                  type="button"
-                  onClick={() => setSelectedLocal(null)}
-                >
-                  ← Back to results
-                </button>
-                <div className={styles.localReviewHeading}>
-                  <Database aria-hidden="true" />
-                  <div>
-                    <h3>{selectedLocal.displayName}</h3>
-                    <p>{selectedLocal.brand || 'Existing Pantry product'}</p>
-                  </div>
+                  {rapidQueue.message ? <p role="status">{rapidQueue.message}</p> : null}
+                </section>
+              ) : rapidQueue.message ? (
+                <p role="status" className={styles.providerNotice}>
+                  {rapidQueue.message}
+                </p>
+              ) : null}
+              <ProviderNotice statuses={statuses} />
+              {searched && !busy && !error && !records.length && !localProducts.length ? (
+                <p className={styles.providerNotice} role="status">
+                  {statuses.some((status) => status.status !== 'available')
+                    ? 'No local match. Some food providers are unavailable; retry or continue with manual entry.'
+                    : context === 'pantry'
+                      ? 'No matching food found. Refine your search or enter the item details manually.'
+                      : 'No matching food found. Refine your search or close to continue with manual ingredient entry.'}
+                </p>
+              ) : null}
+              {savingImport ? (
+                <p role="status">Saving the reviewed food. Please wait before closing.</p>
+              ) : null}
+              {localProducts.length ? (
+                <div className={styles.localResults}>
+                  <h3>Already in Pantry</h3>
+                  {localProducts.map((product) => (
+                    <button
+                      type="button"
+                      className={styles.localResult}
+                      key={product.id}
+                      onClick={() => setSelectedLocal(product)}
+                    >
+                      <Database size={15} />
+                      <strong>{product.displayName}</strong>
+                      {product.brand ? ` · ${product.brand}` : ''}
+                    </button>
+                  ))}
                 </div>
+              ) : null}
+              <div className={styles.results} aria-busy={busy} aria-live="polite">
+                {busy ? (
+                  <AsyncSkeleton label="Loading food search results" variant="rows" />
+                ) : (
+                  records.map((record) => (
+                    <button
+                      type="button"
+                      className={styles.result}
+                      key={`${record.provider}:${record.providerRecordId}`}
+                      onClick={() => void selectSearchResult(record)}
+                    >
+                      {record.images[0] ? (
+                        <Image src={record.images[0].url} alt="" width={72} height={72} />
+                      ) : (
+                        <span className={styles.placeholder}>
+                          <Barcode />
+                        </span>
+                      )}
+                      <span>
+                        <strong>{record.displayName}</strong>
+                        <small>
+                          {[record.brand, record.quantity, record.dataType]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </small>
+                        <small>
+                          {record.provider === 'open_food_facts'
+                            ? 'Open Food Facts'
+                            : 'USDA FoodData Central'}{' '}
+                          · {Math.round(record.completeness * 100)}% coverage
+                        </small>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+              {embedded && onManualRequest ? (
+                <div className={styles.embeddedFooter}>
+                  <button type="button" onClick={onManualRequest}>
+                    Enter details manually
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : selectedLocal ? (
+            <form className={styles.review} onSubmit={useLocalProduct}>
+              <button
+                className={styles.backButton}
+                type="button"
+                onClick={() => setSelectedLocal(null)}
+              >
+                ← Back to results
+              </button>
+              <div className={styles.localReviewHeading}>
+                <Database aria-hidden="true" />
+                <div>
+                  <h3>{selectedLocal.displayName}</h3>
+                  <p>{selectedLocal.brand || 'Saved food record'}</p>
+                </div>
+              </div>
+              {context === 'pantry' ? (
+                <div className={styles.reviewGrid}>
+                  <label>
+                    Quantity
+                    <input
+                      name="quantityRemaining"
+                      type="number"
+                      min="0"
+                      step="any"
+                      defaultValue="1"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Unit
+                    <select name="unit" defaultValue="each">
+                      <option>each</option>
+                      <option>g</option>
+                      <option>kg</option>
+                      <option>ml</option>
+                      <option>l</option>
+                      <option>package</option>
+                    </select>
+                  </label>
+                  <label>
+                    Location
+                    <select name="locationId" required>
+                      {locations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.path}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Best before
+                    <input name="bestBeforeDate" type="date" />
+                  </label>
+                </div>
+              ) : (
+                <p className={styles.provenance}>
+                  This uses the existing local product and does not add Pantry stock or Food Diary
+                  intake.
+                </p>
+              )}
+              <button className={styles.confirmButton} disabled={busy}>
+                {busy
+                  ? 'Adding…'
+                  : context === 'pantry'
+                    ? 'Add batch for this product'
+                    : 'Use this product'}
+              </button>
+            </form>
+          ) : selected ? (
+            <form className={styles.review} onSubmit={importRecord}>
+              <button className={styles.backButton} type="button" onClick={() => setSelected(null)}>
+                ← Back to results
+              </button>
+              <div className={styles.reviewHeading}>
+                {selected.images[0] ? (
+                  <Image src={selected.images[0].url} alt="" width={112} height={112} />
+                ) : (
+                  <span className={styles.largePlaceholder}>
+                    <Barcode />
+                  </span>
+                )}
+                <div>
+                  <h3>{selected.displayName}</h3>
+                  <p>
+                    {selected.brand || 'No brand supplied'} ·{' '}
+                    {selected.provider === 'open_food_facts'
+                      ? 'Open Food Facts'
+                      : 'USDA FoodData Central'}
+                  </p>
+                  <small>{selected.license}</small>
+                </div>
+              </div>
+              {selected.catalogRef && (
+                <details>
+                  <summary>Catalog source revision</summary>
+                  <small>
+                    {selected.catalogRef.source_id} · {selected.catalogRef.source_revision}
+                    <br />
+                    Your selection is checked again before saving.
+                  </small>
+                </details>
+              )}
+              {selected.catalogRef?.canonical_product_id && (
+                <CatalogRetailEvidence
+                  key={`${selected.provider}:${selected.providerRecordId}`}
+                  reference={selected.catalogRef}
+                />
+              )}
+              <div className={styles.reviewGrid}>
+                <label>
+                  Name
+                  <input
+                    name="displayName"
+                    defaultValue={selected.displayName}
+                    maxLength={160}
+                    required
+                  />
+                </label>
+                <label>
+                  Brand
+                  <input name="brand" defaultValue={selected.brand} maxLength={120} />
+                </label>
+                <label>
+                  Category
+                  <input
+                    name="category"
+                    defaultValue={selected.categories[0] ?? ''}
+                    maxLength={80}
+                  />
+                </label>
+                <label>
+                  Inventory unit
+                  <select name="defaultInventoryUnit" defaultValue="each">
+                    <option>each</option>
+                    <option>g</option>
+                    <option>kg</option>
+                    <option>ml</option>
+                    <option>l</option>
+                    <option>package</option>
+                  </select>
+                </label>
+                <label>
+                  Package amount
+                  <input name="defaultPackageAmount" type="number" min="0.000001" step="any" />
+                </label>
+                <label>
+                  Package unit
+                  <input name="defaultPackageUnit" maxLength={30} />
+                </label>
                 {context === 'pantry' ? (
-                  <div className={styles.reviewGrid}>
+                  <>
                     <label>
                       Quantity
                       <input
@@ -712,171 +951,32 @@ export function FoodCatalogPicker({
                       Best before
                       <input name="bestBeforeDate" type="date" />
                     </label>
-                  </div>
-                ) : (
-                  <p className={styles.provenance}>
-                    This uses the existing local product and does not add Pantry stock or Food Diary
-                    intake.
-                  </p>
-                )}
-                <button className={styles.confirmButton} disabled={busy}>
-                  {busy
-                    ? 'Adding…'
-                    : context === 'pantry'
-                      ? 'Add batch for this product'
-                      : 'Use this product'}
-                </button>
-              </form>
-            ) : selected ? (
-              <form className={styles.review} onSubmit={importRecord}>
-                <button
-                  className={styles.backButton}
-                  type="button"
-                  onClick={() => setSelected(null)}
-                >
-                  ← Back to results
-                </button>
-                <div className={styles.reviewHeading}>
-                  {selected.images[0] ? (
-                    <Image src={selected.images[0].url} alt="" width={112} height={112} />
-                  ) : (
-                    <span className={styles.largePlaceholder}>
-                      <Barcode />
-                    </span>
-                  )}
-                  <div>
-                    <h3>{selected.displayName}</h3>
-                    <p>
-                      {selected.brand || 'No brand supplied'} ·{' '}
-                      {selected.provider === 'open_food_facts'
-                        ? 'Open Food Facts'
-                        : 'USDA FoodData Central'}
-                    </p>
-                    <small>{selected.license}</small>
-                  </div>
-                </div>
-                {selected.catalogRef && (
-                  <details>
-                    <summary>Catalog source revision</summary>
-                    <small>
-                      {selected.catalogRef.source_id} · {selected.catalogRef.source_revision}
-                      <br />
-                      Your selection is checked again before saving.
-                    </small>
-                  </details>
-                )}
-                {selected.catalogRef?.canonical_product_id && (
-                  <CatalogRetailEvidence
-                    key={`${selected.provider}:${selected.providerRecordId}`}
-                    reference={selected.catalogRef}
-                  />
-                )}
-                <div className={styles.reviewGrid}>
-                  <label>
-                    Name
-                    <input
-                      name="displayName"
-                      defaultValue={selected.displayName}
-                      maxLength={160}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Brand
-                    <input name="brand" defaultValue={selected.brand} maxLength={120} />
-                  </label>
-                  <label>
-                    Category
-                    <input
-                      name="category"
-                      defaultValue={selected.categories[0] ?? ''}
-                      maxLength={80}
-                    />
-                  </label>
-                  <label>
-                    Inventory unit
-                    <select name="defaultInventoryUnit" defaultValue="each">
-                      <option>each</option>
-                      <option>g</option>
-                      <option>kg</option>
-                      <option>ml</option>
-                      <option>l</option>
-                      <option>package</option>
-                    </select>
-                  </label>
-                  <label>
-                    Package amount
-                    <input name="defaultPackageAmount" type="number" min="0.000001" step="any" />
-                  </label>
-                  <label>
-                    Package unit
-                    <input name="defaultPackageUnit" maxLength={30} />
-                  </label>
-                  {context === 'pantry' ? (
-                    <>
-                      <label>
-                        Quantity
-                        <input
-                          name="quantityRemaining"
-                          type="number"
-                          min="0"
-                          step="any"
-                          defaultValue="1"
-                          required
-                        />
-                      </label>
-                      <label>
-                        Unit
-                        <select name="unit" defaultValue="each">
-                          <option>each</option>
-                          <option>g</option>
-                          <option>kg</option>
-                          <option>ml</option>
-                          <option>l</option>
-                          <option>package</option>
-                        </select>
-                      </label>
-                      <label>
-                        Location
-                        <select name="locationId" required>
-                          {locations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.path}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Best before
-                        <input name="bestBeforeDate" type="date" />
-                      </label>
-                    </>
-                  ) : null}
-                </div>
-                {selected.allergens.length ? (
-                  <p className={styles.warning}>
-                    <strong>Allergens:</strong> {selected.allergens.join(', ')}
-                  </p>
+                  </>
                 ) : null}
-                <p className={styles.provenance}>
-                  {selected.nutrients.length} mapped nutrients · retrieved{' '}
-                  {new Date(selected.retrievedAt).toLocaleDateString()} · provider data remains
-                  attributed and immutable.
+              </div>
+              {selected.allergens.length ? (
+                <p className={styles.warning}>
+                  <strong>Allergens:</strong> {selected.allergens.join(', ')}
                 </p>
-                <button className={styles.confirmButton} disabled={busy} aria-busy={busy}>
-                  {busy ? <ButtonSpinner /> : null}
-                  {busy ? 'Adding…' : context === 'pantry' ? 'Add Item' : 'Create and link product'}
-                </button>
-              </form>
-            ) : null}
-            {error ? (
-              <p className={styles.error} role="alert">
-                {error}
+              ) : null}
+              <p className={styles.provenance}>
+                {selected.nutrients.length} mapped nutrients · retrieved{' '}
+                {new Date(selected.retrievedAt).toLocaleDateString()} · provider data remains
+                attributed and immutable.
               </p>
-            ) : null}
-          </section>
-        </div>
-      ) : null}
-    </>
-  );
+              <button className={styles.confirmButton} disabled={busy} aria-busy={busy}>
+                {busy ? <ButtonSpinner /> : null}
+                {busy ? 'Adding…' : context === 'pantry' ? 'Add Item' : 'Create and link product'}
+              </button>
+            </form>
+          ) : null}
+          {error ? (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          ) : null}
+        </section>
+      </div>
+    );
+  }
 }

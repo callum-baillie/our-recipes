@@ -23,7 +23,7 @@ export function DiagnosticsExport() {
       link.download = `bord-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setStatus('Redacted diagnostics downloaded.');
+      setStatus('Troubleshooting JSON report prepared; download started.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Check your connection and retry.');
     } finally {
@@ -34,8 +34,9 @@ export function DiagnosticsExport() {
   return (
     <SettingsPane
       eyebrow="SUPPORT"
-      title="Redacted diagnostics"
-      description="Export safe installation details for troubleshooting."
+      id="support"
+      title="Troubleshooting report (JSON)"
+      description="Redacted installation details for support. This is not a restorable backup."
     >
       <SettingsRow
         title="Diagnostic report"

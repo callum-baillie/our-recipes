@@ -30,41 +30,51 @@ export function JsonLdImportWizard({
   const [error, setError] = useState<string | null>(null);
 
   async function requestDraft(candidateIndex?: number) {
+    if (pending) return;
     setPending(true);
     setError(null);
-    const response = await fetch('/api/v1/jsonld-drafts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, ...(candidateIndex === undefined ? {} : { candidateIndex }) }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      candidates?: JsonLdCandidate[];
-      draft?: Draft;
-      error?: { message?: string };
-    } | null;
-    setPending(false);
-    if (!response.ok || !body) {
-      setError(body?.error?.message ?? 'We could not read that local JSON-LD.');
-      return;
+    try {
+      const response = await fetch('/api/v1/jsonld-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source,
+          ...(candidateIndex === undefined ? {} : { candidateIndex }),
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        candidates?: JsonLdCandidate[];
+        draft?: Draft;
+        error?: { message?: string };
+      } | null;
+      setPending(false);
+      if (!response.ok || !body) {
+        setError(body?.error?.message ?? 'We could not read that local JSON-LD.');
+        return;
+      }
+      if (candidateIndex === undefined && body.candidates) {
+        setCandidates(body.candidates);
+        return;
+      }
+      if (candidateIndex !== undefined && body.draft) {
+        setDraft(body.draft);
+        return;
+      }
+      setError('The JSON-LD response did not contain a recipe review draft.');
+    } catch {
+      setError('Could not reach Bòrd. Your structured recipe data is retained; try again.');
+    } finally {
+      setPending(false);
     }
-    if (candidateIndex === undefined && body.candidates) {
-      setCandidates(body.candidates);
-      return;
-    }
-    if (candidateIndex !== undefined && body.draft) {
-      setDraft(body.draft);
-      return;
-    }
-    setError('The local JSON-LD response did not contain a recipe review draft.');
   }
 
   if (!expanded && !draft) {
     return (
       <section className="jsonld-import-entry" aria-label="Schema.org JSON-LD import">
-        <button type="button" onClick={() => setExpanded(true)}>
+        <button type="button" aria-expanded={false} onClick={() => setExpanded(true)}>
           <Braces size={24} aria-hidden="true" />
           <span>
-            <strong>Paste Schema.org JSON-LD</strong>
+            <strong>Structured recipe data (JSON-LD)</strong>
             <small>Already have structured recipe data? Paste it here.</small>
           </span>
           <ChevronDown size={21} aria-hidden="true" />
@@ -82,8 +92,8 @@ export function JsonLdImportWizard({
             <p className="eyebrow">PORTABLE RECIPE REVIEW</p>
             <h2>Check the imported fields.</h2>
             <p>
-              This Recipe node was parsed locally from pasted Schema.org JSON-LD. It has not been
-              saved yet.
+              This Recipe node was parsed by Bòrd’s server from pasted Schema.org JSON-LD. It has
+              not been saved yet.
             </p>
             <dl>
               <div>
@@ -120,10 +130,10 @@ export function JsonLdImportWizard({
   return (
     <section className="import-card jsonld-import-card" aria-labelledby="jsonld-import-heading">
       <p className="eyebrow">PORTABLE JSON-LD</p>
-      <h2 id="jsonld-import-heading">Paste a Schema.org recipe.</h2>
+      <h2 id="jsonld-import-heading">Structured recipe data (JSON-LD)</h2>
       <p className="jsonld-description">
-        We inspect only pasted JSON-LD Recipe nodes on this device. URLs are never fetched and files
-        are not accepted here.
+        Bòrd’s server parses the pasted JSON-LD Recipe data. URLs are never fetched and files are
+        not accepted here.
       </p>
       {!candidates ? (
         <>
@@ -161,7 +171,7 @@ export function JsonLdImportWizard({
             ) : (
               <ShieldCheck size={17} />
             )}
-            Find Recipe candidates
+            Find recipe candidates
           </button>
           {collapsedByDefault && !source && (
             <button className="text-button" type="button" onClick={() => setExpanded(false)}>

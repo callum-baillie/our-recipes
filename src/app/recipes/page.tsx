@@ -1,3 +1,4 @@
+import type { PantryRecipeAvailability } from '@/lib/domain/pantry-availability';
 import { PageHeader } from '@/components/page-header';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -94,7 +95,7 @@ export default async function RecipeLibraryPage({
         ),
       ]
     : firstLibraryPage.recipes;
-  const pantryAvailability = Object.assign(
+  const pantryAvailability: Record<string, PantryRecipeAvailability> = Object.assign(
     {},
     ...Array.from({ length: Math.ceil(candidateRecipes.length / 500) }, (_, index) =>
       listRecipePantryAvailability(
@@ -121,7 +122,7 @@ export default async function RecipeLibraryPage({
     : {};
   const eagerRecipeId = library.recipes.find((recipe) => recipe.image)?.id;
   return (
-    <main className="recipe-page">
+    <main className="recipe-page recipebook-page">
       <div className="library-heading">
         <PageHeader
           title="Your recipe library"
@@ -129,7 +130,7 @@ export default async function RecipeLibraryPage({
           eyebrow="THE SHARED COOKBOOK"
           description={
             library.total
-              ? `${library.total} recipe${library.total === 1 ? '' : 's'} ready for the kitchen.`
+              ? `${library.total} saved recipe${library.total === 1 ? '' : 's'}.`
               : 'A place for every recipe your household returns to.'
           }
           toolbarRight={<RecipebookNav current="library" />}
@@ -197,9 +198,18 @@ export default async function RecipeLibraryPage({
                 recipe={{
                   ...recipe,
                   pantryAvailability: pantryAvailability[recipe.id]?.state,
-                  pantryInsight: pantryAvailability[recipe.id]
-                    ? `${pantryAvailability[recipe.id]!.counts.ready} covered · ${pantryAvailability[recipe.id]!.counts.partial} short · ${pantryAvailability[recipe.id]!.counts.unknown} unknown`
-                    : undefined,
+                  pantryInsight:
+                    pantryAvailability[recipe.id] &&
+                    (pantryAvailability[recipe.id]!.counts.ready > 0 ||
+                      pantryAvailability[recipe.id]!.counts.partial > 0)
+                      ? Object.entries(pantryAvailability[recipe.id]!.counts)
+                          .filter(([, count]) => count > 0)
+                          .map(
+                            ([state, count]) =>
+                              `${count} ${state === 'ready' ? 'covered' : state === 'partial' ? 'short' : 'unknown'}`,
+                          )
+                          .join(' · ')
+                      : undefined,
                   normalizedNutrition: (() => {
                     if (!showRecipeCardNutrition) return undefined;
                     const presentation = nutritionPresentations[recipe.id];

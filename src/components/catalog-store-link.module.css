@@ -100,3 +100,13 @@
     min-height: 44px;
   }
 }
+
+@media (max-width: 700px) {
+  .search > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .search input {
+    width: 100%;
+  }
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ChevronDown,
   AlertCircle,
   Check,
   Circle,
@@ -328,12 +329,12 @@ export function ImportUploadPanel({
           <Upload size={25} />
         </span>
         <div>
-          <h2>{hasSelection ? 'Add or replace files' : 'Choose photos or PDF'}</h2>
-          <p>JPEG, PNG, WebP, HEIC, HEIF, or PDF · 15 MB total</p>
+          <h2>{hasSelection ? 'Add or replace files' : 'Drop recipe photos or a PDF here'}</h2>
+          <p>JPEG, PNG, WebP, HEIC, HEIF, or PDF · Up to 4 photos or 1 PDF · 15 MB total</p>
         </div>
         <label className="import-upload-trigger" htmlFor="recipe-import-files">
           <Upload size={18} aria-hidden="true" />
-          {hasSelection ? 'Choose again' : 'Choose photos or PDF'}
+          {hasSelection ? 'Choose again' : 'Choose files'}
         </label>
         <input
           ref={inputRef}
@@ -464,16 +465,17 @@ export function ImportUploadPanel({
         </button>
       ) : null}
 
-      <details className="import-transcription" open={Boolean(transcription)}>
-        <summary>
+      <details className="import-transcription">
+        <summary className="recipe-disclosure-summary">
           <ScanText size={20} aria-hidden="true" />
           <span>
             <strong>Add your own transcription</strong>
             <small>Optional. Paste text you already typed or scanned.</small>
           </span>
+          <ChevronDown size={18} aria-hidden="true" />
         </summary>
         <label>
-          <span className="sr-only">Manual transcription (optional)</span>
+          <span>Manual transcription (optional)</span>
           <textarea
             aria-label="Manual transcription (optional)"
             rows={7}
@@ -484,9 +486,17 @@ export function ImportUploadPanel({
             }
           />
           <small>
-            Your text takes priority over OCR. Textless PDFs still need a transcription.
+            This text accompanies your selected files and takes priority over automatic reading.
+            Scanned PDFs need a transcription.
           </small>
         </label>
+        <p>
+          For text without files, use{' '}
+          <a className="inline-link" href="/capture">
+            Text or idea
+          </a>
+          .
+        </p>
       </details>
 
       <p className="import-private-note">

@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Printer, Trash2, X } from 'lucide-react';
+import { CheckSquare, Printer, Trash2, X } from 'lucide-react';
 import { ResultsToolbar } from './search-facet-bar';
 import { AssistedReviewButton } from './assisted-review-button';
 
@@ -44,7 +44,7 @@ export function RecipeLibraryResults({
   async function trash() {
     setBusy(true);
     setStatus('');
-    const failed: string[] = [];
+    const failed: Array<{ id: string; title: string }> = [];
     for (const recipe of recipes.filter((recipe) => activeSelected.includes(recipe.id))) {
       try {
         const response = await fetch(`/api/v1/recipes/${recipe.id}/status`, {
@@ -52,23 +52,17 @@ export function RecipeLibraryResults({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'trash', expectedRevision: recipe.currentRevision }),
         });
-        if (!response.ok) failed.push(recipe.title);
+        if (!response.ok) failed.push({ id: recipe.id, title: recipe.title });
       } catch {
-        failed.push(recipe.title);
+        failed.push({ id: recipe.id, title: recipe.title });
       }
     }
     setBusy(false);
-    setSelected(
-      failed.length
-        ? activeSelected.filter((id) =>
-            failed.includes(recipes.find((recipe) => recipe.id === id)!.title),
-          )
-        : [],
-    );
+    setSelected(failed.map((recipe) => recipe.id));
     setStatus(
       failed.length
-        ? `Could not move to trash: ${failed.join(', ')}. Refresh and try again.`
-        : 'Selected recipes moved to trash.',
+        ? `Could not move to trash: ${failed.map((recipe) => recipe.title).join(', ')}. Refresh and try again.`
+        : 'Selected recipes moved to trash. Restore them from the Trash view.',
     );
     confirm.current?.close();
     router.refresh();
@@ -101,23 +95,24 @@ export function RecipeLibraryResults({
               query={search.get('q') ?? ''}
               title="Review recipe data"
             />
-            <button
-              type="button"
-              title="Move selected recipes to trash"
-              aria-label="Move selected recipes to trash"
-              disabled={busy || !recipes.length}
-              onClick={() => {
-                if (!selecting) {
+            {!selecting ? (
+              <button
+                type="button"
+                disabled={busy || !recipes.length}
+                onClick={() => {
                   setSelecting(true);
-                  setStatus('Select the recipes to move to trash.');
-                } else if (activeSelected.length) confirm.current?.showModal();
-                else setStatus('Select at least one recipe first.');
-              }}
-            >
-              <Trash2 />
-            </button>
+                  setStatus('Select recipes for printing or moving to trash.');
+                }}
+              >
+                <CheckSquare aria-hidden="true" /> Select recipes
+              </button>
+            ) : null}
             <a
-              aria-label="Export or print recipes"
+              aria-label={
+                activeSelected.length
+                  ? `Print ${activeSelected.length} selected recipes`
+                  : 'Print recipes on this page'
+              }
               title={
                 activeSelected.length
                   ? `Print ${activeSelected.length} selected recipes`
@@ -129,7 +124,11 @@ export function RecipeLibraryResults({
               }
             >
               <Printer />
-              <span className="action-label">Print</span>
+              <span className="action-label">
+                {activeSelected.length
+                  ? `Print selected (${activeSelected.length})`
+                  : 'Print this page'}
+              </span>
             </a>
           </>
         }
@@ -138,16 +137,18 @@ export function RecipeLibraryResults({
         <div className="recipe-selection-bar">
           <button
             type="button"
+            disabled={busy}
             onClick={() => {
               setSelecting(false);
               setSelected([]);
             }}
           >
-            Done
+            Cancel selection
           </button>
           <label>
             <input
               type="checkbox"
+              disabled={busy}
               checked={activeSelected.length === recipes.length}
               onChange={(event) =>
                 setSelected(event.target.checked ? recipes.map((recipe) => recipe.id) : [])
@@ -156,6 +157,14 @@ export function RecipeLibraryResults({
             Select this page
           </label>
           <span>{activeSelected.length} selected</span>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={busy || !activeSelected.length}
+            onClick={() => confirm.current?.showModal()}
+          >
+            <Trash2 size={16} aria-hidden="true" /> Move to trash
+          </button>
         </div>
       ) : null}
       {status ? (
@@ -174,6 +183,7 @@ export function RecipeLibraryResults({
                 <input
                   aria-label={`Select ${recipes[index].title}`}
                   type="checkbox"
+                  disabled={busy}
                   checked={activeSelected.includes(recipes[index].id)}
                   onChange={(event) =>
                     setSelected((current) =>
@@ -192,6 +202,13 @@ export function RecipeLibraryResults({
       <dialog ref={confirm} className="bulk-confirm-dialog" aria-labelledby="bulk-trash-title">
         <h2 id="bulk-trash-title">Move {activeSelected.length} recipes to trash?</h2>
         <p>You can restore them from the recipebook’s Trash view.</p>
+        <ul className="bulk-trash-recipes">
+          {recipes
+            .filter((recipe) => activeSelected.includes(recipe.id))
+            .map((recipe) => (
+              <li key={recipe.id}>{recipe.title}</li>
+            ))}
+        </ul>
         <div className="form-actions">
           <button type="button" disabled={busy} onClick={() => confirm.current?.close()}>
             <X /> Cancel

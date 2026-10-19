@@ -1,12 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { AiRuntimeSettings, AiUserPreferences } from '@/lib/domain/ai-runtime-settings';
-import {
-  SettingsPane,
-  SettingsField,
-  SettingsSubsection,
-  SettingsActionBar,
-} from './settings-primitives';
+import { SettingsPane, SettingsField, SettingsActionBar } from './settings-primitives';
 import {
   AI_MODEL_CATALOG,
   type AiWorkload,
@@ -37,6 +32,10 @@ export function AiRuntimeSettingsForm(props: Props) {
   const [version, setVersion] = useState(props.version);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
+  const [saved, setSaved] = useState(
+    JSON.stringify([props.global, props.workloads, props.personal, props.accounts ?? []]),
+  );
+  const dirty = JSON.stringify([settings, workloads, personal, accounts]) !== saved;
   const processing = shared ? settings : (personal?.processing ?? props.global);
   function changeProcessing(changes: Partial<AiRuntimeSettings>) {
     if (shared) setSettings((current) => ({ ...current, ...changes }));
@@ -75,9 +74,11 @@ export function AiRuntimeSettingsForm(props: Props) {
         setWorkloads(body.workloads);
         setAccounts(body.users);
         setVersion(body.version);
+        setSaved(JSON.stringify([body.settings, body.workloads, personal, body.users]));
       } else {
         setPersonal(body.account.preferences);
         setVersion(body.account.version);
+        setSaved(JSON.stringify([settings, workloads, body.account.preferences, accounts]));
       }
       setStatus('AI settings saved. New requests will use these choices.');
     } catch (error) {
@@ -87,7 +88,12 @@ export function AiRuntimeSettingsForm(props: Props) {
     }
   }
   return (
-    <div className="settings-stack" aria-busy={pending}>
+    <div
+      id="ai-defaults"
+      className="settings-stack"
+      aria-busy={pending}
+      onChange={() => setStatus('')}
+    >
       <SettingsPane
         title={shared ? 'Global AI controls' : 'My AI defaults'}
         description={
@@ -219,7 +225,16 @@ export function AiRuntimeSettingsForm(props: Props) {
               }));
           }
           return (
-            <SettingsSubsection key={item.workload} title={item.workload.replaceAll('_', ' ')}>
+            <details className="settings-disclosure" key={item.workload}>
+              <summary>
+                {item.workload.charAt(0).toUpperCase() +
+                  item.workload.slice(1).replaceAll('_', ' ')}{' '}
+                <small>
+                  · {item.model} · {item.reasoningEffort ?? 'Model default'} ·{' '}
+                  {shared ? 'Shared' : override ? 'Personal override' : 'Inherited'}
+                  {!base.enabled ? ' · Unavailable globally' : ''}
+                </small>
+              </summary>
               {!shared && (
                 <SettingsField title="Use global model">
                   <input
@@ -241,7 +256,7 @@ export function AiRuntimeSettingsForm(props: Props) {
               )}
               <SettingsField title="Model">
                 <select
-                  aria-label={`${item.workload.replaceAll('_', ' ')} model`}
+                  aria-label={`${item.workload.charAt(0).toUpperCase() + item.workload.slice(1).replaceAll('_', ' ')} model`}
                   value={item.model}
                   disabled={pending || (!shared && !override)}
                   onChange={(event) =>
@@ -302,7 +317,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   onChange={(event) => update({ enabled: event.target.checked })}
                 />
               </SettingsField>
-            </SettingsSubsection>
+            </details>
           );
         })}
       </SettingsPane>
@@ -331,12 +346,13 @@ export function AiRuntimeSettingsForm(props: Props) {
           ))}
         </SettingsPane>
       )}
-      <SettingsActionBar>
-        <p role="status">{status}</p>
+      <SettingsActionBar
+        status={status || (dirty ? 'Unsaved AI defaults' : 'No unsaved AI defaults')}
+      >
         <button
           type="button"
           className="primary-button"
-          disabled={pending}
+          disabled={pending || !dirty}
           onClick={() => void save()}
         >
           {pending ? 'Saving…' : shared ? 'Save global AI settings' : 'Save my AI defaults'}

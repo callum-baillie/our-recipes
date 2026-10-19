@@ -142,6 +142,21 @@ function buildSummaryEvidence(profileId: string, now: Date) {
   };
 }
 
+export function aiSummaryUnavailableReason(profileId: string) {
+  if (!getAiWorkloadSetting(profileId, 'nutrition_summary').enabled) return 'disabled_workload';
+  const policy = getAiDataPolicy(profileId);
+  if (
+    !policy.summaryNutritionEnabled &&
+    !policy.summaryMealPlansEnabled &&
+    !policy.summaryShoppingListsEnabled &&
+    !policy.summaryRecipesEnabled
+  )
+    return 'disabled_outputs';
+  return buildSummaryEvidence(profileId, new Date()).requestedDomains.length
+    ? null
+    : 'no_eligible_evidence';
+}
+
 export async function generateAiSummaryBundle(profileId: string, now = new Date()) {
   const evidence = buildSummaryEvidence(profileId, now);
   if (!evidence.requestedDomains.length) return [];

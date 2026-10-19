@@ -15,6 +15,8 @@ import {
   updateMealPlanEntryStatusWithNutrition,
   updateMealPlanEntryWithNutrition,
 } from '@/lib/services/nutrition-planning-orchestration-service';
+import { createRecipe } from '@/lib/services/recipe-service';
+import { recipeInputSchema } from '@/lib/domain/recipe';
 import { listPlannedMeals, refreshMealPlanRecipeSnapshot } from '@/lib/services/planning-service';
 
 function setupOneProfile() {
@@ -42,6 +44,104 @@ describe('meal plan Nutrition allocation orchestration', () => {
   afterEach(() => {
     resetDatabaseForTests();
     vi.unstubAllEnvs();
+  });
+
+  it('copies audience, alternatives and single-food snapshots into the next week', () => {
+    const actor = setupOneProfile();
+    const first = createRecipe(
+      recipeInputSchema.parse({
+        summary: 'A recipe for copying.',
+        prepMinutes: 0,
+        cookMinutes: 0,
+        sourceName: '',
+        sourceUrl: '',
+        tags: [],
+        title: 'Soup',
+        servings: '2',
+        ingredientGroups: [
+          { name: '', ingredients: [{ quantity: 1, unit: 'kg', item: 'Potatoes', note: '' }] },
+        ],
+        instructionSections: [{ title: '', steps: ['Boil the potatoes.'] }],
+      }),
+      actor.id,
+    );
+    const second = createRecipe(
+      recipeInputSchema.parse({
+        summary: 'A recipe for copying.',
+        prepMinutes: 0,
+        cookMinutes: 0,
+        sourceName: '',
+        sourceUrl: '',
+        tags: [],
+        title: 'Stew',
+        servings: '2',
+        ingredientGroups: [
+          { name: '', ingredients: [{ quantity: 1, unit: 'kg', item: 'Carrots', note: '' }] },
+        ],
+        instructionSections: [{ title: '', steps: ['Simmer the carrots.'] }],
+      }),
+      actor.id,
+    );
+    const alternatives = addMealPlanEntryWithNutrition(
+      {
+        plannedFor: '2026-12-28',
+        meal: 'dinner',
+        kind: 'options',
+        profileIds: [actor.id],
+        recipeId: '',
+        title: 'Soup or stew',
+        servings: 2,
+        note: 'Keep this note',
+        options: [
+          { kind: 'recipe', recipeId: first.id, label: first.title },
+          { kind: 'recipe', recipeId: second.id, label: second.title },
+        ],
+      },
+      actor.id,
+    );
+    const item = addMealPlanEntryWithNutrition(
+      {
+        plannedFor: '2026-12-31',
+        meal: 'lunch',
+        kind: 'item',
+        profileIds: [actor.id],
+        recipeId: '',
+        title: 'Yogurt',
+        servings: 3,
+        note: 'Plain',
+        foodItem: {
+          item: 'Yogurt',
+          quantity: 125,
+          unit: 'g',
+          note: 'unsweetened',
+          shoppingCategory: 'Other',
+          pantryProductId: '',
+        },
+      },
+      actor.id,
+    );
+    const result = duplicateWeekWithNutrition(
+      { weekStart: '2026-12-28', destinationWeekStart: '2027-01-04' },
+      actor.id,
+    );
+    const copiedOptions = result.find((entry) => entry.kind === 'options')!;
+    const copiedItem = result.find((entry) => entry.kind === 'item')!;
+    expect(copiedOptions).toMatchObject({
+      profileIds: alternatives.profileIds,
+      options: alternatives.options,
+      note: alternatives.note,
+      servings: 2,
+      status: 'planned',
+      plannedFor: '2027-01-04',
+    });
+    expect(copiedItem).toMatchObject({
+      profileIds: item.profileIds,
+      recipeIngredientsSnapshot: item.recipeIngredientsSnapshot,
+      note: 'Plain',
+      servings: 3,
+      plannedFor: '2027-01-07',
+    });
+    expect(copiedItem.id).not.toBe(item.id);
   });
 
   it('automatically assigns the full serving count in a one-profile household', () => {

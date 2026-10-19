@@ -38,6 +38,7 @@
   line-height: 1.5;
 }
 .content {
+  min-height: 0;
   overflow-y: auto;
   display: grid;
   gap: 1rem;
@@ -49,7 +50,7 @@
   font-size: 0.9rem;
   font-weight: 600;
 }
-.dialog input,
+.dialog input:not([type='checkbox']):not([type='radio']),
 .dialog select,
 .dialog textarea {
   min-width: 0;
@@ -86,8 +87,8 @@
   border-top: 1px solid var(--line);
 }
 .dialog button[type='submit'] {
-  background: var(--leaf);
-  color: white;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .row {
   display: flex;
@@ -289,7 +290,7 @@
   .dialog {
     width: calc(100vw - 1rem);
   }
-  .dialog input,
+  .dialog input:not([type='checkbox']):not([type='radio']),
   .dialog select,
   .dialog textarea {
     font-size: 16px;
@@ -313,4 +314,42 @@
   flex: 0 0 20px;
   padding: 0;
   accent-color: var(--leaf);
+}
+
+.editableFields {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.dialog h2 {
+  font:
+    500 var(--panel-title-size, 1.5rem)/1.2 var(--font-display, Georgia),
+    serif;
+}
+.dialog header > button {
+  flex: 0 0 44px;
+  width: 44px;
+  padding: 0.5rem;
+  border-radius: 50%;
+}
+.dialog input[type='checkbox'] {
+  width: 1.2rem;
+  height: 1.2rem;
+  min-height: 0;
+  padding: 0;
+  flex: 0 0 1.2rem;
+  accent-color: var(--leaf);
+}
+.audienceMode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.audienceMode [aria-pressed='true'] {
+  background: var(--selection-surface);
+  color: var(--on-selection);
 }

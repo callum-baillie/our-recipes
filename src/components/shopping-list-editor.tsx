@@ -1,4 +1,11 @@
 'use client';
+import { AppDialog } from './app-dialog';
+import { DialogViewport } from './dialog-viewport';
+import {
+  shoppingWorkflow,
+  shoppingWorkflowState,
+  moveShoppingItem,
+} from '@/lib/domain/shopping-workflow';
 import { formatShoppingQuantity } from '@/lib/domain/shopping-quantity';
 import { ShoppingListNotes } from './shopping-list-notes';
 import { ShoppingListShortcuts } from './shopping-list-shortcuts';
@@ -317,11 +324,7 @@ export async function runTrackedIntakeOperation<T>(
 }
 
 function normalizedState(item: Item): ShoppingState {
-  return item.checked
-    ? 'sourced'
-    : item.shoppingState === 'sourced'
-      ? 'to_buy'
-      : item.shoppingState;
+  return shoppingWorkflowState(item);
 }
 
 export function shoppingItemAmount(
@@ -478,6 +481,7 @@ export function ShoppingListEditor({
   const [query, setQuery] = useState('');
   const [focusedShopping, setFocusedShopping] = useState(true);
   const pendingStateChanges = useRef(new Set<string>());
+  const reorderPending = useRef(false);
   const [pendingItems, setPendingItems] = useState<string[]>([]);
   const [lastChecked, setLastChecked] = useState<{
     item: Item;
@@ -488,6 +492,18 @@ export function ShoppingListEditor({
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [cartQuantityItem, setCartQuantityItem] = useState<Item | null>(null);
   const [cartQuantityDraft, setCartQuantityDraft] = useState('');
+  const [editingItem, setEditingItem] = useState<{
+    id: string;
+    name: string;
+    quantity: string;
+    unit: string;
+    aisleId: string;
+  } | null>(null);
+  const [editError, setEditError] = useState('');
+  const editingItemId = useRef<string | null>(null);
+  useEffect(() => {
+    editingItemId.current = editingItem?.id ?? null;
+  }, [editingItem?.id]);
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
   const [groupMode, setGroupMode] = useState<GroupMode>('aisle');
   const [selectedSupermarketId, setSelectedSupermarketId] = useState(
@@ -574,6 +590,7 @@ export function ShoppingListEditor({
     const refresh = async () => {
       if (
         fetching ||
+        reorderPending.current ||
         document.visibilityState !== 'visible' ||
         document.activeElement?.matches('input,textarea,select')
       )
@@ -584,11 +601,13 @@ export function ShoppingListEditor({
         const body = await response.json();
         if (!response.ok)
           throw new Error('Shared list updates paused. Your edits are kept; reconnect to sync.');
-        if (disposed) return;
+        if (disposed || reorderPending.current) return;
         const latest = body.list.items as Item[];
         setItems((current) => {
           const locked = (id: string) =>
-            dirtyItems.current.has(id) || pendingStateChanges.current.has(id);
+            dirtyItems.current.has(id) ||
+            pendingStateChanges.current.has(id) ||
+            editingItemId.current === id;
           const byId = new Map(current.map((item) => [item.id, item]));
           return [
             ...latest.map((item) =>
@@ -638,17 +657,14 @@ export function ShoppingListEditor({
     });
   const itemsByState = (state: ShoppingState) =>
     searched.filter((item) => normalizedState(item) === state);
+  const wholeTrip = shoppingWorkflow(items);
   const toBuy = itemsByState('to_buy');
   const inCart = itemsByState('in_cart');
   const cantFind = itemsByState('cant_find');
   const sourced = itemsByState('sourced');
   const total = items.length;
-  const progressCount = items.filter((item) =>
-    ['in_cart', 'sourced'].includes(normalizedState(item)),
-  ).length;
-  const remaining = items.filter((item) =>
-    ['to_buy', 'cant_find'].includes(normalizedState(item)),
-  ).length;
+  const progressCount = wholeTrip.inCart.length + wholeTrip.sourced.length;
+  const remaining = wholeTrip.toBuy.length + wholeTrip.cantFind.length;
   const progress = total ? Math.round((progressCount / total) * 100) : 0;
   const scanMatches = useMemo(
     () =>
@@ -953,7 +969,10 @@ export function ShoppingListEditor({
       setScanRecord(null);
       setBarcode('');
       setScanQuantity('1');
-      showToast(`${itemName} added to ${unpackMode ? 'Pantry unpacking' : 'In cart'}.`, 'success');
+      showToast(
+        `${itemName} added to ${unpackMode ? 'Pantry unpacking' : 'Add to cart'}.`,
+        'success',
+      );
     } catch (error) {
       setScanStatus(error instanceof Error ? error.message : 'Could not add the scanned item.');
     } finally {
@@ -1127,27 +1146,42 @@ export function ShoppingListEditor({
   }, [items, matchPantryProduct, stockedPantryProducts]);
 
   const remove = async (item: Item) => {
+    if (busy) return false;
+    setBusy('remove');
     try {
       const response = await fetch(`/api/v1/shopping-lists/${list.id}/items/${item.id}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
         showToast(`Could not remove ${item.item}.`, 'error');
-        return;
+        return false;
       }
       setItems((current) => current.filter((entry) => entry.id !== item.id));
       showToast(`${item.item} removed.`, 'success');
+      return true;
     } catch {
       showToast(`Could not remove ${item.item}. Check the connection and try again.`, 'error');
+      return false;
+    } finally {
+      setBusy('');
     }
   };
 
+  const movementContext = (item: Item) =>
+    searched.filter(
+      (entry) =>
+        normalizedState(entry) === normalizedState(item) &&
+        (groupMode !== 'aisle' ||
+          (entry.aisleId && aisleById.has(entry.aisleId) ? entry.aisleId : 'unassigned') ===
+            (item.aisleId && aisleById.has(item.aisleId) ? item.aisleId : 'unassigned')),
+    );
   const reorder = async (item: Item, direction: -1 | 1) => {
-    const index = items.findIndex((entry) => entry.id === item.id);
-    const swap = index + direction;
-    if (index < 0 || swap < 0 || swap >= items.length) return;
-    const next = [...items];
-    [next[index], next[swap]] = [next[swap], next[index]];
+    if (sortMode !== 'position' || busy) return;
+    const next = moveShoppingItem(items, movementContext(item), item.id, direction);
+    if (!next) return;
+    const previousPositions = new Map(items.map((entry) => [entry.id, entry.position]));
+    setBusy('reorder');
+    reorderPending.current = true;
     setItems(next);
     try {
       const response = await fetch(`/api/v1/shopping-lists/${list.id}`, {
@@ -1155,12 +1189,70 @@ export function ShoppingListEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemIds: next.map((entry) => entry.id) }),
       });
-      if (response.ok) return;
-      setItems(items);
-      showToast('Could not save that item order.', 'error');
+      if (!response.ok) throw new Error('Could not save that item order.');
     } catch {
-      setItems(items);
-      showToast('Could not save that item order. Check the connection and try again.', 'error');
+      setItems((current) =>
+        current.map((entry) => ({
+          ...entry,
+          position: previousPositions.get(entry.id) ?? entry.position,
+        })),
+      );
+      showToast('Could not save that item order. Your previous order was restored.', 'error');
+    } finally {
+      reorderPending.current = false;
+      setBusy('');
+    }
+  };
+  const openItemEditor = (item: Item) => {
+    setEditError('');
+    setEditingItem({
+      id: item.id,
+      name: item.item,
+      quantity: String(item.quantity ?? ''),
+      unit: item.unit,
+      aisleId: item.aisleId ?? '',
+    });
+  };
+  const commitItemEdit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!editingItem || busy) return;
+    const original = items.find((item) => item.id === editingItem.id);
+    const raw = editingItem.quantity.trim();
+    const quantity = raw === '' ? null : Number(raw);
+    if (
+      !original ||
+      !editingItem.name.trim() ||
+      editingItem.name.trim().length > 160 ||
+      (quantity !== null && (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000))
+    ) {
+      setEditError(
+        'Enter a name up to 160 characters and a buy quantity greater than zero, up to 10,000, or leave quantity blank when unknown.',
+      );
+      return;
+    }
+    const changed = {
+      ...original,
+      item: editingItem.name.trim(),
+      quantity,
+      unit: editingItem.unit.trim(),
+      aisleId: editingItem.aisleId || null,
+    };
+    const previousDirty = dirtyItems.current.get(original.id);
+    updateLocal(original.id, changed);
+    const version = dirtyItems.current.get(original.id);
+    setBusy('edit');
+    const ok = await save(changed);
+    setBusy('');
+    if (ok) {
+      setEditingItem(null);
+      showToast('Item changes saved.', 'success');
+    } else {
+      if (dirtyItems.current.get(original.id) === version) {
+        setItems((current) => current.map((item) => (item.id === original.id ? original : item)));
+        if (previousDirty === undefined) dirtyItems.current.delete(original.id);
+        else dirtyItems.current.set(original.id, previousDirty);
+      }
+      setEditError('Changes were not saved. Your entries are kept here; try again.');
     }
   };
 
@@ -1404,16 +1496,18 @@ export function ShoppingListEditor({
           {item.cartLabel && item.cartLabel !== item.item ? (
             <small className={styles.requestedItem}>For: {item.item}</small>
           ) : null}
-          <span>
-            {pantryContributions(item).length ? (
-              <small className={styles.aisleBadge}>Meal plan</small>
-            ) : null}
-            {item.policyBreakdown ? (
-              <small className={styles.aisleBadge}>
-                {item.policyBreakdown.mode === 'always_have' ? 'Always have' : 'Always buy'}
-              </small>
-            ) : null}
-          </span>
+          {(pantryContributions(item).length > 0 || item.policyBreakdown) && (
+            <span>
+              {pantryContributions(item).length ? (
+                <small className={styles.aisleBadge}>Meal plan</small>
+              ) : null}
+              {item.policyBreakdown ? (
+                <small className={styles.aisleBadge}>
+                  {item.policyBreakdown.mode === 'always_have' ? 'Always have' : 'Always buy'}
+                </small>
+              ) : null}
+            </span>
+          )}
           <span
             className={`${styles.quantitySummary} ${
               quantitySummary.isEstimate ? styles.quantitySummaryEstimate : ''
@@ -1432,7 +1526,18 @@ export function ShoppingListEditor({
               <span className={styles.pantryAmount}>{pantryStockLabel(matchedProduct)}</span>
             ) : null}
             {quantitySummary.calculation ? (
-              <span className={styles.quantityCalculation}>{quantitySummary.calculation}</span>
+              <span className={styles.quantityCalculation}>
+                {quantitySummary.calculation}
+                {quantitySummary.isEstimate && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => openItemEditor(item)}
+                  >
+                    Set buy quantity
+                  </button>
+                )}
+              </span>
             ) : null}
           </span>
           {groupMode === 'none' ? (
@@ -1441,7 +1546,16 @@ export function ShoppingListEditor({
             </span>
           ) : null}
         </div>
-        {state === 'cant_find' ? (
+        {state === 'sourced' ? (
+          <button
+            className={styles.stateButton}
+            type="button"
+            disabled={pendingItems.includes(item.id)}
+            onClick={() => void setItemState(item, 'to_buy', 0, '')}
+          >
+            Move back to To buy
+          </button>
+        ) : state === 'cant_find' ? (
           <>
             <button
               className={`${styles.stateButton} ${styles.foundButton}`}
@@ -1479,7 +1593,7 @@ export function ShoppingListEditor({
                   ? 'Remove from cart'
                   : item.cartQuantity > 0
                     ? 'Add remaining'
-                    : 'In cart'}
+                    : 'Add to cart'}
               </span>
             </button>
             <button
@@ -1488,9 +1602,33 @@ export function ShoppingListEditor({
               disabled={pendingItems.includes(item.id)}
               onClick={() => void setItemState(item, 'cant_find')}
             >
-              <CircleHelp size={19} /> <span>Can’t Find</span>
+              <CircleHelp size={19} /> <span>Can’t find</span>
             </button>
           </>
+        )}
+        {state === 'sourced' && (
+          <details className={styles.sourcedActions}>
+            <summary className="recipe-disclosure-summary">
+              <span>Other actions</span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
+            <div>
+              <button
+                type="button"
+                disabled={pendingItems.includes(item.id)}
+                onClick={() => void setItemState(item, 'in_cart')}
+              >
+                Move to cart
+              </button>
+              <button
+                type="button"
+                disabled={pendingItems.includes(item.id)}
+                onClick={() => void setItemState(item, 'cant_find')}
+              >
+                Move to Can’t find
+              </button>
+            </div>
+          </details>
         )}
         {state !== 'cant_find' && (state === 'in_cart' || item.cartQuantity > 0) ? (
           <button
@@ -1502,66 +1640,16 @@ export function ShoppingListEditor({
             Change quantity
           </button>
         ) : null}
-        <details className={styles.itemMenu}>
-          <summary aria-label={`Edit ${item.item}`}>•••</summary>
-          <div className={styles.itemEditor}>
-            <input
-              aria-label={`Shopping item ${items.findIndex((entry) => entry.id === item.id) + 1}`}
-              value={item.item}
-              onChange={(event) => updateLocal(item.id, { item: event.target.value })}
-              onBlur={() => void save(items.find((entry) => entry.id === item.id) ?? item)}
-            />
-            <input
-              aria-label={`${item.item} quantity`}
-              inputMode="decimal"
-              value={item.quantity ?? ''}
-              onChange={(event) =>
-                updateLocal(item.id, {
-                  quantity: event.target.value === '' ? null : Number(event.target.value),
-                })
-              }
-              onBlur={() => void save(items.find((entry) => entry.id === item.id) ?? item)}
-            />
-            <input
-              aria-label={`${item.item} unit`}
-              value={item.unit}
-              onChange={(event) => updateLocal(item.id, { unit: event.target.value })}
-              onBlur={() => void save(items.find((entry) => entry.id === item.id) ?? item)}
-            />
-            <select
-              aria-label={`Aisle for ${item.item}`}
-              value={item.aisleId ?? ''}
-              onChange={(event) => {
-                const changed = { ...item, aisleId: event.target.value || null };
-                updateLocal(item.id, changed);
-                void save(changed);
-              }}
-            >
-              <option value="">Unassigned</option>
-              {list.aisles.map((aisle) => (
-                <option key={aisle.id} value={aisle.id}>
-                  {aisle.name}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={() => void reorder(item, -1)}>
-              <ArrowUp size={15} /> Move up
-            </button>
-            <button type="button" onClick={() => void reorder(item, 1)}>
-              <ArrowDown size={15} /> Move down
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`Remove “${item.item}” from this shopping list?`)) {
-                  void remove(item);
-                }
-              }}
-            >
-              <Trash2 size={15} /> Remove
-            </button>
-          </div>
-        </details>
+        {!focusedShopping && (
+          <button
+            className={styles.itemMenu}
+            type="button"
+            aria-label={`Edit ${item.item}`}
+            onClick={() => openItemEditor(item)}
+          >
+            Edit
+          </button>
+        )}
         {suggestedMatches.length ? (
           <section
             className={styles.pantryMatchPanel}
@@ -1911,7 +1999,11 @@ export function ShoppingListEditor({
           {sectionItems.length ? (
             groupMode === 'aisle' ? (
               groupedItems.map((group) => (
-                <section className={styles.aisleGroup} key={group.id}>
+                <section
+                  className={styles.aisleGroup}
+                  id={`aisle-${list.id}-${state}-${group.id}`}
+                  key={group.id}
+                >
                   <h2>
                     <span>{group.name}</span>
                     <small>{group.items.length}</small>
@@ -1923,7 +2015,11 @@ export function ShoppingListEditor({
               sectionItems.map(renderItem)
             )
           ) : (
-            <p className={styles.emptyState}>Nothing here yet.</p>
+            <p className={styles.emptyState}>
+              {query
+                ? 'No matching items in this section. Clear search to see the full list.'
+                : 'Nothing here yet.'}
+            </p>
           )}
         </div>
       </details>
@@ -1950,13 +2046,27 @@ export function ShoppingListEditor({
   };
 
   const scrollToRemaining = () => {
-    document
-      .getElementById(`shopping-items-${list.id}-to_buy`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const state = wholeTrip.toBuy.length
+      ? 'to_buy'
+      : wholeTrip.cantFind.length
+        ? 'cant_find'
+        : 'in_cart';
+    setQuery('');
+    requestAnimationFrame(() => {
+      const section = document.getElementById(
+        `shopping-items-${list.id}-${state}`,
+      ) as HTMLDetailsElement | null;
+      if (section) {
+        section.open = true;
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        section.querySelector('summary')?.focus({ preventScroll: true });
+      }
+    });
   };
 
   return (
     <section className={`${styles.shoppingMode} ${focusedShopping ? styles.focusedShopping : ''}`}>
+      <DialogViewport />
       <div className={styles.shoppingTaskbar}>
         <div>
           <strong>
@@ -1968,7 +2078,7 @@ export function ShoppingListEditor({
           </strong>
           <span>
             {total
-              ? `${progressCount} of ${total} fully covered`
+              ? `${progressCount} of ${total} in cart or sourced`
               : 'Add an item or build a list from your meal plan.'}
           </span>
           {list.isAutomaticRestockTarget ? (
@@ -1998,63 +2108,69 @@ export function ShoppingListEditor({
             type="search"
           />
         </label>
-        <div className={styles.quickActions} aria-label="Shopping list tools">
-          <button
-            type="button"
-            onClick={() => setScanOpen(true)}
-            aria-label="Scan item"
-            title="Scan item"
-          >
-            <ScanLine aria-hidden="true" />
-            <span>Scan</span>
-          </button>
-          <button type="button" onClick={addListItem} aria-label="Add item" title="Add item">
-            <Plus aria-hidden="true" />
-            <span>Add</span>
-          </button>
-          <button type="button" onClick={openNotes} aria-label="Add note" title="Add note">
-            <StickyNote aria-hidden="true" />
-            <span>Note</span>
-          </button>
-          <button
-            type="button"
-            onClick={scrollToRemaining}
-            aria-label={`${remaining} items remaining`}
-            title="Items remaining"
-          >
-            <ListTodo aria-hidden="true" />
-            <span>{remaining} left</span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={unpackMode}
-            onClick={() => setUnpackMode((current) => !current)}
-            aria-label={unpackMode ? 'Close unpack mode' : 'Unpack groceries into Pantry'}
-            title="Unpack groceries"
-          >
-            <PackageOpen aria-hidden="true" />
-            <span>Unpack</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setAssistantOpen(true)}
-            aria-label="Chat with the kitchen assistant"
-            title="Kitchen assistant"
-          >
-            <Sparkles aria-hidden="true" />
-            <span>Assistant</span>
-          </button>
-          <button
-            type="button"
-            disabled={!lastChecked}
-            onClick={() => void restoreLastAction()}
-            aria-label="Undo last shopping action"
-            title="Undo"
-          >
-            <Undo2 aria-hidden="true" />
-            <span>Undo</span>
-          </button>
-        </div>
+        <details className={styles.toolsDisclosure}>
+          <summary className="recipe-disclosure-summary">
+            <span>Shopping tools</span>
+            <ChevronDown size={18} aria-hidden="true" />
+          </summary>
+          <div className={styles.quickActions} aria-label="Shopping list tools">
+            <button
+              type="button"
+              onClick={() => setScanOpen(true)}
+              aria-label="Scan item"
+              title="Scan item"
+            >
+              <ScanLine aria-hidden="true" />
+              <span>Scan</span>
+            </button>
+            <button type="button" onClick={addListItem} aria-label="Add item" title="Add item">
+              <Plus aria-hidden="true" />
+              <span>Add</span>
+            </button>
+            <button type="button" onClick={openNotes} aria-label="Add note" title="Add note">
+              <StickyNote aria-hidden="true" />
+              <span>Note</span>
+            </button>
+            <button
+              type="button"
+              onClick={scrollToRemaining}
+              aria-label={`${remaining} items remaining`}
+              title="Items remaining"
+            >
+              <ListTodo aria-hidden="true" />
+              <span>{remaining} left</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={unpackMode}
+              onClick={() => setUnpackMode((current) => !current)}
+              aria-label={unpackMode ? 'Close unpack mode' : 'Unpack groceries into Pantry'}
+              title="Unpack groceries"
+            >
+              <PackageOpen aria-hidden="true" />
+              <span>Unpack</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssistantOpen(true)}
+              aria-label="Chat with the kitchen assistant"
+              title="Kitchen assistant"
+            >
+              <Sparkles aria-hidden="true" />
+              <span>Assistant</span>
+            </button>
+            <button
+              type="button"
+              disabled={!lastChecked}
+              onClick={() => void restoreLastAction()}
+              aria-label="Undo last shopping action"
+              title="Undo"
+            >
+              <Undo2 aria-hidden="true" />
+              <span>Undo</span>
+            </button>
+          </div>
+        </details>
         <div className={styles.shoppingModeSwitch} aria-label="Shopping list view">
           <button
             type="button"
@@ -2139,7 +2255,7 @@ export function ShoppingListEditor({
               </button>
             )}
             <Link href="/settings/lists">
-              <Settings size={17} /> List settings
+              <Settings size={17} /> Shopping settings
             </Link>
           </section>
         </div>
@@ -2265,6 +2381,39 @@ export function ShoppingListEditor({
         </form>
       ) : null}
 
+      {query && (
+        <p role="status" className={styles.resultScope}>
+          {searched.length} of {items.length} items match “{query}”.{' '}
+          <button className="text-button" type="button" onClick={() => setQuery('')}>
+            Clear search
+          </button>
+        </p>
+      )}
+      <nav className={styles.aisleNavigation} aria-label="Jump to shopping section">
+        <button type="button" onClick={scrollToRemaining}>
+          Remaining ({remaining})
+        </button>
+        {groupMode === 'aisle' &&
+          [
+            ...list.aisles.map((aisle) => ({ id: aisle.id, name: aisle.name })),
+            { id: 'unassigned', name: 'Unassigned' },
+          ]
+            .filter((aisle) => toBuy.some((item) => (item.aisleId ?? 'unassigned') === aisle.id))
+            .map((aisle) => (
+              <a
+                key={aisle.id}
+                href={`#aisle-${list.id}-to_buy-${aisle.id}`}
+                onClick={() => {
+                  const details = document.getElementById(
+                    `shopping-items-${list.id}-to_buy`,
+                  ) as HTMLDetailsElement | null;
+                  if (details) details.open = true;
+                }}
+              >
+                {aisle.name}
+              </a>
+            ))}
+      </nav>
       <div className={styles.contentGrid}>
         <div className={styles.listColumn}>
           {!focusedShopping && (
@@ -2299,7 +2448,7 @@ export function ShoppingListEditor({
           {section('to_buy', 'Items to buy', toBuy)}
           {section('in_cart', 'In cart', inCart, styles.inCartSection)}
           {section('cant_find', 'Can’t find', cantFind, styles.cantFindSection)}
-          {section('sourced', 'Done', sourced, styles.sourcedSection)}
+          {section('sourced', 'Sourced', sourced, styles.sourcedSection)}
           {cantFind.length ? (
             <section className={styles.retryPanel}>
               <div>
@@ -2358,8 +2507,8 @@ export function ShoppingListEditor({
               <span style={{ width: `${progress}%` }} />
             </div>
             <footer>
-              <span>{sourced.length} sourced</span>
-              <span>{inCart.length} in cart</span>
+              <span>{wholeTrip.sourced.length} sourced</span>
+              <span>{wholeTrip.inCart.length} in cart</span>
             </footer>
           </section>
           <section>
@@ -2400,9 +2549,148 @@ export function ShoppingListEditor({
           <PackageOpen /> Unpack
         </button>
         <button type="button" onClick={() => setReviewOpen(true)}>
-          <ClipboardCheck /> Done
+          <ClipboardCheck /> Review trip
         </button>
       </nav>
+
+      {editingItem && items.some((item) => item.id === editingItem.id) && (
+        <AppDialog
+          className={styles.editDialog}
+          aria-labelledby="shopping-item-edit-title"
+          onClose={() => {
+            if (busy !== 'edit') setEditingItem(null);
+          }}
+        >
+          <header>
+            <div>
+              <h2 id="shopping-item-edit-title">Edit item</h2>
+              <p>{items.find((item) => item.id === editingItem.id)?.item}</p>
+            </div>
+            <button
+              type="button"
+              disabled={busy === 'edit'}
+              aria-label="Close item editor"
+              onClick={() => setEditingItem(null)}
+            >
+              <X />
+            </button>
+          </header>
+          <form onSubmit={(event) => void commitItemEdit(event)}>
+            <fieldset role="presentation" disabled={!!busy} className={styles.editBody}>
+              <label>
+                Name
+                <input
+                  value={editingItem.name}
+                  maxLength={160}
+                  required
+                  onChange={(event) => setEditingItem({ ...editingItem, name: event.target.value })}
+                />
+              </label>
+              <label>
+                To buy quantity
+                <input
+                  inputMode="decimal"
+                  value={editingItem.quantity}
+                  onChange={(event) =>
+                    setEditingItem({ ...editingItem, quantity: event.target.value })
+                  }
+                  aria-describedby="buy-quantity-help"
+                />
+              </label>
+              <p id="buy-quantity-help">
+                Blank means the buy quantity is unknown.{' '}
+                {
+                  shoppingQuantitySummary(items.find((item) => item.id === editingItem.id)!)
+                    .calculation
+                }{' '}
+                Recipe demand and Pantry stock are separate.
+              </p>
+              <label>
+                Unit
+                <input
+                  value={editingItem.unit}
+                  maxLength={30}
+                  onChange={(event) => setEditingItem({ ...editingItem, unit: event.target.value })}
+                />
+              </label>
+              <label>
+                Aisle
+                <select
+                  aria-label="Aisle"
+                  value={editingItem.aisleId}
+                  onChange={(event) =>
+                    setEditingItem({ ...editingItem, aisleId: event.target.value })
+                  }
+                >
+                  <option value="">Unassigned</option>
+                  {list.aisles.map((aisle) => (
+                    <option key={aisle.id} value={aisle.id}>
+                      {aisle.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {editError && <p role="alert">{editError}</p>}
+              {sortMode !== 'position' && (
+                <p>
+                  Movement uses List order.{' '}
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => setSortMode('position')}
+                  >
+                    Use List order
+                  </button>
+                </p>
+              )}
+              <p>
+                Movement saves immediately. Cancel keeps that order and discards unsaved field
+                edits.
+              </p>
+              <div className={styles.editActions}>
+                {([-1, 1] as const).map((direction) => {
+                  const item = items.find((entry) => entry.id === editingItem.id)!;
+                  const context = movementContext(item);
+                  const index = context.findIndex((entry) => entry.id === item.id);
+                  return (
+                    <button
+                      key={direction}
+                      type="button"
+                      disabled={sortMode !== 'position' || !!busy || !context[index + direction]}
+                      onClick={() => void reorder(item, direction)}
+                    >
+                      {direction === -1 ? <ArrowUp size={16} /> : <ArrowDown size={16} />} Move{' '}
+                      {direction === -1 ? 'up' : 'down'}
+                    </button>
+                  );
+                })}
+                <button
+                  className="text-button"
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() => {
+                    const item = items.find((entry) => entry.id === editingItem.id)!;
+                    if (window.confirm(`Remove “${item.item}” from this shopping list?`))
+                      void remove(item).then((removed) => {
+                        if (removed) setEditingItem(null);
+                      });
+                  }}
+                >
+                  <Trash2 size={16} /> Remove item
+                </button>
+              </div>
+            </fieldset>
+            <footer>
+              <button type="button" disabled={busy === 'edit'} onClick={() => setEditingItem(null)}>
+                Cancel
+              </button>
+              <button className="primary-button" type="submit" disabled={!!busy}>
+                {busy === 'edit' ? 'Saving…' : 'Save changes'}
+              </button>
+            </footer>
+          </form>
+        </AppDialog>
+      )}
 
       <dialog
         className={`${styles.workflowDialog} ${styles.quantityDialog}`}
@@ -2712,7 +3000,7 @@ export function ShoppingListEditor({
           </button>
         </header>
         <div className={styles.dialogBody}>
-          {!toBuy.length && !cantFind.length ? (
+          {!wholeTrip.toBuy.length && !wholeTrip.cantFind.length ? (
             <section className={styles.reviewComplete}>
               <CheckCircle2 />
               <h3>Everything is accounted for</h3>
@@ -2730,14 +3018,14 @@ export function ShoppingListEditor({
             </section>
           ) : (
             <>
-              {toBuy.length ? (
+              {wholeTrip.toBuy.length ? (
                 <section className={styles.reviewGroup}>
                   <h3>
-                    Still to buy <span>{toBuy.length}</span>
+                    Still to buy <span>{wholeTrip.toBuy.length}</span>
                   </h3>
                   <p>These items have not been marked as in your cart.</p>
                   <ul>
-                    {toBuy.map((item) => (
+                    {wholeTrip.toBuy.map((item) => (
                       <li key={item.id}>
                         <span>{item.item}</span>
                         <button
@@ -2752,17 +3040,17 @@ export function ShoppingListEditor({
                   </ul>
                 </section>
               ) : null}
-              {cantFind.length ? (
+              {wholeTrip.cantFind.length ? (
                 <section className={`${styles.reviewGroup} ${styles.reviewWarning}`}>
                   <h3>
-                    Can’t find <span>{cantFind.length}</span>
+                    Can’t find <span>{wholeTrip.cantFind.length}</span>
                   </h3>
                   <p>
                     Try substitutes now, loop back through the store, or make a list for another
                     supermarket.
                   </p>
                   <ul>
-                    {cantFind.map((item) => (
+                    {wholeTrip.cantFind.map((item) => (
                       <li key={item.id}>
                         <span>{item.item}</span>
                         <button
@@ -2779,7 +3067,7 @@ export function ShoppingListEditor({
                   </ul>
                 </section>
               ) : null}
-              {cantFind.length ? (
+              {wholeTrip.cantFind.length ? (
                 <section className={styles.reviewRetry}>
                   <Store />
                   <div>

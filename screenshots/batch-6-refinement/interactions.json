@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "name": "section navigation and appearance keyboard",
+      "passed": true
+    },
+    {
+      "name": "nutrition estimate review and conflict",
+      "passed": true
+    },
+    {
+      "name": "onboarding type popup and security completion",
+      "passed": true
+    },
+    {
+      "name": "backup selection validation and reset pending",
+      "passed": true
+    },
+    {
+      "name": "API key identity and one-time result",
+      "passed": true
+    },
+    {
+      "name": "connected app import and refresh failure",
+      "passed": true
+    },
+    {
+      "name": "task retry failure survives polling and draft review gets focus",
+      "passed": true
+    }
+  ],
+  "blocked": []
+}

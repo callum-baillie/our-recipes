@@ -1,14 +1,13 @@
 'use client';
-
+import { useRef, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ButtonSpinner } from './skeleton';
-import { usePendingAction } from './use-pending-action';
-import { useState, type FormEvent } from 'react';
-
-import styles from '@/components/nutrition-meal-planning.module.css';
-import { NutritionVisualMarker } from '@/components/nutrition-visual-marker';
+import { ChevronDown } from 'lucide-react';
 import { createClientUuid } from '@/lib/client/client-uuid';
-
+import { useNutritionRequest } from './use-nutrition-request';
+import { NutritionFeedback } from './nutrition-form-fields';
+import formStyles from './nutrition-dashboard.module.css';
+import styles from './nutrition-meal-planning.module.css';
 export type NutritionMealProjectionView = {
   range: { start: string; end: string };
   meals: Array<{
@@ -41,358 +40,361 @@ export type NutritionMealProjectionView = {
   confirmedTotalsByDate?: Record<string, Record<string, number>>;
 };
 
-type Allocation = NutritionMealProjectionView['meals'][number]['ownAllocations'][number];
-
-function amount(value: number | undefined, digits = 1) {
-  return value === undefined
-    ? 'Unknown'
-    : value.toLocaleString(undefined, { maximumFractionDigits: digits });
-}
-
+type Meal = NutritionMealProjectionView['meals'][number];
+type Allocation = Meal['ownAllocations'][number];
 export function NutritionMealPlanning({
   activeProfileId,
+  activeProfileName = 'This person',
   canManageProfile,
   showNutritionPreview = true,
   today,
   consumedToday,
   projection,
+  embedded = false,
 }: {
   activeProfileId: string;
+  activeProfileName?: string;
   canManageProfile: boolean;
   showNutritionPreview?: boolean;
   today: string;
   consumedToday: Record<string, number>;
   projection: NutritionMealProjectionView;
+  embedded?: boolean;
 }) {
-  const router = useRouter();
-  const [status, setStatus] = useState('');
-  const { pending, run } = usePendingAction(setStatus);
-  const [preparedIds, setPreparedIds] = useState<Record<string, string>>(() =>
-    Object.fromEntries(projection.meals.map((meal) => [meal.mealPlanEntryId, createClientUuid()])),
-  );
-  const plannedToday = projection.totalsByDate[today] ?? {};
-
-  async function saveAllocation(
-    event: FormEvent<HTMLFormElement>,
-    mealPlanEntryId: string,
-    current: Allocation | null,
-  ) {
-    event.preventDefault();
-    return run(async () => {
-      const data = new FormData(event.currentTarget);
-      setStatus('Saving planned portion…');
-      const response = await fetch(`/api/v1/nutrition/profiles/${activeProfileId}/allocations`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          seriesId: current?.seriesId,
-          supersedesAllocationVersionId: current?.id ?? null,
-          mealPlanEntryId,
-          cookSessionId: null,
-          state: data.get('state'),
-          servings: Number(data.get('servings')),
-          portionWeightGrams: null,
-          intakeSeriesId: null,
-          note: data.get('note'),
-        }),
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: { message?: string };
-        } | null;
-        setStatus(body?.error?.message ?? 'The planned portion could not be saved.');
-        return;
-      }
-      setStatus('Planned portion saved. Nothing was recorded as eaten.');
-      router.refresh();
-    });
-  }
-
-  async function recordPreparedBatch(
-    event: FormEvent<HTMLFormElement>,
-    meal: NutritionMealProjectionView['meals'][number],
-  ) {
-    event.preventDefault();
-    return run(async () => {
-      if (!meal.calculationId) return;
-      const data = new FormData(event.currentTarget);
-      const preparedInstanceId = preparedIds[meal.mealPlanEntryId] ?? createClientUuid();
-      const finalWeight = String(data.get('finalWeightGrams') ?? '').trim();
-      setStatus('Saving prepared batch…');
-      const response = await fetch(
-        `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            preparedInstanceId,
-            recipeCalculationId: meal.calculationId,
-            mealPlanEntryId: meal.mealPlanEntryId,
-            cookSessionId: null,
-            actualServings: Number(data.get('actualServings')),
-            finalWeightGrams: finalWeight ? Number(finalWeight) : null,
-            preparationMatchesCalculation: data.get('preparationMatchesCalculation') === 'yes',
-            note: data.get('note'),
-          }),
-        },
-      );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: { message?: string };
-        } | null;
-        setStatus(body?.error?.message ?? 'The prepared batch could not be saved.');
-        return;
-      }
-      setPreparedIds((current) => ({
-        ...current,
-        [meal.mealPlanEntryId]: createClientUuid(),
-      }));
-      setStatus('Prepared batch saved. No food was recorded as eaten.');
-      router.refresh();
-    });
-  }
-
   return (
     <section
-      className={styles.panel}
-      aria-busy={pending}
-      aria-labelledby="planned-nutrition-heading"
+      className={embedded ? styles.embedded : styles.panel}
+      aria-label="Planned portion management"
     >
-      <header className={styles.heading}>
-        <div>
-          <h2 id="planned-nutrition-heading">Planned nutrition and portions</h2>
+      {!embedded && (
+        <header>
+          <h2>Planned meals and personal portions</h2>
           <p>
-            Portions are explicit and may be fractional. Planning or serving never records food as
-            eaten.
+            {activeProfileName} · meals from {projection.range.start} to {projection.range.end}.
+            Assigning or serving food does not establish consumption.
           </p>
-        </div>
-        <span>
-          {projection.range.start} to {projection.range.end}
-        </span>
-      </header>
-
-      {showNutritionPreview ? (
-        <div className={styles.comparison} aria-label={`${today} planned and consumed comparison`}>
+        </header>
+      )}
+      {showNutritionPreview && (
+        <div
+          className={styles.comparison}
+          aria-label={`${activeProfileName} · ${today} planned and consumed comparison`}
+        >
           {[
             ['Calories', 'energy_kcal', 'kcal'],
             ['Protein', 'protein', 'g'],
             ['Carbohydrate', 'carbohydrate', 'g'],
             ['Fat', 'total_fat', 'g'],
           ].map(([label, code, unit]) => (
-            <article key={code}>
-              <strong>{label}</strong>
+            <div key={code}>
+              <strong>
+                {label} · {today}
+              </strong>
               <span>
-                Planned: {amount(plannedToday[code])} {unit}
+                Planned: {projection.totalsByDate[today]?.[code!]?.toLocaleString() ?? 'Unknown'}{' '}
+                {unit}
               </span>
               <span>
-                Consumed: {amount(consumedToday[code])} {unit}
+                Consumed: {consumedToday[code!]?.toLocaleString() ?? 'Unknown'} {unit}
               </span>
-            </article>
+            </div>
           ))}
         </div>
-      ) : (
-        <p className={styles.empty}>
-          Nutrition metric previews are hidden by this profile&apos;s display preference.
-        </p>
       )}
-
-      {projection.meals.length === 0 ? (
-        <p className={styles.empty}>No meals are planned in this date range.</p>
+      {!projection.meals.length ? (
+        <p className={styles.empty}>
+          No meals in this range.{' '}
+          <Link className="inline-link" href="/planner">
+            Open meal planner
+          </Link>
+        </p>
       ) : (
         <ol className={styles.meals}>
           {projection.meals.map((meal) => (
-            <li key={meal.mealPlanEntryId}>
-              <header>
-                <div>
-                  <span>
-                    {meal.plannedFor} · {meal.meal}
-                  </span>
-                  <h3>{meal.title}</h3>
-                </div>
-                <dl>
-                  <div>
-                    <dt>Total</dt>
-                    <dd>{meal.totalServings}</dd>
-                  </div>
-                  <div>
-                    <dt>Assigned</dt>
-                    <dd>{meal.assignedServings}</dd>
-                  </div>
-                  <div>
-                    <dt>Unassigned</dt>
-                    <dd>{meal.unassignedServings}</dd>
-                  </div>
-                </dl>
-              </header>
-              {meal.overallocatedServings > 0 ? (
-                <p className={styles.warning}>
-                  Existing history is over-allocated by {meal.overallocatedServings} servings.
-                  Reduce a current allocation before adding another.
-                </p>
-              ) : null}
-              <p className={styles.quality}>
-                Calculation: {meal.calculationStatus}
-                {meal.completeness === null
-                  ? ''
-                  : ` · ${Math.round(meal.completeness * 100)}% complete`}
-                {meal.confidence === null
-                  ? ''
-                  : ` · ${Math.round(meal.confidence * 100)}% confidence`}
-              </p>
-              {showNutritionPreview && meal.plannedValues ? (
-                <div className={styles.nutrients}>
-                  <strong>This profile: {meal.plannedServings} planned servings</strong>
-                  <span>
-                    <NutritionVisualMarker nutrientCode="energy_kcal" compact />
-                    {amount(meal.plannedValues.energy_kcal, 0)} kcal
-                  </span>
-                  <span>
-                    <NutritionVisualMarker nutrientCode="protein" compact />
-                    {amount(meal.plannedValues.protein)} g protein
-                  </span>
-                </div>
-              ) : showNutritionPreview && meal.plannedServings > 0 ? (
-                <p className={styles.warning}>
-                  Planned portions are saved, but current normalized nutrient evidence is
-                  unavailable. Missing values are not zero.
-                </p>
-              ) : null}
-              <details className={styles.allocationTools}>
-                <summary>Manage portions and prepared batches</summary>
-                <div className={styles.allocations}>
-                  {meal.ownAllocations.map((allocation) => (
-                    <form
-                      key={allocation.seriesId}
-                      onSubmit={(event) =>
-                        void saveAllocation(event, meal.mealPlanEntryId, allocation)
-                      }
-                    >
-                      <strong>My portion · revision {allocation.revision}</strong>
-                      <label>
-                        Status
-                        <select name="state" defaultValue={allocation.state}>
-                          <option value="planned">Planned</option>
-                          <option value="served">Served, not yet eaten</option>
-                          <option value="skipped">Skipped</option>
-                          <option value="leftover">Leftover, not eaten</option>
-                        </select>
-                      </label>
-                      <label>
-                        Servings
-                        <input
-                          name="servings"
-                          type="number"
-                          min="0.000001"
-                          max="1000000"
-                          step="any"
-                          defaultValue={allocation.servings ?? 1}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Note
-                        <input name="note" maxLength={500} defaultValue={allocation.note} />
-                      </label>
-                      <button type="submit" disabled={pending || !canManageProfile}>
-                        {pending ? <ButtonSpinner /> : null} Save revision
-                      </button>
-                    </form>
-                  ))}
-                  {meal.unassignedServings > 0 ? (
-                    <form
-                      onSubmit={(event) => void saveAllocation(event, meal.mealPlanEntryId, null)}
-                    >
-                      <strong>Assign another portion</strong>
-                      <label>
-                        Status
-                        <select name="state" defaultValue="planned">
-                          <option value="planned">Planned</option>
-                          <option value="served">Served, not yet eaten</option>
-                          <option value="skipped">Skipped</option>
-                          <option value="leftover">Leftover, not eaten</option>
-                        </select>
-                      </label>
-                      <label>
-                        Servings
-                        <input
-                          name="servings"
-                          type="number"
-                          min="0.000001"
-                          max={meal.unassignedServings}
-                          step="any"
-                          defaultValue={Math.min(1, meal.unassignedServings)}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Note
-                        <input name="note" maxLength={500} />
-                      </label>
-                      <button type="submit" disabled={pending || !canManageProfile}>
-                        {pending ? <ButtonSpinner /> : null} Assign portion
-                      </button>
-                    </form>
-                  ) : null}
-                  {meal.calculationStatus === 'current' && meal.calculationId ? (
-                    <form onSubmit={(event) => void recordPreparedBatch(event, meal)}>
-                      <strong>Record a prepared batch</strong>
-                      <p className={styles.formHint}>
-                        Use the actual yield after cooking. This does not record consumption.
-                      </p>
-                      <label>
-                        Actual servings prepared
-                        <input
-                          name="actualServings"
-                          type="number"
-                          min="0.000001"
-                          max="1000000"
-                          step="any"
-                          defaultValue={meal.totalServings}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Final cooked weight in grams, if used in the calculation
-                        <input
-                          name="finalWeightGrams"
-                          type="number"
-                          min="0.000001"
-                          max="1000000"
-                          step="any"
-                        />
-                      </label>
-                      <label>
-                        <input
-                          name="preparationMatchesCalculation"
-                          type="checkbox"
-                          value="yes"
-                          required
-                        />{' '}
-                        The ingredients, optional items, substitutions, exclusions, drained or
-                        edible portions, and final weight match this calculation.
-                      </label>
-                      <p className={styles.formHint}>
-                        If anything changed while cooking, recalculate Nutrition first. The prepared
-                        batch freezes that calculation and cannot be replaced later.
-                      </p>
-                      <label>
-                        Preparation note
-                        <input name="note" maxLength={1000} />
-                      </label>
-                      <button type="submit" disabled={pending || !canManageProfile}>
-                        {pending ? <ButtonSpinner /> : null} Save prepared batch
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-              </details>
-            </li>
+            <PlannedMealPortions
+              key={`${activeProfileId}:${meal.mealPlanEntryId}`}
+              meal={meal}
+              profileId={activeProfileId}
+              profileName={activeProfileName}
+              canManage={canManageProfile}
+              showNutrition={showNutritionPreview}
+            />
           ))}
         </ol>
       )}
-      <p className={styles.status} role="status" aria-live="polite">
-        {status}
-      </p>
     </section>
+  );
+}
+function PlannedMealPortions({
+  meal,
+  profileId,
+  profileName,
+  canManage,
+  showNutrition,
+}: {
+  meal: Meal;
+  profileId: string;
+  profileName: string;
+  canManage: boolean;
+  showNutrition: boolean;
+}) {
+  const router = useRouter();
+  const request = useNutritionRequest(`${profileId}:planned:${meal.mealPlanEntryId}`);
+  const preparedId = useRef(createClientUuid());
+  const reviewHref = `/nutrition?view=diary&task=calculate&recipe=${meal.recipeId ?? ''}#nutrition-data-tools`;
+  async function save(event: FormEvent<HTMLFormElement>, allocation: Allocation | null) {
+    event.preventDefault();
+    if (!canManage || request.isPending()) return;
+    const data = new FormData(event.currentTarget);
+    const task = allocation?.seriesId ?? 'new';
+    const result = await request.send(task, `/api/v1/nutrition/profiles/${profileId}/allocations`, {
+      seriesId: allocation?.seriesId,
+      supersedesAllocationVersionId: allocation?.id ?? null,
+      mealPlanEntryId: meal.mealPlanEntryId,
+      cookSessionId: null,
+      state: data.get('state'),
+      servings: Number(data.get('servings')),
+      portionWeightGrams: null,
+      intakeSeriesId: null,
+      note: data.get('note'),
+    });
+    if (result) {
+      request.message(
+        task,
+        'success',
+        `Personal portion saved for ${profileName}. No food was recorded as eaten.`,
+      );
+      router.refresh();
+    }
+  }
+  async function prepare(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canManage || request.isPending() || !meal.calculationId) return;
+    const data = new FormData(event.currentTarget);
+    const final = String(data.get('finalWeightGrams') ?? '').trim();
+    const result = await request.send(
+      'prepare',
+      `/api/v1/nutrition/profiles/${profileId}/prepared-recipes`,
+      {
+        preparedInstanceId: preparedId.current,
+        recipeCalculationId: meal.calculationId,
+        mealPlanEntryId: meal.mealPlanEntryId,
+        cookSessionId: null,
+        actualServings: Number(data.get('actualServings')),
+        finalWeightGrams: final ? Number(final) : null,
+        preparationMatchesCalculation: data.get('preparationMatchesCalculation') === 'yes',
+        note: data.get('note'),
+      },
+      { replay: true, pending: 'Recording prepared batch…' },
+    );
+    if (result) {
+      preparedId.current = createClientUuid();
+      request.message(
+        'prepare',
+        'success',
+        'Prepared batch recorded. Serving or saving leftovers does not log consumption.',
+      );
+      router.refresh();
+    }
+  }
+  function portionForm(allocation: Allocation | null) {
+    const task = allocation?.seriesId ?? 'new';
+    return (
+      <form key={allocation?.id ?? task} onSubmit={(event) => void save(event, allocation)}>
+        <fieldset
+          className={formStyles.formFields}
+          disabled={request.pending || !canManage || request.isBlocked(task)}
+        >
+          <strong>
+            {allocation
+              ? `${profileName} · ${allocation.servings ?? 'Unknown'} servings · ${allocation.state}`
+              : 'Assign another personal portion'}
+          </strong>
+          <label>
+            Portion state
+            <select name="state" defaultValue={allocation?.state ?? 'planned'}>
+              <option value="planned">Planned</option>
+              <option value="served">Served, not eaten</option>
+              <option value="skipped">Skipped</option>
+              <option value="leftover">Leftover, not eaten</option>
+            </select>
+          </label>
+          <label>
+            Personal servings
+            <input
+              name="servings"
+              type="number"
+              min="0.000001"
+              max={allocation ? 1000000 : meal.unassignedServings}
+              step="any"
+              defaultValue={allocation?.servings ?? Math.min(1, meal.unassignedServings)}
+              required
+            />
+          </label>
+          <label>
+            Note (optional)
+            <input name="note" maxLength={500} defaultValue={allocation?.note ?? ''} />
+          </label>
+          <button type="submit">
+            {request.busyTask === task
+              ? 'Saving portion…'
+              : allocation
+                ? 'Save portion revision'
+                : 'Assign portion'}
+          </button>
+        </fieldset>
+        <NutritionFeedback value={request.feedback[task]} />
+      </form>
+    );
+  }
+  return (
+    <li>
+      <header>
+        <div>
+          <span>
+            {meal.plannedFor} · {meal.meal}
+          </span>
+          <h3>{meal.title}</h3>
+        </div>
+        <p>
+          Shared capacity: {meal.totalServings} servings · {meal.assignedServings} assigned across
+          people · {meal.unassignedServings} unassigned
+        </p>
+      </header>
+      <div className={styles.personal}>
+        <strong>{profileName}’s saved portions</strong>
+        {meal.ownAllocations.length ? (
+          <ul>
+            {meal.ownAllocations.map((allocation) => (
+              <li key={allocation.id}>
+                {allocation.servings ?? 'Unknown'} servings · {allocation.state}
+                {allocation.state === 'eaten' ? ' · counted in diary, not editable here' : ''}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span>No personal portion assigned.</span>
+        )}
+      </div>
+      {meal.overallocatedServings > 0 && (
+        <p className={styles.warning}>
+          Saved allocations exceed the shared capacity by {meal.overallocatedServings} servings.
+          Correct an allocation before adding another.
+        </p>
+      )}
+      <p className={styles.quality}>
+        {meal.calculationStatus === 'current'
+          ? 'Current recipe calculation'
+          : meal.calculationStatus === 'stale'
+            ? 'Recipe calculation needs review'
+            : 'Nutrition calculation unavailable'}
+        {meal.completeness === null ? '' : ` · ${Math.round(meal.completeness * 100)}% coverage`}.{' '}
+        {meal.recipeId && (
+          <Link className="inline-link" href={reviewHref}>
+            Review recipe nutrition
+          </Link>
+        )}
+      </p>
+      {showNutrition && meal.plannedValues && (
+        <p className={styles.quality}>
+          Personal planned estimates: {meal.plannedValues.energy_kcal ?? 'Unknown'} kcal ·{' '}
+          {meal.plannedValues.protein ?? 'Unknown'} g protein.
+        </p>
+      )}
+      <details className={styles.allocationTools}>
+        <summary className="recipe-disclosure-summary">
+          Manage portions and prepared batches
+          <ChevronDown size={18} />
+        </summary>
+        <div className={styles.allocations}>
+          {meal.ownAllocations.map((allocation) =>
+            allocation.state === 'eaten' ? (
+              <div key={allocation.id}>
+                <p>
+                  This portion is recorded as consumed. Change it through diary correction history.
+                </p>
+                <Link className="inline-link" href="/nutrition?view=diary">
+                  Find consumed entry in diary
+                </Link>
+              </div>
+            ) : (
+              portionForm(allocation)
+            ),
+          )}
+          {meal.unassignedServings > 0 ? (
+            portionForm(null)
+          ) : (
+            <NutritionFeedback value={request.feedback.new} />
+          )}
+        </div>
+        {meal.calculationStatus === 'current' && meal.calculationId ? (
+          <form onSubmit={(event) => void prepare(event)}>
+            <fieldset className={formStyles.formFields} disabled={request.pending || !canManage}>
+              <h4>Record a prepared batch</h4>
+              <p className={formStyles.helper}>
+                Use the actual yield after cooking. This freezes the reviewed calculation and does
+                not record food as eaten.
+              </p>
+              <div className={formStyles.formGrid}>
+                <label>
+                  Actual servings prepared
+                  <input
+                    name="actualServings"
+                    type="number"
+                    min="0.000001"
+                    max="1000000"
+                    step="any"
+                    defaultValue={meal.totalServings}
+                    required
+                  />
+                </label>
+                <label>
+                  Final cooked weight (g, if used)
+                  <input
+                    name="finalWeightGrams"
+                    type="number"
+                    min="0.000001"
+                    max="1000000"
+                    step="any"
+                  />
+                </label>
+              </div>
+              <label className={formStyles.checkRow}>
+                <input name="preparationMatchesCalculation" type="checkbox" value="yes" required />
+                Ingredients, optional items, substitutions, exclusions, edible/drained portions and
+                final weight match this calculation.
+              </label>
+              <label>
+                Preparation note (optional)
+                <input name="note" maxLength={1000} />
+              </label>
+              <button type="submit">
+                {request.busyTask === 'prepare' ? 'Recording batch…' : 'Save prepared batch'}
+              </button>
+            </fieldset>
+            <NutritionFeedback value={request.feedback.prepare}>
+              {request.feedback.prepare?.phase === 'success' && (
+                <Link className="inline-link" href="/nutrition?view=diary#prepared-servings">
+                  View prepared servings
+                </Link>
+              )}
+            </NutritionFeedback>
+          </form>
+        ) : (
+          <p className={styles.quality}>
+            A current recipe calculation is required before recording a prepared batch.{' '}
+            <Link className="inline-link" href={reviewHref}>
+              Review recipe nutrition
+            </Link>
+            .
+          </p>
+        )}
+        {!canManage && (
+          <p className={styles.quality}>
+            Portion changes are unavailable for this read-only profile.
+          </p>
+        )}
+      </details>
+    </li>
   );
 }

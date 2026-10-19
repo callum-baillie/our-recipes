@@ -3,12 +3,17 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDown, ChevronUp, Minus, Plus, Save, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { LoadingIndicator } from '@/components/skeleton';
 import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
+import { ingredientIdentityChanged } from '@/lib/domain/ingredient-identity';
+import { createClientUuid } from '@/lib/client/client-uuid';
+import { restoreRecipeDraft } from '@/lib/domain/recipe-draft';
+import { AppDialog } from './app-dialog';
+import './recipe-editor.css';
 
 import {
   emptyRecipeInput,
@@ -32,8 +37,6 @@ const recipeFormSchema = recipeInputSchema.extend({
   equipmentText: z.string(),
 });
 
-type StoredDraft = Partial<FormValues> & { tagsText?: unknown; equipmentText?: unknown };
-
 function recipePayloadFromForm(values: FormValues): RecipePayload {
   return recipeInputSchema.parse({
     ...values,
@@ -44,12 +47,42 @@ function recipePayloadFromForm(values: FormValues): RecipePayload {
   });
 }
 
+function fieldLabel(name: string): string {
+  const ingredient = /^ingredientGroups\.(\d+)\.ingredients\.(\d+)\.(\w+)$/u.exec(name);
+  if (ingredient)
+    return `Ingredient ${Number(ingredient[1]) + 1}-${Number(ingredient[2]) + 1}: ${ingredient[3] === 'item' ? 'name' : ingredient[3] === 'shoppingCategory' ? 'shopping category' : ingredient[3]}`;
+  const step = /^instructionSections\.(\d+)\.steps\.(\d+)$/u.exec(name);
+  if (step) return `Method section ${Number(step[1]) + 1}, step ${Number(step[2]) + 1}`;
+  const labels: Record<string, string> = {
+    title: 'Recipe name',
+    servings: 'Serves',
+    prepMinutes: 'Prep minutes',
+    cookMinutes: 'Cook minutes',
+    restMinutes: 'Rest minutes',
+    sourceUrl: 'Source URL',
+    sourceName: 'Source name',
+    originalAuthor: 'Original author',
+    cookingMethod: 'Cooking method',
+    equipmentText: 'Equipment',
+    ingredientGroups: 'Ingredients',
+    instructionSections: 'Method',
+  };
+  return (
+    labels[name] ??
+    name
+      .replace(/^nutrition/u, 'Nutrition: ')
+      .replace(/([a-z])([A-Z])/gu, '$1 $2')
+      .replaceAll('.', ' › ')
+  );
+}
+
 type RecipeFormProps = {
   initial?: RecipeInput;
   recipeId?: string;
   currentRevision?: number;
   confirmationLabel?: string;
   intro?: ReactNode;
+  linkedFoods?: Record<string, string>;
 };
 
 function IngredientGroupEditor({
@@ -59,7 +92,9 @@ function IngredientGroupEditor({
   onRemove,
   isFirst,
   isLast,
+  linkedFoods = {},
 }: {
+  linkedFoods?: Record<string, string>;
   form: UseFormReturn<FormValues>;
   groupIndex: number;
   onMove: (from: number, to: number) => void;
@@ -71,6 +106,13 @@ function IngredientGroupEditor({
     control: form.control,
     name: `ingredientGroups.${groupIndex}.ingredients` as const,
   });
+  const rows = useWatch({
+    control: form.control,
+    name: `ingredientGroups.${groupIndex}.ingredients` as const,
+  });
+  const identities = useRef<Record<string, string>>({});
+  const [reviewLinks, setReviewLinks] = useState<Record<string, boolean>>({});
+  const [linkedNames, setLinkedNames] = useState<Record<string, string>>({});
   return (
     <fieldset className="editor-group">
       <legend>Ingredient section {groupIndex + 1}</legend>
@@ -84,38 +126,50 @@ function IngredientGroupEditor({
             placeholder="e.g. For the soup"
           />
         </label>
-        <div className="reorder-actions" aria-label={`Ingredient section ${groupIndex + 1} order`}>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={isFirst}
-            onClick={() => onMove(groupIndex, groupIndex - 1)}
-            aria-label={`Move ingredient section ${groupIndex + 1} up`}
+        {!(isFirst && isLast) && (
+          <div
+            className="reorder-actions"
+            aria-label={`Ingredient section ${groupIndex + 1} order`}
           >
-            <ChevronUp size={16} />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={isLast}
-            onClick={() => onMove(groupIndex, groupIndex + 1)}
-            aria-label={`Move ingredient section ${groupIndex + 1} down`}
-          >
-            <ChevronDown size={16} />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={isFirst && isLast}
-            onClick={onRemove}
-            aria-label={`Remove ingredient section ${groupIndex + 1}`}
-          >
-            <Minus size={16} />
-          </button>
-        </div>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={isFirst}
+              onClick={() => onMove(groupIndex, groupIndex - 1)}
+              aria-label={`Move ingredient section ${groupIndex + 1} up`}
+            >
+              <ChevronUp size={16} />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={isLast}
+              onClick={() => onMove(groupIndex, groupIndex + 1)}
+              aria-label={`Move ingredient section ${groupIndex + 1} down`}
+            >
+              <ChevronDown size={16} />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={isFirst && isLast}
+              onClick={() => {
+                if (
+                  !rows.some((row) => row.item.trim()) ||
+                  window.confirm('Remove this ingredient section and its contents?')
+                )
+                  onRemove();
+              }}
+              aria-label={`Remove ingredient section ${groupIndex + 1}`}
+            >
+              <Minus size={16} />
+            </button>
+          </div>
+        )}
       </div>
       {ingredients.fields.map((field, ingredientIndex) => (
         <div className="ingredient-row" key={field.id}>
+          <span className="ingredient-row-number">Ingredient {ingredientIndex + 1}</span>
           <input
             aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} quantity`}
             inputMode="decimal"
@@ -134,30 +188,64 @@ function IngredientGroupEditor({
           <input
             aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} item`}
             placeholder="Ingredient"
+            onFocus={(event) => {
+              identities.current[field.id] = event.currentTarget.value;
+            }}
             {...form.register(
               `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
             )}
+            onBlur={(event) => {
+              void form
+                .register(`ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item`)
+                .onBlur(event);
+              if (
+                form.getValues(
+                  `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId`,
+                ) &&
+                ingredientIdentityChanged(
+                  identities.current[field.id] ?? event.target.value,
+                  event.target.value,
+                )
+              )
+                setReviewLinks((current) => ({ ...current, [field.id]: true }));
+            }}
           />
-          <input
-            aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} note`}
-            placeholder="Note"
-            {...form.register(
-              `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.note` as const,
-            )}
-          />
-          <select
-            aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} shopping category`}
-            title="Shopping category"
-            {...form.register(
-              `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.shoppingCategory` as const,
-            )}
-          >
-            {SHOPPING_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+          <details className="ingredient-row-details">
+            <summary>
+              Details{' '}
+              <small>
+                {rows?.[ingredientIndex]?.note ? 'Note · ' : ''}
+                {rows?.[ingredientIndex]?.shoppingCategory || 'Other'}
+              </small>
+            </summary>
+            <label>
+              <span>Preparation note</span>
+              <textarea
+                rows={2}
+                aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} note`}
+                placeholder="Note"
+                {...form.register(
+                  `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.note` as const,
+                )}
+              />
+            </label>
+            <label>
+              <span>Shopping category</span>
+              <select
+                aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} shopping category`}
+                title="Shopping category"
+                {...form.register(
+                  `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.shoppingCategory` as const,
+                )}
+              >
+                {SHOPPING_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </details>
           <input
             type="hidden"
             {...form.register(
@@ -166,10 +254,11 @@ function IngredientGroupEditor({
           />
           <FoodCatalogPicker
             context="recipe"
-            defaultQuery={form.getValues(
-              `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
-            )}
+            launchLabel="Find food data"
+            defaultQuery={rows?.[ingredientIndex]?.item ?? ''}
             onImported={(product) => {
+              setReviewLinks((current) => ({ ...current, [field.id]: false }));
+              setLinkedNames((names) => ({ ...names, [product.id]: product.displayName }));
               form.setValue(
                 `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
                 product.displayName,
@@ -182,34 +271,103 @@ function IngredientGroupEditor({
               );
             }}
           />
-          <div className="reorder-actions compact-actions">
-            <button
-              className="icon-button"
-              type="button"
-              disabled={ingredientIndex === 0}
-              onClick={() => ingredients.move(ingredientIndex, ingredientIndex - 1)}
-              aria-label={`Move ingredient ${ingredientIndex + 1} up`}
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              disabled={ingredientIndex === ingredients.fields.length - 1}
-              onClick={() => ingredients.move(ingredientIndex, ingredientIndex + 1)}
-              aria-label={`Move ingredient ${ingredientIndex + 1} down`}
-            >
-              <ChevronDown size={14} />
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              disabled={ingredients.fields.length === 1}
-              onClick={() => ingredients.remove(ingredientIndex)}
-              aria-label={`Remove ingredient ${ingredientIndex + 1}`}
-            >
-              <Minus size={14} />
-            </button>
+          {reviewLinks[field.id] && rows?.[ingredientIndex]?.pantryProductId && (
+            <aside className="ingredient-food-link" data-link-review role="alert">
+              <strong>
+                Ingredient identity changed. Keep this food link or clear it and find another food.
+              </strong>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setReviewLinks((current) => ({ ...current, [field.id]: false }))}
+              >
+                Keep food link
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  form.setValue(
+                    `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId`,
+                    '',
+                    { shouldDirty: true },
+                  );
+                  setReviewLinks((current) => ({ ...current, [field.id]: false }));
+                }}
+              >
+                Clear and relink
+              </button>
+            </aside>
+          )}
+          {ingredients.fields.length > 1 && (
+            <div className="reorder-actions compact-actions">
+              <button
+                className="icon-button"
+                type="button"
+                disabled={ingredientIndex === 0}
+                onClick={() => ingredients.move(ingredientIndex, ingredientIndex - 1)}
+                aria-label={`Move ingredient ${ingredientIndex + 1} up`}
+              >
+                <ChevronUp size={14} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={ingredientIndex === ingredients.fields.length - 1}
+                onClick={() => ingredients.move(ingredientIndex, ingredientIndex + 1)}
+                aria-label={`Move ingredient ${ingredientIndex + 1} down`}
+              >
+                <ChevronDown size={14} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={ingredients.fields.length === 1}
+                onClick={() => {
+                  if (
+                    !rows?.[ingredientIndex]?.item ||
+                    window.confirm(
+                      `Remove ingredient ${ingredientIndex + 1}: ${rows[ingredientIndex].item}?`,
+                    )
+                  )
+                    ingredients.remove(ingredientIndex);
+                }}
+                aria-label={`Remove ingredient ${ingredientIndex + 1}`}
+              >
+                <Minus size={14} />
+              </button>
+            </div>
+          )}
+          <div className="ingredient-food-link">
+            {rows?.[ingredientIndex]?.pantryProductId ? (
+              <>
+                <span>
+                  Linked to{' '}
+                  {linkedNames[rows[ingredientIndex].pantryProductId!] ??
+                    linkedFoods[rows[ingredientIndex].pantryProductId!] ??
+                    'saved food record'}
+                </span>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() =>
+                    form.setValue(
+                      `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId`,
+                      '',
+                      { shouldDirty: true },
+                    )
+                  }
+                >
+                  Clear link
+                </button>
+                <small>
+                  Food identity only; recipe amounts and pantry stock are separate. If you change
+                  the ingredient, check this link or use Find food data to relink.
+                </small>
+              </>
+            ) : (
+              <span>{rows?.[ingredientIndex]?.item ? 'Not linked to food data' : ''}</span>
+            )}
           </div>
         </div>
       ))}
@@ -252,7 +410,9 @@ function InstructionSectionEditor({
     control: form.control,
     name: `instructionSections.${sectionIndex}.steps` as const,
   });
-  const updateSteps = (nextSteps: string[]) => {
+  const [stepIds, setStepIds] = useState(() => steps.map(() => createClientUuid()));
+  const updateSteps = (nextSteps: string[], ids?: string[]) => {
+    if (ids) setStepIds(ids);
     form.setValue(`instructionSections.${sectionIndex}.steps` as const, nextSteps, {
       shouldDirty: true,
     });
@@ -270,38 +430,46 @@ function InstructionSectionEditor({
             placeholder="e.g. Make the soup"
           />
         </label>
-        <div className="reorder-actions" aria-label={`Method section ${sectionIndex + 1} order`}>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={isFirst}
-            onClick={() => onMove(sectionIndex, sectionIndex - 1)}
-            aria-label={`Move method section ${sectionIndex + 1} up`}
-          >
-            <ChevronUp size={16} />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={isLast}
-            onClick={() => onMove(sectionIndex, sectionIndex + 1)}
-            aria-label={`Move method section ${sectionIndex + 1} down`}
-          >
-            <ChevronDown size={16} />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            disabled={isFirst && isLast}
-            onClick={onRemove}
-            aria-label={`Remove method section ${sectionIndex + 1}`}
-          >
-            <Minus size={16} />
-          </button>
-        </div>
+        {!(isFirst && isLast) && (
+          <div className="reorder-actions" aria-label={`Method section ${sectionIndex + 1} order`}>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={isFirst}
+              onClick={() => onMove(sectionIndex, sectionIndex - 1)}
+              aria-label={`Move method section ${sectionIndex + 1} up`}
+            >
+              <ChevronUp size={16} />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={isLast}
+              onClick={() => onMove(sectionIndex, sectionIndex + 1)}
+              aria-label={`Move method section ${sectionIndex + 1} down`}
+            >
+              <ChevronDown size={16} />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              disabled={isFirst && isLast}
+              onClick={() => {
+                if (
+                  !steps.some((step) => step.trim()) ||
+                  window.confirm('Remove this method section and its contents?')
+                )
+                  onRemove();
+              }}
+              aria-label={`Remove method section ${sectionIndex + 1}`}
+            >
+              <Minus size={16} />
+            </button>
+          </div>
+        )}
       </div>
       {steps.map((_step, stepIndex) => (
-        <div className="step-editor" key={`${sectionIndex}-${stepIndex}`}>
+        <div className="step-editor" key={stepIds[stepIndex]}>
           <span aria-hidden="true">{stepIndex + 1}</span>
           <textarea
             aria-label={`Method section ${sectionIndex + 1}, step ${stepIndex + 1}`}
@@ -309,46 +477,68 @@ function InstructionSectionEditor({
             placeholder="Describe this step clearly."
             {...form.register(`instructionSections.${sectionIndex}.steps.${stepIndex}` as const)}
           />
-          <div className="reorder-actions compact-actions">
-            <button
-              className="icon-button"
-              type="button"
-              disabled={stepIndex === 0}
-              onClick={() => {
-                const next = [...steps];
-                [next[stepIndex - 1], next[stepIndex]] = [next[stepIndex]!, next[stepIndex - 1]!];
-                updateSteps(next);
-              }}
-              aria-label={`Move step ${stepIndex + 1} up`}
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              disabled={stepIndex === steps.length - 1}
-              onClick={() => {
-                const next = [...steps];
-                [next[stepIndex], next[stepIndex + 1]] = [next[stepIndex + 1]!, next[stepIndex]!];
-                updateSteps(next);
-              }}
-              aria-label={`Move step ${stepIndex + 1} down`}
-            >
-              <ChevronDown size={14} />
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              disabled={steps.length === 1}
-              onClick={() => updateSteps(steps.filter((_, index) => index !== stepIndex))}
-              aria-label={`Remove step ${stepIndex + 1}`}
-            >
-              <Minus size={14} />
-            </button>
-          </div>
+          {steps.length > 1 && (
+            <div className="reorder-actions compact-actions">
+              <button
+                className="icon-button"
+                type="button"
+                disabled={stepIndex === 0}
+                onClick={() => {
+                  const next = [...steps];
+                  [next[stepIndex - 1], next[stepIndex]] = [next[stepIndex]!, next[stepIndex - 1]!];
+                  const ids = [...stepIds];
+                  [ids[stepIndex - 1], ids[stepIndex]] = [ids[stepIndex]!, ids[stepIndex - 1]!];
+                  updateSteps(next, ids);
+                  requestAnimationFrame(() =>
+                    form.setFocus(`instructionSections.${sectionIndex}.steps.${stepIndex - 1}`),
+                  );
+                }}
+                aria-label={`Move step ${stepIndex + 1} up`}
+              >
+                <ChevronUp size={14} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={stepIndex === steps.length - 1}
+                onClick={() => {
+                  const next = [...steps];
+                  [next[stepIndex], next[stepIndex + 1]] = [next[stepIndex + 1]!, next[stepIndex]!];
+                  const ids = [...stepIds];
+                  [ids[stepIndex], ids[stepIndex + 1]] = [ids[stepIndex + 1]!, ids[stepIndex]!];
+                  updateSteps(next, ids);
+                  requestAnimationFrame(() =>
+                    form.setFocus(`instructionSections.${sectionIndex}.steps.${stepIndex + 1}`),
+                  );
+                }}
+                aria-label={`Move step ${stepIndex + 1} down`}
+              >
+                <ChevronDown size={14} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={steps.length === 1}
+                onClick={() => {
+                  if (!steps[stepIndex]?.trim() || window.confirm(`Remove step ${stepIndex + 1}?`))
+                    updateSteps(
+                      steps.filter((_, index) => index !== stepIndex),
+                      stepIds.filter((_, index) => index !== stepIndex),
+                    );
+                }}
+                aria-label={`Remove step ${stepIndex + 1}`}
+              >
+                <Minus size={14} />
+              </button>
+            </div>
+          )}
         </div>
       ))}
-      <button className="text-button" type="button" onClick={() => updateSteps([...steps, ''])}>
+      <button
+        className="text-button"
+        type="button"
+        onClick={() => updateSteps([...steps, ''], [...stepIds, createClientUuid()])}
+      >
         <Plus size={16} /> Add step
       </button>
     </fieldset>
@@ -361,12 +551,20 @@ export function RecipeForm({
   currentRevision,
   confirmationLabel,
   intro,
+  linkedFoods,
 }: RecipeFormProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
   const [savedDraft, setSavedDraft] = useState<FormValues | null>(null);
   const [aiImproving, setAiImproving] = useState(false);
+  const [aiDraft, setAiDraft] = useState<FormValues | null>(null);
+  const [aiBefore, setAiBefore] = useState<FormValues | null>(null);
+  const [aiUndo, setAiUndo] = useState<FormValues | null>(null);
+  const [draftMessage, setDraftMessage] = useState('');
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const navigating = useRef(false);
   const defaults = useMemo<FormValues>(
     () =>
       ({
@@ -386,45 +584,111 @@ export function RecipeForm({
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? [];
   const category = useWatch({ control: form.control, name: 'category' }) ?? '';
   const cuisine = useWatch({ control: form.control, name: 'cuisine' }) ?? '';
+  const supportingCount = [
+    watchedValues.sourceName,
+    watchedValues.sourceUrl,
+    watchedValues.originalAuthor,
+    watchedValues.cookingMethod,
+    watchedValues.equipmentText,
+  ].filter(Boolean).length;
+  const nutritionCount = Object.entries(watchedValues).filter(
+    ([key, value]) => key.startsWith('nutrition') && value !== '' && value != null,
+  ).length;
+  const notesCount = [watchedValues.tips, watchedValues.sharedNotes].filter(Boolean).length;
   const draftKey = `bord:recipe-draft:${recipeId ?? 'new'}`;
   const legacyDraftKey = `our-recipes:recipe-draft:${recipeId ?? 'new'}`;
 
   useEffect(() => {
-    let restoreTimer: number | undefined;
-    const rawDraft =
-      window.localStorage.getItem(draftKey) ?? window.localStorage.getItem(legacyDraftKey);
-    if (!rawDraft) return undefined;
+    let timer: number | undefined;
     try {
-      const parsed = JSON.parse(rawDraft) as StoredDraft;
-      const candidate = recipeFormSchema.safeParse({
-        ...parsed,
-        tags:
-          typeof parsed.tagsText === 'string'
-            ? parsed.tagsText
-                .split(',')
-                .map((tag) => tag.trim())
-                .filter(Boolean)
-            : parsed.tags,
-        equipmentText: typeof parsed.equipmentText === 'string' ? parsed.equipmentText : '',
-        equipment:
-          typeof parsed.equipmentText === 'string'
-            ? parsed.equipmentText.split('\n').filter(Boolean)
-            : parsed.equipment,
-      });
-      if (candidate.success)
-        restoreTimer = window.setTimeout(() => setSavedDraft(candidate.data), 0);
+      const raw = localStorage.getItem(draftKey) ?? localStorage.getItem(legacyDraftKey);
+      if (raw) {
+        const candidate = restoreRecipeDraft(raw, defaults);
+        timer = window.setTimeout(() => {
+          if (candidate) setSavedDraft(candidate as unknown as FormValues);
+          else
+            setDraftMessage(
+              'The stored draft could not be recovered. Your current editor is still available.',
+            );
+        }, 0);
+      }
     } catch {
-      window.localStorage.removeItem(draftKey);
+      timer = window.setTimeout(
+        () =>
+          setDraftMessage(
+            'Local draft storage is unavailable. Keep this page open until you save.',
+          ),
+        0,
+      );
     }
-    return () => {
-      if (restoreTimer) window.clearTimeout(restoreTimer);
-    };
-  }, [draftKey, legacyDraftKey]);
+    return () => window.clearTimeout(timer);
+  }, [draftKey, legacyDraftKey, defaults]);
 
   useEffect(() => {
-    if (form.formState.isDirty)
-      window.localStorage.setItem(draftKey, JSON.stringify(watchedValues));
-  }, [draftKey, form.formState.isDirty, watchedValues]);
+    if (!form.formState.isDirty || savedDraft) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(watchedValues));
+    } catch {
+      window.setTimeout(
+        () =>
+          setDraftMessage(
+            'Local draft recovery is unavailable. Keep this page open until you save.',
+          ),
+        0,
+      );
+    }
+  }, [draftKey, form.formState.isDirty, watchedValues, savedDraft]);
+
+  useEffect(() => {
+    function checkNavigation(event: MouseEvent) {
+      const link = (event.target as Element).closest?.('a[href]');
+      if (
+        !link ||
+        navigating.current ||
+        !form.formState.isDirty ||
+        link.getAttribute('href')?.startsWith('#')
+      )
+        return;
+      if (
+        !window.confirm(
+          'Leave this recipe with unsaved changes? A local draft may be available on this device.',
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+    document.addEventListener('click', checkNavigation, true);
+    return () => document.removeEventListener('click', checkNavigation, true);
+  }, [form.formState.isDirty]);
+
+  function revealField(name: string) {
+    const field = formRef.current?.querySelector<HTMLElement>(`[name="${name}"]`);
+    let parent = field?.parentElement;
+    while (parent) {
+      if (parent instanceof HTMLDetailsElement) parent.open = true;
+      parent = parent.parentElement;
+    }
+    if (field?.getAttribute('type') === 'hidden')
+      field.parentElement?.querySelector<HTMLElement>('[role="combobox"]')?.focus();
+    else field?.focus();
+    field?.scrollIntoView({ block: 'center' });
+  }
+  function invalid(errors: typeof form.formState.errors) {
+    const names: string[] = [];
+    function collect(value: unknown, path = '') {
+      if (!value || typeof value !== 'object') return;
+      if ('message' in value) {
+        names.push(path);
+        return;
+      }
+      for (const [key, child] of Object.entries(value))
+        if (key !== 'ref') collect(child, path ? `${path}.${key}` : key);
+    }
+    collect(errors);
+    setInvalidFields(names);
+    if (names[0]) revealField(names[0]);
+  }
 
   useEffect(() => {
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
@@ -438,6 +702,7 @@ export function RecipeForm({
 
   async function submit(values: FormValues) {
     setServerError(null);
+    setInvalidFields([]);
     try {
       const basePayload = recipePayloadFromForm(values);
       const payload = recipeId
@@ -460,8 +725,11 @@ export function RecipeForm({
         showToast(message, 'error');
         return;
       }
-      window.localStorage.removeItem(draftKey);
-      window.localStorage.removeItem(legacyDraftKey);
+      try {
+        window.localStorage.removeItem(draftKey);
+        window.localStorage.removeItem(legacyDraftKey);
+      } catch {}
+      navigating.current = true;
       form.reset(values);
       showToast(recipeId ? 'Recipe revision saved.' : 'Recipe added to your cookbook.', 'success');
       if (
@@ -488,7 +756,9 @@ export function RecipeForm({
     setAiImproving(true);
     setServerError(null);
     try {
-      const recipe = recipePayloadFromForm(form.getValues());
+      const snapshot = structuredClone(form.getValues());
+      setAiBefore(snapshot);
+      const recipe = recipePayloadFromForm(snapshot);
       const response = await fetch(`/api/v1/recipes/${recipeId}/improve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -505,7 +775,7 @@ export function RecipeForm({
         ...body.candidate.recipe,
         equipmentText: body.candidate.recipe.equipment.join('\n'),
       } as FormValues;
-      form.reset(improvedValues, { keepDefaultValues: true });
+      setAiDraft(improvedValues);
       showToast(
         'AI improvement draft ready. Review the changes, then save a new revision.',
         'success',
@@ -523,10 +793,64 @@ export function RecipeForm({
   return (
     <form
       className={`recipe-form${intro ? ' editor-form-layout' : ''}`}
-      onSubmit={form.handleSubmit(submit)}
+      ref={formRef}
+      onSubmit={(event) => {
+        const review = formRef.current?.querySelector<HTMLElement>('[data-link-review]');
+        if (review) {
+          event.preventDefault();
+          review.querySelector<HTMLElement>('button')?.focus();
+          review.scrollIntoView({ block: 'center' });
+          return;
+        }
+        void form.handleSubmit(submit, invalid)(event);
+      }}
       noValidate
     >
       {intro ? <div className="editor-intro">{intro}</div> : null}
+      <div className="editor-save-bar">
+        <span role="status">
+          {form.formState.isSubmitting
+            ? 'Saving…'
+            : form.formState.isDirty
+              ? 'Unsaved recipe draft'
+              : 'Ready to edit'}
+        </span>
+        <button className="primary-button" type="submit" disabled={form.formState.isSubmitting}>
+          {recipeId ? 'Save changes' : (confirmationLabel ?? 'Add recipe')}
+        </button>
+      </div>
+      {aiUndo && (
+        <aside className="draft-recovery">
+          <span>AI changes are an unsaved draft.</span>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              if (window.confirm('Restore the editor from before applying AI changes?')) {
+                form.reset(aiUndo, { keepDefaultValues: true });
+                setAiUndo(null);
+              }
+            }}
+          >
+            Undo AI draft
+          </button>
+        </aside>
+      )}
+      {draftMessage && <p role="status">{draftMessage}</p>}
+      {invalidFields.length > 0 && (
+        <aside className="form-error" role="alert">
+          <strong>Check these fields before saving</strong>
+          <ul>
+            {invalidFields.map((name) => (
+              <li key={name}>
+                <button type="button" className="text-button" onClick={() => revealField(name)}>
+                  {fieldLabel(name)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
       <div className="editor-card-column">
         {savedDraft && (
           <aside className="draft-recovery" aria-live="polite">
@@ -539,7 +863,7 @@ export function RecipeForm({
                 className="text-button"
                 type="button"
                 onClick={() => {
-                  form.reset(savedDraft);
+                  form.reset(savedDraft, { keepDefaultValues: true });
                   setSavedDraft(null);
                 }}
               >
@@ -549,8 +873,10 @@ export function RecipeForm({
                 className="text-button"
                 type="button"
                 onClick={() => {
-                  window.localStorage.removeItem(draftKey);
-                  window.localStorage.removeItem(legacyDraftKey);
+                  try {
+                    window.localStorage.removeItem(draftKey);
+                    window.localStorage.removeItem(legacyDraftKey);
+                  } catch {}
                   setSavedDraft(null);
                 }}
               >
@@ -582,7 +908,7 @@ export function RecipeForm({
               placeholder="Why it belongs in your cookbook."
             />
           </label>
-          <div className="field-grid three-columns">
+          <div className="field-grid editor-timings">
             <label>
               <span>Serves</span>
               <input {...form.register('servings')} />
@@ -607,40 +933,54 @@ export function RecipeForm({
               </span>
               <select {...form.register('difficulty')}>
                 <option value="">Not set</option>
+                {initial.difficulty &&
+                  !['easy', 'standard', 'involved'].includes(initial.difficulty) && (
+                    <option value={initial.difficulty}>{initial.difficulty} (saved value)</option>
+                  )}
                 <option value="easy">Easy</option>
                 <option value="standard">Standard</option>
                 <option value="involved">Involved</option>
               </select>
             </label>
           </div>
-          <div className="field-grid two-columns recipe-taxonomy-grid">
-            <input type="hidden" {...form.register('category')} />
-            <RecipeTaxonomySelector
-              label="Categories"
-              value={parseRecipeTaxonomyValues(category)}
-              options={RECIPE_CATEGORY_OPTIONS}
-              onChange={(values) =>
-                form.setValue('category', joinRecipeTaxonomyValues(values), {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-              error={form.formState.errors.category?.message}
-            />
-            <input type="hidden" {...form.register('cuisine')} />
-            <RecipeTaxonomySelector
-              label="Cuisines"
-              value={parseRecipeTaxonomyValues(cuisine)}
-              options={RECIPE_CUISINE_OPTIONS}
-              onChange={(values) =>
-                form.setValue('cuisine', joinRecipeTaxonomyValues(values), {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-              error={form.formState.errors.cuisine?.message}
-            />
-          </div>
+          <details className="editor-optional" open={Boolean(initial.category || initial.cuisine)}>
+            <summary>
+              Classification{' '}
+              <small>
+                {parseRecipeTaxonomyValues(category).length +
+                  parseRecipeTaxonomyValues(cuisine).length}{' '}
+                selected
+              </small>
+            </summary>
+            <div className="field-grid two-columns recipe-taxonomy-grid">
+              <input type="hidden" {...form.register('category')} />
+              <RecipeTaxonomySelector
+                label="Categories"
+                value={parseRecipeTaxonomyValues(category)}
+                options={RECIPE_CATEGORY_OPTIONS}
+                onChange={(values) =>
+                  form.setValue('category', joinRecipeTaxonomyValues(values), {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                error={form.formState.errors.category?.message}
+              />
+              <input type="hidden" {...form.register('cuisine')} />
+              <RecipeTaxonomySelector
+                label="Cuisines"
+                value={parseRecipeTaxonomyValues(cuisine)}
+                options={RECIPE_CUISINE_OPTIONS}
+                onChange={(values) =>
+                  form.setValue('cuisine', joinRecipeTaxonomyValues(values), {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                error={form.formState.errors.cuisine?.message}
+              />
+            </div>
+          </details>
         </section>
       </div>
 
@@ -653,6 +993,7 @@ export function RecipeForm({
           <IngredientGroupEditor
             key={field.id}
             form={form}
+            linkedFoods={linkedFoods}
             groupIndex={index}
             onMove={ingredientGroups.move}
             onRemove={() => ingredientGroups.remove(index)}
@@ -694,7 +1035,7 @@ export function RecipeForm({
                 type="button"
                 onClick={() => void improveWithAi()}
                 disabled={aiImproving || form.formState.isSubmitting}
-                title="Uses one paid OpenAI request and keeps ingredients unchanged"
+                aria-describedby="editor-ai-permission"
               >
                 {aiImproving ? (
                   <LoadingIndicator label="Improving recipe" />
@@ -706,6 +1047,12 @@ export function RecipeForm({
             ) : null}
           </div>
         </div>
+        {recipeId && (
+          <p id="editor-ai-permission" className="editor-help">
+            AI Improve starts one paid AI request. Review and apply the suggested draft; your
+            current edits stay intact until you choose.
+          </p>
+        )}
         {instructionSections.fields.map((field, index) => (
           <InstructionSectionEditor
             key={field.id}
@@ -726,47 +1073,81 @@ export function RecipeForm({
         </button>
       </section>
 
-      <section className="recipe-form-section two-columns">
-        <RecipeTagSelector
-          value={tags}
-          onChange={(nextTags) =>
-            form.setValue('tags', nextTags, { shouldDirty: true, shouldValidate: true })
-          }
-        />
-        <label>
-          <span>
-            Source name <em>(optional)</em>
-          </span>
-          <input {...form.register('sourceName')} />
-        </label>
-        <label>
-          <span>
-            Source URL <em>(optional)</em>
-          </span>
-          <input type="url" {...form.register('sourceUrl')} />
-        </label>
-        <label>
-          <span>
-            Original author <em>(optional)</em>
-          </span>
-          <input {...form.register('originalAuthor')} placeholder="e.g. Rowan Lee" />
-        </label>
-        <label>
-          <span>
-            Cooking method <em>(optional)</em>
-          </span>
-          <input {...form.register('cookingMethod')} placeholder="e.g. oven-baked" />
-        </label>
-        <label>
-          <span>
-            Equipment <em>(one item per line, optional)</em>
-          </span>
-          <textarea
-            rows={4}
-            {...form.register('equipmentText')}
-            placeholder={'Large pot\nImmersion blender'}
+      <details
+        className="recipe-form-section editor-optional"
+        open={Boolean(
+          initial.tags?.length ||
+          initial.sourceName ||
+          initial.sourceUrl ||
+          initial.originalAuthor ||
+          initial.cookingMethod ||
+          initial.equipment?.length,
+        )}
+      >
+        <summary>
+          Source, equipment and tags{' '}
+          <small>
+            {tags.length ? `${tags.length} tags · ` : ''}
+            {supportingCount ? `${supportingCount} fields filled` : 'Optional recipe details'}
+          </small>
+        </summary>
+        <div className="field-grid two-columns">
+          <RecipeTagSelector
+            value={tags}
+            onChange={(nextTags) =>
+              form.setValue('tags', nextTags, { shouldDirty: true, shouldValidate: true })
+            }
           />
-        </label>
+          <label>
+            <span>
+              Source name <em>(optional)</em>
+            </span>
+            <input {...form.register('sourceName')} />
+          </label>
+          <label>
+            <span>
+              Source URL <em>(optional)</em>
+            </span>
+            <input type="url" {...form.register('sourceUrl')} />
+          </label>
+          <label>
+            <span>
+              Original author <em>(optional)</em>
+            </span>
+            <input {...form.register('originalAuthor')} placeholder="e.g. Rowan Lee" />
+          </label>
+          <label>
+            <span>
+              Cooking method <em>(optional)</em>
+            </span>
+            <input {...form.register('cookingMethod')} placeholder="e.g. oven-baked" />
+          </label>
+          <label>
+            <span>
+              Equipment <em>(one item per line, optional)</em>
+            </span>
+            <textarea
+              rows={4}
+              {...form.register('equipmentText')}
+              placeholder={'Large pot\nImmersion blender'}
+            />
+          </label>
+        </div>
+      </details>
+      <details
+        className="recipe-form-section editor-optional"
+        open={Object.entries(initial).some(
+          ([key, value]) => key.startsWith('nutrition') && value !== '' && value != null,
+        )}
+      >
+        <summary>
+          Recipe-source nutrition{' '}
+          <small>
+            {nutritionCount
+              ? `${nutritionCount} values filled · per serving`
+              : 'Optional · per serving; leave unknown values blank'}
+          </small>
+        </summary>
         <fieldset className="nutrition-fields">
           <legend>
             Nutrition per serving <em>(optional; review AI estimates)</em>
@@ -821,6 +1202,19 @@ export function RecipeForm({
             </label>
           </div>
         </fieldset>
+      </details>
+      <details
+        className="recipe-form-section editor-optional"
+        open={Boolean(initial.tips || initial.sharedNotes)}
+      >
+        <summary>
+          Tips and shared notes{' '}
+          <small>
+            {notesCount
+              ? `${notesCount} notes filled · shared with the household`
+              : 'Optional · visible to the household'}
+          </small>
+        </summary>
         <label>
           <span>
             Tips <em>(optional)</em>
@@ -841,7 +1235,7 @@ export function RecipeForm({
             placeholder="A household note for every cook."
           />
         </label>
-      </section>
+      </details>
       {serverError && (
         <p className="form-error" role="alert">
           {serverError}
@@ -856,9 +1250,67 @@ export function RecipeForm({
         {form.formState.isSubmitting
           ? 'Saving recipe…'
           : recipeId
-            ? 'Save a new revision'
-            : (confirmationLabel ?? 'Add to the cookbook')}
+            ? 'Save changes'
+            : (confirmationLabel ?? 'Add recipe')}
       </button>
+      {aiDraft && (
+        <AppDialog
+          open
+          onClose={() => setAiDraft(null)}
+          aria-label="Review AI improvement"
+          className="editor-ai-review"
+        >
+          <h2>Review AI improvement</h2>
+          <p>
+            Your current editor has been kept, including changes made while waiting. Applying this
+            draft replaces it; cancel keeps your edits.
+          </p>
+          {aiBefore && (
+            <details>
+              <summary>Recipe before the request</summary>
+              <h3>{aiBefore.title}</h3>
+              <p>{aiBefore.summary}</p>
+              {aiBefore.instructionSections.map((section, index) => (
+                <ol key={index}>
+                  {section.steps.map((step, index) => (
+                    <li key={index}>{step}</li>
+                  ))}
+                </ol>
+              ))}
+            </details>
+          )}
+          <details open>
+            <summary>Suggested recipe draft</summary>
+            <h3>{aiDraft.title}</h3>
+            {aiDraft.instructionSections.map((section, index) => (
+              <div key={index}>
+                <strong>{section.title}</strong>
+                <ol>
+                  {section.steps.map((text, index) => (
+                    <li key={index}>{text}</li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </details>
+          <button type="button" className="secondary-button" onClick={() => setAiDraft(null)}>
+            Keep current edits
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => {
+              if (window.confirm('Replace the current unsaved editor with this AI draft?')) {
+                setAiUndo(structuredClone(form.getValues()));
+                form.reset(aiDraft, { keepDefaultValues: true });
+                setAiDraft(null);
+              }
+            }}
+          >
+            Apply draft
+          </button>
+        </AppDialog>
+      )}
     </form>
   );
 }

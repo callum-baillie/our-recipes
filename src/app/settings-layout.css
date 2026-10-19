@@ -1,3 +1,51 @@
+.settings-workspace {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr);
+  min-height: calc(100dvh - var(--header-height, 4.25rem));
+}
+.settings-sidebar {
+  position: sticky;
+  top: var(--header-height, 4.25rem);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--header-height, 4.25rem));
+  padding: 2rem 1.7rem 1.5rem;
+  background: color-mix(in srgb, var(--page) 94%, var(--linen));
+  border-right: 1px solid var(--line);
+}
+.settings-sidebar h2 {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+.settings-sidebar nav {
+  display: grid;
+  gap: 0.25rem;
+}
+.settings-sidebar nav a {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.45rem 0.75rem;
+  color: var(--muted);
+  border-radius: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.settings-sidebar nav a:hover,
+.settings-sidebar nav a:focus-visible {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+body:has(.api-settings-page) .settings-sidebar a[href='/settings/api'],
+body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--leaf) 10%, var(--linen));
+}
+
 /* Shared by app settings and account preferences. Keep the same content grid everywhere. */
 .settings-content {
   min-width: 0;
@@ -22,7 +70,7 @@
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: var(--field);
-  overflow: clip;
+  overflow: visible;
   padding: 0;
 }
 .settings-content .settings-pane-header {
@@ -206,7 +254,7 @@
   gap: 0.75rem;
   margin-bottom: 0.6rem;
 }
-.settings-content .settings-subsection h3 {
+.settings-content .settings-subsection > header h3 {
   font-size: 0.9rem;
   margin: 0;
   font-weight: 650;
@@ -438,11 +486,6 @@
   display: grid;
   gap: 1.75rem;
 }
-.settings-content .profile-goal-settings-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
 .settings-content .profile-goal-settings-options label {
   display: inline-flex;
   align-items: center;
@@ -517,13 +560,6 @@
   margin-block: 0.5rem;
 }
 
-.settings-content .appearance-palette-grid {
-  grid-template-columns: repeat(auto-fit, minmax(4.25rem, 1fr));
-}
-.settings-content .appearance-mode-grid {
-  grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
-}
-
 .settings-content .settings-pane-icon {
   display: grid;
   place-items: center;
@@ -537,4 +573,345 @@
 .settings-content .profile-settings-list {
   width: 100%;
   min-width: 0;
+}
+
+.settings-mobile-nav {
+  display: none;
+}
+.settings-section-nav {
+  min-width: 0;
+}
+.settings-content .settings-overview {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.settings-content .settings-overview-card {
+  margin: 0;
+  min-width: 0;
+  padding: 1.15rem;
+}
+.settings-content .settings-overview-card h2 {
+  font: 650 1rem/1.4 var(--font-body, inherit);
+}
+.settings-content .settings-overview-card p {
+  font-size: 0.9rem;
+}
+.settings-content .settings-pane,
+.settings-content [id] {
+  scroll-margin-top: calc(var(--header-height, 4.25rem) + 1rem);
+}
+.settings-section-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  padding: 0.75rem 0;
+}
+.settings-section-index a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.settings-form-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.settings-content .profile-goal-settings-options {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+.settings-content .appearance-palette-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.settings-content .appearance-mode-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.settings-member > summary {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+.settings-member > summary small {
+  font-weight: 400;
+  color: var(--muted);
+}
+.settings-member {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--field);
+}
+.settings-content .settings-member .settings-pane {
+  border: 0;
+}
+.settings-identity-preview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+}
+.settings-identity-preview img,
+.settings-avatar-fallback {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+}
+.settings-content .settings-subsection:first-child,
+.settings-content .settings-group:first-child {
+  border-top: 0;
+  margin-top: 0;
+}
+.settings-content .brand-icon-search > span:last-child {
+  border: 0;
+  padding: 0;
+}
+.settings-content .brand-icon-categories {
+  max-height: 22rem;
+  overflow: auto;
+  padding: 0.35rem;
+}
+.settings-content .settings-disclosure > summary {
+  display: list-item;
+  list-style-position: inside;
+}
+.settings-content .settings-disclosure[open] > summary {
+  color: var(--leaf);
+}
+@media (max-width: 900px) {
+  .settings-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-sidebar {
+    position: static;
+    min-width: 0;
+    min-height: 0;
+    padding: 0.5rem var(--page-gutter);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .settings-sidebar h2,
+  .settings-security-note,
+  .settings-sidebar .settings-desktop-nav {
+    display: none;
+  }
+  .settings-mobile-nav {
+    display: block;
+  }
+  .settings-mobile-nav > summary {
+    min-height: 44px;
+    cursor: pointer;
+    padding: 0.45rem 0.2rem;
+  }
+  .settings-mobile-nav > summary span {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-inline: 0.4rem;
+  }
+  .settings-mobile-nav > summary strong {
+    font-size: 0.9rem;
+  }
+  .settings-sidebar .settings-mobile-nav nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+  }
+  .settings-sidebar nav a {
+    font-size: 0.9rem;
+    min-width: 0;
+  }
+}
+@container (max-width: 660px) {
+  .settings-content .settings-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-content .appearance-palette-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .settings-content .settings-action-bar {
+    align-items: start;
+  }
+}
+.nutrient-picker {
+  border: 0;
+  padding: 1rem 0;
+  margin: 0;
+}
+.nutrient-picker > legend {
+  font-weight: 650;
+}
+.nutrient-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.nutrient-catalogue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.nutrient-catalogue > label {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font-weight: 500;
+}
+.nutrient-catalogue small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.nutrient-picker .settings-disclosure > label {
+  display: grid;
+  gap: 0.4rem;
+  padding-block: 0.5rem;
+}
+.settings-content .backup-review-dialog[open] {
+  padding: 1.25rem;
+  overflow: auto;
+  width: min(38rem, calc(100vw - 2rem));
+}
+.backup-review-dialog code {
+  overflow-wrap: anywhere;
+}
+.profile-onboarding-dialog .onboarding-profile-identity {
+  align-items: start;
+}
+.profile-onboarding-dialog .onboarding-avatar-editor {
+  align-content: start;
+}
+.profile-onboarding-dialog .color-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(44px, 1fr));
+  gap: 0.35rem;
+  width: 100%;
+}
+.profile-onboarding-dialog .color-swatch {
+  width: 44px;
+  justify-self: center;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+}
+@media (max-width: 700px) {
+  .profile-onboarding-dialog .onboarding-profile-identity-fields {
+    order: -1;
+  }
+  .profile-onboarding-dialog .onboarding-avatar-preview {
+    margin: 0;
+  }
+}
+.settings-passkey-create {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  flex-wrap: wrap;
+  padding-block: 1rem;
+}
+.settings-passkey-create label {
+  display: grid;
+  gap: 0.45rem;
+  flex: 1 1 15rem;
+}
+.settings-passkey-create input {
+  width: 100%;
+}
+.settings-content .appearance-mode {
+  flex-wrap: wrap;
+}
+.settings-content .appearance-mode small {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.settings-content .settings-action-bar > div[role='status']:empty {
+  display: none;
+}
+
+.personal-profile-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.settings-hub {
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+}
+
+/* Keep the fieldset mutation lock in the dialog's existing scrolling body track. */
+.onboarding-shell > .settings-form-fields {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.onboarding-shell > .settings-form-fields > .onboarding-step {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.settings-content .settings-choice-value {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.profile-onboarding-dialog .onboarding-security-complete {
+  max-height: calc(var(--dialog-viewport-height, 100dvh) - 2rem);
+  overflow: auto;
+  width: 100%;
+  margin: 0;
+  padding: 1.25rem;
+}
+@container (max-width: 660px) {
+  .settings-content .settings-choice-value {
+    text-align: left;
+  }
+}
+
+.backup-review-dialog .dialog-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+.backup-review-dialog .dialog-heading h2 {
+  margin: 0.25rem 0;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+.backup-review-dialog .dialog-heading button {
+  flex-shrink: 0;
+}
+
+.settings-content .settings-local-status {
+  flex-basis: 100%;
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }

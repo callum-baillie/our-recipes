@@ -19,17 +19,26 @@ export function RecipePantryPanel({
   initialAvailability,
   products,
   allowMapping = true,
+  targetServings,
+  onAvailabilityChange,
+  compact = false,
 }: {
   initialAvailability: PantryRecipeAvailability;
   products: PantryProductOption[];
   allowMapping?: boolean;
+  targetServings?: number;
+  onAvailabilityChange?: (availability: PantryRecipeAvailability) => void;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [availability, setAvailability] = useState(initialAvailability);
-  const [servings, setServings] = useState(String(initialAvailability.targetServings ?? ''));
+  const [ownServings, setServings] = useState(String(initialAvailability.targetServings ?? ''));
   const [pendingIngredientId, setPendingIngredientId] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const [message, setMessage] = useState('');
+  const servings = targetServings === undefined ? ownServings : String(targetServings);
+  const checkedServings = availability.targetServings ?? availability.baseServings;
+  const stale = checkedServings !== null && Number(servings) !== checkedServings;
 
   async function refreshForServings() {
     const value = Number(servings);
@@ -44,8 +53,10 @@ export function RecipePantryPanel({
         availability?: PantryRecipeAvailability;
         error?: { message?: string };
       } | null;
-      if (response.ok && body?.availability) setAvailability(body.availability);
-      else setMessage(body?.error?.message ?? 'Pantry availability could not be recalculated.');
+      if (response.ok && body?.availability) {
+        setAvailability(body.availability);
+        onAvailabilityChange?.(body.availability);
+      } else setMessage(body?.error?.message ?? 'Pantry availability could not be recalculated.');
     } catch {
       setMessage('Pantry availability could not be recalculated. Check your connection and retry.');
     } finally {
@@ -85,11 +96,15 @@ export function RecipePantryPanel({
     <section className={styles.panel} aria-labelledby={`pantry-${availability.recipeId}`}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>PANTRY CHECK</p>
-          <h2 id={`pantry-${availability.recipeId}`}>What you have on hand</h2>
+          {!compact && <p className={styles.eyebrow}>PANTRY CHECK</p>}
+          <h3 id={`pantry-${availability.recipeId}`}>What you have on hand</h3>
         </div>
         <PantryAvailabilityPill state={availability.state} />
       </header>
+      <p role="status">
+        Checked for {checkedServings ?? 'original'} servings.
+        {stale ? ` Batch changed to ${servings}; recheck availability.` : ''}
+      </p>
       <p className={styles.explainer}>
         Only compatible exact quantities count. Approximate, unmapped, and incompatible stock stays
         visibly unknown.
@@ -104,6 +119,7 @@ export function RecipePantryPanel({
             max="1000"
             step="0.25"
             value={servings}
+            readOnly={targetServings !== undefined}
             onChange={(event) => setServings(event.target.value)}
           />
           <button

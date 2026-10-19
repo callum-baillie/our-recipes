@@ -91,7 +91,8 @@ export function RecipeReactionButtons({
           <button
             type="button"
             key={reactionScore}
-            aria-label={`${label} (score ${reactionScore})`}
+            aria-label={label}
+            title={label}
             aria-pressed={selected}
             disabled={pendingReaction !== null}
             aria-busy={pendingReaction === reactionScore}
@@ -102,6 +103,9 @@ export function RecipeReactionButtons({
             ) : (
               <Icon size={17} fill={selected ? 'currentColor' : 'none'} aria-hidden="true" />
             )}
+            {reactionScore === RECIPE_REACTION_SCORES.staple ? (
+              <span className="recipe-reaction-label">Staple</span>
+            ) : null}
           </button>
         );
       })}

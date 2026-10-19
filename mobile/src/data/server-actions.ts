@@ -1,3 +1,6 @@
+import { Alert } from 'react-native';
+import { router } from 'expo-router';
+import { preserveRecipeFields, type EditableDetail } from '@/data/recipe-edit';
 import { useAuth } from '@/auth/auth-context';
 import { randomUUID } from 'expo-crypto';
 import type { PantryItem, Recipe, ShoppingItem } from '@/data/types';
@@ -7,7 +10,7 @@ import { useBord } from '@/state/bord-store';
 export function useServerActions() {
   const { request } = useAuth();
   const { refresh } = useSync();
-  const { dispatch } = useBord();
+  const { dispatch, state } = useBord();
 
   return {
     async saveRecipe(
@@ -26,7 +29,7 @@ export function useServerActions() {
       existing?: Recipe,
       importId?: string,
     ) {
-      const payload = {
+      let payload: Record<string, unknown> = {
         title: input.title,
         summary: input.summary,
         status: 'active',
@@ -67,6 +70,12 @@ export function useServerActions() {
         ],
         instructionSections: [{ title: '', steps: input.steps }],
       };
+      if (existing && !importId) {
+        const { recipe: detail } = await request<{ recipe: EditableDetail }>(
+          `/api/v1/recipes/${encodeURIComponent(existing.id)}`,
+        );
+        payload = preserveRecipeFields(detail, payload, existing, input);
+      }
       const path = importId
         ? `/api/v1/imports/${encodeURIComponent(importId)}/confirm`
         : existing
@@ -117,6 +126,21 @@ export function useServerActions() {
           },
         );
         await refresh();
+        if (
+          shoppingState === 'in_cart' &&
+          state.lists.find((list) => list.id === listId)?.settings?.openPantryPurchaseOnCheck
+        ) {
+          Alert.alert('Record this purchase in Pantry?', item.name, [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Record purchase',
+              onPress: () =>
+                router.push(
+                  `/(app)/(lists)/manage?listId=${encodeURIComponent(listId)}&intakeItemId=${encodeURIComponent(item.id)}`,
+                ),
+            },
+          ]);
+        }
       } catch (error) {
         dispatch({
           type: 'set-shopping-state',

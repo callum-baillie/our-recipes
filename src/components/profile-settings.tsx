@@ -1,9 +1,12 @@
 'use client';
+/* eslint-disable @next/next/no-img-element -- Uncommitted avatar URLs need a direct loading failure fallback. */
 
 import { Archive, Plus, RotateCcw, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useState } from 'react';
+import { AppDialog } from './app-dialog';
 
+import { RegionalChoice } from './regional-choice';
 import { kitchenInterviewQuestions, emptyKitchenInterview } from './kitchen-interview';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import {
@@ -72,6 +75,18 @@ export function ProfileSettings({
   const [pendingGuardian, setPendingGuardian] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  async function reconcile() {
+    const response = await fetch('/api/v1/profiles?enriched=true', { cache: 'no-store' });
+    const body = await response.json();
+    if (!response.ok)
+      throw new Error(
+        body.error?.message ??
+          'The change may be saved. Refresh members to reload roles and archive eligibility.',
+      );
+    setProfiles(body.profiles);
+    setGuardians(body.guardians);
+  }
+
   async function saveProfile(profile: Profile, data: ProfileValues) {
     setError(null);
     const response = await fetch(`/api/v1/profiles/${profile.id}`, {
@@ -87,13 +102,14 @@ export function ProfileSettings({
       const message = body?.error?.message ?? 'We could not update this profile.';
       setError(message);
       showToast(message, 'error');
-      return;
+      throw new Error(message);
     }
     setProfiles((current) =>
-      current.map((item) => (item.id === profile.id ? body.profile! : item)),
+      current.map((item) => (item.id === profile.id ? { ...item, ...body.profile! } : item)),
     );
     showToast(`${body.profile.displayName} updated.`, 'success');
     router.refresh();
+    return body.profile;
   }
 
   async function archive(profile: Profile, archived: boolean) {
@@ -111,15 +127,16 @@ export function ProfileSettings({
       const message = body?.error?.message ?? 'We could not change this profile.';
       setError(message);
       showToast(message, 'error');
-      return;
+      throw new Error(message);
     }
     setProfiles((current) =>
-      current.map((item) => (item.id === profile.id ? body.profile! : item)),
+      current.map((item) => (item.id === profile.id ? { ...item, ...body.profile! } : item)),
     );
     showToast(
       archived ? `${body.profile.displayName} archived.` : `${body.profile.displayName} restored.`,
       'success',
     );
+    await reconcile();
     router.refresh();
   }
 
@@ -138,8 +155,19 @@ export function ProfileSettings({
       const message = body?.error?.message ?? 'We could not change this role.';
       setError(message);
       showToast(message, 'error');
-      return false;
+      throw new Error(message);
     }
+    setProfiles((current) => {
+      const next = current.map((item) =>
+        item.id === profile.id ? { ...item, role: body.account!.role } : item,
+      );
+      const activeAdmins = next.filter((item) => !item.archivedAt && item.role === 'admin');
+      return next.map((item) => ({
+        ...item,
+        isLastAdmin: !item.archivedAt && item.role === 'admin' && activeAdmins.length === 1,
+      }));
+    });
+    await reconcile().catch((error) => setError(error.message));
     router.refresh();
     showToast(`${profile.displayName} is now ${body.account.role}.`, 'success');
     return true;
@@ -174,6 +202,23 @@ export function ProfileSettings({
 
   return (
     <div className="settings-page">
+      <button
+        className="primary-button"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="profile-onboarding-dialog"
+        aria-expanded={adding}
+        onClick={() => setAdding(true)}
+      >
+        <Plus size={16} /> Add profile
+      </button>
+      <button
+        className="text-button"
+        type="button"
+        onClick={() => void reconcile().catch((error) => setError(error.message))}
+      >
+        Refresh members
+      </button>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -241,33 +286,45 @@ export function ProfileSettings({
         </SettingsPane>
       ) : null}
       <section className="profile-settings-list">
-        {profiles.map((profile) => (
-          <ProfileEditor
-            key={profile.id}
-            profile={profile}
-            active={profile.id === activeProfileId}
-            onSave={saveProfile}
-            onArchive={archive}
-            onRoleChange={saveRole}
-          />
-        ))}
+        {[...profiles]
+          .sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt)))
+          .map((profile, index, sorted) => (
+            <Fragment key={profile.id}>
+              {profile.archivedAt && (index === 0 || !sorted[index - 1]?.archivedAt) && (
+                <h3>Archived members</h3>
+              )}
+              <details className="settings-member">
+                <summary>
+                  <strong>{profile.displayName}</strong>
+                  <small>
+                    {profile.role} ·{' '}
+                    {profile.archivedAt
+                      ? 'Archived'
+                      : profile.id === activeProfileId
+                        ? 'Active profile'
+                        : 'Active member'}{' '}
+                    · Edit
+                  </small>
+                </summary>
+                <ProfileEditor
+                  key={profile.id}
+                  profile={profile}
+                  active={profile.id === activeProfileId}
+                  onSave={saveProfile}
+                  onArchive={archive}
+                  onRoleChange={saveRole}
+                  lastActiveMember={profiles.filter((item) => !item.archivedAt).length === 1}
+                />
+              </details>
+            </Fragment>
+          ))}
       </section>
-      <button
-        className="text-button"
-        type="button"
-        aria-haspopup="dialog"
-        aria-controls="profile-onboarding-dialog"
-        aria-expanded={adding}
-        onClick={() => setAdding(true)}
-      >
-        <Plus size={16} /> Add another profile
-      </button>
       {adding ? (
         <ProfileOnboardingDialog
           aiEnabled={aiEnabled}
           onClose={() => setAdding(false)}
-          onProfileCreated={(profile) => {
-            setProfiles((current) => [...current, profile]);
+          onProfileCreated={() => {
+            void reconcile().catch((error) => setError(error.message));
             router.refresh();
           }}
         />
@@ -282,30 +339,23 @@ function ProfileOnboardingDialog({
   onProfileCreated,
 }: {
   onClose: () => void;
-  onProfileCreated: (profile: Profile) => void;
+  onProfileCreated: () => void;
   aiEnabled: boolean;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
+  const [dismissal, setDismissal] = useState({ dirty: false, pending: false, completion: false });
 
   function closeDialog() {
-    dialogRef.current?.close();
+    if (dismissal.pending || dismissal.completion) return;
+    if (dismissal.dirty && !window.confirm('Discard this new profile draft?')) return;
+    onClose();
   }
 
   return (
-    <dialog
+    <AppDialog
       className="profile-onboarding-dialog"
       id="profile-onboarding-dialog"
-      ref={dialogRef}
       aria-labelledby="profile-onboarding-dialog-title"
-      onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) closeDialog();
-      }}
+      onClose={closeDialog}
     >
       <h2 className="sr-only" id="profile-onboarding-dialog-title">
         New profile onboarding
@@ -313,6 +363,7 @@ function ProfileOnboardingDialog({
       <button
         className="profile-onboarding-dialog-close"
         type="button"
+        disabled={dismissal.pending || dismissal.completion}
         aria-label="Close profile onboarding"
         onClick={closeDialog}
       >
@@ -321,13 +372,15 @@ function ProfileOnboardingDialog({
       <OnboardingWizard
         aiEnabled={aiEnabled}
         mode="profile"
+        onDismissStateChange={setDismissal}
+        onCommitted={onProfileCreated}
         onCancel={closeDialog}
-        onProfileCreated={(profile) => {
-          onProfileCreated({ ...profile, role: 'parent', isLastAdmin: false });
-          closeDialog();
+        onProfileCreated={() => {
+          onProfileCreated();
+          onClose();
         }}
       />
-    </dialog>
+    </AppDialog>
   );
 }
 
@@ -338,15 +391,20 @@ export function ProfileEditor({
   onArchive,
   onRoleChange,
   personal = false,
+  lastActiveMember = false,
 }: {
   profile: Profile;
   personal?: boolean;
+  lastActiveMember?: boolean;
   active: boolean;
-  onSave: (profile: Profile, values: ProfileValues) => Promise<void>;
+  onSave: (profile: Profile, values: ProfileValues) => Promise<Profile | void>;
   onArchive: (profile: Profile, archived: boolean) => Promise<void>;
   onRoleChange: (profile: Profile, role: AppRole) => Promise<boolean>;
 }) {
   const [actionError, setActionError] = useState('');
+  const [action, setAction] = useState<'save' | 'role' | 'archive' | null>(null);
+  const [lastAction, setLastAction] = useState<'save' | 'role' | 'archive' | null>(null);
+  const [savedMessage, setSavedMessage] = useState('');
   const { pending, run } = usePendingAction(setActionError);
   const [values, setValues] = useState({
     displayName: profile.displayName,
@@ -359,8 +417,20 @@ export function ProfileEditor({
     mainGoals: profile.mainGoals ?? '',
     goalContext: profile.goalContext ?? defaultProfileGoalContext,
   });
+  const [saved, setSaved] = useState(values);
+  const dirty = JSON.stringify(saved) !== JSON.stringify(values);
+  const [avatarFailed, setAvatarFailed] = useState('');
+  async function perform(kind: 'save' | 'role' | 'archive', task: () => Promise<unknown>) {
+    setAction(kind);
+    setLastAction(kind);
+    setActionError('');
+    await run(task);
+    setAction(null);
+  }
   const archived = Boolean(profile.archivedAt);
-  const [role, setRole] = useState(profile.role);
+  const [roleDraft, setRoleDraft] = useState<{ confirmed: AppRole; value: AppRole } | null>(null);
+  const role = roleDraft?.confirmed === profile.role ? roleDraft.value : profile.role;
+  const setRole = (value: AppRole) => setRoleDraft({ confirmed: profile.role, value });
 
   function toggleGoalFocus(focus: ProfileGoalFocus) {
     const selected = values.goalContext.focusAreas.includes(focus);
@@ -385,7 +455,15 @@ export function ProfileEditor({
   return (
     <SettingsPane
       className="profile-editor"
-      eyebrow={archived ? 'ARCHIVED PROFILE' : active ? 'ACTIVE PROFILE' : 'HOUSEHOLD PROFILE'}
+      eyebrow={
+        personal
+          ? 'YOUR PROFILE'
+          : archived
+            ? 'ARCHIVED PROFILE'
+            : active
+              ? 'ACTIVE PROFILE'
+              : 'HOUSEHOLD PROFILE'
+      }
       title={
         <span className="profile-editor-title">
           <span
@@ -399,22 +477,25 @@ export function ProfileEditor({
       description={
         personal
           ? 'Your identity, regional preferences, and cooking goals.'
-          : profile.isLastAdmin
-            ? 'This is the only active admin. Promote another admin before demoting or archiving it.'
-            : 'Household identity and access role. Personal preferences are managed from My profile.'
+          : 'Household identity and access role. Personal preferences are managed from My profile.'
       }
       actions={
         !personal && (
           <button
             className="text-button"
             type="button"
-            disabled={pending || (profile.isLastAdmin && !archived)}
+            disabled={pending || (!archived && (profile.isLastAdmin || active || lastActiveMember))}
             title={
               profile.isLastAdmin && !archived
                 ? 'Promote another active profile to Admin before archiving this one.'
                 : undefined
             }
-            onClick={() => void run(() => onArchive(profile, !archived))}
+            onClick={() =>
+              void perform('archive', async () => {
+                await onArchive(profile, !archived);
+                setSavedMessage(archived ? 'Profile restored.' : 'Profile archived.');
+              })
+            }
           >
             {archived ? (
               <>
@@ -429,228 +510,344 @@ export function ProfileEditor({
         )
       }
     >
-      <div className="settings-fields">
-        {!personal && (
-          <SettingsField
-            title="Access role"
-            description={
-              <>
-                <small>
-                  {profile.isLastAdmin
-                    ? 'This is the only active admin. Promote another admin before demoting it.'
-                    : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
-                </small>
-              </>
-            }
-          >
-            <select
-              value={role}
-              disabled={pending}
-              aria-busy={pending}
-              onChange={async (event) => {
-                const nextRole = event.target.value as AppRole;
-                setRole(nextRole);
-                if (!(await run(() => onRoleChange(profile, nextRole)))) setRole(profile.role);
-              }}
-            >
-              <option value="admin">Admin</option>
-              <option value="parent">Parent</option>
-              <option value="child">Child</option>
-            </select>
-          </SettingsField>
-        )}
-        <SettingsField
-          description="The name shown on your profile and in shared kitchen activity."
-          title="Display name"
-        >
-          <input
-            value={values.displayName}
-            onChange={(event) => setValues({ ...values, displayName: event.target.value })}
-          />
-        </SettingsField>
-        <SettingsField
-          description="Use a link to the picture you want shown with this profile."
-          title="Avatar URL (optional)"
-        >
-          <input
-            value={values.avatarUrl}
-            onChange={(event) => setValues({ ...values, avatarUrl: event.target.value })}
-          />
-        </SettingsField>
-        <SettingsField description="Helps distinguish this profile in shared views." title="Color">
-          <input
-            type="color"
-            value={values.color}
-            onChange={(event) => setValues({ ...values, color: event.target.value })}
-          />
-        </SettingsField>
-        {personal && (
-          <>
-            <SettingsField
-              description="Choose how recipe quantities are displayed for this profile."
-              title="Units"
-            >
-              <select
-                value={values.units}
-                onChange={(event) =>
-                  setValues({ ...values, units: event.target.value as Profile['units'] })
+      <form
+        onChange={() => {
+          setSavedMessage('');
+          setActionError('');
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void perform('save', async () => {
+            const submitted = personal
+              ? {
+                  ...values,
+                  goalContext: {
+                    ...values.goalContext,
+                    kitchenInterview: profile.goalContext.kitchenInterview,
+                  },
                 }
-              >
-                <option value="metric">Metric</option>
-                <option value="imperial">US customary</option>
-              </select>
-            </SettingsField>
-            <SettingsField
-              description="Choose the unit used for cooking temperatures."
-              title="Temperature"
-            >
-              <select
-                value={values.temperatureUnit}
-                onChange={(event) =>
-                  setValues({
-                    ...values,
-                    temperatureUnit: event.target.value as Profile['temperatureUnit'],
-                  })
-                }
-              >
-                <option value="C">Celsius</option>
-                <option value="F">Fahrenheit</option>
-              </select>
-            </SettingsField>
-            <SettingsField
-              description="Controls regional number and date formatting, such as en-US or en-GB."
-              title="Locale"
-            >
-              <input
-                value={values.locale}
-                onChange={(event) => setValues({ ...values, locale: event.target.value })}
+              : values;
+            const acknowledged = await onSave(profile, submitted);
+            const next = acknowledged
+              ? ({
+                  ...values,
+                  ...Object.fromEntries(
+                    Object.keys(values).map((key) => [key, acknowledged[key as keyof Profile]]),
+                  ),
+                  avatarUrl: acknowledged.avatarUrl ?? '',
+                } as ProfileValues)
+              : values;
+            setValues(next);
+            setSaved(next);
+            setSavedMessage('Profile and cooking preferences saved.');
+          });
+        }}
+      >
+        <fieldset className="settings-form-fields" disabled={pending || archived}>
+          <div className="settings-identity-preview">
+            {values.avatarUrl && avatarFailed !== values.avatarUrl ? (
+              <img
+                src={values.avatarUrl}
+                alt=""
+                onError={() => setAvatarFailed(values.avatarUrl)}
               />
-            </SettingsField>
-            <SettingsField
-              description="Use an IANA timezone, such as America/Chicago, for local dates and times."
-              title="Time zone"
-            >
-              <input
-                value={values.timezone}
-                onChange={(event) => setValues({ ...values, timezone: event.target.value })}
-              />
-            </SettingsField>
-            <SettingsSubsection
-              title="Cooking goals"
-              description="Update these preferences as your priorities and routines change."
-            >
-              <SettingsRow
-                title="Focus areas"
-                description="Choose the kinds of support you would find useful."
-                align="start"
+            ) : (
+              <span
+                className="settings-avatar-fallback"
+                style={{ backgroundColor: values.color }}
+                aria-hidden="true"
               >
-                <div className="profile-goal-settings-options">
-                  {profileGoalFocusOptions.map((option) => {
-                    const selected = values.goalContext.focusAreas.includes(option.value);
-                    return (
-                      <label className={selected ? 'selected' : ''} key={option.value}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          disabled={!selected && values.goalContext.focusAreas.length >= 8}
-                          onChange={() => toggleGoalFocus(option.value)}
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </SettingsRow>
-              <div className="settings-fields">
-                <SettingsField
-                  description="Describe what is motivating your cooking goals."
-                  title="Why it matters now"
-                >
-                  <textarea
-                    rows={3}
-                    maxLength={800}
-                    value={values.goalContext.motivation}
-                    onChange={(event) => updateGoalContext({ motivation: event.target.value })}
-                  />
-                </SettingsField>
-                <SettingsField
-                  description="Share practical obstacles the assistant should consider."
-                  title="What gets in the way"
-                >
-                  <textarea
-                    rows={3}
-                    maxLength={800}
-                    value={values.goalContext.challenges}
-                    onChange={(event) => updateGoalContext({ challenges: event.target.value })}
-                  />
-                </SettingsField>
-                <SettingsField
-                  description="Describe the outcome you are working toward."
-                  title="What success feels like"
-                >
-                  <textarea
-                    rows={3}
-                    maxLength={800}
-                    value={values.goalContext.successVision}
-                    onChange={(event) => updateGoalContext({ successVision: event.target.value })}
-                  />
-                </SettingsField>
-              </div>
-            </SettingsSubsection>
+                {values.displayName.slice(0, 1)}
+              </span>
+            )}
+            <span>
+              {values.displayName || 'Your profile'}
+              {dirty ? ' · Unsaved preview' : ''}
+            </span>
+          </div>
+          <div className="settings-fields">
             {!personal && (
-              <SettingsSubsection
-                title="Kitchen interview"
-                description="Food preferences are gentle guidance; allergies and exclusions always take priority."
-              >
-                {kitchenInterviewQuestions.map((question) => (
-                  <SettingsField
-                    key={question.key}
-                    title={question.title}
-                    description={question.help}
+              <>
+                <SettingsField
+                  title="Access role"
+                  description={
+                    <>
+                      <small>
+                        {profile.isLastAdmin
+                          ? 'This is the only active admin. Promote another admin before demoting it.'
+                          : 'Admin manages settings; Parent manages shared content; Child is personal-only.'}
+                      </small>
+                    </>
+                  }
+                >
+                  <select
+                    value={role}
+                    disabled={pending}
+                    aria-busy={pending}
+                    onChange={(event) => setRole(event.target.value as AppRole)}
                   >
-                    <textarea
-                      rows={2}
-                      maxLength={question.key === 'taste' ? 500 : 800}
-                      value={values.goalContext.kitchenInterview?.[question.key] ?? ''}
-                      onChange={(event) =>
-                        updateGoalContext({
-                          kitchenInterview: {
-                            ...emptyKitchenInterview,
-                            ...values.goalContext.kitchenInterview,
-                            [question.key]: event.target.value,
-                          },
-                        })
+                    <option value="admin">Admin</option>
+                    <option value="parent">Parent</option>
+                    <option value="child">Child</option>
+                  </select>
+                </SettingsField>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={pending || role === profile.role}
+                  onClick={() =>
+                    void perform('role', async () => {
+                      try {
+                        if (!(await onRoleChange(profile, role))) setRole(profile.role);
+                        else
+                          setSavedMessage('Access role updated. Identity edits remain separate.');
+                      } catch (error) {
+                        setRole(profile.role);
+                        throw error;
                       }
-                    />
-                  </SettingsField>
-                ))}
-              </SettingsSubsection>
+                    })
+                  }
+                >
+                  {action === 'role' ? 'Updating role…' : 'Update role'}
+                </button>
+                {lastAction === 'role' && actionError && (
+                  <p className="form-error" role="alert">
+                    {actionError}
+                  </p>
+                )}
+              </>
             )}
             <SettingsField
-              description="Additional context for this profile’s cooking preferences."
-              title="Anything else the app should remember (optional)"
+              description="The name shown on your profile and in shared kitchen activity."
+              title="Display name"
             >
-              <textarea
-                rows={3}
-                value={values.mainGoals}
-                onChange={(event) => setValues({ ...values, mainGoals: event.target.value })}
+              <input
+                required
+                maxLength={80}
+                value={values.displayName}
+                onChange={(event) => setValues({ ...values, displayName: event.target.value })}
               />
             </SettingsField>
-          </>
+            <SettingsField
+              description="Use a link to the picture you want shown with this profile."
+              title="Avatar URL (optional)"
+            >
+              <input
+                type="url"
+                maxLength={2048}
+                value={values.avatarUrl}
+                onChange={(event) => setValues({ ...values, avatarUrl: event.target.value })}
+              />
+            </SettingsField>
+            <SettingsField
+              description="Helps distinguish this profile in shared views."
+              title="Color"
+            >
+              <input
+                type="color"
+                value={values.color}
+                onChange={(event) => setValues({ ...values, color: event.target.value })}
+              />
+            </SettingsField>
+            {personal && (
+              <>
+                <SettingsField
+                  description="Choose how recipe quantities are displayed for this profile."
+                  title="Units"
+                >
+                  <select
+                    value={values.units}
+                    onChange={(event) =>
+                      setValues({ ...values, units: event.target.value as Profile['units'] })
+                    }
+                  >
+                    <option value="metric">Metric</option>
+                    <option value="imperial">US customary</option>
+                  </select>
+                </SettingsField>
+                <SettingsField
+                  description="Choose the unit used for cooking temperatures."
+                  title="Temperature"
+                >
+                  <select
+                    value={values.temperatureUnit}
+                    onChange={(event) =>
+                      setValues({
+                        ...values,
+                        temperatureUnit: event.target.value as Profile['temperatureUnit'],
+                      })
+                    }
+                  >
+                    <option value="C">Celsius</option>
+                    <option value="F">Fahrenheit</option>
+                  </select>
+                </SettingsField>
+                <SettingsField
+                  description="Choose a regional number, date and time format. Stored identifiers remain editable."
+                  title="Regional format"
+                >
+                  <RegionalChoice
+                    kind="locale"
+                    required
+                    value={values.locale}
+                    onChange={(event) => setValues({ ...values, locale: event.target.value })}
+                  />
+                </SettingsField>
+                <SettingsField
+                  description="Choose a time zone independently of regional formatting."
+                  title="Time zone"
+                >
+                  <RegionalChoice
+                    kind="timezone"
+                    required
+                    value={values.timezone}
+                    onChange={(event) => setValues({ ...values, timezone: event.target.value })}
+                  />
+                </SettingsField>
+                <SettingsSubsection
+                  title="Cooking goals"
+                  description="Update these preferences as your priorities and routines change."
+                >
+                  <SettingsRow
+                    title="Focus areas"
+                    description={`${values.goalContext.focusAreas.length} of 8 selected. At the limit, deselect a choice before adding another.`}
+                    align="start"
+                  >
+                    <div className="profile-goal-settings-options">
+                      {profileGoalFocusOptions.map((option) => {
+                        const selected = values.goalContext.focusAreas.includes(option.value);
+                        return (
+                          <label className={selected ? 'selected' : ''} key={option.value}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={!selected && values.goalContext.focusAreas.length >= 8}
+                              onChange={() => toggleGoalFocus(option.value)}
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </SettingsRow>
+                  <details className="settings-disclosure">
+                    <summary>More cooking context (optional)</summary>
+                    <div className="settings-fields">
+                      <SettingsField
+                        description="Describe what is motivating your cooking goals."
+                        title="Why it matters now"
+                      >
+                        <textarea
+                          rows={3}
+                          maxLength={800}
+                          value={values.goalContext.motivation}
+                          onChange={(event) =>
+                            updateGoalContext({ motivation: event.target.value })
+                          }
+                        />
+                      </SettingsField>
+                      <SettingsField
+                        description="Share practical obstacles the assistant should consider."
+                        title="What gets in the way"
+                      >
+                        <textarea
+                          rows={3}
+                          maxLength={800}
+                          value={values.goalContext.challenges}
+                          onChange={(event) =>
+                            updateGoalContext({ challenges: event.target.value })
+                          }
+                        />
+                      </SettingsField>
+                      <SettingsField
+                        description="Describe the outcome you are working toward."
+                        title="What success feels like"
+                      >
+                        <textarea
+                          rows={3}
+                          maxLength={800}
+                          value={values.goalContext.successVision}
+                          onChange={(event) =>
+                            updateGoalContext({ successVision: event.target.value })
+                          }
+                        />
+                      </SettingsField>
+                    </div>
+                  </details>
+                </SettingsSubsection>
+                {!personal && (
+                  <SettingsSubsection
+                    title="Kitchen interview"
+                    description="Food preferences are gentle guidance; allergies and exclusions always take priority."
+                  >
+                    {kitchenInterviewQuestions.map((question) => (
+                      <SettingsField
+                        key={question.key}
+                        title={question.title}
+                        description={question.help}
+                      >
+                        <textarea
+                          rows={2}
+                          maxLength={question.key === 'taste' ? 500 : 800}
+                          value={values.goalContext.kitchenInterview?.[question.key] ?? ''}
+                          onChange={(event) =>
+                            updateGoalContext({
+                              kitchenInterview: {
+                                ...emptyKitchenInterview,
+                                ...values.goalContext.kitchenInterview,
+                                [question.key]: event.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </SettingsField>
+                    ))}
+                  </SettingsSubsection>
+                )}
+                <SettingsField
+                  description="Additional context for this profile’s cooking preferences."
+                  title="Anything else the app should remember (optional)"
+                >
+                  <textarea
+                    rows={3}
+                    value={values.mainGoals}
+                    onChange={(event) => setValues({ ...values, mainGoals: event.target.value })}
+                  />
+                </SettingsField>
+              </>
+            )}
+          </div>
+        </fieldset>
+        {active && !personal && <p>Switch to another active profile before archiving this one.</p>}
+        {lastActiveMember && !archived && (
+          <p>The last active household member cannot be archived.</p>
         )}
-      </div>
-      {actionError ? <p role="alert">{actionError}</p> : null}
-      <SettingsActionBar>
-        <button
-          className="primary-button compact"
-          type="button"
-          disabled={pending || archived || !values.displayName.trim()}
-          aria-busy={pending}
-          onClick={() => void run(() => onSave(profile, values))}
+        {actionError && lastAction !== 'role' ? <p role="alert">{actionError}</p> : null}
+        <SettingsActionBar
+          status={
+            action
+              ? action === 'save'
+                ? 'Saving profile…'
+                : action === 'role'
+                  ? 'Updating access role…'
+                  : 'Updating archive state…'
+              : actionError ||
+                (dirty
+                  ? `${savedMessage ? savedMessage + ' ' : ''}Unsaved profile changes`
+                  : savedMessage || 'No unsaved profile changes')
+          }
         >
-          {pending ? <ButtonSpinner /> : <Save size={16} />} {pending ? 'Saving…' : 'Save profile'}
-        </button>
-      </SettingsActionBar>
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={pending || archived || !dirty || !values.displayName.trim()}
+            aria-busy={pending}
+          >
+            {action === 'save' ? <ButtonSpinner /> : <Save size={16} />}{' '}
+            {action === 'save' ? 'Saving…' : 'Save profile'}
+          </button>
+        </SettingsActionBar>
+      </form>
     </SettingsPane>
   );
 }

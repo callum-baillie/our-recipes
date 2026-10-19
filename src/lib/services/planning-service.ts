@@ -1062,6 +1062,8 @@ export function duplicateWeek(
     meal: entry.meal,
     recipeId: entry.recipeId,
     kind: entry.kind,
+    profileIds: entry.profileIds,
+    options: entry.options,
     recipeOverride: entry.recipeOverride,
     recipeRevision: entry.recipeRevision,
     recipeCalculationId: entry.recipeCalculationId,

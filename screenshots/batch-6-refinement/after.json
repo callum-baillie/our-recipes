@@ -1,0 +1,285 @@
+{
+  "out": [
+    {
+      "device": "desktop",
+      "route": "/account",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Your preferences"
+    },
+    {
+      "device": "desktop",
+      "route": "/account/nutrition",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Callum's Nutrition"
+    },
+    {
+      "device": "desktop",
+      "route": "/account/ai",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "AI preferences"
+    },
+    {
+      "device": "desktop",
+      "route": "/account/integrations",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Your connected apps"
+    },
+    {
+      "device": "desktop",
+      "route": "/account/automation",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Schedules & background tasks"
+    },
+    {
+      "device": "desktop",
+      "route": "/account/security",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Account security"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Household settings"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/profiles",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Household members & roles"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/recipes",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Recipes"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/meal-plan",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Meal plans"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/pantry",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Pantry"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/lists",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Shopping lists"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/system",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "System"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/automation",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Background processing"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/api",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "API keys"
+    },
+    {
+      "device": "desktop",
+      "route": "/settings/ai",
+      "width": 1440,
+      "viewport": 1440,
+      "title": "Global AI settings"
+    },
+    {
+      "device": "mobile",
+      "route": "/account",
+      "width": 390,
+      "viewport": 390,
+      "title": "Your preferences"
+    },
+    {
+      "device": "mobile",
+      "route": "/account/nutrition",
+      "width": 390,
+      "viewport": 390,
+      "title": "Callum's Nutrition"
+    },
+    {
+      "device": "mobile",
+      "route": "/account/ai",
+      "width": 390,
+      "viewport": 390,
+      "title": "AI preferences"
+    },
+    {
+      "device": "mobile",
+      "route": "/account/integrations",
+      "width": 390,
+      "viewport": 390,
+      "title": "Your connected apps"
+    },
+    {
+      "device": "mobile",
+      "route": "/account/automation",
+      "width": 390,
+      "viewport": 390,
+      "title": "Schedules & background tasks"
+    },
+    {
+      "device": "mobile",
+      "route": "/account/security",
+      "width": 390,
+      "viewport": 390,
+      "title": "Account security"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings",
+      "width": 390,
+      "viewport": 390,
+      "title": "Household settings"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/profiles",
+      "width": 390,
+      "viewport": 390,
+      "title": "Household members & roles"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/recipes",
+      "width": 390,
+      "viewport": 390,
+      "title": "Recipes"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/meal-plan",
+      "width": 390,
+      "viewport": 390,
+      "title": "Meal plans"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/pantry",
+      "width": 390,
+      "viewport": 390,
+      "title": "Pantry"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/lists",
+      "width": 390,
+      "viewport": 390,
+      "title": "Shopping lists"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/system",
+      "width": 390,
+      "viewport": 390,
+      "title": "System"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/automation",
+      "width": 390,
+      "viewport": 390,
+      "title": "Background processing"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/api",
+      "width": 390,
+      "viewport": 390,
+      "title": "API keys"
+    },
+    {
+      "device": "mobile",
+      "route": "/settings/ai",
+      "width": 390,
+      "viewport": 390,
+      "title": "Global AI settings"
+    },
+    {
+      "route": "/account/nutrition",
+      "width": 820,
+      "height": 844,
+      "textScale": 1,
+      "documentWidth": 820
+    },
+    {
+      "route": "/settings/lists",
+      "width": 820,
+      "height": 844,
+      "textScale": 1,
+      "documentWidth": 820
+    },
+    {
+      "route": "/account/nutrition",
+      "width": 900,
+      "height": 844,
+      "textScale": 1,
+      "documentWidth": 900
+    },
+    {
+      "route": "/settings/lists",
+      "width": 900,
+      "height": 844,
+      "textScale": 1,
+      "documentWidth": 900
+    },
+    {
+      "route": "/account/nutrition",
+      "width": 320,
+      "height": 640,
+      "textScale": 1,
+      "documentWidth": 320
+    },
+    {
+      "route": "/settings/lists",
+      "width": 320,
+      "height": 640,
+      "textScale": 1,
+      "documentWidth": 320
+    },
+    {
+      "route": "/account/nutrition",
+      "width": 390,
+      "height": 600,
+      "textScale": 2,
+      "documentWidth": 390
+    },
+    {
+      "route": "/settings/lists",
+      "width": 390,
+      "height": 600,
+      "textScale": 2,
+      "documentWidth": 390
+    }
+  ],
+  "errors": []
+}

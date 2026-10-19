@@ -1,3 +1,5 @@
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
+import { getHouseholdState } from '@/lib/services/household-service';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -8,6 +10,7 @@ import {
   AiAssistantProviderUnavailableError,
 } from '@/lib/providers/ai-assistant-provider';
 import {
+  aiSummaryUnavailableReason,
   AiSummaryInProgressError,
   listAiSummaries,
   refreshAiSummaryBundle,
@@ -36,12 +39,32 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!hasTrustedMutationOrigin(request))
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const actor = await profileId();
+  const scope = new URL(request.url).searchParams.get('scope');
+  if (scope && scope !== 'account')
+    return jsonError(400, 'invalid_summary_scope', 'Choose account scope or the active profile.');
+  const principal = scope === 'account' ? await getAuthenticatedSessionPrincipal(request) : null;
+  if (scope === 'account' && !principal)
+    return jsonError(401, 'authentication_required', 'Sign in to update your summaries.');
+  const actor = principal?.linkedProfileId ?? (await profileId());
   if (!actor)
     return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
   try {
     const summaries = await refreshAiSummaryBundle(actor);
-    return NextResponse.json({ summaries }, { status: 201 });
+    return NextResponse.json(
+      {
+        summaries,
+        recipient: {
+          id: actor,
+          name:
+            getHouseholdState().profiles.find((profile) => profile.id === actor)?.displayName ??
+            'Your profile',
+        },
+        outcome: summaries.length
+          ? 'updated'
+          : (aiSummaryUnavailableReason(actor) ?? 'no_eligible_evidence'),
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof AiSummaryInProgressError)
       return jsonError(409, 'summary_in_progress', error.message);

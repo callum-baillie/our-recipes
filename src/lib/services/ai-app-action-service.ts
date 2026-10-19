@@ -63,7 +63,12 @@ export type AppActionReview = {
     changeLabel?: string;
   }[];
   status: string;
-  results?: { summary: string; ok: boolean; message: string }[];
+  results?: {
+    summary: string;
+    ok: boolean;
+    message: string;
+    state?: 'completed' | 'failed' | 'pending' | 'not-attempted';
+  }[];
   jobId?: string;
 };
 function operation(p: RequestPrincipal, id: string) {
@@ -266,12 +271,22 @@ export function listPendingAppActions(p: RequestPrincipal, threadId: string): Ap
           ? job.items.map((item) => ({
               summary: item.label,
               ok: item.status === 'succeeded',
+              state:
+                item.status === 'succeeded'
+                  ? ('completed' as const)
+                  : item.status === 'failed'
+                    ? ('failed' as const)
+                    : item.status === 'cancelled'
+                      ? ('not-attempted' as const)
+                      : ('pending' as const),
               message:
                 item.status === 'succeeded'
                   ? 'Image saved.'
                   : item.status === 'failed'
                     ? `Image failed (${item.errorCode ?? 'unknown error'}).`
-                    : 'Waiting for generation.',
+                    : item.status === 'cancelled'
+                      ? 'Not attempted. The task was cancelled.'
+                      : 'Waiting for generation.',
             }))
           : correction?.results,
         jobId: correction?.jobId,

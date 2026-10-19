@@ -453,7 +453,7 @@
   }
 
   .header h2 {
-    font-size: 1rem;
+    font-size: 1.15rem;
   }
 }
 
@@ -559,6 +559,8 @@
 }
 .header h2 {
   margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
   line-height: 1.25;
 }
 .composer form {
@@ -685,7 +687,9 @@
   font-size: 0.85rem;
 }
 .settingsPanel h3 {
-  margin-top: 0;
+  margin: 0 0 0.75rem;
+  font-family: var(--font-serif);
+  font-size: var(--panel-title-size);
 }
 .settingsPanel .paidTools {
   display: flex;
@@ -696,7 +700,9 @@
 .settingsPanel input {
   width: 20px;
   height: 20px;
-  flex-shrink: 0;
+  min-height: 0;
+  padding: 0;
+  flex: 0 0 20px;
 }
 @media (max-width: 540px) {
   .assistantMark {
@@ -706,7 +712,7 @@
     grid-template-columns: minmax(0, 1fr) auto auto auto;
   }
   .header h2 {
-    font-size: 1rem;
+    font-size: 1.15rem;
   }
 }
 
@@ -756,4 +762,24 @@
   .composerMeta:has(> .keyboardHint:only-child) {
     display: none;
   }
+}
+
+.settingsPanel .paidTools small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+.settingsPanel p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.settingsLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
 }

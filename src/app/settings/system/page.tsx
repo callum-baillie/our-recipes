@@ -33,13 +33,28 @@ export default async function SystemSettingsPage() {
         title="System"
         description="Kitchen identity, installation status, backups, and recovery."
       />
+      <nav className="settings-section-index" aria-label="System sections">
+        {[
+          ['kitchen-identity', 'Kitchen identity'],
+          ['installation-health', 'Installation health'],
+          ['food-providers', 'Food providers'],
+          ['support', 'Support'],
+          ['backups', 'Backups and recovery'],
+          ['danger', 'Erase app data'],
+        ].map(([id, label]) => (
+          <a key={id} href={`#${id}`}>
+            {label}
+          </a>
+        ))}
+      </nav>
       <AppSettingsForm
         initialKitchenName={state.household.kitchenName}
         initialKitchenIcon={state.household.kitchenIcon}
       />
       <SettingsPane
         eyebrow="INSTALLATION"
-        title="Release status"
+        id="installation-health"
+        title="Installation health"
         description="Read-only details for this installation and its local database."
       >
         <SettingsRow title="App version">
@@ -60,10 +75,11 @@ export default async function SystemSettingsPage() {
       </SettingsPane>
       <SettingsPane
         eyebrow="FOOD DATA"
-        title="Read-only providers"
+        id="food-providers"
+        title="Food providers"
         description="Credentials stay in the server environment. Camera scanning also requires a trusted HTTPS origin."
       >
-        <SettingsRow title="Bòrd Food API">
+        <SettingsRow title="Catalog capabilities · Bòrd Food API">
           <output>
             {catalogStatus.state.replaceAll('_', ' ')} · {catalogStatus.mode.replaceAll('_', ' ')}
           </output>
@@ -72,7 +88,7 @@ export default async function SystemSettingsPage() {
           <output>{catalogStatus.storeDirectoryEnabled ? 'Enabled' : 'Disabled'}</output>
         </SettingsRow>
         {Object.entries(catalogStatus.packs).map(([name, pack]) => (
-          <SettingsRow key={name} title={`Catalog · ${name}`}>
+          <SettingsRow key={name} title={`Catalog pack · ${name}`}>
             <output>
               {!pack.enabled
                 ? 'Disabled'
@@ -85,7 +101,7 @@ export default async function SystemSettingsPage() {
           </SettingsRow>
         ))}
         {Object.entries(catalogStatus.sources).map(([name, source]) => (
-          <SettingsRow key={name} title={`Source · ${name.replaceAll('_', ' ')}`}>
+          <SettingsRow key={name} title={`Upstream catalog source · ${name.replaceAll('_', ' ')}`}>
             <output>
               {!source.enabled
                 ? 'Disabled'
@@ -106,7 +122,9 @@ export default async function SystemSettingsPage() {
           <SettingsRow
             key={provider.provider}
             title={
-              provider.provider === 'open_food_facts' ? 'Open Food Facts' : 'USDA FoodData Central'
+              provider.provider === 'open_food_facts'
+                ? 'Direct provider · Open Food Facts'
+                : 'Direct provider · USDA FoodData Central'
             }
           >
             <output>

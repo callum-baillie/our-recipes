@@ -1,58 +1,92 @@
 .page {
   max-width: var(--workspace-width);
-  padding: var(--workspace-top-space) var(--page-gutter) 3rem;
+  padding: var(--workspace-top-space) var(--page-gutter) 2rem;
   margin: auto;
+}
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.context p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.context nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.context a,
+.prepare > a,
+.preview > header > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .workspace {
   display: grid;
-  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  grid-template-columns: minmax(19rem, 23rem) minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
 }
 .sidebar {
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 0.7rem;
   padding: 1rem;
   display: grid;
   gap: 1rem;
   min-width: 0;
+  scrollbar-gutter: stable;
 }
-.sidebar section {
+.sidebar section,
+.formats {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.6rem;
   border-top: 1px solid var(--line);
   padding-top: 1rem;
 }
-.sidebar h2 {
-  font-size: 1rem;
+.sidebar h2,
+.formats h2 {
+  font: 650 1.05rem/1.4 var(--font-sans, system-ui);
   margin: 0;
 }
 .sidebar label:not(.check) {
   display: grid;
   gap: 0.4rem;
+  font-weight: 650;
 }
 .sidebar select,
 .sidebar input:not([type='checkbox']) {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   padding: 0.65rem;
   color: var(--ink);
   background: var(--page);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
+  font: inherit;
+  font-weight: 400;
 }
 .check {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   min-height: 44px;
-  line-height: 1.35;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 .check input {
   width: 1.1rem;
   height: 1.1rem;
+  min-height: 0;
   flex-shrink: 0;
+  accent-color: var(--leaf);
 }
 .types {
   display: grid;
@@ -62,12 +96,17 @@
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  padding: 0.7rem;
+  min-height: 44px;
+  padding: 0.65rem;
   border: 0;
   background: transparent;
   color: var(--ink);
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
   text-align: left;
+  font: inherit;
+}
+.types svg {
+  flex-shrink: 0;
 }
 .types button[aria-pressed='true'] {
   background: var(--selection-surface);
@@ -76,78 +115,77 @@
 .recipeChoices {
   max-height: 17rem;
   overflow: auto;
+  padding: 0.2rem;
 }
 .suboptions {
-  padding-left: 1.5rem;
+  padding-left: 0.75rem;
   border-left: 2px solid var(--line);
+  display: grid;
+  gap: 0.35rem;
 }
 .sidebar p,
-.hint {
+.sidebar small,
+.hint,
+.formats p {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 400;
   line-height: 1.5;
   margin: 0;
 }
 .selectionActions {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
   justify-content: space-between;
 }
 .selectionActions button {
-  background: none;
-  border: 0;
-  color: var(--ink);
-  text-decoration: underline;
-  font-size: 0.78rem;
-}
-.primary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  font: inherit;
+  font-size: 0.9rem;
   min-height: 44px;
-  background: var(--leaf);
-  color: var(--on-primary);
-  border: 0;
-  border-radius: 0.65rem;
-  padding: 0.75rem;
+}
+.prepare {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.5rem 0.15rem;
+  background: var(--field);
+}
+.prepare button {
+  width: 100%;
 }
 .preview {
   min-width: 0;
   display: grid;
-  gap: 1rem;
+  gap: 0.85rem;
 }
-.preview header {
+.preview > header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
 }
-.preview header > div {
+.preview > header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.preview > p {
+  margin: 0;
+}
+.outputActions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
 }
-.preview header button,
-.preview header a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.65rem;
-  background: var(--field);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  text-decoration: none;
-  font: inherit;
-  font-size: 0.85rem;
+.outputActions > * {
+  justify-content: center;
 }
 .preview iframe {
+  display: block;
   width: 100%;
-  height: 78dvh;
+  height: 70dvh;
   border: 1px solid var(--line);
-  border-radius: 0.8rem;
+  border-radius: 0.5rem;
   background: #e8e8e8;
 }
 .empty {
@@ -155,55 +193,59 @@
   place-content: center;
   justify-items: center;
   text-align: center;
-  min-height: 60dvh;
+  min-height: 22rem;
   background: var(--linen);
   border: 1px dashed var(--line);
-  border-radius: 1rem;
-  padding: 2rem;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+.empty p {
+  max-width: 32rem;
 }
 .error {
   color: var(--danger, #a33);
-  padding: 1rem;
+  padding: 0.8rem;
   border: 1px solid currentColor;
-  border-radius: 0.6rem;
+  border-radius: 0.45rem;
+  overflow-wrap: anywhere;
 }
-.sidebar details a {
+.error p {
+  margin: 0.2rem 0 0.5rem;
+}
+.disclosure > summary,
+.viewer > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0.7rem 0.2rem;
+  font-weight: 650;
+}
+.disclosure a {
   display: block;
-  padding: 0.5rem;
+  padding: 0.65rem 0.2rem;
 }
-@media (max-width: 800px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .types {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .preview iframe {
-    height: 65dvh;
-  }
-  .sidebar select,
-  .sidebar input {
-    font-size: 16px;
-  }
-  .page {
-    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
-  }
+.disclosure li {
+  overflow-wrap: anywhere;
 }
-
-@media (min-width: 801px) {
-  .sidebar {
-    max-height: calc(100dvh - 8rem);
-    overflow: auto;
-    position: sticky;
-    top: 5.5rem;
-  }
-  .primary {
-    position: sticky;
-    bottom: 0;
-    box-shadow: 0 0 0 0.4rem var(--field);
-  }
+.disclosure li button {
+  margin-left: 0.5rem;
 }
-
+.formats {
+  gap: 0.75rem;
+}
+.formats > button {
+  justify-self: start;
+}
+.formats h3 {
+  margin: 0.5rem 0;
+  font: 650 1rem/1.4 system-ui;
+}
+.formats > div {
+  display: grid;
+  gap: 0.65rem;
+}
+.formats a {
+  justify-self: start;
+}
 .previewDocument {
   position: relative;
   min-width: 0;
@@ -213,4 +255,48 @@
   inset: 0;
   z-index: 1;
   align-content: start;
+}
+.sidebar,
+.preview {
+  scroll-margin-top: 7rem;
+}
+@media (min-width: 801px) {
+  .sidebar {
+    max-height: calc(100dvh - 8rem - var(--app-notice-height, 0px));
+    overflow: auto;
+    position: sticky;
+    top: 5.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .prepare {
+    position: sticky;
+    bottom: -0.5rem;
+    box-shadow: 0 -0.4rem 0 var(--field);
+  }
+}
+@media (max-width: 800px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .types {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  }
+  .preview iframe {
+    height: 55dvh;
+  }
+  .sidebar select,
+  .sidebar input {
+    font-size: 1rem;
+  }
+  .page {
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+  }
+  .outputActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  }
+  .outputActions > a:first-child {
+    grid-column: 1/-1;
+  }
 }

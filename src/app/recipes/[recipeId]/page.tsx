@@ -47,7 +47,11 @@ export default async function RecipeDetailPage({
   if (!recipe) notFound();
   const collections = listCollectionsForRecipe(recipe.id);
   const importProvenance = getRecipeImportProvenance(recipe.id);
-  const availableTags = listTags().map((tag) => tag.name);
+  const savedTags = listTags();
+  const availableTags = savedTags.map((tag) => tag.name);
+  const availableTagColours = Object.fromEntries(
+    savedTags.flatMap((tag) => (tag.color ? [[tag.name, tag.color]] : [])),
+  );
   const favorite = actor.profileId ? isFavorite(recipe.id, actor.profileId) : null;
   const pantryAvailability = getRecipePantryAvailability(recipe.id);
   const pantryProducts = listPantryProducts().map(({ id, displayName }) => ({ id, displayName }));
@@ -69,6 +73,9 @@ export default async function RecipeDetailPage({
             />
           }
         />
+        <a className="jump-to-recipe" href="#recipe">
+          Jump to ingredients and method ↓
+        </a>
         <RecipeImageGallery
           recipeId={recipe.id}
           recipeTitle={recipe.title}
@@ -81,7 +88,7 @@ export default async function RecipeDetailPage({
         />
         <RecipeNormalizedNutrition recipeId={recipe.id} nutrition={normalizedNutrition} />
         <RecipeServingDetails
-          sidebar={
+          preparation={
             <>
               <RecipePantryCard
                 initialAvailability={pantryAvailability}
@@ -97,6 +104,10 @@ export default async function RecipeDetailPage({
                   </ul>
                 </aside>
               )}
+            </>
+          }
+          supporting={
+            <>
               {(importProvenance ||
                 recipe.sourceName ||
                 recipe.sourceUrl ||
@@ -181,6 +192,7 @@ export default async function RecipeDetailPage({
           currentRevision={recipe.currentRevision}
           tags={recipe.tags}
           availableTags={availableTags}
+          availableTagColours={availableTagColours}
           nutritionCalories={recipe.nutritionCalories}
           nutritionProteinGrams={recipe.nutritionProteinGrams}
           nutritionCarbohydrateGrams={recipe.nutritionCarbohydrateGrams}
@@ -194,9 +206,6 @@ export default async function RecipeDetailPage({
           instructionSections={recipe.instructionSections}
         />
       </article>
-      <a className="jump-to-recipe" href="#recipe">
-        Jump to recipe ↓
-      </a>
     </main>
   );
 }

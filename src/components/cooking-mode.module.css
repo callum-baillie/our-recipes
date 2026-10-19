@@ -1,7 +1,6 @@
 .confirmation {
-  position: fixed;
-  inset: 1rem;
-  z-index: 20;
+  --dialog-overflow: auto;
+  --dialog-bottom-padding: 1.25rem;
   overflow: auto;
   max-width: 48rem;
   margin: auto;
@@ -90,8 +89,7 @@
 
 @media (max-width: 42rem) {
   .confirmation {
-    inset: 0;
-    border-radius: 0;
+    border-radius: 1rem;
   }
 
   .deduction,

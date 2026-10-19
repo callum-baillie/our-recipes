@@ -3,12 +3,25 @@ import { formatShoppingQuantity } from '@/lib/domain/shopping-quantity';
 import { ButtonSpinner } from './skeleton';
 import { InlineAlert } from './inline-alert';
 
-import { Check, ChevronLeft, ChevronRight, Heart, Play, Plus, Timer, X } from 'lucide-react';
+import {
+  ChevronDown,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  Play,
+  Plus,
+  Timer,
+  X,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react';
 
+import { AppDialog } from './app-dialog';
+import { DialogViewport } from './dialog-viewport';
+import { cookSessionStartSchema } from '@/lib/domain/cooking';
 import { createClientUuid } from '@/lib/client/client-uuid';
 import { RecipePantryPanel } from '@/components/recipe-pantry-panel';
 import { convertTemperature, recipeYieldNumber, scaledQuantity } from '@/lib/domain/cooking';
@@ -89,7 +102,15 @@ export function CookingMode({
     [recipe],
   );
   const baseServings = recipeYieldNumber(recipe.servings) ?? 1;
-  const [servings, setServings] = useState(initialServings ?? baseServings);
+  const [servingInput, setServingInput] = useState(String(initialServings ?? baseServings));
+  const servingsValid = cookSessionStartSchema.safeParse({
+    recipeId: recipe.id,
+    targetServings: servingInput,
+  }).success;
+  const servings = servingsValid ? Number(servingInput) : (initialServings ?? baseServings);
+  const [checkedAvailability, setCheckedAvailability] = useState(pantryAvailability);
+  const [finishing, setFinishing] = useState(false);
+  const finishLock = useRef(false);
   const [step, setStep] = useState(0);
   const [readingMode, setReadingMode] = useState<'steps' | 'recipe'>('steps');
   const [cookingBusy, setCookingBusy] = useState(false);
@@ -122,7 +143,8 @@ export function CookingMode({
   const allocationRequestVersions = useRef(new Map<string, number>());
   const allocationTriplets = useRef(new Map<string, string>());
   const [timers, setTimers] = useState<LocalTimer[]>([]);
-  const [timerMinutes, setTimerMinutes] = useState(5);
+  const [timerMinutes, setTimerMinutes] = useState('5');
+  const [timerError, setTimerError] = useState('');
   const [temperature, setTemperature] = useState('');
   const [temperatureUnit, setTemperatureUnit] = useState<'C' | 'F'>('C');
   const touchStartX = useRef<number | null>(null);
@@ -141,6 +163,7 @@ export function CookingMode({
     return () => window.clearInterval(id);
   }, []);
   const startCooking = async () => {
+    if (!servingsValid) throw new Error('Choose a whole number from 1 to 100 servings.');
     const response = await fetch('/api/v1/cook-sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -157,6 +180,9 @@ export function CookingMode({
       throw new Error('Could not start cooking. Please try again.');
     if (body?.session) {
       setSessionId(body.session.id);
+      const currentStep = document.getElementById('current-cooking-step');
+      currentStep?.scrollIntoView({ block: 'start' });
+      currentStep?.focus({ preventScroll: true });
       setPlannedMeal(body.pantry?.plannedMeal ?? null);
       const review: ReviewLine[] = (body.pantry?.recommendedConsumptions ?? []).map((entry) => ({
         ...entry,
@@ -177,13 +203,18 @@ export function CookingMode({
             products: summary.dashboard?.products ?? summary.products ?? [],
             locations: summary.dashboard?.locations ?? summary.locations ?? [],
           }),
+        )
+        .catch(() =>
+          setActionError(
+            'Cooking started. Pantry options could not be loaded; retry before finishing.',
+          ),
         );
     }
   };
   const finishCooking = async () => {
     setShowPantryConfirmation(true);
   };
-  const confirmFinish = async () => {
+  const saveFinish = async () => {
     if (!sessionId) return;
     setFinishStatus('Saving confirmed deductions…');
     const confirmedLeftovers = leftovers.flatMap((leftover) =>
@@ -231,6 +262,21 @@ export function CookingMode({
     setSessionId(null);
     await fetch('/api/v1/pantry/summary', { cache: 'no-store' });
     router.refresh();
+  };
+  const confirmFinish = async () => {
+    if (finishLock.current) return;
+    finishLock.current = true;
+    setFinishing(true);
+    try {
+      await saveFinish();
+    } catch {
+      setFinishStatus(
+        'Could not finish cooking. Your pantry review is retained; check the connection and try again.',
+      );
+    } finally {
+      finishLock.current = false;
+      setFinishing(false);
+    }
   };
   const refreshAllocation = async (
     index: number,
@@ -375,16 +421,22 @@ export function CookingMode({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ favorite: !favorite }),
       });
-      if (!response.ok) throw new Error('Could not save your favorite. Please try again.');
+      if (!response.ok) throw new Error('Could not update your reaction. Please try again.');
       setFavorite(!favorite);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Could not save your favorite.');
+      setActionError(error instanceof Error ? error.message : 'Could not update your reaction.');
     } finally {
       setFavoriteBusy(false);
     }
   };
   const addTimer = () => {
-    const seconds = Math.max(1, Math.round(timerMinutes * 60));
+    const minutes = Number(timerMinutes);
+    if (!timerMinutes.trim() || !Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+      setTimerError('Enter 1 to 1,440 minutes.');
+      return;
+    }
+    setTimerError('');
+    const seconds = Math.round(minutes * 60);
     setTimers((current) => [
       ...current,
       {
@@ -400,6 +452,7 @@ export function CookingMode({
     `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const changeStep = (next: number) => {
     setReadingMode('steps');
+    document.getElementById('current-cooking-step')?.scrollIntoView({ block: 'start' });
     setStep(Math.max(0, Math.min(Math.max(steps.length - 1, 0), next)));
   };
   const toggleCurrentStep = () => {
@@ -413,7 +466,7 @@ export function CookingMode({
     if (!wasComplete && step < steps.length - 1) changeStep(step + 1);
   };
   const showTimers = () =>
-    document.getElementById('cook-timers')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('cook-timers')?.scrollIntoView({ block: 'center' });
   const handleStepTouchEnd = (event: TouchEvent<HTMLElement>) => {
     const startX = touchStartX.current;
     const endX = event.changedTouches[0]?.clientX;
@@ -432,12 +485,13 @@ export function CookingMode({
           type="button"
           disabled={favoriteBusy}
           aria-busy={favoriteBusy}
+          aria-label={favorite ? 'Clear positive reaction' : 'Like this recipe'}
           aria-pressed={favorite}
           onClick={() => void toggleFavorite()}
         >
           {favoriteBusy && <ButtonSpinner />}
           <Heart size={18} fill={favorite ? 'currentColor' : 'none'} />{' '}
-          {favorite ? 'Favorite' : 'Save favorite'}
+          {favorite ? 'Liked' : 'Like'}
         </button>
       </header>
       {actionError && <InlineAlert tone="error">{actionError}</InlineAlert>}
@@ -450,12 +504,11 @@ export function CookingMode({
               alt={recipe.images[0].altText || recipe.title}
               width={recipe.images[0].width}
               height={recipe.images[0].height}
+              loading="eager"
               unoptimized
             />
           ) : null}
-          <p className="eyebrow">MAKE THIS MEAL</p>
           <h1>{recipe.title}</h1>
-          {recipe.summary ? <p className="cooking-recipe-summary">{recipe.summary}</p> : null}
           <div className="serving-control">
             <label>
               Cook for{' '}
@@ -463,15 +516,18 @@ export function CookingMode({
                 type="number"
                 min="1"
                 max="100"
-                value={servings}
-                onChange={(event) => setServings(Math.max(1, Number(event.target.value) || 1))}
+                value={servingInput}
+                disabled={Boolean(sessionId)}
+                aria-invalid={!servingsValid}
+                aria-describedby="cook-serving-context"
+                onChange={(event) => setServingInput(event.target.value)}
               />{' '}
               servings
             </label>
             <button
               className="primary-button compact"
               type="button"
-              disabled={cookingBusy}
+              disabled={cookingBusy || !servingsValid}
               aria-busy={cookingBusy}
               onClick={() => void runCookingAction()}
             >
@@ -490,45 +546,34 @@ export function CookingMode({
               )}
             </button>
           </div>
+          <p id="cook-serving-context" role="status">
+            {sessionId
+              ? `Cooking session for ${servings} servings. Batch size is fixed for this session.`
+              : servingsValid
+                ? 'Browse steps freely; Start cooking records this batch size.'
+                : 'Choose a whole number from 1 to 100 servings.'}
+          </p>
         </div>
-        <aside className="temperature-card">
-          <strong>Temperature converter</strong>
-          <div>
-            <input
-              aria-label="Temperature"
-              inputMode="decimal"
-              value={temperature}
-              onChange={(event) => setTemperature(event.target.value)}
-            />
-            <select
-              aria-label="Temperature unit"
-              value={temperatureUnit}
-              onChange={(event) => setTemperatureUnit(event.target.value as 'C' | 'F')}
-            >
-              <option value="C">°C</option>
-              <option value="F">°F</option>
-            </select>
-          </div>
-          {temperature && Number.isFinite(Number(temperature)) && (
-            <p>
-              {temperatureUnit === 'C'
-                ? `${convertTemperature(Number(temperature), 'C')}°F`
-                : `${convertTemperature(Number(temperature), 'F')}°C`}{' '}
-              <span>converted — original recipe stays unchanged.</span>
-            </p>
-          )}
-        </aside>
       </section>
       {pantryAvailability ? (
         <details className="cooking-pantry">
-          <summary>
-            Pantry check
-            <span>{pantryAvailability.state.replaceAll('_', ' ')}</span>
+          <summary className="recipe-disclosure-summary">
+            <span>
+              Pantry check · {checkedAvailability?.state.replaceAll('_', ' ')}
+              {(checkedAvailability?.targetServings ?? checkedAvailability?.baseServings) !==
+              servings
+                ? ' · Recheck batch'
+                : ''}
+            </span>
+            <ChevronDown size={18} aria-hidden="true" />
           </summary>
           <RecipePantryPanel
             initialAvailability={pantryAvailability}
             products={[]}
             allowMapping={false}
+            compact
+            targetServings={servings}
+            onAvailabilityChange={setCheckedAvailability}
           />
         </details>
       ) : (
@@ -563,7 +608,12 @@ export function CookingMode({
             </div>
           ))}
         </aside>
-        <section className="step-focus">
+        <section
+          className="step-focus"
+          id="current-cooking-step"
+          tabIndex={-1}
+          aria-label="Cooking instructions"
+        >
           <div className="button-row" role="group" aria-label="Recipe reading mode">
             <button
               type="button"
@@ -582,6 +632,7 @@ export function CookingMode({
           </div>
           {readingMode === 'recipe' ? (
             <ol className="cooking-full-method">
+              {steps.length === 0 && <li>This recipe does not have written steps yet.</li>}
               {steps.map((entry, index) => (
                 <li key={index}>
                   <strong>{entry.section}</strong>
@@ -593,7 +644,7 @@ export function CookingMode({
                       setReadingMode('steps');
                     }}
                   >
-                    Start at step {index + 1}
+                    View step {index + 1}
                   </button>
                 </li>
               ))}
@@ -606,7 +657,7 @@ export function CookingMode({
               <div
                 className="cooking-step-progress"
                 role="progressbar"
-                aria-label="Recipe step progress"
+                aria-label="Current step position"
                 aria-valuemin={0}
                 aria-valuemax={steps.length || 1}
                 aria-valuenow={steps.length ? step + 1 : 0}
@@ -635,36 +686,63 @@ export function CookingMode({
                   disabled={step === 0}
                   onClick={() => changeStep(step - 1)}
                 >
-                  <ChevronLeft size={18} /> Back
+                  <ChevronLeft size={18} /> Previous
                 </button>
                 <button
                   className="primary-button"
                   type="button"
-                  disabled={step === steps.length - 1}
+                  disabled={step >= steps.length - 1}
                   onClick={() => changeStep(step + 1)}
                 >
-                  Next step <ChevronRight size={18} />
+                  Next <ChevronRight size={18} />
                 </button>
               </div>
             </>
           )}
+          <div className="cooking-task-actions">
+            {steps.length > 0 && readingMode === 'steps' && (
+              <button
+                type="button"
+                className="text-button cooking-desktop-complete"
+                aria-pressed={completedSteps.has(step)}
+                onClick={toggleCurrentStep}
+              >
+                {completedSteps.has(step) ? 'Mark step incomplete' : 'Complete step'}
+              </button>
+            )}
+            {sessionId && (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={cookingBusy}
+                onClick={() => void finishCooking()}
+              >
+                Finish cooking
+              </button>
+            )}
+          </div>
         </section>
         <aside id="cook-timers" className={`timer-panel ${styles.timerPanel}`}>
           <h2>
             <Timer size={20} /> Timers
           </h2>
+          <label htmlFor="cook-timer-minutes">Minutes</label>
           <div className="add-timer">
             <input
+              id="cook-timer-minutes"
               aria-label="Timer minutes"
+              max="1440"
+              aria-invalid={Boolean(timerError)}
               type="number"
               min="1"
               value={timerMinutes}
-              onChange={(event) => setTimerMinutes(Number(event.target.value))}
+              onChange={(event) => setTimerMinutes(event.target.value)}
             />
             <button className="text-button" type="button" onClick={addTimer}>
-              <Plus size={16} /> Add
+              <Plus size={16} /> Add timer
             </button>
           </div>
+          {timerError && <p role="alert">{timerError}</p>}
           <p role="status">
             {timers.some((timer) => timer.remaining === 0)
               ? 'Timer finished. Check your food.'
@@ -678,6 +756,7 @@ export function CookingMode({
                 <button
                   className="text-button"
                   type="button"
+                  disabled={timer.remaining === 0}
                   onClick={() =>
                     setTimers((current) =>
                       current.map((entry) =>
@@ -692,7 +771,7 @@ export function CookingMode({
                     )
                   }
                 >
-                  {timer.running ? 'Pause' : 'Resume'}
+                  {timer.remaining === 0 ? 'Finished' : timer.running ? 'Pause' : 'Resume'}
                 </button>
                 <button
                   className="icon-button"
@@ -709,291 +788,357 @@ export function CookingMode({
           ) : (
             <p className="muted">Run as many local timers as you need.</p>
           )}
+          <details className="temperature-card">
+            <summary>Temperature converter</summary>
+
+            <div>
+              <input
+                aria-label="Temperature to convert"
+                inputMode="decimal"
+                value={temperature}
+                onChange={(event) => setTemperature(event.target.value)}
+              />
+              <select
+                aria-label="Convert from unit"
+                value={temperatureUnit}
+                onChange={(event) => setTemperatureUnit(event.target.value as 'C' | 'F')}
+              >
+                <option value="C">°C</option>
+                <option value="F">°F</option>
+              </select>
+            </div>
+            {temperature && Number.isFinite(Number(temperature)) && (
+              <p>
+                Converted result:{' '}
+                {temperatureUnit === 'C'
+                  ? `${convertTemperature(Number(temperature), 'C')}°F`
+                  : `${convertTemperature(Number(temperature), 'F')}°C`}{' '}
+                <span>converted — original recipe stays unchanged.</span>
+              </p>
+            )}
+          </details>
         </aside>
       </section>
       {showPantryConfirmation && (
-        <section className={styles.confirmation} aria-labelledby="pantry-cook-confirmation">
-          <h2 id="pantry-cook-confirmation">Confirm Pantry changes</h2>
-          <p>
-            <strong>Nothing is deducted until you press the confirmation button below.</strong>
-          </p>
-          {plannedMeal ? (
-            <p className={styles.mealIdentity}>
-              Planned meal: {plannedMeal.title} · {plannedMeal.meal} on {plannedMeal.plannedFor}
+        <>
+          <DialogViewport />
+          <AppDialog
+            open
+            className={styles.confirmation}
+            onClose={() => {
+              if (!finishLock.current) setShowPantryConfirmation(false);
+            }}
+            aria-labelledby="pantry-cook-confirmation"
+          >
+            <button
+              className="dialog-close"
+              type="button"
+              aria-label="Close pantry confirmation"
+              disabled={finishing}
+              onClick={() => setShowPantryConfirmation(false)}
+            >
+              <X size={20} />
+            </button>
+            <h2 id="pantry-cook-confirmation">Confirm Pantry changes</h2>
+            <p>
+              <strong>Nothing is deducted until you press the confirmation button below.</strong>
             </p>
-          ) : null}
-          {pantryReview.length ? (
-            pantryReview.map((entry, index) => (
-              <fieldset className={styles.deduction} key={entry.ingredientId}>
-                <legend>{entry.ingredientName}</legend>
-                <label>
-                  Pantry product
-                  <select
-                    aria-label={`${entry.ingredientName} Pantry product`}
-                    value={entry.productId}
-                    disabled={entry.decision !== 'deduct'}
-                    onChange={(event) =>
-                      void refreshAllocation(index, { productId: event.target.value })
-                    }
-                  >
-                    {entry.compatibleProducts.map((product) => (
-                      <option key={product.productId} value={product.productId}>
-                        {product.productName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Quantity used
-                  <input
-                    aria-label={`Quantity used · Deduction ${index + 1} quantity · ${entry.ingredientName} deduction quantity`}
-                    type="number"
-                    min="0.000001"
-                    step="any"
-                    value={entry.quantity}
-                    disabled={entry.decision !== 'deduct'}
-                    onChange={(event) => {
-                      const quantity = Number(event.target.value);
-                      allocationRequestVersions.current.set(
-                        entry.ingredientId,
-                        (allocationRequestVersions.current.get(entry.ingredientId) ?? 0) + 1,
-                      );
-                      allocationTriplets.current.set(
-                        entry.ingredientId,
-                        `${entry.productId}\u0000${quantity}\u0000${entry.unit}`,
-                      );
-                      setPantryReview((current) =>
-                        current.map((item, position) =>
-                          position === index ? { ...item, quantity } : item,
-                        ),
-                      );
-                    }}
-                    onBlur={(event) =>
-                      void refreshAllocation(index, { quantity: Number(event.currentTarget.value) })
-                    }
-                  />
-                </label>
-                <label>
-                  Unit
-                  <input
-                    aria-label={`${entry.ingredientName} deduction unit`}
-                    value={entry.unit}
-                    disabled={entry.decision !== 'deduct'}
-                    onChange={(event) => {
-                      const unit = event.target.value;
-                      allocationRequestVersions.current.set(
-                        entry.ingredientId,
-                        (allocationRequestVersions.current.get(entry.ingredientId) ?? 0) + 1,
-                      );
-                      allocationTriplets.current.set(
-                        entry.ingredientId,
-                        `${entry.productId}\u0000${entry.quantity}\u0000${unit}`,
-                      );
-                      setPantryReview((current) =>
-                        current.map((item, position) =>
-                          position === index ? { ...item, unit } : item,
-                        ),
-                      );
-                    }}
-                    onBlur={(event) =>
-                      void refreshAllocation(index, { unit: event.currentTarget.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Pantry tracking
-                  <select
-                    value={entry.decision}
-                    aria-label={`${entry.ingredientName} Pantry tracking`}
-                    onChange={(event) =>
-                      setPantryReview((current) =>
-                        current.map((item, position) =>
-                          position === index
-                            ? { ...item, decision: event.target.value as ReviewLine['decision'] }
-                            : item,
-                        ),
-                      )
-                    }
-                  >
-                    <option value="deduct">Deduct exact stock</option>
-                    <option value="skip">Do not deduct</option>
-                    <option value="inaccurate">Tracking is inaccurate</option>
-                  </select>
-                </label>
-                {entry.decision === 'inaccurate' ? (
-                  <label className={styles.fullRow}>
-                    What is inaccurate?
-                    <input
-                      value={entry.note}
-                      maxLength={500}
-                      required
+            {plannedMeal ? (
+              <p className={styles.mealIdentity}>
+                Planned meal: {plannedMeal.title} · {plannedMeal.meal} on {plannedMeal.plannedFor}
+              </p>
+            ) : null}
+            {pantryReview.length ? (
+              pantryReview.map((entry, index) => (
+                <fieldset
+                  className={styles.deduction}
+                  disabled={finishing}
+                  key={entry.ingredientId}
+                >
+                  <legend>{entry.ingredientName}</legend>
+                  <label>
+                    Pantry product
+                    <select
+                      aria-label={`${entry.ingredientName} Pantry product`}
+                      value={entry.productId}
+                      disabled={entry.decision !== 'deduct'}
                       onChange={(event) =>
+                        void refreshAllocation(index, { productId: event.target.value })
+                      }
+                    >
+                      {entry.compatibleProducts.map((product) => (
+                        <option key={product.productId} value={product.productId}>
+                          {product.productName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Quantity used
+                    <input
+                      aria-label={`Quantity used · Deduction ${index + 1} quantity · ${entry.ingredientName} deduction quantity`}
+                      type="number"
+                      min="0.000001"
+                      step="any"
+                      value={entry.quantity}
+                      disabled={entry.decision !== 'deduct'}
+                      onChange={(event) => {
+                        const quantity = Number(event.target.value);
+                        allocationRequestVersions.current.set(
+                          entry.ingredientId,
+                          (allocationRequestVersions.current.get(entry.ingredientId) ?? 0) + 1,
+                        );
+                        allocationTriplets.current.set(
+                          entry.ingredientId,
+                          `${entry.productId}\u0000${quantity}\u0000${entry.unit}`,
+                        );
                         setPantryReview((current) =>
                           current.map((item, position) =>
-                            position === index ? { ...item, note: event.target.value } : item,
+                            position === index ? { ...item, quantity } : item,
                           ),
-                        )
+                        );
+                      }}
+                      onBlur={(event) =>
+                        void refreshAllocation(index, {
+                          quantity: Number(event.currentTarget.value),
+                        })
                       }
                     />
                   </label>
-                ) : null}
-                {entry.decision === 'deduct' ? (
-                  <div className={styles.batchReview}>
-                    <strong>
-                      {entry.preview.sufficient
-                        ? 'Expected FEFO batch reductions'
-                        : 'Not enough exact compatible stock'}
-                    </strong>
-                    {entry.preview.deductions.map((batch) => (
-                      <p key={batch.batchId}>
-                        {batch.locationName} ·{' '}
-                        {batch.expiryDate ? `expires ${batch.expiryDate}` : 'expiry unknown'} ·{' '}
-                        {batch.quantity} {batch.unit} from {batch.quantityBefore} {batch.batchUnit}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={styles.fullRow}>
-                    No Pantry quantity will be deducted for this ingredient.
-                  </p>
-                )}
-              </fieldset>
-            ))
-          ) : (
-            <p>No exact mapped ingredient deductions are proposed.</p>
-          )}
-          <div className={styles.leftoverHeading}>
-            <h3>Leftover batches</h3>
-            <button
-              type="button"
-              onClick={() =>
-                setLeftovers((current) => [
-                  ...current,
-                  {
-                    id: createClientUuid(),
-                    productId: '',
-                    locationId: '',
-                    quantity: '',
-                    unit: '',
-                    useByDate: '',
-                  },
-                ])
-              }
-            >
-              Add leftover
-            </button>
-          </div>
-          {leftovers.map((leftover, index) => (
-            <fieldset className={styles.leftover} key={leftover.id}>
-              <legend>Leftover {index + 1}</legend>
-              <select
-                aria-label={`Leftover ${index + 1} product`}
-                value={leftover.productId}
-                onChange={(event) =>
-                  setLeftovers((current) =>
-                    current.map((item) =>
-                      item.id === leftover.id ? { ...item, productId: event.target.value } : item,
-                    ),
-                  )
+                  <label>
+                    Unit
+                    <input
+                      aria-label={`${entry.ingredientName} deduction unit`}
+                      value={entry.unit}
+                      disabled={entry.decision !== 'deduct'}
+                      onChange={(event) => {
+                        const unit = event.target.value;
+                        allocationRequestVersions.current.set(
+                          entry.ingredientId,
+                          (allocationRequestVersions.current.get(entry.ingredientId) ?? 0) + 1,
+                        );
+                        allocationTriplets.current.set(
+                          entry.ingredientId,
+                          `${entry.productId}\u0000${entry.quantity}\u0000${unit}`,
+                        );
+                        setPantryReview((current) =>
+                          current.map((item, position) =>
+                            position === index ? { ...item, unit } : item,
+                          ),
+                        );
+                      }}
+                      onBlur={(event) =>
+                        void refreshAllocation(index, { unit: event.currentTarget.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Pantry tracking
+                    <select
+                      value={entry.decision}
+                      aria-label={`${entry.ingredientName} Pantry tracking`}
+                      onChange={(event) =>
+                        setPantryReview((current) =>
+                          current.map((item, position) =>
+                            position === index
+                              ? { ...item, decision: event.target.value as ReviewLine['decision'] }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="deduct">Deduct exact stock</option>
+                      <option value="skip">Do not deduct</option>
+                      <option value="inaccurate">Tracking is inaccurate</option>
+                    </select>
+                  </label>
+                  {entry.decision === 'inaccurate' ? (
+                    <label className={styles.fullRow}>
+                      What is inaccurate?
+                      <input
+                        value={entry.note}
+                        maxLength={500}
+                        required
+                        onChange={(event) =>
+                          setPantryReview((current) =>
+                            current.map((item, position) =>
+                              position === index ? { ...item, note: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                  ) : null}
+                  {entry.decision === 'deduct' ? (
+                    <div className={styles.batchReview}>
+                      <strong>
+                        {entry.preview.sufficient
+                          ? 'Expected FEFO batch reductions'
+                          : 'Not enough exact compatible stock'}
+                      </strong>
+                      {entry.preview.deductions.map((batch) => (
+                        <p key={batch.batchId}>
+                          {batch.locationName} ·{' '}
+                          {batch.expiryDate ? `expires ${batch.expiryDate}` : 'expiry unknown'} ·{' '}
+                          {batch.quantity} {batch.unit} from {batch.quantityBefore}{' '}
+                          {batch.batchUnit}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={styles.fullRow}>
+                      No Pantry quantity will be deducted for this ingredient.
+                    </p>
+                  )}
+                </fieldset>
+              ))
+            ) : (
+              <p>No exact mapped ingredient deductions are proposed.</p>
+            )}
+            <div className={styles.leftoverHeading}>
+              <h3>Leftover batches</h3>
+              <button
+                type="button"
+                onClick={() =>
+                  setLeftovers((current) => [
+                    ...current,
+                    {
+                      id: createClientUuid(),
+                      productId: '',
+                      locationId: '',
+                      quantity: '',
+                      unit: '',
+                      useByDate: '',
+                    },
+                  ])
                 }
               >
-                <option value="">Choose product</option>
-                {pantryOptions.products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.displayName}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label={`Leftover ${index + 1} location`}
-                value={leftover.locationId}
-                onChange={(event) =>
-                  setLeftovers((current) =>
-                    current.map((item) =>
-                      item.id === leftover.id ? { ...item, locationId: event.target.value } : item,
-                    ),
-                  )
-                }
-              >
-                <option value="">Choose location</option>
-                {pantryOptions.locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.path}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label={`Leftover ${index + 1} quantity`}
-                type="number"
-                min="0.000001"
-                step="any"
-                value={leftover.quantity}
-                onChange={(event) =>
-                  setLeftovers((current) =>
-                    current.map((item) =>
-                      item.id === leftover.id ? { ...item, quantity: event.target.value } : item,
-                    ),
-                  )
-                }
-              />
-              <input
-                aria-label={`Leftover ${index + 1} unit`}
-                placeholder="unit"
-                value={leftover.unit}
-                onChange={(event) =>
-                  setLeftovers((current) =>
-                    current.map((item) =>
-                      item.id === leftover.id ? { ...item, unit: event.target.value } : item,
-                    ),
-                  )
-                }
-              />
-              <label>
-                Use by{' '}
-                <input
-                  aria-label={`Leftover ${index + 1} use-by date`}
-                  type="date"
-                  value={leftover.useByDate}
+                Add leftover
+              </button>
+            </div>
+            {leftovers.map((leftover, index) => (
+              <fieldset className={styles.leftover} disabled={finishing} key={leftover.id}>
+                <legend>Leftover {index + 1}</legend>
+                <select
+                  aria-label={`Leftover ${index + 1} product`}
+                  value={leftover.productId}
                   onChange={(event) =>
                     setLeftovers((current) =>
                       current.map((item) =>
-                        item.id === leftover.id ? { ...item, useByDate: event.target.value } : item,
+                        item.id === leftover.id ? { ...item, productId: event.target.value } : item,
+                      ),
+                    )
+                  }
+                >
+                  <option value="">Choose product</option>
+                  {pantryOptions.products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.displayName}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label={`Leftover ${index + 1} location`}
+                  value={leftover.locationId}
+                  onChange={(event) =>
+                    setLeftovers((current) =>
+                      current.map((item) =>
+                        item.id === leftover.id
+                          ? { ...item, locationId: event.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                >
+                  <option value="">Choose location</option>
+                  {pantryOptions.locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.path}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label={`Leftover ${index + 1} quantity`}
+                  type="number"
+                  min="0.000001"
+                  step="any"
+                  value={leftover.quantity}
+                  onChange={(event) =>
+                    setLeftovers((current) =>
+                      current.map((item) =>
+                        item.id === leftover.id ? { ...item, quantity: event.target.value } : item,
                       ),
                     )
                   }
                 />
-              </label>
+                <input
+                  aria-label={`Leftover ${index + 1} unit`}
+                  placeholder="unit"
+                  value={leftover.unit}
+                  onChange={(event) =>
+                    setLeftovers((current) =>
+                      current.map((item) =>
+                        item.id === leftover.id ? { ...item, unit: event.target.value } : item,
+                      ),
+                    )
+                  }
+                />
+                <label>
+                  Use by{' '}
+                  <input
+                    aria-label={`Leftover ${index + 1} use-by date`}
+                    type="date"
+                    value={leftover.useByDate}
+                    onChange={(event) =>
+                      setLeftovers((current) =>
+                        current.map((item) =>
+                          item.id === leftover.id
+                            ? { ...item, useByDate: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLeftovers((current) => current.filter((item) => item.id !== leftover.id))
+                  }
+                >
+                  Remove
+                </button>
+              </fieldset>
+            ))}
+            <div className={styles.actions}>
               <button
                 type="button"
-                onClick={() =>
-                  setLeftovers((current) => current.filter((item) => item.id !== leftover.id))
-                }
+                disabled={finishing}
+                onClick={() => setShowPantryConfirmation(false)}
               >
-                Remove
+                Keep cooking
               </button>
-            </fieldset>
-          ))}
-          <div className={styles.actions}>
-            <button type="button" onClick={() => setShowPantryConfirmation(false)}>
-              Keep cooking
-            </button>
-            <button
-              className="primary-button"
-              type="button"
-              aria-label="Confirm deductions and finish · Confirm Pantry changes and finish cooking"
-              disabled={
-                pantryReview.some(
-                  (entry) => entry.decision === 'deduct' && !entry.preview.sufficient,
-                ) ||
-                pantryReview.some((entry) => entry.decision === 'inaccurate' && !entry.note.trim())
-              }
-              onClick={() => void confirmFinish()}
-            >
-              Confirm Pantry changes and finish cooking
-            </button>
-          </div>
-          {finishStatus && <p role="status">{finishStatus}</p>}
-        </section>
+              <button
+                className="primary-button"
+                type="button"
+                aria-label="Confirm deductions and finish · Confirm Pantry changes and finish cooking"
+                disabled={
+                  finishing ||
+                  pantryReview.some(
+                    (entry) => entry.decision === 'deduct' && !entry.preview.sufficient,
+                  ) ||
+                  pantryReview.some(
+                    (entry) => entry.decision === 'inaccurate' && !entry.note.trim(),
+                  )
+                }
+                onClick={() => void confirmFinish()}
+              >
+                Confirm Pantry changes and finish cooking
+              </button>
+            </div>
+            {finishStatus && <p role="status">{finishStatus}</p>}
+          </AppDialog>
+        </>
       )}
       {!showPantryConfirmation && finishStatus && (
         <div className={styles.finishStatus}>

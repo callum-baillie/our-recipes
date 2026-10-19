@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { AiSummaryCards, type AiSummaryCardData } from './ai-summary-cards';
+import { useRef, useState } from 'react';
 
 import { AI_WORKLOAD_DEFAULTS, aiWorkloadSchema } from '@/lib/domain/ai-assistant';
 
@@ -88,14 +89,21 @@ function label(value: string) {
 export function AiSettingsForm({
   initialSettings,
   privacyOnly = false,
+  personName = 'Your profile',
 }: {
   initialSettings: Settings;
   privacyOnly?: boolean;
+  personName?: string;
 }) {
   const [settings, setSettings] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatedSummaries, setUpdatedSummaries] = useState<AiSummaryCardData[]>([]);
   const [status, setStatus] = useState('');
+  const [statusSource, setStatusSource] = useState<'save' | 'refresh'>('save');
+  const lock = useRef(false);
+  const [savedPolicy, setSavedPolicy] = useState(JSON.stringify(initialSettings.dataPolicy));
+  const dirty = JSON.stringify(settings.dataPolicy) !== savedPolicy;
   const imageGeneration = settings.workloads.find((item) => item.workload === 'image_generation');
 
   function updateWorkload(index: number, changes: Partial<Workload>) {
@@ -120,10 +128,14 @@ export function AiSettingsForm({
     const body = (await response.json()) as Settings & { error?: { message?: string } };
     if (!response.ok) throw new Error(body.error?.message ?? 'AI settings could not be saved.');
     setSettings(body);
+    setSavedPolicy(JSON.stringify(body.dataPolicy));
     return body;
   }
 
   async function save() {
+    if (lock.current) return;
+    lock.current = true;
+    setStatusSource('save');
     setSaving(true);
     setStatus('Saving…');
     try {
@@ -132,37 +144,54 @@ export function AiSettingsForm({
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'AI settings could not be saved.');
     } finally {
+      lock.current = false;
       setSaving(false);
     }
   }
 
   async function refreshSummaries() {
+    if (lock.current) return;
+    lock.current = true;
+    let policySaved = false;
+    setStatusSource('refresh');
     setRefreshing(true);
     setStatus('Saving settings and preparing one summary request…');
     try {
       await persistSettings();
-      const response = await fetch('/api/v1/ai/summaries', { method: 'POST' });
+      policySaved = true;
+      const response = await fetch('/api/v1/ai/summaries?scope=account', { method: 'POST' });
       const body = (await response.json().catch(() => null)) as {
-        summaries?: unknown[];
+        summaries?: AiSummaryCardData[];
+        outcome?: string;
+        recipient?: { id: string; name: string };
         error?: { message?: string };
       } | null;
       if (!response.ok)
         throw new Error(body?.error?.message ?? 'AI summaries could not be refreshed.');
       const count = body?.summaries?.length ?? 0;
+      setUpdatedSummaries(body?.summaries ?? []);
       setStatus(
         count
-          ? `Updated ${count} summary ${count === 1 ? 'section' : 'sections'} in one AI request.`
-          : 'Nothing was sent: enabled summary sections do not have shareable data yet.',
+          ? `${body?.recipient?.name ?? personName}: updated ${count} summary ${count === 1 ? 'section' : 'sections'}. Privacy and summary settings saved.`
+          : `${personName}: privacy and summary settings saved. ${body?.outcome === 'disabled_workload' ? 'Summary requests are disabled by task or account rules.' : body?.outcome === 'disabled_outputs' ? 'No summary outputs are enabled.' : 'No eligible shared evidence is available for the enabled outputs.'}`,
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'AI summaries could not be refreshed.');
+      setStatus(
+        `${policySaved ? 'Privacy and summary settings saved; summary updating failed. ' : ''}${error instanceof Error ? error.message : 'AI summaries could not be refreshed.'}`,
+      );
     } finally {
+      lock.current = false;
       setRefreshing(false);
     }
   }
 
   return (
-    <div className="settings-stack">
+    <div id="ai-privacy" className="settings-stack" onChange={() => setStatus('')}>
+      <nav className="settings-section-index" aria-label="Privacy and summary sections">
+        <a href="#ai-summary-policy">Desired outputs</a>
+        <a href="#ai-sharing-inputs">Permitted inputs</a>
+        <a href="#ai-privacy-save">Save privacy settings</a>
+      </nav>
       {!privacyOnly && (
         <SettingsPane
           title="Recipe images"
@@ -192,12 +221,13 @@ export function AiSettingsForm({
         </SettingsPane>
       )}
       <SettingsPane
+        id="ai-summary-policy"
         title="Summaries"
         description="Choose which summaries to prepare and how often to refresh them."
       >
         <SettingsField
           title="Update frequency"
-          description="The server requests a summary only when an enabled section has shareable data."
+          description="Off stops automatic refresh. You can still explicitly update enabled summaries here; a new request may be paid."
         >
           <select
             value={String(settings.dataPolicy.summaryFrequency)}
@@ -223,7 +253,7 @@ export function AiSettingsForm({
                 type="checkbox"
                 role="switch"
                 checked={Boolean(settings.dataPolicy[key])}
-                disabled={saving || refreshing || settings.dataPolicy.summaryFrequency === 'off'}
+                disabled={saving || refreshing}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
@@ -235,8 +265,10 @@ export function AiSettingsForm({
           ))}
         </SettingsSubsection>
         <SettingsRow
-          title="Refresh summaries now"
-          description="Saves your current choices and requests fresh summaries using the enabled data categories."
+          role="group"
+          aria-label={`Update ${personName}'s summaries`}
+          title={`Update ${personName}'s summaries`}
+          description="Saves only privacy and summary settings, then requests enabled summaries for this person. It does not save the separate AI defaults draft."
         >
           <button
             className="secondary-button"
@@ -246,6 +278,14 @@ export function AiSettingsForm({
           >
             {refreshing ? 'Updating summaries…' : 'Update summaries'}
           </button>
+          {statusSource === 'refresh' && status && (
+            <p className="settings-local-status" role="status">
+              {status}
+            </p>
+          )}
+          {updatedSummaries.length > 0 && (
+            <a href="#my-summary-results">View {personName}&apos;s updated summaries</a>
+          )}
         </SettingsRow>
       </SettingsPane>
       {!privacyOnly && (
@@ -349,42 +389,80 @@ export function AiSettingsForm({
         </SettingsPane>
       )}
       <SettingsPane
-        title="Data sharing"
+        id="ai-sharing-inputs"
+        title="Permitted inputs"
         description="Only enabled categories may be sent for this profile’s future AI requests. Earlier requests cannot be recalled."
       >
-        {policyFields.map(([key, title, description]) => (
-          <SettingsField key={key} title={title} description={description}>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={Boolean(settings.dataPolicy[key])}
-              disabled={saving || refreshing}
-              onChange={(event) =>
-                setSettings((current) => ({
-                  ...current,
-                  dataPolicy: { ...current.dataPolicy, [key]: event.target.checked },
-                }))
-              }
-            />
-          </SettingsField>
+        <p>
+          Desired outputs do not enable input sharing. Enable only the categories you intend to
+          share. An output without permitted evidence cannot be prepared.{' '}
+          <a href="/account/nutrition">Nutrition preferences</a>
+        </p>
+        {[
+          { title: 'Recipes and planning', fields: policyFields.slice(0, 5) },
+          { title: 'Nutrition and identity', fields: policyFields.slice(5, 11) },
+          { title: 'Pantry and shopping', fields: policyFields.slice(11) },
+        ].map((group) => (
+          <SettingsSubsection key={group.title} title={group.title}>
+            {group.fields.map(([key, title, description]) => (
+              <SettingsField key={key} title={title} description={description}>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={Boolean(settings.dataPolicy[key])}
+                  disabled={saving || refreshing}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      dataPolicy: { ...current.dataPolicy, [key]: event.target.checked },
+                    }))
+                  }
+                />
+              </SettingsField>
+            ))}
+          </SettingsSubsection>
         ))}
       </SettingsPane>
-      <SettingsActionBar status={status}>
-        <button
-          className="primary-button"
-          type="button"
-          disabled={saving || refreshing}
-          onClick={() => void save()}
+      {updatedSummaries.length > 0 && (
+        <>
+          <section id="my-summary-results">
+            <h2>{personName}&apos;s generated snapshots</h2>
+            {updatedSummaries.map((summary) => (
+              <AiSummaryCards
+                key={summary.id}
+                domain={summary.domain}
+                placement="nutrition"
+                initialSummary={summary}
+              />
+            ))}
+          </section>
+        </>
+      )}
+      <div id="ai-privacy-save">
+        <SettingsActionBar
+          status={
+            (statusSource === 'save' ? status : '') ||
+            (dirty
+              ? 'Unsaved privacy and summary settings'
+              : 'No unsaved privacy or summary settings')
+          }
         >
-          {saving ? (
-            <>
-              <LoadingIndicator label="Saving AI settings" /> Saving…
-            </>
-          ) : (
-            'Save AI settings'
-          )}
-        </button>
-      </SettingsActionBar>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={saving || refreshing || !dirty}
+            onClick={() => void save()}
+          >
+            {saving ? (
+              <>
+                <LoadingIndicator label="Saving AI settings" /> Saving…
+              </>
+            ) : (
+              'Save privacy and summary settings'
+            )}
+          </button>
+        </SettingsActionBar>
+      </div>
     </div>
   );
 }

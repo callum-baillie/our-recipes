@@ -1,3 +1,4 @@
+import { validTimeZone, validLocale } from './regional';
 import { z } from 'zod';
 import { bodyMetricsSchema, bodyMetricsError } from './body-metrics';
 
@@ -15,8 +16,8 @@ export const profileInputSchema = z.object({
   avatarUrl: z.union([z.literal(''), z.string().url().max(2_048)]).optional(),
   units: z.enum(['metric', 'imperial']),
   temperatureUnit: z.enum(['C', 'F']),
-  locale: z.string().trim().min(2).max(35),
-  timezone: z.string().trim().min(2).max(80),
+  locale: z.string().trim().min(2).max(35).refine(validLocale, 'Choose a valid regional format.'),
+  timezone: z.string().trim().min(2).max(80).refine(validTimeZone, 'Choose a valid time zone.'),
   mainGoals: z.string().trim().max(2_000).optional(),
   goalContext: profileGoalContextSchema.optional(),
 });

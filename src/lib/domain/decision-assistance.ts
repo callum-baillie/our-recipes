@@ -14,7 +14,7 @@ export const DECISION_TASKS = {
     help: 'Resolve unmapped ingredients without replacing saved mappings.',
   },
   pantry_review: {
-    label: 'Check pantry freshness',
+    label: 'Review dates and storage',
     help: 'Prioritize date and storage checks. Suggestions do not discard stock.',
   },
   nutrition_match: {

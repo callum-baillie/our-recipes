@@ -1,0 +1,122 @@
+.editor-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  grid-column: 1/-1;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.editor-save-bar span,
+.editor-help {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.editor-optional > summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font: 1.4rem var(--font-serif, Georgia, serif);
+}
+.editor-optional > summary::after {
+  content: '⌄';
+  margin-left: auto;
+}
+.editor-optional[open] > summary::after {
+  transform: rotate(180deg);
+}
+.editor-optional > summary small {
+  font: 0.85rem var(--font-sans, sans-serif);
+  color: var(--muted);
+}
+.editor-optional[open] > summary {
+  margin-bottom: 1rem;
+}
+.ingredient-row-number {
+  grid-column: 1/-1;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.ingredient-food-link {
+  grid-column: 1/-1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.ingredient-food-link small {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+.editor-ai-review {
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.editor-timings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.editor-timings > label:first-child {
+  grid-column: 1/-1;
+}
+@media (min-width: 700px) {
+  .editor-timings {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+  .editor-timings > label:first-child {
+    grid-column: auto;
+  }
+}
+@media (max-width: 650px) {
+  .editor-form-layout .ingredient-row > input:nth-of-type(3) {
+    grid-row: 2;
+  }
+  .editor-form-layout .ingredient-row > input:nth-of-type(1),
+  .editor-form-layout .ingredient-row > input:nth-of-type(2) {
+    grid-row: 3;
+  }
+  .editor-form-layout .ingredient-row > input:nth-of-type(4) {
+    grid-row: 4;
+  }
+}
+.recipe-taxonomy-menu button[aria-selected='true'] {
+  background: var(--leaf-pale);
+  outline: 2px solid var(--leaf);
+  outline-offset: -2px;
+}
+
+.ingredient-row-details {
+  min-width: 0;
+}
+.ingredient-row-details > summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 2.9rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.ingredient-row-details > summary::after {
+  content: '⌄';
+  margin-left: auto;
+}
+.ingredient-row-details[open] > summary::after {
+  transform: rotate(180deg);
+}
+.ingredient-row-details > label {
+  margin-top: 0.5rem;
+}
+@media (max-width: 650px) {
+  .editor-form-layout .ingredient-row-details {
+    grid-column: 1/-1;
+    grid-row: 4;
+  }
+}
+
+.recipe-form .ingredient-row-details textarea {
+  min-height: 4.5rem;
+  max-height: 12rem;
+}

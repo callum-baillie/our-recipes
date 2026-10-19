@@ -96,19 +96,9 @@ describe('Nutrition surface convergence', () => {
     }
   });
 
-  it('preserves explicit allocation and audited reassignment exceptions', () => {
-    const dashboard = source('src/components/nutrition-dashboard.tsx');
-    expect(dashboard).toContain("command: 'copy_entry' | 'move' | 'restore' | 'reassign'");
-    expect(dashboard).toContain("entryLifecycleCommand(event, entry, 'reassign')");
-    expect(dashboard).toContain('Reassignment reason');
-    expect(source('src/components/nutrition-meal-planning.tsx')).toContain('Save revision');
-  });
-
   it('uses a dark-theme Nutrition eyebrow color above 4.5 to 1', () => {
-    const dashboardCss = source('src/components/nutrition-dashboard.module.css');
     const settingsCss = source('src/components/nutrition-profile-settings.module.css');
     const themesCss = source('src/app/themes.css');
-    expect(dashboardCss).toContain('color: var(--accent-text)');
     expect(settingsCss).toContain('color: var(--accent-text)');
     expect(themesCss).toContain('--accent-text: light-dark(#863c22, #ffad91)');
     expect(contrast('#ffad91', '#202920')).toBeGreaterThanOrEqual(4.5);

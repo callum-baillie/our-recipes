@@ -1,0 +1,26 @@
+[
+  {
+    "device": "mobile",
+    "route": "/account/nutrition",
+    "title": "Batch One Kitchen · Bòrd",
+    "width": 390
+  },
+  {
+    "device": "mobile",
+    "route": "/settings/lists",
+    "title": "Settings · Batch One Kitchen · Bòrd",
+    "width": 390
+  },
+  {
+    "device": "mobile",
+    "route": "/settings/system",
+    "title": "Settings · Batch One Kitchen · Bòrd",
+    "width": 390
+  },
+  {
+    "device": "mobile",
+    "route": "/settings/api",
+    "title": "Settings · Batch One Kitchen · Bòrd",
+    "width": 390
+  }
+]

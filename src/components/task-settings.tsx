@@ -9,6 +9,8 @@ import {
   SettingsEmpty,
 } from './settings-primitives';
 import { useEffect, useRef, useState } from 'react';
+import { scheduledDraftExample } from '@/lib/domain/task-settings';
+import { RegionalChoice } from './regional-choice';
 import { SettingsPageHeader } from './settings-page-header';
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
 import { AsyncSkeleton, ButtonSpinner } from './skeleton';
@@ -53,6 +55,11 @@ export function TaskSettings({
     decision: 'confirm' | 'cancel';
   } | null>(null);
   const [actions, setActions] = useState<AiDrawerAction[]>([]);
+  const reviewSurface = useRef<HTMLDivElement>(null);
+  const lock = useRef(false);
+  const [saved, setSaved] = useState(JSON.stringify(initial.settings));
+  const [errorJobId, setErrorJobId] = useState<string | null>(null);
+  const [pollError, setPollError] = useState('');
   const [jobError, setJobError] = useState('');
   const [retryTarget, setRetryTarget] = useState<Job | null>(null);
   const retryDialog = useRef<HTMLDialogElement>(null);
@@ -67,10 +74,10 @@ export function TaskSettings({
         if (!response.ok) throw new Error(body.error?.message ?? 'Tasks could not be loaded.');
         if (active) {
           setJobs(body.jobs);
-          setJobError('');
+          setPollError('');
         }
       } catch (error) {
-        if (active) setJobError(error instanceof Error ? error.message : 'Could not load tasks.');
+        if (active) setPollError(error instanceof Error ? error.message : 'Could not load tasks.');
       } finally {
         if (active) setJobsLoading(false);
       }
@@ -85,6 +92,8 @@ export function TaskSettings({
     };
   }, []);
   async function save() {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
     setSavingSettings(true);
     setStatus('');
@@ -92,20 +101,34 @@ export function TaskSettings({
       const response = await fetch('/api/v1/account/automation', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings, expectedVersion: version }),
+        body: JSON.stringify({
+          settings: Object.fromEntries(
+            Object.entries(settings).filter(
+              ([key]) => key !== 'executionMode' && key !== 'batchMinItems',
+            ),
+          ),
+          expectedVersion: version,
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? 'Settings could not be saved.');
       setVersion(body.version);
+      setSettings(body.settings);
+      setSaved(JSON.stringify(body.settings));
       setStatus('Automation preferences saved.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to save.');
     } finally {
+      lock.current = false;
       setBusy(false);
       setSavingSettings(false);
     }
   }
   async function command(job: Job, command: 'retry' | 'cancel') {
+    if (lock.current) return;
+    lock.current = true;
+    setErrorJobId(job.id);
+    setJobError('');
     setBusy(true);
     setPendingJobAction({ id: job.id, action: command });
     try {
@@ -116,6 +139,7 @@ export function TaskSettings({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? 'Task could not be updated.');
+      if (command === 'retry') retryDialog.current?.close();
       setJobs((current) =>
         body.job.id === job.id
           ? current.map((item) => (item.id === job.id ? body.job : item))
@@ -124,13 +148,16 @@ export function TaskSettings({
     } catch (error) {
       setJobError(error instanceof Error ? error.message : 'Task update failed.');
     } finally {
+      lock.current = false;
       setBusy(false);
       setPendingJobAction(null);
-      if (command === 'retry') retryDialog.current?.close();
     }
   }
   async function review(job: Job) {
-    if (!job.actionId) return;
+    if (!job.actionId || lock.current) return;
+    lock.current = true;
+    setErrorJobId(job.id);
+    setJobError('');
     setBusy(true);
     setPendingJobAction({ id: job.id, action: 'review' });
     try {
@@ -141,9 +168,14 @@ export function TaskSettings({
           body.error?.message ?? 'Select your own profile from the user menu to review this draft.',
         );
       setActions(body.action ? [body.action] : []);
+      requestAnimationFrame(() => {
+        reviewSurface.current?.focus();
+        reviewSurface.current?.scrollIntoView({ block: 'start' });
+      });
     } catch (error) {
       setJobError(error instanceof Error ? error.message : 'Could not open draft.');
     } finally {
+      lock.current = false;
       setBusy(false);
       setPendingJobAction(null);
     }
@@ -153,6 +185,10 @@ export function TaskSettings({
     decision: 'confirm' | 'cancel',
     conflictResolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
   ) {
+    if (lock.current) return;
+    lock.current = true;
+    setErrorJobId(id);
+    setJobError('');
     setBusy(true);
     setPendingDecision({ id, decision });
     try {
@@ -167,25 +203,28 @@ export function TaskSettings({
     } catch (error) {
       setJobError(error instanceof Error ? error.message : 'Draft update failed.');
     } finally {
+      lock.current = false;
       setBusy(false);
       setPendingDecision(null);
     }
   }
+  const schedule = scheduledDraftExample(settings, new Date(), initial.lastScheduledDate);
   return (
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="MY AUTOMATION"
         title="Schedules & background tasks"
-        description="Choose how your AI work runs and prepare future meal plans for review."
+        description="Prepare future meal-plan drafts for review and follow your personal tasks."
       />
       <form
+        onChange={() => setStatus('')}
         onSubmit={(event) => {
           event.preventDefault();
           void save();
         }}
       >
         <SettingsPane
-          title="Bulk processing"
+          title="AI processing preferences"
           description="Choose task models and Direct or Batch processing in your AI preferences. Existing queued tasks retain their selected processing mode."
         >
           <a className="text-button" href="/account/ai">
@@ -250,7 +289,9 @@ export function TaskSettings({
                   description="The IANA timezone used by this schedule, such as America/Chicago."
                   title="Timezone"
                 >
-                  <input
+                  <RegionalChoice
+                    kind="timezone"
+                    required
                     value={settings.timezone}
                     onChange={(event) => set('timezone', event.target.value)}
                   />
@@ -380,16 +421,50 @@ export function TaskSettings({
               </SettingsField>
             </>
           )}
+          {settings.weeklyPlanEnabled && (
+            <p>
+              <strong>Scheduled draft:</strong>{' '}
+              {
+                ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
+                  settings.weekday
+                ]
+              }{' '}
+              at {String(settings.hour).padStart(2, '0')}:00 ({settings.timezone}); {settings.days}{' '}
+              days starting {settings.aheadDays} {settings.aheadDays === 1 ? 'day' : 'days'} after
+              that run ·{' '}
+              {profiles
+                .filter((profile) =>
+                  (settings.selectedProfileIds ?? [profileId]).includes(profile.id),
+                )
+                .map((profile) => profile.name)
+                .join(', ')}{' '}
+              · {settings.mealSlots.join(', ')}.
+            </p>
+          )}
+          {schedule && settings.weeklyPlanEnabled && (
+            <p>
+              Prospective run date: {schedule.runDate} · Plan {schedule.start}–{schedule.end}. A
+              running server must perform the scheduled check; this is not a completed or applied
+              plan.
+            </p>
+          )}
           <p>
             Scheduled runs create a draft below. Existing meals are kept; review and confirm the
             draft before it changes your planner. The app must be running on the scheduled day. Last
             scheduled: {initial.lastScheduledDate ?? 'Never'}.
           </p>
         </SettingsGroup>
-        <SettingsActionBar status={status}>
+        <SettingsActionBar
+          status={
+            status ||
+            (JSON.stringify(settings) !== saved
+              ? 'Unsaved schedule changes'
+              : 'No unsaved schedule changes')
+          }
+        >
           <button className="primary-button" disabled={busy || !canEdit} aria-busy={savingSettings}>
             {savingSettings ? <ButtonSpinner /> : null}
-            {savingSettings ? 'Saving…' : 'Save preferences'}
+            {savingSettings ? 'Saving…' : 'Save schedule'}
           </button>
         </SettingsActionBar>
       </form>
@@ -402,14 +477,20 @@ export function TaskSettings({
             <AsyncSkeleton label="Loading recent background tasks" variant="rows" />
           ) : (
             <>
-              {jobError && <p role="alert">{jobError}</p>}
-              {!jobs.length && !jobError && <SettingsEmpty>No background tasks yet.</SettingsEmpty>}
+              {pollError && (
+                <p role="alert">{pollError} Last known tasks are retained; polling will retry.</p>
+              )}
+              {jobError && !errorJobId && <p role="alert">{jobError}</p>}
+              {!jobs.length && !jobError && !pollError && (
+                <SettingsEmpty>No background tasks yet.</SettingsEmpty>
+              )}
             </>
           )}
           {[...jobs].reverse().map((job) => (
             <article className={`settings-item ${styles.job}`} key={job.id}>
               <div>
                 <strong>{job.title}</strong>
+                {jobError && errorJobId === job.id && <p role="alert">{jobError}</p>}
                 <p>
                   {job.status.replaceAll('_', ' ')} · {job.executionMode}
                   {job.totalItems ? ` · ${job.completedItems}/${job.totalItems} completed` : ''}
@@ -495,21 +576,36 @@ export function TaskSettings({
           ))}
         </SettingsSubsection>
       </SettingsPane>
-      {actions.map((action) => (
-        <AiActionCard
-          key={action.id}
-          action={action}
-          busy={busy}
-          pendingDecision={pendingDecision?.id === action.id ? pendingDecision.decision : null}
-          onDecide={(...args) => void decide(...args)}
-        />
-      ))}
-      <dialog ref={retryDialog} aria-labelledby="retry-task-title" className={styles.retryDialog}>
+      <div
+        ref={reviewSurface}
+        id="task-draft-review"
+        tabIndex={-1}
+        aria-label="Generated draft review"
+      >
+        {actions.map((action) => (
+          <AiActionCard
+            key={action.id}
+            action={action}
+            busy={busy}
+            pendingDecision={pendingDecision?.id === action.id ? pendingDecision.decision : null}
+            onDecide={(...args) => void decide(...args)}
+          />
+        ))}
+      </div>
+      <dialog
+        onCancel={(event) => {
+          if (busy) event.preventDefault();
+        }}
+        ref={retryDialog}
+        aria-labelledby="retry-task-title"
+        className={styles.retryDialog}
+      >
         <h2 id="retry-task-title">Retry unfinished work?</h2>
         <p>
           This can make paid AI requests for unfinished items. Successful results are kept. Work
           already sent before cancellation may still be billed by the provider.
         </p>
+        {jobError && <p role="alert">{jobError}</p>}
         <div className={styles.actions}>
           <button type="button" disabled={busy} onClick={() => retryDialog.current?.close()}>
             Keep current results

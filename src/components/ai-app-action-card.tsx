@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ImagePlus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronRight, ImagePlus, Pencil, Trash2 } from 'lucide-react';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 import { InlineAlert } from './inline-alert';
 import { ButtonSpinner } from './skeleton';
@@ -46,6 +47,14 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
   const status =
     proposal.status !== 'pending' ? proposal.status : (outcome?.status ?? proposal.status);
   const results = proposal.results ?? outcome?.results ?? [];
+  const completed = results.filter((result) => result.ok).length;
+  const failed = results.filter(
+    (result) => !result.ok && (!result.state || result.state === 'failed'),
+  ).length;
+  const waiting = results.filter((result) => result.state === 'pending').length;
+  const notAttempted =
+    Math.max(0, proposal.actions.length - results.length) +
+    results.filter((result) => result.state === 'not-attempted').length;
   const images = proposal.actions.every((action) => action.path.endsWith('/images/generate'));
   async function decide(decision: 'apply' | 'dismiss') {
     setPending(decision);
@@ -75,7 +84,21 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
       <li key={index} className={styles.row}>
         <Icon size={17} aria-hidden="true" />
         <div>
-          <strong>{action.recordLabel ?? action.summary.split('. ')[0]}</strong>
+          <strong>
+            {action.parameters.recipeId ? (
+              <Link
+                className="inline-link"
+                href={`/recipes/${encodeURIComponent(action.parameters.recipeId)}`}
+              >
+                {action.recordLabel ?? action.summary.split('. ')[0]}
+              </Link>
+            ) : (
+              (action.recordLabel ?? action.summary.split('. ')[0])
+            )}
+          </strong>
+          {image && !action.recordLabel ? (
+            <span>Recipe title unavailable in this saved proposal.</span>
+          ) : null}
           <span>
             {action.changeLabel ??
               (action.method === 'DELETE' ? 'Remove' : action.method === 'POST' ? 'Add' : 'Update')}
@@ -97,7 +120,7 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
       aria-busy={pending !== null}
     >
       <header>
-        <span className={styles.badge}>
+        <span className={styles.badge} data-status={status}>
           {status === 'pending'
             ? 'Review changes'
             : status === 'queued'
@@ -106,14 +129,17 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
         </span>
         <h3>{proposal.title}</h3>
         <small>
-          {proposal.actions.length} {images ? 'images' : 'changes'}
+          {proposal.actions.length} requested {images ? 'images' : 'changes'}
           {images && status === 'pending' ? ' · Paid generation' : ''}
         </small>
       </header>
       <ul className={styles.rows}>{proposal.actions.slice(0, 4).map(row)}</ul>
       {proposal.actions.length > 4 && (
         <details>
-          <summary>Show {proposal.actions.length - 4} more</summary>
+          <summary>
+            <ChevronRight size={16} aria-hidden="true" /> Show {proposal.actions.length - 4} more{' '}
+            {images ? 'recipes' : 'changes'}
+          </summary>
           <ul className={styles.rows}>
             {proposal.actions.slice(4).map((action, index) => row(action, index + 4))}
           </ul>
@@ -142,8 +168,9 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
       )}
       {status === 'partial' && (
         <InlineAlert tone="warning">
-          {results.filter((result) => result.ok).length} of {proposal.actions.length} changes
-          completed. Review the results before retrying.
+          {completed} completed · {failed} failed · {notAttempted} not attempted
+          {waiting ? ` · ${waiting} waiting` : ''}. Inspect the results and source records before
+          starting another request.
         </InlineAlert>
       )}
       {status === 'applied' && (
@@ -153,11 +180,22 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
       )}
       {!!results.length && status !== 'queued' && (
         <details>
-          <summary>Results</summary>
+          <summary>
+            <ChevronRight size={16} aria-hidden="true" /> View results ({results.length})
+          </summary>
           <ul className={styles.results}>
             {results.map((result, index) => (
               <li key={index}>
-                <strong>{result.summary}</strong>
+                <strong>
+                  {result.ok
+                    ? 'Completed'
+                    : result.state === 'pending'
+                      ? 'Waiting'
+                      : result.state === 'not-attempted'
+                        ? 'Not attempted'
+                        : 'Failed'}
+                  : {result.summary}
+                </strong>
                 <span>{result.message}</span>
               </li>
             ))}

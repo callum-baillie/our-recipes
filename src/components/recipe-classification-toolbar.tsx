@@ -18,6 +18,7 @@ type RecipeClassificationToolbarProps = {
   cookingMethod: string;
   tags: string[];
   availableTags: string[];
+  availableTagColours?: Record<string, string>;
 };
 
 function titleCase(value: string): string {
@@ -33,10 +34,12 @@ export function RecipeClassificationToolbar({
   cookingMethod,
   tags,
   availableTags,
+  availableTagColours = {},
 }: RecipeClassificationToolbarProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [newTag, setNewTag] = useState('');
+  const [editing, setEditing] = useState(false);
   const [pendingTag, setPendingTag] = useState<string | null>(null);
   const categories = parseRecipeTaxonomyValues(category);
   const cuisines = parseRecipeTaxonomyValues(cuisine);
@@ -111,7 +114,7 @@ export function RecipeClassificationToolbar({
         )}
         {cookingMethod && (
           <div>
-            <dt>Method</dt>
+            <dt>Cooking method</dt>
             <dd>{titleCase(cookingMethod)}</dd>
           </div>
         )}
@@ -125,59 +128,78 @@ export function RecipeClassificationToolbar({
           {tags.length === 0 && <span className="recipe-tag-empty">None yet</span>}
           {tags.map((tag) => (
             <span className="recipe-tag-pill" key={tag}>
+              {availableTagColours[tag] && (
+                <i
+                  className="saved-tag-swatch"
+                  style={{ backgroundColor: availableTagColours[tag] }}
+                  aria-hidden="true"
+                />
+              )}{' '}
               {titleCase(tag)}
-              <button
-                type="button"
-                disabled={pendingTag !== null}
-                onClick={() =>
-                  void saveTags(
-                    tags.filter((current) => current !== tag),
-                    `${titleCase(tag)} tag removed.`,
-                  )
-                }
-                aria-label={`Remove ${tag} tag`}
-              >
-                {pendingTag === `${titleCase(tag)} tag removed.` ? (
-                  <LoadingIndicator label={`Removing ${titleCase(tag)} tag`} />
-                ) : (
-                  <X size={12} aria-hidden="true" />
-                )}
-              </button>
+              {editing && (
+                <button
+                  type="button"
+                  disabled={pendingTag !== null}
+                  onClick={() =>
+                    void saveTags(
+                      tags.filter((current) => current !== tag),
+                      `${titleCase(tag)} tag removed.`,
+                    )
+                  }
+                  aria-label={`Remove ${tag} tag`}
+                >
+                  {pendingTag === `${titleCase(tag)} tag removed.` ? (
+                    <LoadingIndicator label={`Removing ${titleCase(tag)} tag`} />
+                  ) : (
+                    <X size={12} aria-hidden="true" />
+                  )}
+                </button>
+              )}
             </span>
           ))}
         </div>
-        <form className="recipe-add-tag" onSubmit={addTag}>
-          <label className="sr-only" htmlFor="recipe-new-tag">
-            Add a tag
-          </label>
-          <input
-            id="recipe-new-tag"
-            value={newTag}
-            onChange={(event) => setNewTag(event.target.value)}
-            placeholder="Add tag"
-            list="recipe-available-tags"
-            maxLength={40}
-            disabled={pendingTag !== null || tags.length >= 20}
-          />
-          <datalist id="recipe-available-tags">
-            {availableTags
-              .filter((tag) => !tags.includes(tag))
-              .map((tag) => (
-                <option value={tag} key={tag} />
-              ))}
-          </datalist>
-          <button
-            type="submit"
-            disabled={pendingTag !== null || !newTag.trim() || tags.length >= 20}
-            aria-label="Attach tag"
-          >
-            {pendingTag?.endsWith('tag added.') ? (
-              <LoadingIndicator label="Adding tag" />
-            ) : (
-              <Plus size={15} aria-hidden="true" />
-            )}
-          </button>
-        </form>
+        <button
+          type="button"
+          className="text-button"
+          aria-expanded={editing}
+          onClick={() => setEditing(!editing)}
+        >
+          {editing ? 'Done editing tags' : 'Edit tags'}
+        </button>
+        {editing && (
+          <form className="recipe-add-tag" onSubmit={addTag}>
+            <label className="sr-only" htmlFor="recipe-new-tag">
+              Add a tag
+            </label>
+            <input
+              id="recipe-new-tag"
+              value={newTag}
+              onChange={(event) => setNewTag(event.target.value)}
+              placeholder="Add tag"
+              list="recipe-available-tags"
+              maxLength={40}
+              disabled={pendingTag !== null || tags.length >= 20}
+            />
+            <datalist id="recipe-available-tags">
+              {availableTags
+                .filter((tag) => !tags.includes(tag))
+                .map((tag) => (
+                  <option value={tag} key={tag} />
+                ))}
+            </datalist>
+            <button
+              type="submit"
+              disabled={pendingTag !== null || !newTag.trim() || tags.length >= 20}
+              aria-label="Attach tag"
+            >
+              {pendingTag?.endsWith('tag added.') ? (
+                <LoadingIndicator label="Adding tag" />
+              ) : (
+                <Plus size={15} aria-hidden="true" />
+              )}
+            </button>
+          </form>
+        )}
       </div>
     </section>
   );

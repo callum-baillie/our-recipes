@@ -19,6 +19,11 @@ export function RecipePantryCard({
       <h2>Pantry check</h2>
       <PantryAvailabilityPill state={initialAvailability.state} />
       <p>
+        Checked for{' '}
+        {initialAvailability.targetServings ?? initialAvailability.baseServings ?? 'the original'}{' '}
+        servings. Recheck in the ingredient tool after changing the batch size.
+      </p>
+      <p>
         {mapped} of {initialAvailability.ingredients.length} ingredients linked to pantry products.
       </p>
       <button className="text-button" onClick={() => dialog.current?.showModal()}>

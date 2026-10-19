@@ -1,9 +1,10 @@
 .workspace {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: clamp(1rem, 3vw, 2.5rem);
+  min-width: 0;
   display: grid;
   gap: 1.5rem;
+}
+.workspace > header {
+  margin-bottom: 0;
 }
 .header {
   display: grid;
@@ -62,7 +63,7 @@
   flex-wrap: wrap;
   align-items: center;
 }
-.actions button,
+.actions button:not(:global(.primary-button)),
 .route button,
 .link {
   border: 1px solid var(--line);
@@ -74,15 +75,13 @@
   font: inherit;
   cursor: pointer;
 }
-.actions button:disabled,
+.actions button:not(:global(.primary-button)):disabled,
 .route button:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.actions .primary {
-  background: #2f5945;
-  color: white;
-  border-color: #2f5945;
+.primary {
+  min-height: 3rem;
 }
 .check {
   display: flex;
@@ -90,9 +89,26 @@
   gap: 0.6rem;
   line-height: 1.45;
   font-size: 0.9rem;
+  min-height: 44px;
+  padding-block: 0.35rem;
+  cursor: pointer;
+  font-weight: 400;
+}
+.helper {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.5;
+  margin-top: 0.3rem;
 }
 .check input {
-  margin-top: 0.25rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  min-height: 0;
+  flex: 0 0 1.2rem;
+  padding: 0;
+  margin: 0.2rem 0 0;
 }
 .cards {
   display: grid;
@@ -157,7 +173,7 @@
 }
 
 .embedded {
-  margin-block: 1.25rem;
+  margin-block: 1rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: var(--card);
@@ -174,7 +190,7 @@
 .contextHeader h2,
 .contextHeader h3 {
   margin: 0.4rem 0;
-  font-size: 1.1rem;
+  font-size: var(--panel-title-size);
 }
 .contextHeader p {
   margin: 0;
@@ -242,4 +258,25 @@
 .reviewValues dd {
   margin: 0.25rem 0 0;
   white-space: pre-wrap;
+}
+
+.embedded:has(> .panel:first-child) {
+  border: 0;
+  margin: 0;
+  border-radius: 0;
+}
+.embedded > .panel:first-child {
+  border: 0;
+  padding: 1.25rem;
+}
+@media (max-width: 650px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel {
+    padding: 1rem;
+  }
+  .workspace > .panel > .actions > .primary {
+    width: 100%;
+  }
 }

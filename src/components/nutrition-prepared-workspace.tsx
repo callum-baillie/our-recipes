@@ -1,13 +1,15 @@
 'use client';
-
-import { useRouter } from 'next/navigation';
-import { ButtonSpinner } from './skeleton';
-import { usePendingAction } from './use-pending-action';
 import { useState, type FormEvent } from 'react';
-
-import styles from '@/components/nutrition-prepared-workspace.module.css';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 import { createClientUuid } from '@/lib/client/client-uuid';
-
+import { nutritionEventInstant, nutritionWallTime } from '@/lib/domain/nutrition-ui';
+import { useNutritionDraft } from './use-nutrition-draft';
+import { useNutritionRequest } from './use-nutrition-request';
+import { NutritionEventFields, NutritionFeedback } from './nutrition-form-fields';
+import formStyles from './nutrition-dashboard.module.css';
+import styles from './nutrition-prepared-workspace.module.css';
 export type PreparedServingWorkspace = Array<{
   id: string;
   recipeNameSnapshot: string;
@@ -32,420 +34,454 @@ export type PreparedServingWorkspace = Array<{
   }>;
 }>;
 
-function createKeys(items: PreparedServingWorkspace, prefix: string) {
-  return Object.fromEntries(items.map((item) => [`${prefix}:${item.id}`, createClientUuid()]));
-}
-
-async function responseError(response: Response) {
-  const body = (await response.json().catch(() => null)) as {
-    error?: { message?: string };
-  } | null;
-  return body?.error?.message ?? 'The prepared portion could not be saved.';
-}
-
+type Prepared = PreparedServingWorkspace[number];
+type Allocation = Prepared['ownAllocations'][number];
+type Context = {
+  profileId: string;
+  profileName: string;
+  canManage: boolean;
+  date: string;
+  today: string;
+  timeZone: string;
+};
 export function NutritionPreparedWorkspace({
   activeProfileId,
   activeProfileName,
   canManageProfile,
   workspace,
+  date,
+  today,
+  timeZone = 'UTC',
+  onLog,
 }: {
   activeProfileId: string;
   activeProfileName: string;
   canManageProfile: boolean;
   workspace: PreparedServingWorkspace;
+  date?: string;
+  today?: string;
+  timeZone?: string;
+  onLog?: () => void;
 }) {
-  const router = useRouter();
-  const [status, setStatus] = useState('');
-  const { pending, run } = usePendingAction(setStatus);
-  const [commandKeys, setCommandKeys] = useState<Record<string, string>>(() => ({
-    ...createKeys(workspace, 'eat'),
-    ...createKeys(workspace, 'serve'),
-    ...Object.fromEntries(
-      workspace.flatMap((item) =>
-        item.ownAllocations.flatMap((allocation) => [
-          [`eat:${allocation.id}`, createClientUuid()],
-          [`state:${allocation.id}`, createClientUuid()],
-        ]),
-      ),
-    ),
-  }));
-  const [localNow] = useState(() =>
-    new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16),
-  );
-
-  function stableKey(key: string) {
-    return commandKeys[key] ?? createClientUuid();
-  }
-
-  function rotateKey(key: string) {
-    setCommandKeys((current) => ({ ...current, [key]: createClientUuid() }));
-  }
-
-  async function confirmEaten(
-    event: FormEvent<HTMLFormElement>,
-    preparedId: string,
-    allocation: PreparedServingWorkspace[number]['ownAllocations'][number] | null,
-  ) {
-    event.preventDefault();
-    return run(async () => {
-      const data = new FormData(event.currentTarget);
-      const portionBasis = data.get('portionBasis');
-      const servingCount = Number(data.get('servingCount'));
-      const portionWeightGrams = Number(data.get('portionWeightGrams'));
-      const keyName = allocation ? `eat:${allocation.id}` : `eat:${preparedId}`;
-      setStatus('Confirming eaten portion…');
-      const response = await fetch(
-        `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes/${preparedId}/consume`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            idempotencyKey: stableKey(keyName),
-            servingCount: portionBasis === 'servings' ? servingCount : null,
-            portionWeightGrams: portionBasis === 'weight' ? portionWeightGrams : null,
-            occurredAt: new Date(String(data.get('occurredAt'))).toISOString(),
-            mealSlot: data.get('mealSlot'),
-            allocationSeriesId: allocation?.seriesId,
-            supersedesAllocationVersionId: allocation?.id ?? null,
-            note: data.get('note'),
-          }),
-        },
-      );
-      if (!response.ok) {
-        setStatus(await responseError(response));
-        return;
-      }
-      rotateKey(keyName);
-      setStatus('Eaten portion confirmed with an immutable Nutrition snapshot.');
-      router.refresh();
-    });
-  }
-
-  function remainingWeight(prepared: PreparedServingWorkspace[number]) {
-    return prepared.finalWeightGrams
-      ? (prepared.remainingServings / prepared.actualServings) * prepared.finalWeightGrams
-      : null;
-  }
-
-  async function recordState(
-    event: FormEvent<HTMLFormElement>,
-    preparedId: string,
-    allocation: PreparedServingWorkspace[number]['ownAllocations'][number] | null,
-  ) {
-    event.preventDefault();
-    return run(async () => {
-      const data = new FormData(event.currentTarget);
-      const keyName = allocation ? `state:${allocation.id}` : `serve:${preparedId}`;
-      const allocationSeriesId = allocation?.seriesId ?? stableKey(keyName);
-      setStatus('Saving prepared portion state…');
-      const response = await fetch(
-        `/api/v1/nutrition/profiles/${activeProfileId}/prepared-recipes/${preparedId}/allocations`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            allocationSeriesId,
-            supersedesAllocationVersionId: allocation?.id ?? null,
-            state: data.get('state'),
-            servingCount: Number(data.get('servingCount')),
-            note: data.get('note'),
-          }),
-        },
-      );
-      if (!response.ok) {
-        setStatus(await responseError(response));
-        return;
-      }
-      rotateKey(keyName);
-      setStatus('Prepared portion state saved. No food was recorded as eaten.');
-      router.refresh();
-    });
-  }
-
+  const currentDay = today ?? nutritionWallTime(new Date(), timeZone).slice(0, 10);
+  const context = {
+    profileId: activeProfileId,
+    profileName: activeProfileName,
+    canManage: canManageProfile,
+    date: date ?? currentDay,
+    today: currentDay,
+    timeZone,
+  };
   return (
-    <section
-      className={styles.panel}
-      aria-busy={pending}
-      aria-labelledby="prepared-serving-heading"
-    >
+    <section className={styles.panel} aria-label="Prepared servings">
       <header>
-        <div>
-          <h2 id="prepared-serving-heading">Prepared servings</h2>
-          <p>
-            Serving, skipping, and saving leftovers are not consumption. Only “Confirm eaten” adds
-            an immutable Food Diary entry.
-          </p>
-        </div>
-      </header>
-      {workspace.length === 0 ? (
-        <p className={styles.empty}>
-          No prepared batches yet. Record one from a current planned meal in Overview.
+        <h2>Prepared servings</h2>
+        <p>
+          Inventory includes saved batches from any date. Choose the receiving person, portion and
+          event date before confirming eaten; serving or saving leftovers does not add diary
+          nutrients.
         </p>
+      </header>
+      {!workspace.length ? (
+        <div className={styles.empty}>
+          <p>
+            No prepared batches yet. Start with an eligible planned recipe and its current
+            calculation.
+          </p>
+          <Link className="inline-link" href="/nutrition?view=overview&portions=1#planned-portions">
+            View planned meals
+          </Link>
+          {onLog && (
+            <button type="button" onClick={onLog} disabled={!canManageProfile}>
+              Log an unplanned recipe portion
+            </button>
+          )}
+        </div>
       ) : (
         <ol className={styles.batches}>
           {workspace.map((prepared) => (
-            <li key={prepared.id}>
-              <header>
-                <div>
-                  <h3>{prepared.recipeNameSnapshot}</h3>
-                  <p>
-                    {prepared.assignedServings} assigned · {prepared.remainingServings} remaining of{' '}
-                    {prepared.actualServings}
-                  </p>
-                </div>
-                <span>
-                  {Math.round(prepared.completeness * 100)}% complete ·{' '}
-                  {Math.round(prepared.confidence * 100)}% confidence
-                </span>
-              </header>
-              {prepared.calculationAlignment !== 'as_calculated' ? (
-                <p className={styles.warning}>
-                  Preparation changes need a matching recalculation before any portion can be
-                  recorded as eaten.
-                </p>
-              ) : null}
-              {prepared.overallocatedServings > 0 ? (
-                <p className={styles.warning}>
-                  Existing allocation history exceeds the recorded yield by{' '}
-                  {prepared.overallocatedServings} servings.
-                </p>
-              ) : null}
-
-              <div className={styles.allocations}>
-                {prepared.ownAllocations.map((allocation) => (
-                  <article key={allocation.seriesId}>
-                    <strong>
-                      {activeProfileName}:{' '}
-                      {allocation.portionWeightGrams
-                        ? `${allocation.portionWeightGrams} g (${allocation.servings} serving equivalent)`
-                        : `${allocation.servings} serving${allocation.servings === 1 ? '' : 's'}`}{' '}
-                      · {allocation.state}
-                    </strong>
-                    <small>Revision {allocation.revision}</small>
-                    {allocation.state !== 'eaten' ? (
-                      <>
-                        <form
-                          onSubmit={(event) => void recordState(event, prepared.id, allocation)}
-                        >
-                          <label>
-                            Update state
-                            <select
-                              name="state"
-                              defaultValue={
-                                allocation.state === 'planned' ? 'served' : allocation.state
-                              }
-                            >
-                              <option value="served">Served, not yet eaten</option>
-                              <option value="skipped">Skipped</option>
-                              <option value="leftover">Leftover, not eaten</option>
-                            </select>
-                          </label>
-                          <label>
-                            Servings
-                            <input
-                              name="servingCount"
-                              type="number"
-                              min="0.000001"
-                              step="any"
-                              defaultValue={allocation.servings ?? 1}
-                              required
-                            />
-                          </label>
-                          <label>
-                            Note
-                            <input name="note" maxLength={500} defaultValue={allocation.note} />
-                          </label>
-                          <button type="submit" disabled={pending || !canManageProfile}>
-                            {pending ? <ButtonSpinner /> : null} Save state revision
-                          </button>
-                        </form>
-                        {prepared.calculationAlignment === 'as_calculated' ? (
-                          <form
-                            onSubmit={(event) => void confirmEaten(event, prepared.id, allocation)}
-                          >
-                            <strong>Confirm this portion was eaten</strong>
-                            <label>
-                              Portion basis
-                              <select
-                                name="portionBasis"
-                                defaultValue={allocation.portionWeightGrams ? 'weight' : 'servings'}
-                              >
-                                <option value="servings">Serving count</option>
-                                {prepared.finalWeightGrams ? (
-                                  <option value="weight">Weighed portion in grams</option>
-                                ) : null}
-                              </select>
-                            </label>
-                            <label>
-                              Servings eaten
-                              <input
-                                name="servingCount"
-                                type="number"
-                                min="0.000001"
-                                step="any"
-                                defaultValue={allocation.servings ?? 1}
-                              />
-                            </label>
-                            {prepared.finalWeightGrams ? (
-                              <label>
-                                Portion weight in grams
-                                <input
-                                  name="portionWeightGrams"
-                                  type="number"
-                                  min="0.000001"
-                                  max={prepared.finalWeightGrams}
-                                  step="any"
-                                  defaultValue={allocation.portionWeightGrams ?? undefined}
-                                />
-                              </label>
-                            ) : null}
-                            <label>
-                              When
-                              <input
-                                name="occurredAt"
-                                type="datetime-local"
-                                defaultValue={localNow}
-                                suppressHydrationWarning
-                                required
-                              />
-                            </label>
-                            <label>
-                              Meal
-                              <select name="mealSlot" defaultValue="dinner">
-                                <option value="breakfast">Breakfast</option>
-                                <option value="lunch">Lunch</option>
-                                <option value="dinner">Dinner</option>
-                                <option value="snack">Snack</option>
-                                <option value="other">Other</option>
-                              </select>
-                            </label>
-                            <label>
-                              Note
-                              <input name="note" maxLength={500} />
-                            </label>
-                            <button type="submit" disabled={pending || !canManageProfile}>
-                              {pending ? <ButtonSpinner /> : null} Confirm eaten
-                            </button>
-                          </form>
-                        ) : null}
-                      </>
-                    ) : (
-                      <p className={styles.confirmed}>
-                        Recorded in Food Diary. Use diary correction history to change it.
-                      </p>
-                    )}
-                  </article>
-                ))}
-              </div>
-
-              {prepared.remainingServings > 0 ? (
-                <div className={styles.newPortion}>
-                  <form onSubmit={(event) => void recordState(event, prepared.id, null)}>
-                    <strong>Set aside another portion</strong>
-                    <label>
-                      State
-                      <select name="state" defaultValue="served">
-                        <option value="served">Served, not yet eaten</option>
-                        <option value="leftover">Leftover, not eaten</option>
-                      </select>
-                    </label>
-                    <label>
-                      Servings
-                      <input
-                        name="servingCount"
-                        type="number"
-                        min="0.000001"
-                        max={prepared.remainingServings}
-                        step="any"
-                        defaultValue={Math.min(1, prepared.remainingServings)}
-                        required
-                      />
-                    </label>
-                    <label>
-                      Note
-                      <input name="note" maxLength={500} />
-                    </label>
-                    <button type="submit" disabled={pending || !canManageProfile}>
-                      {pending ? <ButtonSpinner /> : null} Save portion
-                    </button>
-                  </form>
-                  {prepared.calculationAlignment === 'as_calculated' ? (
-                    <form onSubmit={(event) => void confirmEaten(event, prepared.id, null)}>
-                      <strong>Confirm another portion eaten</strong>
-                      <label>
-                        Portion basis
-                        <select name="portionBasis" defaultValue="servings">
-                          <option value="servings">Serving count</option>
-                          {prepared.finalWeightGrams ? (
-                            <option value="weight">Weighed portion in grams</option>
-                          ) : null}
-                        </select>
-                      </label>
-                      <label>
-                        Servings eaten
-                        <input
-                          name="servingCount"
-                          type="number"
-                          min="0.000001"
-                          max={prepared.remainingServings}
-                          step="any"
-                          defaultValue={Math.min(1, prepared.remainingServings)}
-                        />
-                      </label>
-                      {remainingWeight(prepared) ? (
-                        <label>
-                          Portion weight in grams
-                          <input
-                            name="portionWeightGrams"
-                            type="number"
-                            min="0.000001"
-                            max={remainingWeight(prepared)!}
-                            step="any"
-                            defaultValue={Math.min(
-                              remainingWeight(prepared)!,
-                              prepared.finalWeightGrams! / prepared.actualServings,
-                            )}
-                          />
-                        </label>
-                      ) : null}
-                      <label>
-                        When
-                        <input
-                          name="occurredAt"
-                          type="datetime-local"
-                          defaultValue={localNow}
-                          suppressHydrationWarning
-                          required
-                        />
-                      </label>
-                      <label>
-                        Meal
-                        <select name="mealSlot" defaultValue="dinner">
-                          <option value="breakfast">Breakfast</option>
-                          <option value="lunch">Lunch</option>
-                          <option value="dinner">Dinner</option>
-                          <option value="snack">Snack</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </label>
-                      <label>
-                        Note
-                        <input name="note" maxLength={500} />
-                      </label>
-                      <button type="submit" disabled={pending || !canManageProfile}>
-                        {pending ? <ButtonSpinner /> : null} Confirm eaten
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-              ) : null}
-            </li>
+            <PreparedBatch
+              key={`${activeProfileId}:${prepared.id}`}
+              prepared={prepared}
+              {...context}
+            />
           ))}
         </ol>
       )}
-      <p className={styles.status} role="status" aria-live="polite">
-        {status}
-      </p>
     </section>
+  );
+}
+function PreparedBatch({ prepared, ...context }: Context & { prepared: Prepared }) {
+  const request = useNutritionRequest(
+    `${context.profileId}:prepared:${prepared.id}:${context.date}`,
+  );
+  const forms = (allocation: Allocation | null) => {
+    const key = allocation?.seriesId ?? 'new';
+    return (
+      <div className={styles.portionTasks}>
+        {allocation?.state === 'eaten' ? (
+          <div className={styles.confirmed}>
+            <p>
+              {context.profileName}: this portion is recorded in the Food Diary. Correct consumption
+              there.
+            </p>
+            <Link className="inline-link" href="/nutrition?view=diary">
+              Find consumed entry in diary
+            </Link>
+            <NutritionFeedback value={request.feedback[`consume:${key}`]} />
+          </div>
+        ) : (
+          <>
+            <details>
+              <summary className="recipe-disclosure-summary">
+                {allocation ? 'Update saved portion state' : 'Set aside a portion'}
+                <ChevronDown size={18} />
+              </summary>
+              <PreparedTaskForm
+                key={`${key}:state:${context.date}`}
+                {...context}
+                prepared={prepared}
+                allocation={allocation}
+                mode="state"
+                request={request}
+              />
+            </details>
+            {prepared.calculationAlignment === 'as_calculated' && (
+              <details>
+                <summary className="recipe-disclosure-summary">
+                  {allocation ? 'Confirm this portion was eaten' : 'Confirm another portion eaten'}
+                  <ChevronDown size={18} />
+                </summary>
+                <PreparedTaskForm
+                  key={`${key}:consume:${context.date}`}
+                  {...context}
+                  prepared={prepared}
+                  allocation={allocation}
+                  mode="consume"
+                  request={request}
+                />
+              </details>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+  return (
+    <li>
+      <header>
+        <h3>{prepared.recipeNameSnapshot}</h3>
+        <p>
+          Shared prepared yield: {prepared.actualServings} servings · {prepared.assignedServings}{' '}
+          assigned · {prepared.remainingServings} unassigned capacity
+        </p>
+      </header>
+      <p className={styles.helper}>
+        Unassigned capacity is separate from physically uneaten leftovers. Nutrition evidence:{' '}
+        {Math.round(prepared.completeness * 100)}% complete ·{' '}
+        {Math.round(prepared.confidence * 100)}% confidence.
+      </p>
+      {prepared.calculationAlignment !== 'as_calculated' && (
+        <p className={styles.warning}>
+          Preparation changes need matching calculation evidence before consumption can be recorded.
+          Saved portion states remain available.
+        </p>
+      )}
+      {prepared.overallocatedServings > 0 && (
+        <p className={styles.warning}>
+          Saved allocation history exceeds this batch’s yield by {prepared.overallocatedServings}{' '}
+          servings. Resolve capacity before assigning more.
+        </p>
+      )}
+      <div className={styles.allocations}>
+        {prepared.ownAllocations.map((allocation) => (
+          <article key={allocation.seriesId}>
+            <strong>
+              {context.profileName} ·{' '}
+              {allocation.portionWeightGrams != null
+                ? `${allocation.portionWeightGrams} g (${allocation.servings ?? 'unknown'} serving equivalent)`
+                : `${allocation.servings ?? 'Unknown'} servings`}{' '}
+              · {allocation.state}
+            </strong>
+            <small>Revision {allocation.revision}</small>
+            {forms(allocation)}
+          </article>
+        ))}
+      </div>
+      {prepared.remainingServings > 0 && <div className={styles.newPortion}>{forms(null)}</div>}
+      {prepared.remainingServings <= 0 && (
+        <>
+          <NutritionFeedback value={request.feedback['consume:new']} />
+          <NutritionFeedback value={request.feedback['state:new']} />
+        </>
+      )}
+      {!context.canManage && (
+        <p className={styles.helper}>Prepared portions are read only for this profile.</p>
+      )}
+    </li>
+  );
+}
+function PreparedTaskForm({
+  prepared,
+  allocation,
+  mode,
+  request,
+  ...context
+}: Context & {
+  prepared: Prepared;
+  allocation: Allocation | null;
+  mode: 'state' | 'consume';
+  request: ReturnType<typeof useNutritionRequest>;
+}) {
+  const router = useRouter();
+  const task = `${mode}:${allocation?.seriesId ?? 'new'}`;
+  const defaultServings = allocation?.servings ?? Math.min(1, prepared.remainingServings);
+  const { draft, update, clear, notice } = useNutritionDraft(
+    `${context.profileId}:prepared:${prepared.id}:${allocation?.seriesId ?? 'new'}:${mode}:${context.date}`,
+    {
+      date: context.date,
+      time: '',
+      occurrence: '',
+      mealSlot: 'dinner',
+      portionBasis: allocation?.portionWeightGrams != null ? 'weight' : 'servings',
+      servings: String(defaultServings),
+      grams: allocation?.portionWeightGrams?.toString() ?? '',
+      state:
+        allocation?.state === 'leftover'
+          ? 'leftover'
+          : allocation?.state === 'skipped'
+            ? 'skipped'
+            : 'served',
+      note: allocation?.note ?? '',
+      expectedId: allocation?.id ?? '',
+      seriesId: allocation?.seriesId ?? '',
+      operationId: '',
+      uncertain: '',
+    },
+  );
+  const [savedDate, setSavedDate] = useState('');
+  function change(patch: Partial<typeof draft>) {
+    update({ ...patch, operationId: '' });
+  }
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!context.canManage || request.isPending()) return;
+    try {
+      const operationId = draft.operationId || createClientUuid();
+      update({ operationId });
+      let url = `/api/v1/nutrition/profiles/${context.profileId}/prepared-recipes/${prepared.id}/`;
+      let body: object;
+      if (mode === 'consume') {
+        url += 'consume';
+        body = {
+          idempotencyKey: operationId,
+          servingCount: draft.portionBasis === 'servings' ? Number(draft.servings) : null,
+          portionWeightGrams: draft.portionBasis === 'weight' ? Number(draft.grams) : null,
+          occurredAt: nutritionEventInstant(
+            draft.date,
+            draft.time,
+            context.timeZone,
+            draft.occurrence,
+          ),
+          mealSlot: draft.mealSlot,
+          allocationSeriesId: draft.seriesId || undefined,
+          supersedesAllocationVersionId: draft.expectedId || null,
+          note: draft.note,
+        };
+      } else {
+        url += 'allocations';
+        body = {
+          allocationSeriesId: draft.seriesId || operationId,
+          supersedesAllocationVersionId: draft.expectedId || null,
+          state: draft.state,
+          servingCount: Number(draft.servings),
+          note: draft.note,
+        };
+      }
+      const result = await request.send<{ allocation?: { id: string; seriesId: string } }>(
+        task,
+        url,
+        body,
+        {
+          replay: true,
+          pending: mode === 'consume' ? 'Confirming eaten portion…' : 'Saving portion state…',
+        },
+      );
+      if (!result) {
+        if (request.isUncertain(task)) update({ uncertain: 'yes' });
+        return;
+      }
+      request.message(
+        task,
+        'success',
+        mode === 'consume'
+          ? `Food logged for ${context.profileName} · ${draft.date} · ${draft.mealSlot}.`
+          : `Portion state saved for ${context.profileName}. Nothing was recorded as eaten.`,
+      );
+      setSavedDate(draft.date);
+      if (allocation)
+        clear({
+          ...draft,
+          operationId: '',
+          uncertain: '',
+          expectedId: result.allocation?.id ?? draft.expectedId,
+          seriesId: result.allocation?.seriesId ?? draft.seriesId,
+        });
+      else clear();
+      router.refresh();
+    } catch (error) {
+      request.message(
+        task,
+        'error',
+        error instanceof Error ? error.message : 'Check this portion.',
+      );
+    }
+  }
+  return (
+    <form onSubmit={submit}>
+      <p className={styles.helper}>
+        {context.profileName} ·{' '}
+        {mode === 'consume' ? `event date ${draft.date}` : 'saved portion state'}.{' '}
+        {mode === 'consume'
+          ? 'Only confirmation below records consumed food.'
+          : 'This does not change consumed totals.'}
+      </p>
+      {notice && <p className={styles.helper}>{notice}</p>}
+      <fieldset
+        className={formStyles.formFields}
+        disabled={request.pending || !context.canManage || Boolean(draft.uncertain)}
+      >
+        {mode === 'state' ? (
+          <>
+            <label>
+              Portion state
+              <select
+                value={draft.state}
+                onChange={(event) => change({ state: event.target.value })}
+              >
+                <option value="served">Served, not eaten</option>
+                <option value="leftover">Leftover, not eaten</option>
+                {allocation && <option value="skipped">Skipped</option>}
+              </select>
+            </label>
+            <label>
+              Personal servings
+              <input
+                type="number"
+                min="0.000001"
+                max={allocation ? prepared.actualServings : prepared.remainingServings}
+                step="any"
+                value={draft.servings}
+                onChange={(event) => change({ servings: event.target.value })}
+                required
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label>
+              Consumed portion basis
+              <select
+                value={draft.portionBasis}
+                onChange={(event) => change({ portionBasis: event.target.value })}
+              >
+                <option value="servings">Serving count</option>
+                {prepared.finalWeightGrams && <option value="weight">Weighed portion (g)</option>}
+              </select>
+            </label>
+            {draft.portionBasis === 'weight' ? (
+              <label>
+                Amount consumed (g)
+                <input
+                  type="number"
+                  min="0.000001"
+                  max={
+                    allocation
+                      ? (prepared.finalWeightGrams ?? undefined)
+                      : prepared.finalWeightGrams
+                        ? (prepared.remainingServings / prepared.actualServings) *
+                          prepared.finalWeightGrams
+                        : undefined
+                  }
+                  step="any"
+                  value={draft.grams}
+                  onChange={(event) => change({ grams: event.target.value })}
+                  required
+                />
+              </label>
+            ) : (
+              <label>
+                Servings eaten
+                <input
+                  type="number"
+                  min="0.000001"
+                  max={allocation ? prepared.actualServings : prepared.remainingServings}
+                  step="any"
+                  value={draft.servings}
+                  onChange={(event) => change({ servings: event.target.value })}
+                  required
+                />
+              </label>
+            )}
+            <NutritionEventFields
+              draft={draft}
+              update={change}
+              timeZone={context.timeZone}
+              today={context.today}
+            />
+          </>
+        )}
+        <label>
+          Note (optional)
+          <input
+            value={draft.note}
+            maxLength={500}
+            onChange={(event) => change({ note: event.target.value })}
+          />
+        </label>
+      </fieldset>
+      <button
+        className={mode === 'consume' ? formStyles.primaryAction : undefined}
+        type="submit"
+        disabled={request.pending || !context.canManage}
+      >
+        {request.busyTask === task
+          ? 'Saving…'
+          : draft.uncertain
+            ? 'Retry exact request'
+            : mode === 'consume'
+              ? 'Confirm eaten'
+              : 'Save portion state'}
+      </button>
+      <NutritionFeedback value={request.feedback[task]}>
+        {savedDate && mode === 'consume' && (
+          <Link className="inline-link" href={`/nutrition?view=diary&date=${savedDate}`}>
+            View recorded diary day
+          </Link>
+        )}
+      </NutritionFeedback>
+      {draft.uncertain && (
+        <>
+          <Link className="inline-link" href="/nutrition?view=diary" target="_blank">
+            Check saved diary before changing this request
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                window.confirm(
+                  'Only start a different request after checking whether this one saved.',
+                )
+              ) {
+                update({ uncertain: '', operationId: '' });
+                request.message(task, 'error', 'Review the changed request before submitting.');
+              }
+            }}
+          >
+            Checked saved data — edit request
+          </button>
+        </>
+      )}
+    </form>
   );
 }

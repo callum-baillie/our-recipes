@@ -1,0 +1,74 @@
+[
+  {
+    "name": "map cached review with consent off and route undo",
+    "passed": true
+  },
+  {
+    "name": "onboarding short height and enlarged text focus",
+    "passed": true
+  },
+  {
+    "route": "/account",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /account",
+    "passed": true
+  },
+  {
+    "route": "/account/nutrition",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /account/nutrition",
+    "passed": true
+  },
+  {
+    "route": "/account/ai",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /account/ai",
+    "passed": true
+  },
+  {
+    "route": "/account/security",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /account/security",
+    "passed": true
+  },
+  {
+    "route": "/settings/profiles",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /settings/profiles",
+    "passed": true
+  },
+  {
+    "route": "/settings/lists",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /settings/lists",
+    "passed": true
+  },
+  {
+    "route": "/settings/system",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /settings/system",
+    "passed": true
+  },
+  {
+    "route": "/settings/api",
+    "accessibility": []
+  },
+  {
+    "name": "accessibility /settings/api",
+    "passed": true
+  }
+]

@@ -192,6 +192,8 @@ export default async function PlannerPage({
         viewMode={viewMode}
         weekStartsOn={plannerPreferences.weekStartsOn}
         today={today}
+        focusDate={isoDateSchema.safeParse(selected).success ? selected : undefined}
+        nutritionProfileName={activeNutritionProfile.displayName}
         nutritionByDate={nutritionProjection.totalsByDate}
         nutritionGoals={nutritionGoals.map((goal) => ({
           nutrientCode: goal.nutrientCode,
@@ -203,6 +205,10 @@ export default async function PlannerPage({
         pantrySummary={{
           covered: pantryDemand.lines.filter((line) => line.state === 'covered').length,
           total: pantryDemand.lines.length + pantryDemand.unknown.length,
+          short: pantryDemand.lines.filter((line) => line.state === 'shortage').length,
+          uncertain:
+            pantryDemand.lines.filter((line) => line.state === 'uncertain').length +
+            pantryDemand.unknown.length,
           missing:
             pantryDemand.lines.filter((line) => line.state !== 'covered').length +
             pantryDemand.unknown.length,

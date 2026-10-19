@@ -44,6 +44,7 @@ type Section = {
   name: string;
   position?: number;
   matchTerms: string[];
+  termsText?: string;
 };
 
 type Profile = {
@@ -124,10 +125,20 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
   }
 
   const [workspace, setWorkspace] = useState(initialWorkspace);
+  const [savedPreferences, setSavedPreferences] = useState(initialWorkspace.settings);
+  const drafts = useRef(new Map<string, ProfileDraft>());
+  const lock = useRef(false);
+  const routeEditor = useRef<HTMLOListElement>(null);
+  const [previousRoute, setPreviousRoute] = useState<Section[] | null>(null);
+  const [resultStoreId, setResultStoreId] = useState<string | null>(null);
   const firstActive = initialWorkspace.profiles.find((profile) => !profile.archivedAt);
   const [selectedId, setSelectedId] = useState<string | null>(firstActive?.id ?? null);
+  const selectedStore = useRef<string | null>(firstActive?.id ?? null);
   const [draft, setDraft] = useState<ProfileDraft>(() => draftFor(firstActive));
   const [message, setMessage] = useState('');
+  const [pendingOperation, setPendingOperation] = useState<'save' | 'archive' | 'duplicate'>(
+    'save',
+  );
   const [statusArea, setStatusArea] = useState<'preferences' | 'store'>('preferences');
   const [isPending, startTransition] = useTransition();
 
@@ -140,39 +151,69 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
     [workspace.profiles],
   );
 
-  function adopt(next: Workspace, preferredId?: string | null) {
-    setWorkspace(next);
-    const nextProfile = next.profiles.find((profile) => profile.id === preferredId);
-    if (nextProfile) {
-      setSelectedId(nextProfile.id);
-      setDraft(draftFor(nextProfile));
+  function adopt(
+    next: Workspace,
+    preferredId: string | null | undefined,
+    area: 'preferences' | 'store',
+    operation: 'save' | 'archive' | 'duplicate',
+  ) {
+    if (area === 'preferences') {
+      setWorkspace((current) => ({ ...current, settings: next.settings }));
+      setSavedPreferences(next.settings);
+      return;
     }
+    setWorkspace((current) => ({ ...current, profiles: next.profiles }));
+    const nextProfile = next.profiles.find((profile) => profile.id === preferredId);
+    if (nextProfile && operation === 'save') {
+      const value = draftFor(nextProfile);
+      drafts.current.set(nextProfile.id, value);
+      setSelectedId(nextProfile.id);
+      setDraft(value);
+    }
+    if (nextProfile && operation === 'archive')
+      setDraft((current) => ({ ...current, archived: Boolean(nextProfile.archivedAt) }));
+    if (operation === 'duplicate')
+      setResultStoreId(
+        next.profiles.find(
+          (profile) => !workspace.profiles.some((previous) => previous.id === profile.id),
+        )?.id ?? null,
+      );
   }
-
   function run(
     action: () => Promise<Workspace>,
     success: string,
     preferredId = draft.id,
     area: 'preferences' | 'store' = 'store',
+    operation: 'save' | 'archive' | 'duplicate' = 'save',
   ) {
+    if (lock.current) return;
+    lock.current = true;
     setStatusArea(area);
+    setPendingOperation(operation);
     setMessage('');
     startTransition(async () => {
       try {
-        adopt(await action(), preferredId);
+        adopt(await action(), preferredId, area, operation);
         setMessage(success);
         showToast(success, 'success');
       } catch (error) {
         const failure = error instanceof Error ? error.message : 'Something went wrong.';
         setMessage(failure);
         showToast(failure, 'error');
+      } finally {
+        lock.current = false;
       }
     });
   }
-
+  function rememberDraft() {
+    drafts.current.set(draft.id ?? 'new', draft);
+  }
   function selectProfile(profile: Profile) {
+    rememberDraft();
+    selectedStore.current = profile.id;
     setSelectedId(profile.id);
-    setDraft(draftFor(profile));
+    setDraft(drafts.current.get(profile.id) ?? draftFor(profile));
+    setPreviousRoute(null);
     setMessage('');
   }
 
@@ -182,6 +223,9 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
     const sections = [...draft.sections];
     [sections[index], sections[nextIndex]] = [sections[nextIndex], sections[index]];
     setDraft({ ...draft, sections });
+    setRouteAnnouncement(
+      `Moved ${sections[nextIndex]?.name || 'section'} to position ${nextIndex + 1} of ${sections.length}. Save the store to keep this route.`,
+    );
   }
 
   function updateSection(index: number, patch: Partial<Section>) {
@@ -198,10 +242,16 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
       name: draft.name,
       locationLabel: draft.locationLabel,
       notes: draft.notes,
-      sections: draft.sections.map(({ aisleId, name, matchTerms }) => ({
+      sections: draft.sections.map(({ aisleId, name, matchTerms, termsText }) => ({
         aisleId,
         name,
-        matchTerms,
+        matchTerms:
+          termsText === undefined
+            ? matchTerms
+            : termsText
+                .split(',')
+                .map((term) => term.trim())
+                .filter(Boolean),
       })),
     };
     if (draft.id) {
@@ -218,9 +268,9 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
         async () => {
           const next = await requestWorkspace('/api/v1/supermarket-profiles', 'POST', profile);
           const created = next.profiles.find(
-            (candidate) =>
-              candidate.name === profile.name && candidate.locationLabel === profile.locationLabel,
+            (candidate) => !workspace.profiles.some((saved) => saved.id === candidate.id),
           );
+          selectedStore.current = created?.id ?? null;
           setSelectedId(created?.id ?? null);
           setDraft(draftFor(created));
           return next;
@@ -231,12 +281,17 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
     }
   }
 
+  const storeMessage = statusArea === 'store' ? message : '';
   return (
-    <div className={styles.manager}>
+    <fieldset disabled={isPending} className={`settings-form-fields ${styles.manager}`}>
       <SettingsPane
         className={styles.preferences}
+        onChange={() => {
+          setStatusArea('preferences');
+          setMessage('');
+        }}
         eyebrow="GENERAL PREFERENCES"
-        title="Shopping list behavior"
+        title="List defaults"
         description="Shared defaults for list completion, supermarket routing, and shopping mode."
       >
         <SettingsSubsection
@@ -245,7 +300,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
         >
           <SettingsField
             description="Use this store’s route for new shopping lists."
-            title="Default supermarket"
+            title="Default for new lists"
           >
             <select
               value={workspace.settings.defaultSupermarketProfileId ?? ''}
@@ -292,8 +347,8 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
           </SettingsField>
         </SettingsSubsection>
         <SettingsField
-          title="Pantry intake"
-          description="Open purchase details as items are checked so quantities and dates can be recorded."
+          title="Open purchase details when checking items"
+          description="Open purchase details as items are checked so quantities and dates can be reviewed before explicit Pantry intake."
         >
           <input
             role="switch"
@@ -311,7 +366,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
           />
         </SettingsField>
         <SettingsField
-          title="Shopping mode"
+          title="Keep the screen awake"
           description="Prevent the display from sleeping while an active list is open."
         >
           <input
@@ -328,12 +383,18 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
         </SettingsField>
         <SettingsActionBar
           status={
-            statusArea === 'preferences' ? (isPending ? 'Saving preferences…' : message) : undefined
+            statusArea === 'preferences' && message
+              ? isPending
+                ? 'Saving list preferences…'
+                : message
+              : JSON.stringify(workspace.settings) !== JSON.stringify(savedPreferences)
+                ? 'Unsaved list preferences'
+                : 'No unsaved list preferences'
           }
         >
           <button
             className="primary-button compact"
-            aria-busy={isPending}
+            aria-busy={isPending && statusArea === 'preferences'}
             disabled={isPending}
             onClick={() =>
               run(
@@ -352,7 +413,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
             }
             type="button"
           >
-            <Save size={16} /> Save preferences
+            <Save size={16} /> Save list preferences
           </button>
         </SettingsActionBar>
       </SettingsPane>
@@ -372,6 +433,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                   <button
                     className={selectedId === profile.id ? styles.selectedProfile : ''}
                     key={profile.id}
+                    aria-pressed={selectedId === profile.id}
                     onClick={() => selectProfile(profile)}
                     type="button"
                   >
@@ -390,8 +452,11 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                 <button
                   className={selectedId === null ? styles.selectedProfile : ''}
                   onClick={() => {
+                    rememberDraft();
+                    selectedStore.current = null;
                     setSelectedId(null);
-                    setDraft(draftFor());
+                    setDraft(drafts.current.get('new') ?? draftFor());
+                    setPreviousRoute(null);
                     setMessage('');
                   }}
                   type="button"
@@ -415,7 +480,17 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
               ) : null}
             </aside>
 
-            <div className={styles.profileEditor}>
+            <div
+              className={styles.profileEditor}
+              onChange={() => {
+                setStatusArea('store');
+                setMessage('');
+              }}
+            >
+              <h3>Currently editing: {draft.name || 'New store'}</h3>
+              <a className="text-button" href="#store-actions">
+                Store actions and save
+              </a>
               <div className={`settings-fields ${styles.profileFields}`}>
                 <SettingsField
                   description="The name shown when choosing a shopping route."
@@ -455,19 +530,47 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                   profile={workspace.profiles.find((profile) => profile.id === draft.id)!}
                   onChange={(next) => {
                     // Linking only changes the association. Keep unsaved household labels and route edits.
-                    setWorkspace(next as Workspace);
+                    setWorkspace((current) => ({
+                      ...current,
+                      profiles: (next as Workspace).profiles,
+                    }));
                   }}
                 />
               )}
               <StoreMapUpload
                 key={draft.id ?? 'new-store'}
-                onUse={(sections) =>
+                onUse={(sections) => {
+                  if (selectedStore.current !== draft.id) return;
+                  setPreviousRoute(draft.sections);
                   setDraft((current) => ({
                     ...current,
                     sections: sections.map((section) => ({ ...section, id: createClientUuid() })),
-                  }))
-                }
+                  }));
+                  setMessage(
+                    `Route copied to the editor—save ${draft.name || 'this store'} to apply.`,
+                  );
+                  setStatusArea('store');
+                  requestAnimationFrame(() => {
+                    routeEditor.current?.focus();
+                    routeEditor.current?.scrollIntoView({ block: 'start' });
+                  });
+                }}
               />
+              {previousRoute && (
+                <p role="status">
+                  Route copied to the {draft.name || 'new store'} editor. Save this store to apply.{' '}
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => {
+                      setDraft((current) => ({ ...current, sections: previousRoute }));
+                      setPreviousRoute(null);
+                    }}
+                  >
+                    Undo route import
+                  </button>
+                </p>
+              )}
               <div className={styles.routeHeader}>
                 <div>
                   <p className="eyebrow">IN-STORE ROUTE</p>
@@ -484,6 +587,10 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                 {routeAnnouncement}
               </p>
               <ol
+                ref={routeEditor}
+                id="store-route-editor"
+                tabIndex={-1}
+                aria-label="Store route editor"
                 className={styles.routeList}
                 onPointerMove={(event) => {
                   const drag = dragRef.current;
@@ -535,9 +642,6 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                           event.preventDefault();
                           moveSection(index, event.key === 'ArrowUp' ? -1 : 1);
-                          setRouteAnnouncement(
-                            `Moved ${section.name}. Save changes to keep this route.`,
-                          );
                         }
                       }}
                     >
@@ -551,50 +655,65 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                         onChange={(event) => updateSection(index, { name: event.target.value })}
                         placeholder="Section name"
                       />
-                      <input
-                        aria-label={`Section ${index + 1} keywords`}
-                        value={section.matchTerms.join(', ')}
-                        onChange={(event) =>
-                          updateSection(index, {
-                            matchTerms: event.target.value
-                              .split(',')
-                              .map((term) => term.trim())
-                              .filter(Boolean),
-                          })
-                        }
-                        placeholder="Keywords, separated by commas"
-                      />
-                    </div>
-                    <div className={styles.routeActions}>
-                      <button
-                        aria-label={`Move ${section.name || 'section'} up`}
-                        disabled={index === 0}
-                        onClick={() => moveSection(index, -1)}
-                        type="button"
-                      >
-                        <ArrowUp size={16} />
-                      </button>
-                      <button
-                        aria-label={`Move ${section.name || 'section'} down`}
-                        disabled={index === draft.sections.length - 1}
-                        onClick={() => moveSection(index, 1)}
-                        type="button"
-                      >
-                        <ArrowDown size={16} />
-                      </button>
-                      <button
-                        aria-label={`Remove ${section.name || 'section'}`}
-                        disabled={draft.sections.length === 1}
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            sections: draft.sections.filter((_, current) => current !== index),
-                          })
-                        }
-                        type="button"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <details className={styles.keywords}>
+                        <summary>
+                          Route details ·{' '}
+                          {section.termsText === undefined
+                            ? section.matchTerms.length
+                            : section.termsText.split(',').filter((term) => term.trim()).length}
+                        </summary>
+                        <label>
+                          Match terms
+                          <textarea
+                            aria-label={`Section ${index + 1} keywords`}
+                            value={section.termsText ?? section.matchTerms.join(', ')}
+                            onChange={(event) =>
+                              updateSection(index, { termsText: event.target.value })
+                            }
+                            placeholder="Keywords, separated by commas"
+                            rows={2}
+                          />
+                        </label>
+                        <div className={styles.routeActions}>
+                          <button
+                            aria-label={`Move ${section.name || 'section'} up`}
+                            disabled={index === 0}
+                            onClick={() => moveSection(index, -1)}
+                            type="button"
+                          >
+                            <ArrowUp size={16} />
+                          </button>
+                          <button
+                            aria-label={`Move ${section.name || 'section'} down`}
+                            disabled={index === draft.sections.length - 1}
+                            onClick={() => moveSection(index, 1)}
+                            type="button"
+                          >
+                            <ArrowDown size={16} />
+                          </button>
+                          <button
+                            aria-label={`Remove ${section.name || 'section'}`}
+                            disabled={draft.sections.length === 1}
+                            onClick={(event) => {
+                              const row = event.currentTarget.closest('li');
+                              const target = row?.nextElementSibling ?? row?.previousElementSibling;
+                              setDraft({
+                                ...draft,
+                                sections: draft.sections.filter((_, current) => current !== index),
+                              });
+                              setRouteAnnouncement(
+                                `Removed ${section.name}. ${draft.sections.length - 1} route sections remain.`,
+                              );
+                              requestAnimationFrame(() =>
+                                target?.querySelector<HTMLInputElement>('input')?.focus(),
+                              );
+                            }}
+                            type="button"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </details>
                     </div>
                   </li>
                 ))}
@@ -615,7 +734,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                 <Plus size={17} /> Add section
               </button>
 
-              <footer className={styles.editorFooter}>
+              <footer id="store-actions" className={styles.editorFooter}>
                 <p>
                   <Info size={18} />
                   <span>
@@ -635,13 +754,15 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                               `/api/v1/supermarket-profiles/${draft.id}/duplicate`,
                               'POST',
                             ),
-                          'Supermarket duplicated.',
+                          'Saved supermarket duplicated. Open the copy below; your source draft is retained.',
                           null,
+                          'store',
+                          'duplicate',
                         )
                       }
                       type="button"
                     >
-                      <Copy size={16} /> Duplicate
+                      <Copy size={16} /> Duplicate saved store
                     </button>
                   ) : null}
                   {draft.id ? (
@@ -649,22 +770,28 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                       className={styles.archiveButton}
                       disabled={isPending}
                       onClick={() => {
-                        const next = { ...draft, archived: !draft.archived };
-                        setDraft(next);
+                        const saved = workspace.profiles.find(
+                          (profile) => profile.id === draft.id,
+                        )!;
                         run(
                           () =>
-                            requestWorkspace(`/api/v1/supermarket-profiles/${draft.id}`, 'PATCH', {
-                              name: next.name,
-                              locationLabel: next.locationLabel,
-                              notes: next.notes,
-                              sections: next.sections.map(({ aisleId, name, matchTerms }) => ({
+                            requestWorkspace(`/api/v1/supermarket-profiles/${saved.id}`, 'PATCH', {
+                              name: saved.name,
+                              locationLabel: saved.locationLabel,
+                              notes: saved.notes,
+                              sections: saved.sections.map(({ aisleId, name, matchTerms }) => ({
                                 aisleId,
                                 name,
                                 matchTerms,
                               })),
-                              archived: next.archived,
+                              archived: !saved.archivedAt,
                             }),
-                          next.archived ? 'Supermarket archived.' : 'Supermarket restored.',
+                          saved.archivedAt
+                            ? 'Saved store restored. Unsaved edits retained.'
+                            : 'Saved store archived. Unsaved edits retained.',
+                          saved.id,
+                          'store',
+                          'archive',
                         );
                       }}
                       type="button"
@@ -675,7 +802,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                   ) : null}
                   <button
                     className="primary-button compact"
-                    aria-busy={isPending}
+                    aria-busy={isPending && statusArea === 'store' && pendingOperation === 'save'}
                     disabled={
                       isPending ||
                       !draft.name.trim() ||
@@ -684,25 +811,49 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                     onClick={saveProfile}
                     type="button"
                   >
-                    <Save size={16} /> {draft.id ? 'Save supermarket' : 'Add supermarket'}
+                    <Save size={16} />{' '}
+                    {draft.id ? `Save ${draft.name || 'store'}` : 'Add supermarket'}
                   </button>
                 </div>
               </footer>
-              {statusArea === 'store' && (
+              {resultStoreId && (
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => {
+                    const profile = workspace.profiles.find((item) => item.id === resultStoreId);
+                    if (profile) selectProfile(profile);
+                  }}
+                >
+                  Open new copy
+                </button>
+              )}
+              {
                 <p className={styles.status} role="status">
-                  {isPending ? (
+                  {isPending && statusArea === 'store' ? (
                     <>
-                      <LoadingIndicator label="Saving list settings" /> Saving…
+                      <LoadingIndicator label="Saving list settings" />{' '}
+                      {pendingOperation === 'save'
+                        ? 'Saving store…'
+                        : pendingOperation === 'archive'
+                          ? 'Updating saved archive state…'
+                          : 'Duplicating saved store…'}
                     </>
                   ) : (
-                    message
+                    storeMessage ||
+                    (JSON.stringify(draft) !==
+                    JSON.stringify(
+                      draftFor(workspace.profiles.find((profile) => profile.id === draft.id)),
+                    )
+                      ? storeMessage || 'Unsaved store draft'
+                      : 'No unsaved store changes')
                   )}
                 </p>
-              )}
+              }
             </div>
           </div>
         </SettingsSubsection>
       </SettingsPane>
-    </div>
+    </fieldset>
   );
 }

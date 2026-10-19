@@ -1,5 +1,6 @@
 .grid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
@@ -189,7 +190,8 @@
 
 .table caption {
   padding: 0.7rem 0;
-  font-weight: 800;
+  font-weight: 600;
+  font-size: 1rem;
   text-align: left;
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Menu, Plus, Settings, Sparkles } from 'lucide-react';
+import { ChevronDown, Menu, X, Plus, Settings, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -17,6 +17,7 @@ import { hasCustomKitchenIdentity, PRODUCT_NAME } from '@/lib/brand';
 import type { AppRole } from '@/lib/domain/permissions';
 
 import styles from './app-header.module.css';
+import { isRecipebookRoute } from '@/lib/recipebook-routes';
 
 function LazySurface({ label, drawer = false }: { label: string; drawer?: boolean }) {
   return (
@@ -55,7 +56,9 @@ type AppHeaderProps = {
 };
 
 function matchesPath(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return href === '/recipes'
+    ? isRecipebookRoute(pathname)
+    : pathname === href || pathname.startsWith(`${href}/`);
 }
 
 const primaryLinks = [
@@ -116,7 +119,13 @@ export function AppHeader({
                 className={matchesPath(pathname, link.href) ? 'active' : undefined}
                 href={link.href}
                 key={link.href}
-                aria-current={matchesPath(pathname, link.href) ? 'page' : undefined}
+                aria-current={
+                  matchesPath(pathname, link.href)
+                    ? pathname === link.href
+                      ? 'page'
+                      : 'location'
+                    : undefined
+                }
               >
                 {link.label}
               </Link>
@@ -145,20 +154,20 @@ export function AppHeader({
                     setAddRecipeOpen(true);
                   }}
                 >
-                  Recipe
+                  Add recipe
                 </button>
                 <Link
                   hidden={role === 'child'}
                   href="/planner#meal-plan-setup-title"
                   data-menu-close
                 >
-                  Meal Plan
+                  Create meal plan
                 </Link>
                 <Link href="/nutrition?view=diary" data-menu-close>
-                  Nutrition Entry
+                  Log food
                 </Link>
                 <Link hidden={role === 'child'} href="/lists#new-shopping-list" data-menu-close>
-                  Shopping List
+                  Create shopping list
                 </Link>
               </div>
             </DismissibleDetails>
@@ -200,6 +209,8 @@ export function AppHeader({
               className={`${styles.mobileNavigation} mobile-navigation`}
               summary={<Menu size={21} aria-hidden="true" />}
               summaryAriaLabel="Open navigation"
+              expandedSummaryAriaLabel="Close navigation"
+              expandedSummary={<X size={21} aria-hidden="true" />}
               summaryRef={mobileNavigationTriggerRef}
             >
               <nav aria-label="Mobile navigation">
@@ -208,7 +219,13 @@ export function AppHeader({
                     className={matchesPath(pathname, link.href) ? 'active' : undefined}
                     href={link.href}
                     key={link.href}
-                    aria-current={matchesPath(pathname, link.href) ? 'page' : undefined}
+                    aria-current={
+                      matchesPath(pathname, link.href)
+                        ? pathname === link.href
+                          ? 'page'
+                          : 'location'
+                        : undefined
+                    }
                   >
                     {link.label}
                   </Link>
@@ -233,20 +250,20 @@ export function AppHeader({
                       setAddRecipeOpen(true);
                     }}
                   >
-                    Recipe
+                    Add recipe
                   </button>
                   <Link
                     hidden={role === 'child'}
                     href="/planner#meal-plan-setup-title"
                     data-menu-close
                   >
-                    Meal Plan
+                    Create meal plan
                   </Link>
                   <Link href="/nutrition?view=diary" data-menu-close>
-                    Nutrition Entry
+                    Log food
                   </Link>
                   <Link hidden={role === 'child'} href="/lists#new-shopping-list" data-menu-close>
-                    Shopping List
+                    Create shopping list
                   </Link>
                 </div>
               </nav>
@@ -265,6 +282,7 @@ export function AppHeader({
         <div id="ai-assistant-drawer">
           <AiAssistantDrawer
             key={activeProfileId}
+            canManageAiSettings={role === 'admin'}
             open={assistantOpen}
             onClose={() => setAssistantOpen(false)}
             returnFocusRef={assistantTriggerRef}

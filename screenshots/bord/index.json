@@ -1,0 +1,2211 @@
+{
+  "site": "https://bord.tower",
+  "capturedOn": "2026-10-18",
+  "viewports": {
+    "desktop": "1440x1000",
+    "mobile": "390x844"
+  },
+  "imageFormat": "PNG",
+  "pageScreenshots": [
+    {
+      "device": "desktop",
+      "key": "account-ai-preferences",
+      "requestedPath": "/account/ai",
+      "finalPath": "/account/ai",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "AI preferences",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/account-ai-preferences.png"
+    },
+    {
+      "device": "desktop",
+      "key": "account-connected-apps",
+      "requestedPath": "/account/integrations",
+      "finalPath": "/account/integrations",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Your connected apps",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/account-connected-apps.png"
+    },
+    {
+      "device": "desktop",
+      "key": "account-nutrition",
+      "requestedPath": "/account/nutrition",
+      "finalPath": "/account/nutrition",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Callum's Nutrition",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/account-nutrition.png"
+    },
+    {
+      "device": "desktop",
+      "key": "account-preferences",
+      "requestedPath": "/account",
+      "finalPath": "/account",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Your preferences",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/account-preferences.png"
+    },
+    {
+      "device": "desktop",
+      "key": "account-schedules",
+      "requestedPath": "/account/automation",
+      "finalPath": "/account/automation",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Schedules & background tasks",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/account-schedules.png"
+    },
+    {
+      "device": "desktop",
+      "key": "account-security",
+      "requestedPath": "/account/security",
+      "finalPath": "/account/security",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Account security",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/account-security.png"
+    },
+    {
+      "device": "desktop",
+      "key": "collections",
+      "requestedPath": "/collections",
+      "finalPath": "/collections",
+      "status": 200,
+      "title": "Collections · Bòrd",
+      "heading": "Collections",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/collections.png"
+    },
+    {
+      "device": "desktop",
+      "key": "cooking-mode-step-by-step",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "fullPage": true,
+      "filePath": "desktop/pages/cooking-mode-step-by-step.png"
+    },
+    {
+      "device": "desktop",
+      "key": "cooking-mode",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "finalPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "status": 200,
+      "title": "Cook Aldi Pizza Dough Bagels",
+      "heading": "Aldi Pizza Dough Bagels",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/cooking-mode.png"
+    },
+    {
+      "device": "desktop",
+      "key": "forgot-password",
+      "requestedPath": "/forgot-password",
+      "finalPath": "/forgot-password",
+      "status": 200,
+      "heading": "Reset your passphrase.",
+      "fullPage": true,
+      "authenticated": false,
+      "filePath": "desktop/pages/forgot-password.png"
+    },
+    {
+      "device": "desktop",
+      "key": "home",
+      "requestedPath": "/",
+      "finalPath": "/",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Welcome to the kitchen, Callum.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/home.png"
+    },
+    {
+      "device": "desktop",
+      "key": "kitchen-assistance",
+      "requestedPath": "/assist",
+      "finalPath": "/assist",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "A useful next step.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/kitchen-assistance.png"
+    },
+    {
+      "device": "desktop",
+      "key": "meal-planner-day",
+      "requestedPath": "/planner",
+      "fullPage": true,
+      "filePath": "desktop/pages/meal-planner-day.png"
+    },
+    {
+      "device": "desktop",
+      "key": "meal-planner-month",
+      "requestedPath": "/planner",
+      "fullPage": true,
+      "filePath": "desktop/pages/meal-planner-month.png"
+    },
+    {
+      "device": "desktop",
+      "key": "meal-planner-week",
+      "requestedPath": "/planner",
+      "finalPath": "/planner",
+      "status": 200,
+      "title": "Meal planner · Bòrd",
+      "heading": "Meal planner",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/meal-planner-week.png"
+    },
+    {
+      "device": "desktop",
+      "key": "nutrition-dashboard",
+      "requestedPath": "/nutrition",
+      "finalPath": "/nutrition",
+      "status": 200,
+      "title": "Nutrition · Bòrd",
+      "heading": "Callum’s nutrition",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/nutrition-dashboard.png"
+    },
+    {
+      "device": "desktop",
+      "key": "nutrition-diary",
+      "requestedPath": "/nutrition?view=diary",
+      "finalPath": "/nutrition?view=diary",
+      "status": 200,
+      "title": "Nutrition · Bòrd",
+      "heading": "Callum’s nutrition",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/nutrition-diary.png"
+    },
+    {
+      "device": "desktop",
+      "key": "offline",
+      "requestedPath": "/offline",
+      "finalPath": "/offline",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "The kitchen is out of reach for a moment.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/offline.png"
+    },
+    {
+      "device": "desktop",
+      "key": "pantry-inventory",
+      "requestedPath": "/pantry/inventory",
+      "finalPath": "/pantry/inventory",
+      "status": 200,
+      "title": "Pantry · Bòrd",
+      "heading": "Count your pantry",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/pantry-inventory.png"
+    },
+    {
+      "device": "desktop",
+      "key": "pantry",
+      "requestedPath": "/pantry",
+      "finalPath": "/pantry",
+      "status": 200,
+      "title": "Pantry · Bòrd",
+      "heading": "Pantry",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/pantry.png"
+    },
+    {
+      "device": "desktop",
+      "key": "print-meal-plan",
+      "requestedPath": "/print?kind=meal-plan&start=2026-10-12&end=2026-10-18",
+      "finalPath": "/print?kind=meal-plan&start=2026-10-12&end=2026-10-18",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/print-meal-plan.png"
+    },
+    {
+      "device": "desktop",
+      "key": "print-pantry",
+      "requestedPath": "/print?kind=pantry",
+      "finalPath": "/print?kind=pantry",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/print-pantry.png"
+    },
+    {
+      "device": "desktop",
+      "key": "print-recipe",
+      "requestedPath": "/print?kind=recipes&recipes=3664c067-d887-47e6-98cf-2098407f76aa",
+      "finalPath": "/print?kind=recipes&recipes=3664c067-d887-47e6-98cf-2098407f76aa",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/print-recipe.png"
+    },
+    {
+      "device": "desktop",
+      "key": "print-shopping-list",
+      "requestedPath": "/print?kind=shopping-list&listId=ac040427-8476-44c5-932c-85e3d4660e54",
+      "finalPath": "/print?kind=shopping-list&listId=ac040427-8476-44c5-932c-85e3d4660e54",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/print-shopping-list.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-capture-text",
+      "requestedPath": "/capture?mode=text",
+      "fullPage": true,
+      "filePath": "desktop/pages/recipe-capture-text.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-capture-url",
+      "requestedPath": "/capture?mode=url",
+      "fullPage": true,
+      "filePath": "desktop/pages/recipe-capture-url.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-capture",
+      "requestedPath": "/capture",
+      "finalPath": "/capture",
+      "status": 200,
+      "title": "Capture recipe · Bòrd",
+      "heading": "Turn your notes into a recipe.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/recipe-capture.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-detail",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "finalPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "status": 200,
+      "title": "Aldi Pizza Dough Bagels",
+      "heading": "Aldi Pizza Dough Bagels",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/recipe-detail.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-edit",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/edit",
+      "finalPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/edit",
+      "status": 200,
+      "title": "Recipebook · Bòrd",
+      "heading": "Edit recipe",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/recipe-edit.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-import",
+      "requestedPath": "/import",
+      "finalPath": "/import",
+      "status": 200,
+      "title": "Import recipe · Bòrd",
+      "heading": "Import recipes",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/recipe-import.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-library",
+      "requestedPath": "/recipes",
+      "finalPath": "/recipes",
+      "status": 200,
+      "title": "Recipebook · Bòrd",
+      "heading": "Your recipe library",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/recipe-library.png"
+    },
+    {
+      "device": "desktop",
+      "key": "recipe-new",
+      "requestedPath": "/recipes/new",
+      "finalPath": "/recipes/new",
+      "status": 200,
+      "title": "Recipebook · Bòrd",
+      "heading": "New recipe",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/recipe-new.png"
+    },
+    {
+      "device": "desktop",
+      "key": "reset-password",
+      "requestedPath": "/reset-password",
+      "finalPath": "/reset-password",
+      "status": 200,
+      "heading": "Choose a new passphrase.",
+      "fullPage": true,
+      "authenticated": false,
+      "filePath": "desktop/pages/reset-password.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-api-keys",
+      "requestedPath": "/settings/api",
+      "finalPath": "/settings/api",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "API keys",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-api-keys.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-background-tasks",
+      "requestedPath": "/settings/automation",
+      "finalPath": "/settings/automation",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Task queue",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-background-tasks.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-lists",
+      "requestedPath": "/settings/lists",
+      "finalPath": "/settings/lists",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Shopping lists",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-lists.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-meal-plans",
+      "requestedPath": "/settings/meal-plan",
+      "finalPath": "/settings/meal-plan",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Meal plans",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-meal-plans.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-overview",
+      "requestedPath": "/settings",
+      "finalPath": "/settings",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Household settings",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-overview.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-pantry",
+      "requestedPath": "/settings/pantry",
+      "finalPath": "/settings/pantry",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Pantry",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-pantry.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-profiles",
+      "requestedPath": "/settings/profiles",
+      "finalPath": "/settings/profiles",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Household members & roles",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-profiles.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-recipes",
+      "requestedPath": "/settings/recipes",
+      "finalPath": "/settings/recipes",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Recipes",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-recipes.png"
+    },
+    {
+      "device": "desktop",
+      "key": "settings-system-backups",
+      "requestedPath": "/settings/system",
+      "finalPath": "/settings/system",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "System",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/settings-system-backups.png"
+    },
+    {
+      "device": "desktop",
+      "key": "shopping-list-detail",
+      "requestedPath": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "finalPath": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "status": 200,
+      "title": "Meal Plan 10/16 - 10/29",
+      "heading": "Meal Plan 10/16 - 10/29",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/shopping-list-detail.png"
+    },
+    {
+      "device": "desktop",
+      "key": "shopping-lists",
+      "requestedPath": "/lists",
+      "finalPath": "/lists",
+      "status": 200,
+      "title": "Shopping lists · Bòrd",
+      "heading": "Shopping lists",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/shopping-lists.png"
+    },
+    {
+      "device": "desktop",
+      "key": "sign-in",
+      "requestedPath": "/sign-in",
+      "finalPath": "/sign-in",
+      "status": 200,
+      "heading": "Welcome back.",
+      "fullPage": true,
+      "authenticated": false,
+      "filePath": "desktop/pages/sign-in.png"
+    },
+    {
+      "device": "desktop",
+      "key": "tags",
+      "requestedPath": "/tags",
+      "finalPath": "/tags",
+      "status": 200,
+      "title": "Recipe tags · Bòrd",
+      "heading": "Tags",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "desktop/pages/tags.png"
+    },
+    {
+      "device": "mobile",
+      "key": "account-ai-preferences",
+      "requestedPath": "/account/ai",
+      "finalPath": "/account/ai",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "AI preferences",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/account-ai-preferences.png"
+    },
+    {
+      "device": "mobile",
+      "key": "account-connected-apps",
+      "requestedPath": "/account/integrations",
+      "finalPath": "/account/integrations",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Your connected apps",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/account-connected-apps.png"
+    },
+    {
+      "device": "mobile",
+      "key": "account-nutrition",
+      "requestedPath": "/account/nutrition",
+      "finalPath": "/account/nutrition",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Callum's Nutrition",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/account-nutrition.png"
+    },
+    {
+      "device": "mobile",
+      "key": "account-preferences",
+      "requestedPath": "/account",
+      "finalPath": "/account",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Your preferences",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/account-preferences.png"
+    },
+    {
+      "device": "mobile",
+      "key": "account-schedules",
+      "requestedPath": "/account/automation",
+      "finalPath": "/account/automation",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Schedules & background tasks",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/account-schedules.png"
+    },
+    {
+      "device": "mobile",
+      "key": "account-security",
+      "requestedPath": "/account/security",
+      "finalPath": "/account/security",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Account security",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/account-security.png"
+    },
+    {
+      "device": "mobile",
+      "key": "collections",
+      "requestedPath": "/collections",
+      "finalPath": "/collections",
+      "status": 200,
+      "title": "Collections · Bòrd",
+      "heading": "Collections",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/collections.png"
+    },
+    {
+      "device": "mobile",
+      "key": "cooking-mode-step-by-step",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "fullPage": true,
+      "filePath": "mobile/pages/cooking-mode-step-by-step.png"
+    },
+    {
+      "device": "mobile",
+      "key": "cooking-mode",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "finalPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "status": 200,
+      "title": "Cook Aldi Pizza Dough Bagels",
+      "heading": "Aldi Pizza Dough Bagels",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/cooking-mode.png"
+    },
+    {
+      "device": "mobile",
+      "key": "forgot-password",
+      "requestedPath": "/forgot-password",
+      "finalPath": "/forgot-password",
+      "status": 200,
+      "heading": "Reset your passphrase.",
+      "fullPage": true,
+      "authenticated": false,
+      "filePath": "mobile/pages/forgot-password.png"
+    },
+    {
+      "device": "mobile",
+      "key": "home",
+      "requestedPath": "/",
+      "finalPath": "/",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Welcome to the kitchen, Callum.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/home.png"
+    },
+    {
+      "device": "mobile",
+      "key": "kitchen-assistance",
+      "requestedPath": "/assist",
+      "finalPath": "/assist",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "A useful next step.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/kitchen-assistance.png"
+    },
+    {
+      "device": "mobile",
+      "key": "meal-planner-day",
+      "requestedPath": "/planner",
+      "fullPage": true,
+      "filePath": "mobile/pages/meal-planner-day.png"
+    },
+    {
+      "device": "mobile",
+      "key": "meal-planner-month",
+      "requestedPath": "/planner",
+      "fullPage": true,
+      "filePath": "mobile/pages/meal-planner-month.png"
+    },
+    {
+      "device": "mobile",
+      "key": "meal-planner-week",
+      "requestedPath": "/planner",
+      "finalPath": "/planner",
+      "status": 200,
+      "title": "Meal planner · Bòrd",
+      "heading": "Meal planner",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/meal-planner-week.png"
+    },
+    {
+      "device": "mobile",
+      "key": "nutrition-dashboard",
+      "requestedPath": "/nutrition",
+      "finalPath": "/nutrition",
+      "status": 200,
+      "title": "Nutrition · Bòrd",
+      "heading": "Callum’s nutrition",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/nutrition-dashboard.png"
+    },
+    {
+      "device": "mobile",
+      "key": "nutrition-diary",
+      "requestedPath": "/nutrition?view=diary",
+      "finalPath": "/nutrition?view=diary",
+      "status": 200,
+      "title": "Nutrition · Bòrd",
+      "heading": "Callum’s nutrition",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/nutrition-diary.png"
+    },
+    {
+      "device": "mobile",
+      "key": "offline",
+      "requestedPath": "/offline",
+      "finalPath": "/offline",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "The kitchen is out of reach for a moment.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/offline.png"
+    },
+    {
+      "device": "mobile",
+      "key": "pantry-inventory",
+      "requestedPath": "/pantry/inventory",
+      "finalPath": "/pantry/inventory",
+      "status": 200,
+      "title": "Pantry · Bòrd",
+      "heading": "Count your pantry",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/pantry-inventory.png"
+    },
+    {
+      "device": "mobile",
+      "key": "pantry",
+      "requestedPath": "/pantry",
+      "finalPath": "/pantry",
+      "status": 200,
+      "title": "Pantry · Bòrd",
+      "heading": "Pantry",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/pantry.png"
+    },
+    {
+      "device": "mobile",
+      "key": "print-meal-plan",
+      "requestedPath": "/print?kind=meal-plan&start=2026-10-12&end=2026-10-18",
+      "finalPath": "/print?kind=meal-plan&start=2026-10-12&end=2026-10-18",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/print-meal-plan.png"
+    },
+    {
+      "device": "mobile",
+      "key": "print-pantry",
+      "requestedPath": "/print?kind=pantry",
+      "finalPath": "/print?kind=pantry",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/print-pantry.png"
+    },
+    {
+      "device": "mobile",
+      "key": "print-recipe",
+      "requestedPath": "/print?kind=recipes&recipes=3664c067-d887-47e6-98cf-2098407f76aa",
+      "finalPath": "/print?kind=recipes&recipes=3664c067-d887-47e6-98cf-2098407f76aa",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/print-recipe.png"
+    },
+    {
+      "device": "mobile",
+      "key": "print-shopping-list",
+      "requestedPath": "/print?kind=shopping-list&listId=ac040427-8476-44c5-932c-85e3d4660e54",
+      "finalPath": "/print?kind=shopping-list&listId=ac040427-8476-44c5-932c-85e3d4660e54",
+      "status": 200,
+      "title": "Bòrd",
+      "heading": "Export & print",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/print-shopping-list.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-capture-text",
+      "requestedPath": "/capture?mode=text",
+      "fullPage": true,
+      "filePath": "mobile/pages/recipe-capture-text.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-capture-url",
+      "requestedPath": "/capture?mode=url",
+      "fullPage": true,
+      "filePath": "mobile/pages/recipe-capture-url.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-capture",
+      "requestedPath": "/capture",
+      "finalPath": "/capture",
+      "status": 200,
+      "title": "Capture recipe · Bòrd",
+      "heading": "Turn your notes into a recipe.",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/recipe-capture.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-detail",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "finalPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "status": 200,
+      "title": "Aldi Pizza Dough Bagels",
+      "heading": "Aldi Pizza Dough Bagels",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/recipe-detail.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-edit",
+      "requestedPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/edit",
+      "finalPath": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/edit",
+      "status": 200,
+      "title": "Recipebook · Bòrd",
+      "heading": "Edit recipe",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/recipe-edit.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-import",
+      "requestedPath": "/import",
+      "finalPath": "/import",
+      "status": 200,
+      "title": "Import recipe · Bòrd",
+      "heading": "Import recipes",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/recipe-import.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-library",
+      "requestedPath": "/recipes",
+      "finalPath": "/recipes",
+      "status": 200,
+      "title": "Recipebook · Bòrd",
+      "heading": "Your recipe library",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/recipe-library.png"
+    },
+    {
+      "device": "mobile",
+      "key": "recipe-new",
+      "requestedPath": "/recipes/new",
+      "finalPath": "/recipes/new",
+      "status": 200,
+      "title": "Recipebook · Bòrd",
+      "heading": "New recipe",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/recipe-new.png"
+    },
+    {
+      "device": "mobile",
+      "key": "reset-password",
+      "requestedPath": "/reset-password",
+      "finalPath": "/reset-password",
+      "status": 200,
+      "heading": "Choose a new passphrase.",
+      "fullPage": true,
+      "authenticated": false,
+      "filePath": "mobile/pages/reset-password.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-api-keys",
+      "requestedPath": "/settings/api",
+      "finalPath": "/settings/api",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "API keys",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-api-keys.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-background-tasks",
+      "requestedPath": "/settings/automation",
+      "finalPath": "/settings/automation",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Task queue",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-background-tasks.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-lists",
+      "requestedPath": "/settings/lists",
+      "finalPath": "/settings/lists",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Shopping lists",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-lists.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-meal-plans",
+      "requestedPath": "/settings/meal-plan",
+      "finalPath": "/settings/meal-plan",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Meal plans",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-meal-plans.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-overview",
+      "requestedPath": "/settings",
+      "finalPath": "/settings",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Household settings",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-overview.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-pantry",
+      "requestedPath": "/settings/pantry",
+      "finalPath": "/settings/pantry",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Pantry",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-pantry.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-profiles",
+      "requestedPath": "/settings/profiles",
+      "finalPath": "/settings/profiles",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Household members & roles",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-profiles.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-recipes",
+      "requestedPath": "/settings/recipes",
+      "finalPath": "/settings/recipes",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "Recipes",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-recipes.png"
+    },
+    {
+      "device": "mobile",
+      "key": "settings-system-backups",
+      "requestedPath": "/settings/system",
+      "finalPath": "/settings/system",
+      "status": 200,
+      "title": "Settings · Bòrd",
+      "heading": "System",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/settings-system-backups.png"
+    },
+    {
+      "device": "mobile",
+      "key": "shopping-list-detail",
+      "requestedPath": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "finalPath": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "status": 200,
+      "title": "Meal Plan 10/16 - 10/29",
+      "heading": "Meal Plan 10/16 - 10/29",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/shopping-list-detail.png"
+    },
+    {
+      "device": "mobile",
+      "key": "shopping-lists",
+      "requestedPath": "/lists",
+      "finalPath": "/lists",
+      "status": 200,
+      "title": "Shopping lists · Bòrd",
+      "heading": "Shopping lists",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/shopping-lists.png"
+    },
+    {
+      "device": "mobile",
+      "key": "sign-in",
+      "requestedPath": "/sign-in",
+      "finalPath": "/sign-in",
+      "status": 200,
+      "heading": "Welcome back.",
+      "fullPage": true,
+      "authenticated": false,
+      "filePath": "mobile/pages/sign-in.png"
+    },
+    {
+      "device": "mobile",
+      "key": "tags",
+      "requestedPath": "/tags",
+      "finalPath": "/tags",
+      "status": 200,
+      "title": "Recipe tags · Bòrd",
+      "heading": "Tags",
+      "fullPage": true,
+      "authenticated": true,
+      "filePath": "mobile/pages/tags.png"
+    }
+  ],
+  "overlayScreenshots": [
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "global",
+      "label": "add-recipe-dialog",
+      "path": "/",
+      "filePath": "desktop/overlays/dialogs/global--add-recipe-dialog.png",
+      "visibleDialogs": [
+        "add-recipe-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "global",
+      "label": "Switch profile password dialog",
+      "path": "/",
+      "filePath": "desktop/overlays/dialogs/global--switch-profile-password-dialog.png",
+      "visibleDialogs": [
+        "count 1"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "Add a meal",
+      "path": "/planner",
+      "filePath": "desktop/overlays/dialogs/meal-planner--add-a-meal.png",
+      "visibleDialogs": [
+        "recipe-selector-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "edit-meal-dialog",
+      "filePath": "desktop/overlays/dialogs/meal-planner--edit-meal-dialog.png",
+      "visibleDialogs": [
+        "meal-editor-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "meal-plan-generator-lower-section",
+      "path": "/planner",
+      "visibleDialogs": [
+        "meal-plan-generator-title"
+      ],
+      "filePath": "desktop/overlays/dialogs/meal-planner--meal-plan-generator-bottom.png"
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "meal-plan-generator",
+      "path": "/planner",
+      "filePath": "desktop/overlays/dialogs/meal-planner--meal-plan-generator.png",
+      "visibleDialogs": [
+        "meal-plan-generator-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "settings-panel",
+      "path": "/planner",
+      "filePath": "desktop/overlays/dialogs/meal-planner--settings-panel.png",
+      "visibleDialogs": [
+        "planner-settings-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-dashboard",
+      "label": "Choose nutrition profile",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/dialogs/nutrition-dashboard--choose-nutrition-profile.png",
+      "visibleDialogs": [
+        "nutrition-profile-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-dashboard",
+      "label": "edit-nutrition-goals",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/dialogs/nutrition-dashboard--edit-nutrition-goals.png",
+      "visibleDialogs": [
+        "nutrition-goal-setup-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-dashboard",
+      "label": "log-food",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/dialogs/nutrition-dashboard--log-food.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-copy",
+      "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-copy.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-manual",
+      "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-manual.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-product",
+      "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-product.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-recipe",
+      "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-recipe.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-skipped",
+      "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-skipped.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-weight",
+      "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-weight.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "add-item-search",
+      "filePath": "desktop/overlays/dialogs/pantry--add-item-search.png"
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "Add pantry item",
+      "path": "/pantry",
+      "filePath": "desktop/overlays/dialogs/pantry--add-pantry-item.png",
+      "visibleDialogs": [
+        "add-pantry-item-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "Advanced pantry search",
+      "path": "/pantry",
+      "filePath": "desktop/overlays/dialogs/pantry--advanced-pantry-search.png",
+      "visibleDialogs": [
+        "pantry-filter-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "Review pantry",
+      "path": "/pantry",
+      "filePath": "desktop/overlays/dialogs/pantry--review-pantry.png",
+      "visibleDialogs": [
+        "review-pantry_review"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "recipe-library",
+      "label": "Add recipe to collection",
+      "path": "/recipes",
+      "filePath": "desktop/overlays/dialogs/recipe-library--add-recipe-to-collection.png",
+      "visibleDialogs": [
+        "recipe-collection-5e61e988-5134-4296-9a43-7f14e8328856-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "recipe-library",
+      "label": "Advanced search",
+      "path": "/recipes",
+      "filePath": "desktop/overlays/dialogs/recipe-library--advanced-search.png",
+      "visibleDialogs": [
+        "library-filter-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "recipe-library",
+      "label": "Review recipe data",
+      "path": "/recipes",
+      "filePath": "desktop/overlays/dialogs/recipe-library--review-recipe-data.png",
+      "visibleDialogs": [
+        "review-cleanup"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "recipe-new",
+      "label": "Food catalog picker",
+      "path": "/recipes/new",
+      "filePath": "desktop/overlays/dialogs/recipe-new--food-catalog-picker.png",
+      "visibleDialogs": [
+        "_R_7njav5ubrdb_"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "recipe-new",
+      "label": "food-catalog-scan",
+      "filePath": "desktop/overlays/dialogs/recipe-new--food-catalog-scan.png"
+    },
+    {
+      "device": "desktop",
+      "category": "dialogs",
+      "key": "settings-profiles",
+      "label": "add-profile",
+      "path": "/settings/profiles",
+      "filePath": "desktop/overlays/dialogs/settings-profiles--add-profile.png",
+      "visibleDialogs": [
+        "profile-onboarding-dialog-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "account-nutrition",
+      "label": "Advanced dates and reference defaults",
+      "path": "/account/nutrition",
+      "filePath": "desktop/overlays/disclosures/account-nutrition--advanced-dates-and-reference-defaults.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "account-nutrition",
+      "label": "How USDA describes these four categories",
+      "path": "/account/nutrition",
+      "filePath": "desktop/overlays/disclosures/account-nutrition--how-usda-describes-these-four-categories.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "cooking-mode",
+      "label": "Pantry check Unknown",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "filePath": "desktop/overlays/disclosures/cooking-mode--pantry-check-unknown.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "Actions for Aldi Pizza Dough Bagels",
+      "path": "/planner",
+      "filePath": "desktop/overlays/disclosures/meal-planner--actions-for-aldi-pizza-dough-bagels.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "assisted-review-panel",
+      "path": "/planner",
+      "filePath": "desktop/overlays/disclosures/meal-planner--assisted-review-panel.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "meal-type-settings",
+      "path": "/planner",
+      "filePath": "desktop/overlays/disclosures/meal-planner--meal-type-settings.png",
+      "visibleDialogs": [
+        "planner-settings-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "More actions",
+      "path": "/planner",
+      "filePath": "desktop/overlays/disclosures/meal-planner--more-actions.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "Planning notes",
+      "path": "/planner",
+      "filePath": "desktop/overlays/disclosures/meal-planner--planning-notes.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "assisted-review-panel",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/disclosures/nutrition-dashboard--assisted-review-panel.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "Manage planned portions",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/disclosures/nutrition-dashboard--manage-planned-portions.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "Personalise nutrition targets and preferences Optional",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/disclosures/nutrition-dashboard--personalise-nutrition-targets-and-preferences-optional.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "View calculated body composition",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/disclosures/nutrition-dashboard--view-calculated-body-composition.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "View exact nutrition data",
+      "path": "/nutrition",
+      "filePath": "desktop/overlays/disclosures/nutrition-dashboard--view-exact-nutrition-data.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Add food or maintain nutrition data",
+      "path": "/nutrition?view=diary",
+      "filePath": "desktop/overlays/disclosures/nutrition-diary--add-food-or-maintain-nutrition-data.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Copy a diary day",
+      "path": "/nutrition?view=diary",
+      "filePath": "desktop/overlays/disclosures/nutrition-diary--copy-a-diary-day.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Manage prepared servings and leftovers",
+      "path": "/nutrition?view=diary",
+      "filePath": "desktop/overlays/disclosures/nutrition-diary--manage-prepared-servings-and-leftovers.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Record a skipped meal",
+      "path": "/nutrition?view=diary",
+      "filePath": "desktop/overlays/disclosures/nutrition-diary--record-a-skipped-meal.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "pantry",
+      "label": "Manage JARRITOS, NATURAL FLAVOR SODA, MANGO, MANGO",
+      "path": "/pantry",
+      "filePath": "desktop/overlays/disclosures/pantry--manage-jarritos-natural-flavor-soda-mango-mango.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "pantry",
+      "label": "Manage locations",
+      "path": "/pantry",
+      "filePath": "desktop/overlays/disclosures/pantry--manage-locations.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "pantry",
+      "label": "Manage products and staples",
+      "path": "/pantry",
+      "filePath": "desktop/overlays/disclosures/pantry--manage-products-and-staples.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "INGREDIENT-BASED NUTRITION Nutrition calculation Not calculated",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "desktop/overlays/disclosures/recipe-detail--ingredient-based-nutrition-nutrition-calculation-not-c.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "PER SERVING Nutrition information View nutrients",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "desktop/overlays/disclosures/recipe-detail--per-serving-nutrition-information-view-nutrients.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "photo-tools",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "desktop/overlays/disclosures/recipe-detail--photo-tools.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "Revision history 1 saved version",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "desktop/overlays/disclosures/recipe-detail--revision-history-1-saved-version.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "recipe-import",
+      "label": "Add your own transcription Optional. Paste text you already typed or scanned.",
+      "path": "/import",
+      "filePath": "desktop/overlays/disclosures/recipe-import--add-your-own-transcription-optional-paste-text-you-alr.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "settings-lists",
+      "label": "Build a route from a store map",
+      "path": "/settings/lists",
+      "filePath": "desktop/overlays/disclosures/settings-lists--build-a-route-from-a-store-map.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "shopping-list-detail",
+      "label": "Done · 1",
+      "path": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "filePath": "desktop/overlays/disclosures/shopping-list-detail--done-1.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "shopping-list-detail",
+      "label": "Edit floury potatoes",
+      "path": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "filePath": "desktop/overlays/disclosures/shopping-list-detail--edit-floury-potatoes.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "shopping-lists",
+      "label": "Data notes",
+      "path": "/lists",
+      "filePath": "desktop/overlays/disclosures/shopping-lists--data-notes.png"
+    },
+    {
+      "device": "desktop",
+      "category": "disclosures",
+      "key": "shopping-lists",
+      "label": "More actions for Meal Plan 10/16 - 10/29",
+      "path": "/lists",
+      "filePath": "desktop/overlays/disclosures/shopping-lists--more-actions-for-meal-plan-10-16-10-29.png"
+    },
+    {
+      "device": "desktop",
+      "category": "drawers",
+      "key": "global",
+      "label": "ai-assistant-drawer",
+      "path": "/",
+      "filePath": "desktop/overlays/drawers/global--ai-assistant-drawer.png",
+      "visibleDialogs": [
+        "ai-assistant-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "drawers",
+      "key": "global",
+      "label": "assistant-settings",
+      "path": "/",
+      "filePath": "desktop/overlays/drawers/global--assistant-settings.png",
+      "visibleDialogs": [
+        "ai-assistant-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dropdowns",
+      "key": "meal-planner",
+      "label": "date-range-picker",
+      "path": "/planner",
+      "filePath": "desktop/overlays/dropdowns/meal-planner--date-range-picker.png",
+      "visibleDialogs": [
+        "planner-settings-title"
+      ]
+    },
+    {
+      "device": "desktop",
+      "category": "dropdowns",
+      "key": "recipe-new",
+      "label": "Category options",
+      "path": "/recipes/new",
+      "filePath": "desktop/overlays/dropdowns/recipe-new--category-options.png"
+    },
+    {
+      "device": "desktop",
+      "category": "dropdowns",
+      "key": "recipe-new",
+      "label": "Cuisine options",
+      "path": "/recipes/new",
+      "filePath": "desktop/overlays/dropdowns/recipe-new--cuisine-options.png"
+    },
+    {
+      "device": "desktop",
+      "category": "menus",
+      "key": "global",
+      "label": "create-menu",
+      "path": "/",
+      "filePath": "desktop/overlays/menus/global--create-menu.png"
+    },
+    {
+      "device": "desktop",
+      "category": "menus",
+      "key": "global",
+      "label": "profile-menu",
+      "path": "/",
+      "filePath": "desktop/overlays/menus/global--profile-menu.png"
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "global",
+      "label": "add-recipe-dialog",
+      "path": "/",
+      "filePath": "mobile/overlays/dialogs/global--add-recipe-dialog.png",
+      "visibleDialogs": [
+        "add-recipe-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "global",
+      "label": "Switch profile password dialog",
+      "path": "/",
+      "filePath": "mobile/overlays/dialogs/global--switch-profile-password-dialog.png",
+      "visibleDialogs": [
+        "count 1"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "Add a meal",
+      "path": "/planner",
+      "filePath": "mobile/overlays/dialogs/meal-planner--add-a-meal.png",
+      "visibleDialogs": [
+        "recipe-selector-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "edit-meal-dialog",
+      "filePath": "mobile/overlays/dialogs/meal-planner--edit-meal-dialog.png",
+      "visibleDialogs": [
+        "meal-editor-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "meal-plan-generator-lower-section",
+      "path": "/planner",
+      "visibleDialogs": [
+        "meal-plan-generator-title"
+      ],
+      "filePath": "mobile/overlays/dialogs/meal-planner--meal-plan-generator-bottom.png"
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "meal-plan-generator",
+      "path": "/planner",
+      "filePath": "mobile/overlays/dialogs/meal-planner--meal-plan-generator.png",
+      "visibleDialogs": [
+        "meal-plan-generator-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "meal-planner",
+      "label": "settings-panel",
+      "path": "/planner",
+      "filePath": "mobile/overlays/dialogs/meal-planner--settings-panel.png",
+      "visibleDialogs": [
+        "planner-settings-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-dashboard",
+      "label": "Choose nutrition profile",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/dialogs/nutrition-dashboard--choose-nutrition-profile.png",
+      "visibleDialogs": [
+        "nutrition-profile-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-dashboard",
+      "label": "edit-nutrition-goals",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/dialogs/nutrition-dashboard--edit-nutrition-goals.png",
+      "visibleDialogs": [
+        "nutrition-goal-setup-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-dashboard",
+      "label": "log-food",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/dialogs/nutrition-dashboard--log-food.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-copy",
+      "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-copy.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-manual",
+      "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-manual.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-product",
+      "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-product.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-recipe",
+      "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-recipe.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-skipped",
+      "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-skipped.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "nutrition-log",
+      "label": "log-food-weight",
+      "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-weight.png",
+      "visibleDialogs": [
+        "nutrition-log-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "add-item-search",
+      "filePath": "mobile/overlays/dialogs/pantry--add-item-search.png"
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "Add pantry item",
+      "path": "/pantry",
+      "filePath": "mobile/overlays/dialogs/pantry--add-pantry-item.png",
+      "visibleDialogs": [
+        "add-pantry-item-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "Advanced pantry search",
+      "path": "/pantry",
+      "filePath": "mobile/overlays/dialogs/pantry--advanced-pantry-search.png",
+      "visibleDialogs": [
+        "pantry-filter-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "pantry",
+      "label": "Review pantry",
+      "path": "/pantry",
+      "filePath": "mobile/overlays/dialogs/pantry--review-pantry.png",
+      "visibleDialogs": [
+        "review-pantry_review"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "recipe-library",
+      "label": "Add recipe to collection",
+      "path": "/recipes",
+      "filePath": "mobile/overlays/dialogs/recipe-library--add-recipe-to-collection.png",
+      "visibleDialogs": [
+        "recipe-collection-5e61e988-5134-4296-9a43-7f14e8328856-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "recipe-library",
+      "label": "Advanced search",
+      "path": "/recipes",
+      "filePath": "mobile/overlays/dialogs/recipe-library--advanced-search.png",
+      "visibleDialogs": [
+        "library-filter-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "recipe-library",
+      "label": "Review recipe data",
+      "path": "/recipes",
+      "filePath": "mobile/overlays/dialogs/recipe-library--review-recipe-data.png",
+      "visibleDialogs": [
+        "review-cleanup"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "recipe-new",
+      "label": "Food catalog picker",
+      "path": "/recipes/new",
+      "filePath": "mobile/overlays/dialogs/recipe-new--food-catalog-picker.png",
+      "visibleDialogs": [
+        "_R_7njav5ubrdb_"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "recipe-new",
+      "label": "food-catalog-scan",
+      "filePath": "mobile/overlays/dialogs/recipe-new--food-catalog-scan.png"
+    },
+    {
+      "device": "mobile",
+      "category": "dialogs",
+      "key": "settings-profiles",
+      "label": "add-profile",
+      "path": "/settings/profiles",
+      "filePath": "mobile/overlays/dialogs/settings-profiles--add-profile.png",
+      "visibleDialogs": [
+        "profile-onboarding-dialog-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "account-nutrition",
+      "label": "Advanced dates and reference defaults",
+      "path": "/account/nutrition",
+      "filePath": "mobile/overlays/disclosures/account-nutrition--advanced-dates-and-reference-defaults.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "account-nutrition",
+      "label": "How USDA describes these four categories",
+      "path": "/account/nutrition",
+      "filePath": "mobile/overlays/disclosures/account-nutrition--how-usda-describes-these-four-categories.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "cooking-mode",
+      "label": "Pantry check Unknown",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa/cook",
+      "filePath": "mobile/overlays/disclosures/cooking-mode--pantry-check-unknown.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "home",
+      "label": "mobile-search-filters",
+      "path": "/",
+      "filePath": "mobile/overlays/disclosures/home--mobile-search-filters.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "Actions for Aldi Pizza Dough Bagels",
+      "path": "/planner",
+      "filePath": "mobile/overlays/disclosures/meal-planner--actions-for-aldi-pizza-dough-bagels.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "meal-type-settings",
+      "path": "/planner",
+      "filePath": "mobile/overlays/disclosures/meal-planner--meal-type-settings.png",
+      "visibleDialogs": [
+        "planner-settings-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "meal-planner",
+      "label": "mobile-nutrition-panel",
+      "path": "/planner",
+      "filePath": "mobile/overlays/disclosures/meal-planner--mobile-nutrition-panel.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "Manage planned portions",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/disclosures/nutrition-dashboard--manage-planned-portions.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "Personalise nutrition targets and preferences Optional",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/disclosures/nutrition-dashboard--personalise-nutrition-targets-and-preferences-optional.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "View calculated body composition",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/disclosures/nutrition-dashboard--view-calculated-body-composition.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-dashboard",
+      "label": "View exact nutrition data",
+      "path": "/nutrition",
+      "filePath": "mobile/overlays/disclosures/nutrition-dashboard--view-exact-nutrition-data.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Add food or maintain nutrition data",
+      "path": "/nutrition?view=diary",
+      "filePath": "mobile/overlays/disclosures/nutrition-diary--add-food-or-maintain-nutrition-data.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Copy a diary day",
+      "path": "/nutrition?view=diary",
+      "filePath": "mobile/overlays/disclosures/nutrition-diary--copy-a-diary-day.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Manage prepared servings and leftovers",
+      "path": "/nutrition?view=diary",
+      "filePath": "mobile/overlays/disclosures/nutrition-diary--manage-prepared-servings-and-leftovers.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "nutrition-diary",
+      "label": "Record a skipped meal",
+      "path": "/nutrition?view=diary",
+      "filePath": "mobile/overlays/disclosures/nutrition-diary--record-a-skipped-meal.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "pantry",
+      "label": "Manage JARRITOS, NATURAL FLAVOR SODA, MANGO, MANGO",
+      "path": "/pantry",
+      "filePath": "mobile/overlays/disclosures/pantry--manage-jarritos-natural-flavor-soda-mango-mango.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "INGREDIENT-BASED NUTRITION Nutrition calculation Not calculated",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "mobile/overlays/disclosures/recipe-detail--ingredient-based-nutrition-nutrition-calculation-not-c.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "PER SERVING Nutrition information View nutrients",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "mobile/overlays/disclosures/recipe-detail--per-serving-nutrition-information-view-nutrients.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "photo-tools",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "mobile/overlays/disclosures/recipe-detail--photo-tools.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "recipe-detail",
+      "label": "Revision history 1 saved version",
+      "path": "/recipes/3664c067-d887-47e6-98cf-2098407f76aa",
+      "filePath": "mobile/overlays/disclosures/recipe-detail--revision-history-1-saved-version.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "recipe-import",
+      "label": "Add your own transcription Optional. Paste text you already typed or scanned.",
+      "path": "/import",
+      "filePath": "mobile/overlays/disclosures/recipe-import--add-your-own-transcription-optional-paste-text-you-alr.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "settings-lists",
+      "label": "Build a route from a store map",
+      "path": "/settings/lists",
+      "filePath": "mobile/overlays/disclosures/settings-lists--build-a-route-from-a-store-map.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "shopping-list-detail",
+      "label": "Done · 1",
+      "path": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "filePath": "mobile/overlays/disclosures/shopping-list-detail--done-1.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "shopping-list-detail",
+      "label": "More list options",
+      "path": "/lists/ac040427-8476-44c5-932c-85e3d4660e54",
+      "filePath": "mobile/overlays/disclosures/shopping-list-detail--more-list-options.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "shopping-lists",
+      "label": "Data notes",
+      "path": "/lists",
+      "filePath": "mobile/overlays/disclosures/shopping-lists--data-notes.png"
+    },
+    {
+      "device": "mobile",
+      "category": "disclosures",
+      "key": "shopping-lists",
+      "label": "More actions for Meal Plan 10/16 - 10/29",
+      "path": "/lists",
+      "filePath": "mobile/overlays/disclosures/shopping-lists--more-actions-for-meal-plan-10-16-10-29.png"
+    },
+    {
+      "device": "mobile",
+      "category": "drawers",
+      "key": "global",
+      "label": "ai-assistant-drawer",
+      "path": "/",
+      "filePath": "mobile/overlays/drawers/global--ai-assistant-drawer.png",
+      "visibleDialogs": [
+        "ai-assistant-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "drawers",
+      "key": "global",
+      "label": "assistant-settings",
+      "path": "/",
+      "filePath": "mobile/overlays/drawers/global--assistant-settings.png",
+      "visibleDialogs": [
+        "ai-assistant-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dropdowns",
+      "key": "meal-planner",
+      "label": "date-range-picker",
+      "path": "/planner",
+      "filePath": "mobile/overlays/dropdowns/meal-planner--date-range-picker.png",
+      "visibleDialogs": [
+        "planner-settings-title"
+      ]
+    },
+    {
+      "device": "mobile",
+      "category": "dropdowns",
+      "key": "recipe-new",
+      "label": "Category options",
+      "path": "/recipes/new",
+      "filePath": "mobile/overlays/dropdowns/recipe-new--category-options.png"
+    },
+    {
+      "device": "mobile",
+      "category": "dropdowns",
+      "key": "recipe-new",
+      "label": "Cuisine options",
+      "path": "/recipes/new",
+      "filePath": "mobile/overlays/dropdowns/recipe-new--cuisine-options.png"
+    },
+    {
+      "device": "mobile",
+      "category": "menus",
+      "key": "global",
+      "label": "mobile-navigation-menu",
+      "path": "/",
+      "filePath": "mobile/overlays/menus/global--mobile-navigation-menu.png"
+    },
+    {
+      "device": "mobile",
+      "category": "menus",
+      "key": "global",
+      "label": "profile-menu",
+      "path": "/",
+      "filePath": "mobile/overlays/menus/global--profile-menu.png"
+    }
+  ],
+  "unavailableRoutes": [
+    {
+      "device": "desktop",
+      "route": "/capture/bulk",
+      "status": 404,
+      "filePath": "desktop/unavailable/capture-bulk-not-found.png"
+    },
+    {
+      "device": "mobile",
+      "route": "/capture/bulk",
+      "status": 404,
+      "filePath": "mobile/unavailable/capture-bulk-not-found.png"
+    }
+  ],
+  "inventory": {
+    "pngFiles": 216,
+    "desktopPngs": 110,
+    "mobilePngs": 106,
+    "indexedPngs": 216
+  },
+  "notes": [
+    "All forms were left blank and no save, delete, profile-switch, or AI-generation action was submitted.",
+    "Native select popups are represented by their selected controls in page screenshots; custom menus and dialogs are captured in overlays."
+  ]
+}

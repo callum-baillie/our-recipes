@@ -1,3 +1,4 @@
+export const metadata = { title: 'Request a reset link' };
 import { ForgotPasswordForm } from '@/components/auth-forms';
 import { BordLockup } from '@/components/bord-brand';
 

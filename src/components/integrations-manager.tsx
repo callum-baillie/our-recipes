@@ -15,11 +15,26 @@ import { ButtonSpinner } from '@/components/skeleton';
 import styles from './integrations-manager.module.css';
 type Reading = { userId: string; userLabel?: string; weightKilograms: number; measuredAt: string };
 type Account = IntegrationState['accounts'][number];
-const date = (value: string | null) => (value ? new Date(value).toLocaleString() : 'Not yet');
+const date = (value: string | null) =>
+  value
+    ? new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZoneName: undefined,
+      }).format(new Date(value))
+    : 'Not yet';
 export function IntegrationsManager({ initial }: { initial: IntegrationState }) {
   const [state, setState] = useState(initial);
   const [modalOpen, setModalOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [activeAction, setActiveAction] = useState<{ action: string; id: string | null } | null>(
+    null,
+  );
+  const [resultAccount, setResultAccount] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState('');
+  const doing = (action: string, id: string | null = editingId) =>
+    busy && activeAction?.action === action && activeAction.id === id;
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'connect' | 'settings'>('connect');
@@ -43,10 +58,22 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
         .then(async (response) => {
           if (response.ok) {
             const next = (await response.json()) as IntegrationState;
-            if (!controller.signal.aborted) setState(next);
+            if (!controller.signal.aborted) {
+              setState(next);
+              setRefreshError('');
+            }
+          } else {
+            throw new Error(
+              'Connection information could not be refreshed. Last known information is shown.',
+            );
           }
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (!controller.signal.aborted)
+            setRefreshError(
+              'Connection information could not be refreshed. Last known information is shown.',
+            );
+        });
     }, 60_000);
     return () => {
       controller.abort();
@@ -55,6 +82,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
   }, []);
 
   async function request(body: Record<string, unknown>) {
+    setActiveAction({
+      action: String(body.action),
+      id: typeof body.id === 'string' ? body.id : null,
+    });
+    setResultAccount(typeof body.id === 'string' ? body.id : editingId);
     const response = await fetch('/api/v1/integrations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -65,13 +97,23 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
     return data;
   }
   async function reload() {
-    const response = await fetch('/api/v1/integrations', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Unable to refresh connections. Reload this page.');
-    const result = (await response.json()) as IntegrationState;
-    setState(result);
-    return result;
+    try {
+      const response = await fetch('/api/v1/integrations', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to refresh connections.');
+      const result = (await response.json()) as IntegrationState;
+      setState(result);
+      setRefreshError('');
+      return result;
+    } catch {
+      setRefreshError(
+        'Connection information could not be refreshed. The operation result below is unchanged.',
+      );
+      return state;
+    }
   }
   async function run(task: () => Promise<void>) {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
     setError('');
     setMessage('');
@@ -80,7 +122,9 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to update this integration.');
     } finally {
+      lock.current = false;
       setBusy(false);
+      setActiveAction(null);
     }
   }
   function settings(account: Account) {
@@ -125,27 +169,30 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
   const occupied = new Set([...state.accounts.flatMap((a) => a.mappings.map((m) => m.profileId))]);
   return (
     <div className="settings-stack">
+      {refreshError && (
+        <p role="alert">
+          {refreshError}{' '}
+          <button
+            type="button"
+            className="text-button"
+            disabled={busy}
+            onClick={() => void reload()}
+          >
+            Refresh connections
+          </button>
+        </p>
+      )}
       <SettingsPane
-        title="Connected apps"
+        title="Connections"
         description="Manage accounts, profile assignments, and sync schedules."
       >
         <SettingsRow
           title="VeSync"
           description="Connect an Etekcity ESF24 account to import weigh-ins and supported body metrics into Nutrition."
         >
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={connect}
-            disabled={busy}
-            aria-busy={busy}
-          >
-            {busy ? <ButtonSpinner /> : <Plus size={17} />}
-            {busy
-              ? 'Please wait…'
-              : state.accounts.length
-                ? 'Add another account'
-                : 'Connect VeSync'}
+          <button className="secondary-button" type="button" onClick={connect} disabled={busy}>
+            <Plus size={17} />
+            {state.accounts.length ? 'Add another account' : 'Connect VeSync'}
           </button>
         </SettingsRow>
         <SettingsSubsection
@@ -161,18 +208,18 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               <SettingsItem
                 key={account.id}
                 title={account.label}
-                description={`VeSync · ${account.lastError ? 'Needs attention' : account.syncing ? 'Syncing' : account.syncIntervalMinutes ? 'Automatic sync' : 'Manual sync'}`}
+                description={`VeSync · ${account.syncIntervalMinutes ? 'Automatic schedule' : 'Manual schedule'}`}
                 actions={
                   <>
                     <button
                       className="text-button"
                       type="button"
                       disabled={busy || !account.mappings.length || account.syncing}
-                      aria-busy={busy}
+                      aria-busy={doing('sync', account.id)}
                       onClick={() => void sync(account)}
                     >
-                      {busy ? <ButtonSpinner /> : <RefreshCw size={16} />}
-                      {busy ? 'Syncing…' : 'Sync now'}
+                      {doing('sync', account.id) ? <ButtonSpinner /> : <RefreshCw size={16} />}
+                      {doing('sync', account.id) ? 'Syncing…' : 'Sync now'}
                     </button>
                     <button
                       className="text-button"
@@ -186,6 +233,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   </>
                 }
               >
+                {account.syncing && <p role="status">Syncing measurements…</p>}
                 <p>
                   {account.mappings.length
                     ? account.mappings.map((mapping) => mapping.profileName).join(' · ')
@@ -196,10 +244,23 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     ?.label ?? 'Manual only'}{' '}
                   · Last successful sync: {date(account.lastSuccessAt)}
                 </p>
+                {account.lastAttemptAt && account.lastAttemptAt !== account.lastSuccessAt && (
+                  <p>Last attempt: {date(account.lastAttemptAt)}</p>
+                )}
+                <details>
+                  <summary>Connection timestamps</summary>
+                  <p>Last success: {account.lastSuccessAt ?? 'None recorded'}</p>
+                  <p>Last attempt: {account.lastAttemptAt ?? 'None recorded'}</p>
+                </details>
                 {account.nextSyncAt && <p>Next check: {date(account.nextSyncAt)}</p>}
+                <small>Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}.</small>
+                {!modalOpen && resultAccount === account.id && message && (
+                  <p role="status">{message}</p>
+                )}
+                {!modalOpen && resultAccount === account.id && error && <p role="alert">{error}</p>}
                 {account.lastError && (
                   <p role="alert" className={styles.error}>
-                    {account.lastError}
+                    Needs attention: {account.lastError}
                   </p>
                 )}
               </SettingsItem>
@@ -221,7 +282,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     type="button"
                     disabled={busy}
                     className="text-button"
-                    aria-busy={busy}
+                    aria-busy={doing('unassign', mapping.id)}
                     onClick={() =>
                       void run(async () => {
                         await request({ action: 'unassign', id: mapping.id });
@@ -230,29 +291,37 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                       })
                     }
                   >
-                    {busy ? <ButtonSpinner /> : null}
-                    {busy ? 'Removing…' : 'Remove assignment'}
+                    {doing('unassign', mapping.id) ? <ButtonSpinner /> : null}
+                    {doing('unassign', mapping.id) ? 'Removing…' : 'Remove assignment'}
                   </button>
                 }
               />
             ))}
           </SettingsSubsection>
         )}
-        <SettingsSubsection
-          title="How syncing works"
-          description="Automatic sync runs while the Bòrd server is running. Your scale must first upload measurements through the VeSync app. If its session expires, reconnect the account; saved measurements are retained."
-        />
+        <details className="settings-disclosure">
+          <summary>How syncing works</summary>
+          <p>
+            Automatic checks require the Bòrd server to be running. Your scale first uploads through
+            VeSync. A check may find no new readings. Reconnecting or removing assignments preserves
+            saved measurements.
+          </p>
+        </details>
       </SettingsPane>
-      {message && !modalOpen && (
-        <p role="status" className="settings-inline-status">
-          {message}
-        </p>
-      )}
-      {error && !modalOpen && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
+      {message &&
+        !modalOpen &&
+        (!resultAccount || !state.accounts.some((account) => account.id === resultAccount)) && (
+          <p role="status" className="settings-inline-status">
+            {message}
+          </p>
+        )}
+      {error &&
+        !modalOpen &&
+        (!resultAccount || !state.accounts.some((account) => account.id === resultAccount)) && (
+          <p role="alert" className="form-error">
+            {error}
+          </p>
+        )}
       <dialog
         ref={dialog}
         className={`settings-dialog ${styles.dialog}`}
@@ -370,9 +439,9 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               </select>
             </SettingsField>
             <SettingsActionBar>
-              <button className={styles.primary} disabled={busy} aria-busy={busy}>
-                {busy ? <ButtonSpinner /> : null}
-                {busy ? 'Connecting…' : 'Sign in to VeSync'}
+              <button className={styles.primary} disabled={busy} aria-busy={doing('connect', null)}>
+                {doing('connect', null) ? <ButtonSpinner /> : null}
+                {doing('connect') ? 'Connecting…' : 'Sign in to VeSync'}
               </button>
             </SettingsActionBar>
           </form>
@@ -430,9 +499,9 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 </select>
               </SettingsField>
               <SettingsActionBar>
-                <button className={styles.primary} disabled={busy} aria-busy={busy}>
-                  {busy ? <ButtonSpinner /> : null}
-                  {busy ? 'Please wait…' : 'Save settings'}
+                <button className={styles.primary} disabled={busy} aria-busy={doing('settings')}>
+                  {doing('settings') ? <ButtonSpinner /> : null}
+                  {doing('settings') ? 'Saving settings…' : 'Save settings'}
                 </button>
               </SettingsActionBar>
             </form>
@@ -495,7 +564,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 <button
                   className={styles.secondary}
                   disabled={busy || !device}
-                  aria-busy={busy}
+                  aria-busy={doing('preview')}
                   onClick={() =>
                     void run(async () => {
                       const result = await request({
@@ -512,8 +581,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     })
                   }
                 >
-                  {busy ? <ButtonSpinner /> : null}
-                  {busy ? 'Please wait…' : 'Find VeSync profiles'}
+                  {doing('preview') ? <ButtonSpinner /> : null}
+                  {doing('preview') ? 'Finding profiles…' : 'Find VeSync profiles'}
                 </button>
                 {readings.length ? (
                   <>
@@ -566,7 +635,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                     <button
                       className={styles.secondary}
                       disabled={busy || !profileId || !scaleUser}
-                      aria-busy={busy}
+                      aria-busy={doing('assign')}
                       onClick={() =>
                         void run(async () => {
                           await request({
@@ -583,8 +652,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                         })
                       }
                     >
-                      {busy ? <ButtonSpinner /> : null}
-                      {busy ? 'Assigning…' : 'Assign profile'}
+                      {doing('assign') ? <ButtonSpinner /> : null}
+                      {doing('assign') ? 'Assigning…' : 'Assign profile'}
                     </button>
                   </>
                 ) : null}
@@ -597,11 +666,11 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
               <button
                 className={styles.secondary}
                 disabled={busy || !editing.mappings.length}
-                aria-busy={busy}
+                aria-busy={doing('sync')}
                 onClick={() => void sync(editing)}
               >
-                {busy ? <ButtonSpinner /> : <RefreshCw size={16} />}
-                {busy ? 'Syncing…' : 'Sync now'}
+                {doing('sync') ? <ButtonSpinner /> : <RefreshCw size={16} />}
+                {doing('sync') ? 'Syncing…' : 'Sync now'}
               </button>
             </SettingsRow>
             <SettingsRow
@@ -613,7 +682,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                   <button
                     className={styles.danger}
                     disabled={busy}
-                    aria-busy={busy}
+                    aria-busy={doing('remove')}
                     onClick={() =>
                       void run(async () => {
                         await request({ action: 'remove', id: editing.id });
@@ -623,8 +692,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                       })
                     }
                   >
-                    {busy ? <ButtonSpinner /> : null}
-                    {busy ? 'Removing…' : `Remove ${editing.label}`}
+                    {doing('remove') ? <ButtonSpinner /> : null}
+                    {doing('remove') ? 'Removing…' : `Remove ${editing.label}`}
                   </button>
                   <button
                     className={styles.secondary}

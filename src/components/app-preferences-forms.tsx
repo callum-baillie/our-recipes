@@ -2,6 +2,7 @@
 
 import { Save } from 'lucide-react';
 import { useState } from 'react';
+import { useSettingsSave } from './use-settings-save';
 
 import { LoadingIndicator } from '@/components/skeleton';
 import {
@@ -9,9 +10,7 @@ import {
   SettingsPane,
   SettingsRow,
   SettingsField,
-  SettingsSubsection,
 } from '@/components/settings-primitives';
-import { useToast } from '@/components/toast-provider';
 import type {
   MealPlanPreferences,
   PantryPreferences,
@@ -26,9 +25,16 @@ async function savePreferences(category: 'recipes' | 'mealPlan' | 'pantry', valu
     body: JSON.stringify({ category, values }),
   });
   const body = (await response.json().catch(() => null)) as {
+    preferences?: {
+      recipes: RecipePreferences;
+      mealPlan: MealPlanPreferences;
+      pantry: PantryPreferences;
+    };
     error?: { message?: string };
   } | null;
-  if (!response.ok) throw new Error(body?.error?.message ?? 'These settings could not be saved.');
+  if (!response.ok || !body?.preferences)
+    throw new Error(body?.error?.message ?? 'These settings could not be saved.');
+  return body.preferences;
 }
 
 function SaveButton({
@@ -49,107 +55,90 @@ function SaveButton({
 }
 
 export function RecipePreferencesForm({ initial }: { initial: RecipePreferences }) {
-  const { showToast } = useToast();
-  const [values, setValues] = useState(initial);
-  const [pending, setPending] = useState(false);
+  const { values, setValues, pending, dirty, status, save } = useSettingsSave(initial);
+  const [servings, setServings] = useState(String(initial.defaultServings));
   return (
     <form
       className="settings-form"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        setPending(true);
-        try {
-          await savePreferences('recipes', values);
-          showToast('Recipe defaults saved.', 'success');
-        } catch (error) {
-          showToast(
-            error instanceof Error ? error.message : 'Recipe settings could not be saved.',
-            'error',
-          );
-        } finally {
-          setPending(false);
-        }
+        void save(
+          async (snapshot) =>
+            (await savePreferences('recipes', { ...snapshot, defaultServings: Number(servings) }))
+              .recipes,
+          'Recipe settings saved.',
+        );
       }}
     >
-      <SettingsPane
-        eyebrow="LIBRARY DEFAULTS"
-        title="Library defaults"
-        description="Used whenever a page URL does not already specify another choice."
-      >
-        <SettingsField
-          title="Default recipe view"
-          description="Choose how the shared library is ordered when someone first opens it."
+      <fieldset disabled={pending} className="settings-form-fields">
+        <SettingsPane
+          title="Recipe defaults"
+          description="Starting choices for the library and newly created recipes."
         >
-          <select
-            value={values.defaultSort}
-            onChange={(event) =>
-              setValues({
-                ...values,
-                defaultSort: event.target.value as RecipePreferences['defaultSort'],
-              })
-            }
+          <SettingsField
+            title="Default recipe order"
+            description="Choose how the shared library is ordered when someone first opens it."
           >
-            <option value="recently-updated">Recently updated</option>
-            <option value="recently-added">Recently added</option>
-            <option value="alphabetical">Alphabetical</option>
-            <option value="most-recently-cooked">Recently cooked</option>
-            <option value="shortest-time">Shortest time</option>
-            <option value="highest-rated">Highest rated</option>
-          </select>
-        </SettingsField>
-        <SettingsField
-          title="New recipe servings"
-          description="Pre-fill this serving count when a household member creates a recipe."
-        >
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={values.defaultServings}
-            onChange={(event) =>
-              setValues({ ...values, defaultServings: Number(event.target.value) })
-            }
-          />
-        </SettingsField>
-        <SettingsActionBar>
-          <SaveButton pending={pending} label="Save recipe settings" />
-        </SettingsActionBar>
-      </SettingsPane>
+            <select
+              value={values.defaultSort}
+              onChange={(event) =>
+                setValues({
+                  ...values,
+                  defaultSort: event.target.value as RecipePreferences['defaultSort'],
+                })
+              }
+            >
+              <option value="recently-updated">Recently updated</option>
+              <option value="recently-added">Recently added</option>
+              <option value="alphabetical">Alphabetical</option>
+              <option value="most-recently-cooked">Recently cooked</option>
+              <option value="shortest-time">Shortest time</option>
+              <option value="highest-rated">Highest rated</option>
+            </select>
+          </SettingsField>
+          <SettingsField
+            title="New recipe servings"
+            description="Pre-fill this serving count when a household member creates a recipe."
+          >
+            <input
+              type="number"
+              min={1}
+              max={100}
+              required
+              step={1}
+              value={servings}
+              onChange={(event) => {
+                setServings(event.target.value);
+                setValues({ ...values, defaultServings: Number(event.target.value) });
+              }}
+            />
+          </SettingsField>
+          <SettingsActionBar status={status}>
+            <SaveButton pending={pending} disabled={!dirty} label="Save recipe settings" />
+          </SettingsActionBar>
+        </SettingsPane>
+      </fieldset>
     </form>
   );
 }
 
 export function MealPlanPreferencesForm({ initial }: { initial: MealPlanPreferences }) {
-  const { showToast } = useToast();
-  const [values, setValues] = useState(initial);
-  const [pending, setPending] = useState(false);
+  const { values, setValues, pending, dirty, status, save } = useSettingsSave(initial);
   return (
     <form
       className="settings-form"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        setPending(true);
-        try {
-          await savePreferences('mealPlan', values);
-          showToast('Meal plan defaults saved.', 'success');
-        } catch (error) {
-          showToast(
-            error instanceof Error ? error.message : 'Meal plan settings could not be saved.',
-            'error',
-          );
-        } finally {
-          setPending(false);
-        }
+        void save(
+          async (snapshot) => (await savePreferences('mealPlan', snapshot)).mealPlan,
+          'Meal plan settings saved.',
+        );
       }}
     >
-      <SettingsPane
-        eyebrow="PLANNER DEFAULTS"
-        title="Planning defaults"
-        description="These set the starting point; each individual week can still be changed."
-      >
-        <SettingsSubsection
-          title="Planning calendar"
-          description="Choose the first day of each week and the range shown in a fresh plan."
+      <fieldset disabled={pending} className="settings-form-fields">
+        <SettingsPane
+          title="Meal-plan defaults"
+          description="Initial setup choices. Existing meals, generation selections and calendar view stay independent."
         >
           <SettingsField
             description="The first day shown in each planner week."
@@ -166,8 +155,8 @@ export function MealPlanPreferencesForm({ initial }: { initial: MealPlanPreferen
             </select>
           </SettingsField>
           <SettingsField
-            description="How many days a new plan initially displays."
-            title="Default planning window"
+            description="The initial range for new planning; this does not choose a calendar zoom."
+            title="Default planning range"
           >
             <select
               value={values.defaultDuration}
@@ -184,82 +173,74 @@ export function MealPlanPreferencesForm({ initial }: { initial: MealPlanPreferen
               <option value={14}>14 days</option>
             </select>
           </SettingsField>
-        </SettingsSubsection>
-        <SettingsRow
-          title="Meals shown"
-          description="Select the meal slots available when building a plan."
-          align="start"
-        >
-          <fieldset className="settings-choice-group">
-            <legend className="sr-only">Meals shown when planning</legend>
-            <div className="settings-toggle-grid">
-              {MEAL_OPTIONS.map((option) => (
-                <label key={option.value}>
-                  <input
-                    type="checkbox"
-                    checked={values.visibleMealTypes.includes(option.value)}
-                    onChange={(event) =>
-                      setValues({
-                        ...values,
-                        visibleMealTypes: event.target.checked
-                          ? [...values.visibleMealTypes, option.value]
-                          : values.visibleMealTypes.filter((meal) => meal !== option.value),
-                      })
-                    }
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </SettingsRow>
-        <SettingsActionBar>
-          <SaveButton
-            pending={pending}
-            disabled={values.visibleMealTypes.length === 0}
-            label="Save meal plan settings"
-          />
-        </SettingsActionBar>
-      </SettingsPane>
+          <SettingsRow
+            title="Meals shown in the planner"
+            description="Choose at least one row. In-use meal types remain accessible; generation choices are separate."
+            align="start"
+          >
+            <fieldset className="settings-choice-group">
+              <legend className="sr-only">Meals shown when planning</legend>
+              <div className="settings-toggle-grid">
+                {[
+                  ...MEAL_OPTIONS,
+                  ...values.customMealTypes.map((item) => ({
+                    value: item.value,
+                    label: item.label,
+                  })),
+                ].map((option) => (
+                  <label key={option.value}>
+                    <input
+                      type="checkbox"
+                      checked={values.visibleMealTypes.includes(option.value)}
+                      onChange={(event) =>
+                        setValues({
+                          ...values,
+                          visibleMealTypes: event.target.checked
+                            ? [...values.visibleMealTypes, option.value]
+                            : values.visibleMealTypes.filter((meal) => meal !== option.value),
+                        })
+                      }
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </SettingsRow>
+          <SettingsActionBar status={status}>
+            <SaveButton
+              pending={pending}
+              disabled={!dirty || values.visibleMealTypes.length === 0}
+              label="Save meal plan settings"
+            />
+          </SettingsActionBar>
+        </SettingsPane>
+      </fieldset>
     </form>
   );
 }
 
 export function PantryPreferencesForm({ initial }: { initial: PantryPreferences }) {
-  const { showToast } = useToast();
-  const [values, setValues] = useState(initial);
-  const [pending, setPending] = useState(false);
+  const { values, setValues, pending, dirty, status, save } = useSettingsSave(initial);
   return (
     <form
       className="settings-form"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        setPending(true);
-        try {
-          await savePreferences('pantry', values);
-          showToast('Pantry defaults saved.', 'success');
-        } catch (error) {
-          showToast(
-            error instanceof Error ? error.message : 'Pantry settings could not be saved.',
-            'error',
-          );
-        } finally {
-          setPending(false);
-        }
+        void save(
+          async (snapshot) => (await savePreferences('pantry', snapshot)).pantry,
+          'Pantry settings saved.',
+        );
       }}
     >
-      <SettingsPane
-        eyebrow="PANTRY DEFAULTS"
-        title="Stock display"
-        description="Choose the initial filter, order, and grouping used on each new Pantry visit."
-      >
-        <SettingsSubsection
-          title="Initial pantry view"
-          description="These choices control the first view only; filters can still be changed while browsing."
+      <fieldset disabled={pending} className="settings-form-fields">
+        <SettingsPane
+          title="Pantry display"
+          description="Choose the initial filter, order, and grouping used on each new Pantry visit."
         >
           <SettingsField
             description="The stock filter used when first opening Pantry."
-            title="Default view"
+            title="Filter"
           >
             <select
               value={values.defaultView}
@@ -281,7 +262,7 @@ export function PantryPreferencesForm({ initial }: { initial: PantryPreferences 
               <option value="recent">Recent</option>
             </select>
           </SettingsField>
-          <SettingsField description="How pantry stock is sorted initially." title="Default order">
+          <SettingsField description="How pantry stock is sorted initially." title="Sort order">
             <select
               value={values.defaultSort}
               onChange={(event) =>
@@ -300,8 +281,8 @@ export function PantryPreferencesForm({ initial }: { initial: PantryPreferences 
             </select>
           </SettingsField>
           <SettingsField
-            description="Group stock by shelf, category, or expiry."
-            title="Default grouping"
+            description="Organise by location, category, expiry, or leave stock ungrouped."
+            title="Group by"
           >
             <select
               value={values.defaultGroup}
@@ -318,11 +299,11 @@ export function PantryPreferencesForm({ initial }: { initial: PantryPreferences 
               <option value="none">No grouping</option>
             </select>
           </SettingsField>
-        </SettingsSubsection>
-        <SettingsActionBar>
-          <SaveButton pending={pending} label="Save pantry settings" />
-        </SettingsActionBar>
-      </SettingsPane>
+          <SettingsActionBar status={status}>
+            <SaveButton pending={pending} disabled={!dirty} label="Save pantry settings" />
+          </SettingsActionBar>
+        </SettingsPane>
+      </fieldset>
     </form>
   );
 }

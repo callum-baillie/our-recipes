@@ -86,6 +86,8 @@
 }
 .workspaceTools {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 0.85rem;
   margin-top: 1.25rem;
   padding-top: 1rem;
@@ -93,6 +95,7 @@
 }
 .toolbarRow {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem 1.25rem;
@@ -116,21 +119,24 @@
 .filters {
   min-width: 0;
 }
-/* Navigation owns its active state; the header owns its spacing and wrapping. */
+/* Navigation owns scrolling and active state; the header owns its placement. */
 .header :global(.recipebook-nav),
 .header :global(.kitchen-quick-views) {
   margin: 0;
 }
 .header :global(.recipebook-nav) {
-  flex-wrap: wrap;
-  width: auto;
-  overflow: visible;
+  flex-wrap: nowrap;
+  width: 100%;
+  overflow-x: auto;
+  mask-image: linear-gradient(to right, #000 calc(100% - 0.75rem), transparent);
+  padding-right: 0.75rem;
   border: 0;
-  padding: 0;
+  padding-block: 0;
   background: transparent;
 }
 .header :global(.recipebook-nav) a {
-  min-height: 2.5rem;
+  flex: 0 0 auto;
+  min-height: 2.75rem;
   padding-inline: 0.65rem;
   font-weight: 650;
 }

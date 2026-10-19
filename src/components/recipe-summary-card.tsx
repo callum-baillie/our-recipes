@@ -1,4 +1,5 @@
 import { ChefHat, Clock3 } from 'lucide-react';
+import { formatRecipeDuration } from '@/lib/domain/recipe-duration';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -49,7 +50,12 @@ export function RecipeSummaryCard({
   compact?: boolean;
   eager?: boolean;
 }) {
-  const totalMinutes = recipe.prepMinutes + recipe.cookMinutes + recipe.restMinutes;
+  const duration = formatRecipeDuration(
+    recipe.prepMinutes + recipe.cookMinutes + recipe.restMinutes,
+  );
+  const hasMetadata = Boolean(
+    duration || recipe.normalizedNutrition?.status === 'current' || recipe.pantryAvailability,
+  );
   const labels = recipe.tags.length ? recipe.tags : recipe.category ? [recipe.category] : [];
 
   return (
@@ -67,7 +73,7 @@ export function RecipeSummaryCard({
               width={recipe.image.width}
               height={recipe.image.height}
               loading={eager ? 'eager' : 'lazy'}
-              sizes={compact ? '(max-width: 850px) 100vw, 320px' : '(max-width: 700px) 100vw, 33vw'}
+              sizes={compact ? '88px' : '(max-width: 700px) 100vw, 33vw'}
               unoptimized
             />
           ) : (
@@ -83,35 +89,44 @@ export function RecipeSummaryCard({
           <strong>{recipe.title}</strong>
           <span className="recipe-card-description">
             {recipe.summary ||
-              `A saved ${recipe.category ? `${recipe.category.toLocaleLowerCase()} ` : ''}recipe ready for your table.`}
+              `A saved ${recipe.category ? `${recipe.category.toLocaleLowerCase()} ` : ''}recipe from your household cookbook.`}
           </span>
-          <span className="recipe-card-meta">
-            <Clock3 size={14} aria-hidden="true" /> {totalMinutes} min
-            {recipe.category ? ` · ${recipe.category}` : ''}
-          </span>
-          {recipe.normalizedNutrition?.status === 'current' ? (
-            <span
-              className="recipe-card-meta recipe-card-nutrition"
-              aria-label="Normalized nutrition per serving"
-            >
-              {recipe.normalizedNutrition.facts.length
-                ? recipe.normalizedNutrition.facts.map((fact) => (
-                    <span className="recipe-card-nutrition-fact" key={fact.code}>
-                      <NutritionVisualMarker nutrientCode={fact.code} label={fact.label} compact />
-                      {Number(fact.amount.toFixed(fact.digits))} {fact.unit}{' '}
-                      {fact.label.toLocaleLowerCase()}
-                    </span>
-                  ))
-                : 'Selected per-serving values unknown'}
-              {recipe.normalizedNutrition.completeness === null
-                ? ' · coverage unknown'
-                : ` · ${Math.round(recipe.normalizedNutrition.completeness * 100)}% coverage`}
-            </span>
-          ) : null}
-          {recipe.pantryAvailability ? (
-            <span className="recipe-card-meta">
-              <PantryAvailabilityPill state={recipe.pantryAvailability} />
-              {recipe.pantryInsight ? ` · ${recipe.pantryInsight}` : ''}
+          {hasMetadata ? (
+            <span className="recipe-card-metadata">
+              {duration ? (
+                <span className="recipe-card-meta">
+                  <Clock3 size={14} aria-hidden="true" /> {duration}
+                </span>
+              ) : null}
+              {recipe.normalizedNutrition?.status === 'current' ? (
+                <span
+                  className="recipe-card-meta recipe-card-nutrition"
+                  aria-label="Normalized nutrition per serving"
+                >
+                  {recipe.normalizedNutrition.facts.length
+                    ? recipe.normalizedNutrition.facts.map((fact) => (
+                        <span className="recipe-card-nutrition-fact" key={fact.code}>
+                          <NutritionVisualMarker
+                            nutrientCode={fact.code}
+                            label={fact.label}
+                            compact
+                          />
+                          {Number(fact.amount.toFixed(fact.digits))} {fact.unit}{' '}
+                          {fact.label.toLocaleLowerCase()}
+                        </span>
+                      ))
+                    : 'Selected per-serving values unknown'}
+                  {recipe.normalizedNutrition.completeness === null
+                    ? ' · data completeness unknown'
+                    : ` · ${Math.round(recipe.normalizedNutrition.completeness * 100)}% data complete`}
+                </span>
+              ) : null}
+              {recipe.pantryAvailability ? (
+                <span className="recipe-card-meta">
+                  <PantryAvailabilityPill state={recipe.pantryAvailability} />
+                  {recipe.pantryInsight ? ` · ${recipe.pantryInsight}` : ''}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </span>

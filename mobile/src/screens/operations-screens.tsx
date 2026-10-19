@@ -1,3 +1,7 @@
+import { useScreenAwake } from '@/hooks/use-screen-awake';
+import { ExportPanel } from '@/components/export-panel';
+import { diaryForDate } from '@/data/nutrition-diary';
+import { localDate } from '@/data/planner';
 import * as React from 'react';
 import {
   Alert,
@@ -35,13 +39,7 @@ import {
   NutritionGoalChart,
   type HouseholdNutritionComparison,
 } from '@/components/nutrition-chart';
-import {
-  MealCard,
-  NutritionSummary,
-  PantryRow,
-  ShoppingListCard,
-  ShoppingRow,
-} from '@/components/domain-ui';
+import { NutritionSummary, PantryRow, ShoppingListCard, ShoppingRow } from '@/components/domain-ui';
 import { useBord } from '@/state/bord-store';
 import { tokens } from '@/theme/tokens';
 import { useSync } from '@/sync/sync-context';
@@ -81,6 +79,12 @@ export function PantryScreen() {
             <View>
               <Eyebrow>HOUSEHOLD INVENTORY</Eyebrow>
               <EditorialText variant="display">Pantry</EditorialText>
+              <Button
+                label="Manage inventory & history"
+                tone="secondary"
+                onPress={() => router.push('/(app)/(pantry)/inventory')}
+              />
+              <ExportPanel path="/api/v1/pantry/export/pdf" filename="pantry-inventory" body={{}} />
               <Body muted>
                 Know what is on hand, what needs using, and where every batch lives.
               </Body>
@@ -452,6 +456,11 @@ export function PantryDetailScreen({ itemId }: { itemId: string }) {
         <Eyebrow>{item.location.toUpperCase()}</Eyebrow>
         <EditorialText variant="title">{item.name}</EditorialText>
         <Body muted>Track quantity, freshness, and where this batch is stored.</Body>
+        <Button
+          label="Inventory actions & history"
+          tone="secondary"
+          onPress={() => router.push(`/(app)/(pantry)/inventory?batchId=${itemId}`)}
+        />
       </View>
       <TopActions label={`${item.name} actions`}>
         <View style={{ flex: 1 }}>
@@ -839,166 +848,7 @@ export function PantryPolicyEditScreen({ productId }: { productId: string }) {
     </Screen>
   );
 }
-export function PlanScreen() {
-  const { state } = useBord();
-  const { request } = useAuth();
-  const { refresh } = useSync();
-  const days = React.useMemo(() => {
-    const monday = new Date();
-    const weekday = monday.getDay() || 7;
-    monday.setDate(monday.getDate() - weekday + 1);
-    return Array.from({ length: 5 }, (_, offset) => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + offset);
-      return {
-        short: date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
-        long: date.toLocaleDateString(undefined, { weekday: 'long' }),
-        date: date.getDate(),
-        iso: localIsoDate(date),
-        display: date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }),
-      };
-    });
-  }, []);
-  const [selectedDate, setSelectedDate] = React.useState(days[0].iso);
-  const [addOpen, setAddOpen] = React.useState(false);
-  const selected = days.find((entry) => entry.iso === selectedDate) ?? days[0];
-  const selectedMeals = state.mealPlan.filter((item) =>
-    item.date ? item.date === selectedDate : item.day === selected.date,
-  );
-  const addMeal = async (recipe: (typeof state.recipes)[number]) => {
-    try {
-      await request('/api/v1/meal-plan', {
-        method: 'POST',
-        headers: { 'Idempotency-Key': randomUUID() },
-        body: JSON.stringify({
-          plannedFor: selectedDate,
-          meal: 'Snack',
-          recipeId: recipe.id,
-          title: '',
-          servings: Math.max(1, recipe.servings),
-          note: 'Added from Bòrd mobile',
-        }),
-      });
-      await refresh();
-      setAddOpen(false);
-    } catch (error) {
-      Alert.alert('Meal not added', error instanceof Error ? error.message : 'Try again.');
-    }
-  };
-  return (
-    <View style={{ flex: 1, backgroundColor: tokens.color.paper }}>
-      <Screen>
-        <AppHeader title="Meal plan" />
-        <View>
-          <Eyebrow>MEAL PLANNER</Eyebrow>
-          <EditorialText variant="display">Meal plan</EditorialText>
-          <Body muted>A focused day view keeps the weekly plan easy to scan.</Body>
-        </View>
-        <TopActions label="Meal plan actions">
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Add meal"
-              tone="secondary"
-              icon="plus"
-              onPress={() => setAddOpen((current) => !current)}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Plan with assistant"
-              icon="sparkles"
-              onPress={() => router.push('/assistant')}
-            />
-          </View>
-        </TopActions>
-        {addOpen ? (
-          <Group title="CHOOSE A RECIPE">
-            <View style={{ padding: tokens.space.sm, gap: tokens.space.xs }}>
-              {state.recipes.slice(0, 12).map((recipe) => (
-                <Pressable
-                  key={recipe.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add ${recipe.title}`}
-                  onPress={() => void addMeal(recipe)}
-                  style={({ pressed }) => ({
-                    minHeight: tokens.layout.touch,
-                    paddingHorizontal: tokens.space.sm,
-                    borderRadius: tokens.radius.control,
-                    backgroundColor: pressed ? tokens.color.sage : tokens.color.surface,
-                    justifyContent: 'center',
-                  })}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[tokens.type.footnote, { color: tokens.color.ink, fontWeight: '700' }]}
-                  >
-                    {recipe.title}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Group>
-        ) : null}
-        <View style={{ flexDirection: 'row', gap: 7 }}>
-          {days.map(({ short, date, iso }) => (
-            <Pressable
-              key={iso}
-              accessibilityRole="button"
-              accessibilityLabel={`${short}, ${date}`}
-              accessibilityState={{ selected: selectedDate === iso }}
-              onPress={() => setSelectedDate(iso)}
-              style={{
-                flex: 1,
-                minHeight: 62,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: tokens.radius.control,
-                backgroundColor: selectedDate === iso ? tokens.color.sage : tokens.color.surface,
-                borderWidth: 1,
-                borderColor: selectedDate === iso ? tokens.color.olive : tokens.color.separator,
-              }}
-            >
-              <Text
-                style={[
-                  tokens.type.caption,
-                  { color: tokens.color.inkSecondary, fontWeight: '800' },
-                ]}
-              >
-                {short}
-              </Text>
-              <Text
-                style={[
-                  tokens.type.headline,
-                  { color: tokens.color.ink, fontVariant: ['tabular-nums'] },
-                ]}
-              >
-                {date}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View>
-          <EditorialText variant="section">
-            {selected.long}, {selected.display}
-          </EditorialText>
-          <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
-            {selectedMeals.length} {selectedMeals.length === 1 ? 'meal' : 'meals'} planned
-          </Text>
-        </View>
-        {selectedMeals.map((item) => (
-          <MealCard key={item.id} item={item} />
-        ))}
-        {!selectedMeals.length ? (
-          <EmptyState
-            icon="calendar"
-            title="Nothing planned"
-            detail="Add a meal or generate a plan for this day."
-          />
-        ) : null}
-      </Screen>
-    </View>
-  );
-}
+export { PlanScreen } from '@/screens/plan-screen';
 export function NutritionScreen() {
   const { state } = useBord();
   const [selectedDate, setSelectedDate] = React.useState(() => new Date());
@@ -1012,6 +862,14 @@ export function NutritionScreen() {
     if (!selectedMemberKey && members[0]) setSelectedMemberKey(members[0].key);
   }, [members, selectedMemberKey]);
   const selectedMember = members.find((member) => member.key === selectedMemberKey) ?? members[0];
+  const diary = React.useMemo(
+    () =>
+      diaryForDate(
+        selectedMember ? state.nutrition.profileDetails[selectedMember.key] : undefined,
+        localDate(selectedDate),
+      ),
+    [selectedMember, state.nutrition.profileDetails, selectedDate],
+  );
   const profileLabel = selectedMember?.label ?? nutritionProfileLabel(state.nutrition.profiles[0]);
   const selectedComparison =
     comparison && selectedMember ? { ...comparison, members: [selectedMember] } : comparison;
@@ -1047,6 +905,16 @@ export function NutritionScreen() {
       <View>
         <Eyebrow>{profileLabel.toUpperCase()}</Eyebrow>
         <EditorialText variant="title">Nutrition</EditorialText>
+        <Button
+          label="Diary, prepared meals & measurements"
+          tone="secondary"
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/(nutrition)/workspace',
+              params: { profileId: selectedMember?.key ?? '' },
+            })
+          }
+        />
         <Body muted>Confirmed intake and planned portions stay separate.</Body>
       </View>
       <Pressable
@@ -1142,6 +1010,7 @@ export function NutritionScreen() {
           <Button label="Next" tone="quiet" icon="chevron.right" onPress={() => moveDate(1)} />
         </View>
       </View>
+      <Eyebrow>HOUSEHOLD OVERVIEW · {comparison?.periodDays ?? 7} DAYS</Eyebrow>
       <NutritionGoalChart comparison={state.nutrition.household} memberKey={selectedMember?.key} />
       <NutritionSummary comparison={selectedComparison} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1149,26 +1018,58 @@ export function NutritionScreen() {
         <Button
           label="Record"
           icon="plus"
-          onPress={() => router.push('/(app)/(nutrition)/record')}
-        />
-      </View>
-      <Group title="CACHED FROM YOUR SERVER">
-        <DetailRow label="Nutrition profiles" value={String(state.nutrition.profiles.length)} />
-        <Divider />
-        <DetailRow
-          label="Profile datasets"
-          value={String(Object.keys(state.nutrition.profileDetails).length)}
-        />
-        <Divider />
-        <DetailRow
-          label="Cache status"
-          value={
-            state.lastSyncedAt
-              ? `Updated ${new Date(state.lastSyncedAt).toLocaleTimeString()}`
-              : 'Waiting for refresh'
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/(nutrition)/workspace',
+              params: { tab: 'log', profileId: selectedMember?.key ?? '' },
+            })
           }
         />
-      </Group>
+      </View>
+      <Surface style={{ gap: 12 }}>
+        <Eyebrow>CONFIRMED INTAKE · {localDate(selectedDate)}</Eyebrow>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 20 }}>
+          {(
+            [
+              ['energy_kcal', 'Calories', 'kcal'],
+              ['protein', 'Protein', 'g'],
+              ['carbohydrate', 'Carbs', 'g'],
+              ['total_fat', 'Fat', 'g'],
+            ] as const
+          ).map(([code, label, unit]) => (
+            <View key={code} style={{ gap: 4 }}>
+              <Body muted>{label}</Body>
+              <EditorialText>
+                {diary.totals[code] === undefined
+                  ? '—'
+                  : `${Math.round(diary.totals[code])} ${unit}`}
+              </EditorialText>
+            </View>
+          ))}
+        </View>
+      </Surface>
+      {diary.entries.map((entry) => (
+        <Surface key={entry.id} style={{ gap: 8 }}>
+          <Eyebrow>{entry.mealSlot.toUpperCase()}</Eyebrow>
+          <EditorialText>{entry.sourceNameSnapshot}</EditorialText>
+          <Body muted>
+            {entry.values.some((value) => value.estimated)
+              ? 'Includes estimated nutrition'
+              : 'Recorded intake'}
+          </Body>
+        </Surface>
+      ))}
+      {!diary.entries.length ? (
+        <EmptyState
+          icon="fork.knife"
+          title={diary.available ? 'No intake recorded' : 'Diary unavailable'}
+          detail={
+            diary.available
+              ? 'Choose another day or record what you ate. Missing nutrients are shown as a dash.'
+              : 'Refresh to load a diary you have access to. Household comparisons do not grant diary access.'
+          }
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -1208,7 +1109,7 @@ export function NutritionRecordScreen() {
   }, [profileId, profiles]);
   const save = async () => {
     const energy = Number(calories);
-    if (!profileId || !name.trim() || !Number.isFinite(energy) || energy < 0) {
+    if (!profileId || !name.trim() || !calories.trim() || !Number.isFinite(energy) || energy < 0) {
       Alert.alert('Check the entry', 'Choose a profile and enter a name and calories.');
       return;
     }
@@ -1403,6 +1304,11 @@ export function ListsScreen() {
   return (
     <Screen>
       <AppHeader title="Lists" />
+      <Button
+        label="Manage lists & archive"
+        tone="secondary"
+        onPress={() => router.push('/(app)/(lists)/manage')}
+      />
       <View style={{ gap: tokens.space.sm }}>
         <Eyebrow>FROM THE PLAN TO THE PANTRY</Eyebrow>
         <EditorialText variant="display">Shopping lists</EditorialText>
@@ -1474,6 +1380,7 @@ export function ListDetailScreen({ listId }: { listId: string }) {
   const { state } = useBord();
   const actions = useServerActions();
   const list = state.lists.find((entry) => entry.id === listId);
+  useScreenAwake(Boolean(list?.settings?.keepScreenAwake));
   const [query, setQuery] = React.useState('');
   const [filter, setFilter] = React.useState<'to_buy' | 'in_cart' | 'cant_find' | 'all'>('to_buy');
   if (!list) {
@@ -1525,7 +1432,18 @@ export function ListDetailScreen({ listId }: { listId: string }) {
         />
         <View>
           <Eyebrow>SHOPPING LIST</Eyebrow>
+          <ExportPanel
+            path={`/api/v1/shopping-lists/${encodeURIComponent(listId)}/export/pdf`}
+            filename="shopping-list"
+            body={{}}
+          />
+
           <EditorialText variant="title">{list.name}</EditorialText>
+          <Button
+            label="Add items & manage list"
+            tone="secondary"
+            onPress={() => router.push(`/(app)/(lists)/manage?listId=${list.id}`)}
+          />
           <Body muted>
             {toBuy} to find · {inCart} in cart · {cantFind} need attention
           </Body>
@@ -1824,13 +1742,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       </Text>
     </View>
   );
-}
-
-function localIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function nutritionProfileLabel(profile: unknown) {

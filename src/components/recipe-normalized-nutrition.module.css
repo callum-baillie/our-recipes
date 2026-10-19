@@ -1,7 +1,7 @@
 .panel {
   display: grid;
-  gap: 1rem;
-  margin: 1.5rem 0;
+  gap: 0;
+  margin: 1rem 0;
   padding: clamp(1rem, 3vw, 1.5rem);
   border: 1px solid var(--line);
   border-radius: 1.2rem;
@@ -30,7 +30,9 @@
 }
 
 .status {
-  padding: 0.4rem 0.65rem;
+  display: inline-block;
+  margin-top: 0.4rem;
+  padding: 0.2rem 0.5rem;
   border-radius: 999px;
   background: var(--paper);
   font-size: 0.76rem;
@@ -90,11 +92,6 @@
 }
 
 @media (max-width: 760px) {
-  .heading {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .status {
     align-self: start;
   }

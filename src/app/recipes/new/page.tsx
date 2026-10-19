@@ -18,12 +18,11 @@ export default function NewRecipePage() {
           intro={
             <PageHeader
               title="New recipe"
-              eyebrow="A RECIPE WORTH KEEPING"
-              description="Write the details you use at the stove. You can always revise this shared recipe later."
+              description="Start with ingredients and method. Add optional details when useful."
               leading={
                 <Link className="quiet-link editor-back-link" href="/recipes">
                   <ArrowLeft size={16} aria-hidden="true" />
-                  Back to recipe book
+                  Back to recipes
                 </Link>
               }
             />

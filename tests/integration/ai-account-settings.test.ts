@@ -457,3 +457,27 @@ describe('bulk import results and upgrade compatibility', () => {
     expect(listRecipes()).toHaveLength(0);
   });
 });
+
+describe('schedule editing scope', () => {
+  it('does not overwrite a newer personal processing choice from a stale schedule form', async () => {
+    const principal = setup();
+    const { getTaskSettings, saveTaskSettings } =
+      await import('@/lib/services/task-settings-service');
+    const stale = getTaskSettings(principal.linkedProfileId);
+    const personal = getPersonalAiSettings(principal.userId, principal.linkedProfileId);
+    savePersonalAiSettings(principal.userId, principal.linkedProfileId, {
+      version: personal.account.version,
+      preferences: {
+        ...personal.account.preferences,
+        processing: { executionMode: 'direct', batchMinItems: 7 },
+      },
+    });
+    const result = saveTaskSettings(principal, { ...stale.settings, hour: 13 }, stale.version);
+    expect(getEffectiveAiPolicy(principal.linkedProfileId)).toMatchObject({
+      executionMode: 'direct',
+      batchMinItems: 7,
+    });
+    expect(result.settings).toMatchObject({ hour: 13, executionMode: 'direct', batchMinItems: 7 });
+    expect(() => saveTaskSettings(principal, stale.settings, stale.version)).toThrow('changed');
+  });
+});

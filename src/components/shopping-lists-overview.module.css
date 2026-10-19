@@ -1,7 +1,6 @@
 .page {
   width: 100%;
   max-width: 104rem;
-  min-height: 72dvh;
   margin: 0 auto;
   padding: 3rem clamp(1rem, 3.4vw, 3.5rem) clamp(4rem, 7vw, 6.5rem);
 }
@@ -38,7 +37,7 @@
 .hero h1 {
   max-width: 10ch;
   margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display, Georgia), serif;
   font-size: clamp(3.6rem, 4.3vw, 4.25rem);
   font-weight: 600;
   letter-spacing: -0.045em;
@@ -63,17 +62,15 @@
 }
 
 .createPanel {
-  display: grid;
-  padding: 1.15rem;
+  padding: 0.8rem 1rem;
 }
 
 .createTabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 11.5rem));
+  display: flex;
+  flex-wrap: wrap;
   width: fit-content;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .createTabs span,
@@ -92,17 +89,16 @@
 }
 
 .createTabs span {
-  color: var(--leaf);
-  background: var(--leaf-pale);
+  color: var(--muted);
 }
 
 .createTabs a {
-  border-left: 1px solid var(--line);
+  text-decoration: underline;
 }
 
 .createForm {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 10.5rem;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   align-items: start;
   margin-top: 1rem;
@@ -181,7 +177,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr) 11rem 3.2rem;
+  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 15rem) 44px;
   gap: 0.75rem;
   align-items: center;
 }
@@ -212,6 +208,8 @@
 }
 
 .filters {
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: flex;
   gap: 0.45rem;
   align-items: center;
@@ -330,14 +328,13 @@
 }
 
 .listCard h3 {
-  overflow: hidden;
-  margin: 1rem 0 0.25rem;
-  font-family: Georgia, 'Times New Roman', serif;
+  overflow-wrap: anywhere;
+  margin: 0.7rem 0 0.4rem;
+  font-family: var(--font-display, Georgia), serif;
   font-size: 1.65rem;
   font-weight: 600;
   letter-spacing: -0.025em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .listCard p {
@@ -347,7 +344,7 @@
 
 .progressRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
   margin-top: 0.8rem;
@@ -379,7 +376,7 @@
 .cardBody dl {
   display: grid;
   gap: 0.6rem;
-  margin: 1.8rem 0 0;
+  margin: 0.8rem 0 0;
 }
 
 .cardBody dl > div {
@@ -410,7 +407,7 @@
 
 .cardActions {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.3rem;
   align-items: center;
 }
@@ -418,7 +415,7 @@
 .cardActions > button,
 .cardActions summary,
 .renameForm button {
-  min-height: 2.25rem;
+  min-height: 44px;
   padding: 0.4rem 0.6rem;
   color: var(--ink);
   font-size: 0.78rem;
@@ -427,7 +424,7 @@
 }
 
 .cardActions > button + button {
-  border-left: 1px solid var(--line);
+  text-decoration: underline;
 }
 
 .cardActions details {
@@ -463,7 +460,7 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  min-height: 2.25rem;
+  min-height: 44px;
   padding: 0.45rem 0.55rem;
   color: var(--ink);
   text-align: left;
@@ -621,8 +618,7 @@
   overflow: hidden;
   font-size: 0.78rem;
   font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .activityList small,
@@ -791,16 +787,16 @@
 
   .sortField {
     min-width: 0;
+    grid-row: 3;
+  }
+  .directionButton {
+    grid-row: 3;
   }
 
   .filters {
     margin: 0;
     padding-right: 0;
     padding-left: 0;
-  }
-
-  .listCard {
-    min-height: 19rem;
   }
 
   .cardBody {
@@ -904,4 +900,76 @@
 }
 .mainColumn {
   gap: var(--workspace-section-gap);
+}
+
+.createPanel > summary {
+  font-size: 1.1rem;
+}
+.createForm > button {
+  justify-self: start;
+  min-width: 10rem;
+}
+.createForm .nextShopOption {
+  grid-column: 1 / -1;
+}
+.nextShopOption small {
+  display: block;
+  margin-top: 0.2rem;
+  font-weight: 400;
+}
+.cardMenu {
+  grid-column: 2;
+  justify-self: end;
+}
+.listCard:has(details[open]) {
+  transform: none;
+  z-index: 25;
+}
+.cardActions details button:last-child {
+  color: var(--error-ink);
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  margin-top: 0.4rem;
+}
+.resultCount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.filters {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  min-width: 0;
+  padding-bottom: 0.3rem;
+}
+.filters button {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+.sortField {
+  min-width: 0;
+}
+.sortField select {
+  min-width: 0;
+}
+@media (max-width: 520px) {
+  .filters {
+    grid-column: 1 / -1;
+  }
+  .createForm > button {
+    width: 100%;
+  }
+}
+
+.tripHelp {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--muted);
+  padding: 0 0.55rem 0.5rem;
 }

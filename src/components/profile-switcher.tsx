@@ -173,7 +173,7 @@ export function ProfileSwitcher({
             <span>Your household profile</span>
           </div>
           <div className="profile-menu-group" aria-label="Switch household profile">
-            <p className="profile-menu-label">Switch profile</p>
+            <p className="profile-menu-label">Switch profile · account password required</p>
             {profiles.map((profile) => (
               <button
                 key={profile.id}
@@ -256,9 +256,8 @@ export function ProfileSwitcher({
               <KeyRound size={20} />
             </span>
             <div>
-              <p className="eyebrow">SWITCH PROFILE</p>
               <h2 id="profile-password-title">
-                {selectedProfile?.displayName ?? 'Profile'} password
+                Switch to {selectedProfile?.displayName ?? 'profile'}
               </h2>
               <p id="profile-password-description">
                 Enter the account password for this profile to switch on this device.

@@ -1,4 +1,7 @@
 'use client';
+import { AppDialog } from './app-dialog';
+import { DialogViewport } from './dialog-viewport';
+import type { ComponentPropsWithoutRef } from 'react';
 import { KitchenPrintDialog } from './kitchen-print-dialog';
 import { PageHeader } from '@/components/page-header';
 import { DecisionAssistance } from '@/components/decision-assistance';
@@ -10,7 +13,6 @@ import {
   Box,
   CalendarClock,
   ChevronDown,
-  Clock3,
   History,
   Leaf,
   MapPin,
@@ -190,6 +192,56 @@ const sortOptions = [
   ['added', 'Recently added'],
 ] as const;
 
+/** Keep entered management values after recoverable request failures. */
+function RetainedForm({
+  action,
+  children,
+  disabled = false,
+  ...props
+}: Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
+  action: (data: FormData) => unknown;
+  disabled?: boolean;
+}) {
+  return (
+    <form
+      {...props}
+      onInputCapture={(event) => {
+        event.currentTarget.dataset.dirty = 'true';
+      }}
+      onChangeCapture={(event) => {
+        event.currentTarget.dataset.dirty = 'true';
+      }}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const panel = form.closest('dialog');
+        const submitLabel = form
+          .querySelector<HTMLButtonElement>('button[type="submit"], button:not([type])')
+          ?.textContent?.replace(/\s+/g, ' ')
+          .trim();
+        const restoreFocus = form.contains(document.activeElement);
+        form.dataset.submitting = 'true';
+        try {
+          await action(new FormData(form));
+        } finally {
+          delete form.dataset.submitting;
+          requestAnimationFrame(() => {
+            if (!restoreFocus || form.isConnected || !panel?.isConnected) return;
+            const replacement = Array.from(
+              panel.querySelectorAll<HTMLButtonElement>('button'),
+            ).find((button) => button.textContent?.replace(/\s+/g, ' ').trim() === submitLabel);
+            replacement?.focus({ preventScroll: true });
+          });
+        }
+      }}
+    >
+      <fieldset role="presentation" className={styles.formFields} disabled={disabled}>
+        {children}
+      </fieldset>
+    </form>
+  );
+}
+
 function foodProviderLabel(provider: FoodRecord['provider']) {
   return provider === 'usda_fdc' ? 'USDA FoodData Central' : 'Open Food Facts';
 }
@@ -210,35 +262,35 @@ function summaryCards(dashboard: Dashboard) {
     {
       label: 'On hand',
       value: dashboard.summary.activeItems,
-      detail: 'items',
+      detail: 'batches',
       icon: Package,
       tone: 'olive',
     },
     {
       label: 'Expiring soon',
       value: dashboard.summary.expiringSoon,
-      detail: 'items',
+      detail: 'batches',
       icon: CalendarClock,
       tone: 'amber',
     },
     {
       label: 'Low stock',
       value: dashboard.summary.lowStockStaples,
-      detail: 'items',
+      detail: 'products',
       icon: ArrowDownUp,
       tone: 'coral',
     },
     {
       label: 'Opened',
       value: dashboard.summary.openedItems,
-      detail: 'items',
+      detail: 'batches',
       icon: Leaf,
       tone: 'green',
     },
     {
       label: 'Recent changes',
       value: dashboard.summary.recentlyChanged,
-      detail: 'in the last 7 days',
+      detail: 'batches · last 7 days',
       icon: History,
       tone: 'slate',
     },
@@ -246,10 +298,10 @@ function summaryCards(dashboard: Dashboard) {
 }
 
 function formatExpiryDate(batch: Batch): string {
-  if (!batch.expiry.date) return 'No date';
+  if (!batch.expiry.date) return 'No expiry recorded';
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
-    day: '2-digit',
+    ...(batch.expiryPrecision === 'month_only' ? {} : { day: '2-digit' as const }),
     year: 'numeric',
   }).format(new Date(`${batch.expiry.date}T00:00:00`));
 }
@@ -259,7 +311,7 @@ function batchStateLabel(batch: Batch, isLowStock: boolean): string {
   if (batch.expiry.state === 'expired') return 'Date passed';
   if (batch.expiry.state === 'soon') return 'Expiring soon';
   if (batch.status === 'opened') return 'Opened';
-  return 'Good';
+  return batch.status.charAt(0).toUpperCase() + batch.status.slice(1).replaceAll('_', ' ');
 }
 
 function LocationGlyph({ storageType }: { storageType: string }) {
@@ -284,7 +336,7 @@ function expiryLabel(batch: Batch): string {
       : batch.expiry.state === 'soon'
         ? 'approaching'
         : 'recorded';
-  return `${kind} · ${batch.expiry.date} · ${precision} · ${timing}`;
+  return `${kind} · ${batch.expiryPrecision === 'month_only' ? batch.expiry.date.slice(0, 7) : batch.expiry.date} · ${precision} · ${timing}`;
 }
 
 function nullableNumber(value: FormDataEntryValue | null): number | null {
@@ -755,11 +807,18 @@ export function PantryManager({
   const [status, setStatus] = useState('');
   const [expiry, setExpiry] = useState('');
   const [group, setGroup] = useState<'none' | 'location' | 'category' | 'expiry'>(
-    initialPreferences.defaultGroup === 'none' ? 'location' : initialPreferences.defaultGroup,
+    initialPreferences.defaultGroup,
   );
   const [includeInactive, setIncludeInactive] = useState(false);
   const [addProductId, setAddProductId] = useState('');
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [removedBatch, setRemovedBatch] = useState<{
+    id: string;
+    name: string;
+    version: number;
+  } | null>(null);
   const [catalogSaving, setCatalogSaving] = useState(false);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualProductName, setManualProductName] = useState('');
@@ -776,9 +835,10 @@ export function PantryManager({
   const [error, setError] = useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const addItemDialogRef = useRef<HTMLDialogElement>(null);
-  const filterDialogRef = useRef<HTMLDialogElement>(null);
   const manualEntryRef = useRef<HTMLDivElement>(null);
   const loadRequestRef = useRef(0);
+  const manualRequestRef = useRef(0);
+  const manualControllerRef = useRef<AbortController | null>(null);
 
   function openAddItemDialog() {
     setManualEntryOpen(false);
@@ -790,6 +850,11 @@ export function PantryManager({
     resetAddItemDialog();
   }
   function resetAddItemDialog() {
+    // Close the native surface before unmounting so it restores the invoking control.
+    if (addItemDialogRef.current?.open) addItemDialogRef.current.close();
+    manualControllerRef.current?.abort();
+    manualRequestRef.current++;
+    setManualSearchBusy(false);
     setCatalogSaving(false);
     setManualEntryOpen(false);
     setAddItemOpen(false);
@@ -809,6 +874,9 @@ export function PantryManager({
     setManualEntryOpen(true);
     window.requestAnimationFrame(() => {
       manualEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      manualEntryRef.current
+        ?.querySelector<HTMLElement>('select, input')
+        ?.focus({ preventScroll: true });
     });
   }
 
@@ -856,6 +924,31 @@ export function PantryManager({
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (
+      selectedBatchId &&
+      dashboard &&
+      !dashboard.batches.some((batch) => batch.id === selectedBatchId)
+    ) {
+      const frame = requestAnimationFrame(() => {
+        setSelectedBatchId(null);
+        (
+          document.querySelector<HTMLElement>(`button.${styles.rowMenu}`) ??
+          document.querySelector<HTMLInputElement>('input[aria-label="Search Pantry"]')
+        )?.focus();
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [dashboard, selectedBatchId]);
+
+  useEffect(
+    () => () => {
+      manualRequestRef.current++;
+      manualControllerRef.current?.abort();
+    },
+    [],
+  );
 
   const defaultLocationId =
     dashboard?.locations.find(
@@ -929,6 +1022,10 @@ export function PantryManager({
       setManualSearchError('Enter at least two characters to search food data.');
       return;
     }
+    manualControllerRef.current?.abort();
+    const controller = new AbortController();
+    manualControllerRef.current = controller;
+    const requestId = ++manualRequestRef.current;
     setManualSearchBusy(true);
     setManualSearchError('');
     setManualSearchNotice('');
@@ -936,31 +1033,40 @@ export function PantryManager({
     try {
       const response = await fetch('/api/v1/food-data/searches', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, context: 'pantry', kind: 'any', page: 1 }),
       });
+      if (requestId !== manualRequestRef.current) return;
       if (!response.ok) {
         setManualSearchError(await messageFor(response, 'Food search failed.'));
         return;
       }
       const body = (await response.json()) as { records?: FoodRecord[] };
+      if (requestId !== manualRequestRef.current) return;
       const records = body.records ?? [];
       setManualSearchResults(records);
       if (!records.length) setManualSearchNotice('No food-data matches were found.');
     } catch {
+      if (controller.signal.aborted || requestId !== manualRequestRef.current) return;
       setManualSearchError('Food search is temporarily unavailable.');
     } finally {
-      setManualSearchBusy(false);
+      if (requestId === manualRequestRef.current) setManualSearchBusy(false);
     }
   }
 
   async function selectManualFood(record: FoodRecord) {
+    manualControllerRef.current?.abort();
+    const controller = new AbortController();
+    manualControllerRef.current = controller;
+    const requestId = ++manualRequestRef.current;
     setManualSearchBusy(true);
     setManualSearchError('');
     setManualSearchNotice('');
     try {
       const response = await fetch('/api/v1/food-data/details', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: record.provider,
@@ -969,11 +1075,13 @@ export function PantryManager({
           language: navigator.language.slice(0, 2),
         }),
       });
+      if (requestId !== manualRequestRef.current) return;
       if (!response.ok) {
         setManualSearchError(await messageFor(response, 'Food details could not be loaded.'));
         return;
       }
       const body = (await response.json()) as { record: FoodRecord };
+      if (requestId !== manualRequestRef.current) return;
       const detail = body.record;
       const nextUnit = suggestedInventoryUnit(detail);
       setManualProductName(detail.displayName);
@@ -987,13 +1095,28 @@ export function PantryManager({
         `Filled from ${foodProviderLabel(detail.provider)}. Review before adding.`,
       );
     } catch {
+      if (controller.signal.aborted || requestId !== manualRequestRef.current) return;
       setManualSearchError('Food details are temporarily unavailable.');
     } finally {
-      setManualSearchBusy(false);
+      if (requestId === manualRequestRef.current) setManualSearchBusy(false);
     }
   }
 
-  async function mutate(url: string, body: unknown, success: string, method = 'POST') {
+  async function mutate(
+    url: string,
+    body: unknown,
+    success: string,
+    method = 'POST',
+    onSaved?: (body: { batch?: { id: string; version: number; status: string } }) => void,
+  ) {
+    const panel = document.querySelector<HTMLDialogElement>(`dialog.${styles.batchDialog}[open]`);
+    if (
+      panel?.querySelector('form[data-dirty="true"]:not([data-submitting="true"])') &&
+      !window.confirm(
+        'Other batch fields have unsaved edits. Discard those edits and continue with this stock change?',
+      )
+    )
+      return false;
     setBusy(true);
     setError(null);
     try {
@@ -1006,12 +1129,11 @@ export function PantryManager({
         showToast(await messageFor(response, 'That Pantry change could not be saved.'), 'error');
         return false;
       }
+      if (onSaved) {
+        const result = await response.json().catch(() => null);
+        if (result) onSaved(result);
+      }
       showToast(success, 'success');
-      document
-        .querySelectorAll<HTMLDetailsElement>(`details.${styles.rowMenu}[open]`)
-        .forEach((menu) => {
-          menu.open = false;
-        });
       await load();
       return true;
     } catch {
@@ -1183,6 +1305,12 @@ export function PantryManager({
   }
 
   async function duplicateBatch(batch: Batch) {
+    if (
+      !window.confirm(
+        `Add another unopened batch of ${batch.product.displayName}: ${batch.originalQuantity ?? batch.quantityRemaining ?? 'unknown quantity'} ${batch.unit}? This adds stock now. Dates and price will be blank.`,
+      )
+    )
+      return;
     await mutate(
       '/api/v1/pantry/batches',
       {
@@ -1211,7 +1339,7 @@ export function PantryManager({
         notes: batch.notes,
         excludeFromGrocery: batch.excludeFromGrocery,
       },
-      'Recent batch duplicated for unpacking.',
+      'New unopened batch added. Review its dates and quantity.',
     );
   }
 
@@ -1249,7 +1377,31 @@ export function PantryManager({
       `/api/v1/pantry/batches/${batch.id}/actions`,
       { ...body, expectedVersion: batch.version, note: '' },
       success,
+      'POST',
+      (result) => {
+        if (body.type === 'undo') setRemovedBatch(null);
+        else if (result.batch && ['depleted', 'discarded', 'donated'].includes(result.batch.status))
+          setRemovedBatch({
+            id: result.batch.id,
+            name: batch.product.displayName,
+            version: result.batch.version,
+          });
+      },
     );
+  }
+  async function undoRemovedBatch() {
+    if (!removedBatch) return;
+    const restored = await mutate(
+      `/api/v1/pantry/batches/${removedBatch.id}/actions`,
+      { type: 'undo', expectedVersion: removedBatch.version, note: '' },
+      'Last stock change undone.',
+    );
+    if (restored) {
+      setRemovedBatch(null);
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLInputElement>('input[aria-label="Search Pantry"]')?.focus(),
+      );
+    }
   }
 
   if (!dashboard && !initialLoadComplete) {
@@ -1282,19 +1434,23 @@ export function PantryManager({
 
   return (
     <div className={styles.page}>
+      <DialogViewport />
       <PageHeader
         title="Pantry"
         eyebrow="HOUSEHOLD INVENTORY"
-        description="Know what is on hand, what needs using, and where every batch lives."
+        description="Track stock, dates and storage."
         actions={
           <>
-            <KitchenPrintDialog kind="pantry" />
-            <Link className="text-button" href="/pantry/inventory">
-              Inventory mode
-            </Link>
-            <button className={styles.addPanel} type="button" onClick={openAddItemDialog}>
+            <button className="primary-button" type="button" onClick={openAddItemDialog}>
               <Plus size={20} aria-hidden="true" /> Add item
             </button>
+            <Link className="text-button" href="/pantry/inventory">
+              Count stock
+            </Link>
+            <KitchenPrintDialog kind="pantry" />
+            <a className="text-button" href="#pantry-management">
+              Manage pantry
+            </a>
           </>
         }
       />
@@ -1350,7 +1506,7 @@ export function PantryManager({
                     <strong>Enter details manually</strong>
                     <span>Use this when a product is not available from food data providers.</span>
                   </div>
-                  <form action={addItem} className={styles.form}>
+                  <RetainedForm disabled={busy} action={addItem} className={styles.form}>
                     <label>
                       <span>Existing product</span>
                       <select
@@ -1642,7 +1798,7 @@ export function PantryManager({
                     <button disabled={busy || !canEdit || !defaultLocationId} type="submit">
                       {busy ? 'Saving…' : 'Add item'}
                     </button>
-                  </form>
+                  </RetainedForm>
                 </div>
               ) : null}
             </div>
@@ -1650,6 +1806,23 @@ export function PantryManager({
         </dialog>
       ) : null}
 
+      {removedBatch && (
+        <div className={styles.batchUndoNotice} role="status">
+          <span>
+            {removedBatch.name} changed to inactive stock. You can undo its last stock change.
+          </span>
+          <button type="button" disabled={busy || !canEdit} onClick={() => void undoRemovedBatch()}>
+            <Undo2 size={16} /> Undo stock change
+          </button>
+          <button
+            type="button"
+            aria-label="Dismiss stock undo"
+            onClick={() => setRemovedBatch(null)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
       {!canEdit ? (
         <p className={styles.profilePrompt}>Choose a household profile to change Pantry stock.</p>
       ) : null}
@@ -1659,47 +1832,43 @@ export function PantryManager({
         </p>
       ) : null}
       <section className={styles.summary} aria-label="Pantry summary">
-        {summaryCards(dashboard).map(({ detail, icon: Icon, label, tone, value }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => {
-              clearPantryFilters();
-              if (label === 'Expiring soon') setExpiry('soon');
-              else if (label === 'Low stock') setView('low_stock');
-              else if (label === 'Opened') setView('opened');
-              else if (label === 'Recent changes') setView('recent');
-            }}
-            aria-label={`Show ${label.toLowerCase()}: ${value} items`}
-          >
-            <span className={`${styles.summaryIcon} ${styles[tone]}`} aria-hidden="true">
-              <Icon size={26} />
-            </span>
-            <span className={styles.summaryCopy}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-              <small>{detail}</small>
-            </span>
-          </button>
-        ))}
+        {summaryCards(dashboard)
+          .filter((card) => card.value > 0 || card.label === 'On hand')
+          .map(({ detail, icon: Icon, label, tone, value }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                clearPantryFilters();
+                if (label === 'Expiring soon') setExpiry('soon');
+                else if (label === 'Low stock') setView('low_stock');
+                else if (label === 'Opened') setView('opened');
+                else if (label === 'Recent changes') setView('recent');
+              }}
+              aria-label={`Show ${label.toLowerCase()}: ${value} ${detail}`}
+            >
+              <span className={`${styles.summaryIcon} ${styles[tone]}`} aria-hidden="true">
+                <Icon size={26} />
+              </span>
+              <span className={styles.summaryCopy}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+                <small>{detail}</small>
+              </span>
+            </button>
+          ))}
       </section>
 
-      <div className={styles.kitchenActions}>
-        <span>
-          <strong>What can I make?</strong> Start with the ingredients you already have.
-        </span>
-        <Link href="/recipes?pantry=ready">Find recipes to cook</Link>
-        <Link href="/lists">Open shopping lists</Link>
-      </div>
       <div className={styles.mobileToolbar}>
         <SearchFacetBar
           label="Search Pantry"
-          placeholder="Search products, brands or notes"
+          placeholder="Search pantry items"
           query={q}
           onQueryChange={setQ}
           onSearch={() => void load()}
-          onAdvanced={() => filterDialogRef.current?.showModal()}
+          onAdvanced={() => setFilterOpen(true)}
           advancedActive={hasActivePantryFilters}
+          advancedLabel="Pantry filters"
           facets={[
             ...views.slice(0, 6).map(([value, label]) => ({
               key: `view:${value}`,
@@ -1729,107 +1898,131 @@ export function PantryManager({
             }
           }}
         />
-        <dialog
+        <AppDialog
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
           aria-labelledby="pantry-filter-dialog-title"
           className={styles.filterDialog}
-          ref={filterDialogRef}
         >
           <header className={styles.filterDialogHeader}>
             <div>
-              <p className={styles.eyebrow}>PANTRY VIEW</p>
               <h2 id="pantry-filter-dialog-title">Filters</h2>
             </div>
             <button
               aria-label="Close filters"
               className={styles.filterDialogClose}
-              onClick={() => filterDialogRef.current?.close()}
+              onClick={() => setFilterOpen(false)}
               type="button"
             >
               <X size={20} aria-hidden="true" />
             </button>
           </header>
-          <div className={styles.advancedGrid}>
-            <label>
-              <span>Location</span>
-              <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-                <option value="">Every location</option>
-                {dashboard.locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.path}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Category</span>
-              <select value={category} onChange={(event) => setCategory(event.target.value)}>
-                <option value="">Every category</option>
-                {categories.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Status</span>
-              <select value={status} onChange={(event) => setStatus(event.target.value)}>
-                <option value="">Every status</option>
-                {[
-                  'unopened',
-                  'opened',
-                  'frozen',
-                  'thawed',
-                  'reserved',
-                  'depleted',
-                  'discarded',
-                  'donated',
-                ].map((value) => (
-                  <option key={value} value={value}>
-                    {value.replaceAll('_', ' ')}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Expiry</span>
-              <select value={expiry} onChange={(event) => setExpiry(event.target.value)}>
-                <option value="">Every expiry state</option>
-                <option value="soon">Expiring soon</option>
-                <option value="expired">Recorded date passed</option>
-                <option value="unknown">Unknown expiry</option>
-              </select>
-            </label>
-            <label>
-              <span>Group items</span>
-              <select
-                value={group}
-                onChange={(event) => setGroup(event.target.value as typeof group)}
-              >
-                <option value="none">No grouping</option>
-                <option value="location">Group by location</option>
-                <option value="category">Group by category</option>
-                <option value="expiry">Group by expiry</option>
-              </select>
-            </label>
-            <label className={styles.checkbox}>
-              <input
-                checked={includeInactive}
-                onChange={(event) => setIncludeInactive(event.target.checked)}
-                type="checkbox"
-              />
-              Show inactive and archived
-            </label>
+          <div className={styles.filterBody}>
+            <p className={styles.muted}>
+              Filters update stock immediately. Clear filters keeps your group and sort choices;
+              Done closes this view.
+            </p>
+            <div className={styles.advancedGrid}>
+              <label>
+                <span>Location</span>
+                <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+                  <option value="">All locations</option>
+                  {dashboard.locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.path}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Category</span>
+                <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                  <option value="">All categories</option>
+                  {categories.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Item status</span>
+                <select
+                  aria-label="Item status"
+                  value={status}
+                  onChange={(event) => {
+                    setStatus(event.target.value);
+                    if (['depleted', 'discarded', 'donated'].includes(event.target.value))
+                      setIncludeInactive(true);
+                  }}
+                >
+                  <option value="">All item statuses</option>
+                  {[
+                    'unopened',
+                    'opened',
+                    'frozen',
+                    'thawed',
+                    'reserved',
+                    'depleted',
+                    'discarded',
+                    'donated',
+                  ].map((value) => (
+                    <option key={value} value={value}>
+                      {value.replaceAll('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Date status</span>
+                <select value={expiry} onChange={(event) => setExpiry(event.target.value)}>
+                  <option value="">All date statuses</option>
+                  <option value="soon">Expiring soon</option>
+                  <option value="expired">Recorded date passed</option>
+                  <option value="unknown">Unknown expiry</option>
+                </select>
+              </label>
+
+              <label className={styles.checkbox}>
+                <input
+                  checked={includeInactive}
+                  onChange={(event) => {
+                    setIncludeInactive(event.target.checked);
+                    if (!event.target.checked) {
+                      if (['depleted', 'discarded', 'donated'].includes(status)) setStatus('');
+                      if (['depleted', 'discarded', 'donated'].includes(view)) setView('all');
+                    }
+                  }}
+                  type="checkbox"
+                />
+                Show inactive and archived
+              </label>
+            </div>
+            <fieldset className={styles.arrangement}>
+              <legend>Arrange stock</legend>
+              <label>
+                <span>Group items</span>
+                <select
+                  aria-label="Group items"
+                  value={group}
+                  onChange={(event) => setGroup(event.target.value as typeof group)}
+                >
+                  <option value="none">No grouping</option>
+                  <option value="location">Group by location</option>
+                  <option value="category">Group by category</option>
+                  <option value="expiry">Group by expiry</option>
+                </select>
+              </label>
+              <label className={`${styles.sortControl} ${styles.filterDialogSort}`}>
+                <span>Sort:</span>
+                <select value={sort} onChange={(event) => setSort(event.target.value)}>
+                  {sortOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </fieldset>
           </div>
-          <label className={`${styles.sortControl} ${styles.filterDialogSort}`}>
-            <span>Sort:</span>
-            <select value={sort} onChange={(event) => setSort(event.target.value)}>
-              {sortOptions.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <ArrowDownUp size={17} aria-hidden="true" />
-          </label>
           <footer className={styles.filterDialogActions}>
             {hasActivePantryFilters ? (
               <button
@@ -1842,17 +2035,46 @@ export function PantryManager({
             ) : null}
             <button
               className={styles.filterDoneButton}
-              onClick={() => filterDialogRef.current?.close()}
+              onClick={() => setFilterOpen(false)}
               type="button"
             >
               Done
             </button>
           </footer>
-        </dialog>
+        </AppDialog>
+        {hasActivePantryFilters && (
+          <p className={styles.filterSummary}>
+            Showing:{' '}
+            {view !== 'all'
+              ? `view: ${views.find(([value]) => value === view)?.[1] ?? view}; `
+              : ''}
+            {q ? `search: ${q}; ` : ''}
+            {category ? `category: ${category}; ` : ''}
+            {status ? `status: ${status}; ` : ''}
+            {expiry ? `date: ${expiry}; ` : ''}
+            {locationId
+              ? `location: ${dashboard.locations.find((location) => location.id === locationId)?.path}; `
+              : ''}
+            {includeInactive ? 'includes inactive batches and archived products/locations' : ''}
+            <button className="text-button" type="button" onClick={clearPantryFilters}>
+              Clear filters
+            </button>
+          </p>
+        )}
         <ResultsToolbar
+          density="compact"
           summary={
             <>
-              <strong>{dashboard.batches.length}</strong> results
+              <strong>
+                {view === 'essentials' ? essentialProducts.length : dashboard.batches.length}
+              </strong>{' '}
+              {view === 'essentials'
+                ? essentialProducts.length === 1
+                  ? 'product'
+                  : 'products'
+                : dashboard.batches.length === 1
+                  ? 'batch'
+                  : 'batches'}
             </>
           }
           sort={sort}
@@ -1869,19 +2091,17 @@ export function PantryManager({
         />
       </div>
 
-      <div
-        className={`${styles.layout} ${dashboard.batches.length ? '' : styles.layoutEmpty}`.trim()}
-      >
+      <div className={styles.layout}>
         <section aria-labelledby="stock-title">
           <div className={styles.sectionHeading}>
             <div>
               <p className={styles.eyebrow}>
                 {view === 'essentials' ? 'SHOPPING POLICIES' : 'ON HAND'}
               </p>
-              <h2 id="stock-title">
+              <h2 id="stock-title" tabIndex={-1}>
                 {view === 'essentials'
-                  ? `${essentialProducts.length} essentials`
-                  : `${dashboard.batches.length} batches`}
+                  ? `${essentialProducts.length} ${essentialProducts.length === 1 ? 'essential' : 'essentials'}`
+                  : `${dashboard.batches.length} ${dashboard.batches.length === 1 ? 'batch' : 'batches'}`}
               </h2>
             </div>
           </div>
@@ -1937,7 +2157,9 @@ export function PantryManager({
                           </div>
                         </div>
                         <p className={styles.quantity}>
-                          {stock} {product.stockUnit}
+                          {uncertain
+                            ? `Known subtotal: ${stock} ${product.stockUnit || ''} · other stock needs review`
+                            : `${stock} ${product.stockUnit}`}
                         </p>
                         <span className={styles.statusChip}>
                           {needsSetup
@@ -1946,7 +2168,7 @@ export function PantryManager({
                               ? 'Review'
                               : due
                                 ? 'Due'
-                                : 'Healthy'}
+                                : 'At target'}
                         </span>
                       </div>
                       <p className={styles.muted}>
@@ -1957,14 +2179,18 @@ export function PantryManager({
                             : `Buy at least ${product.preferredPurchaseQuantity} ${product.stockUnit} on every Next shop; recipe demand is included, not duplicated.`}
                       </p>
                       <details>
-                        <summary>Quick edit</summary>
-                        <form
+                        <summary className="recipe-disclosure-summary">
+                          <span>Quick edit</span>
+                          <ChevronDown size={18} aria-hidden="true" />
+                        </summary>
+                        <RetainedForm
+                          disabled={busy}
                           action={(formData) => editProduct(product, formData)}
                           className={styles.form}
                         >
                           <ProductEditFields product={product} />
                           <button disabled={busy || !canEdit}>Save policy</button>
-                        </form>
+                        </RetainedForm>
                       </details>
                     </article>
                   );
@@ -1973,7 +2199,21 @@ export function PantryManager({
             ) : (
               <div className={styles.empty}>
                 <h2>No essentials yet</h2>
-                <p>Open Manage products and choose Always have or Always buy.</p>
+                <p>
+                  <a
+                    className="inline-link"
+                    href="#pantry-products"
+                    onClick={() => {
+                      const panel = document.getElementById(
+                        'pantry-products',
+                      ) as HTMLDetailsElement | null;
+                      if (panel) panel.open = true;
+                    }}
+                  >
+                    Manage products
+                  </a>{' '}
+                  to choose Always have or Always buy.
+                </p>
               </div>
             )
           ) : dashboard.batches.length ? (
@@ -1984,9 +2224,10 @@ export function PantryManager({
                     <span>
                       <LocationGlyph storageType={batches[0]?.location.storageType ?? 'pantry'} />
                       <strong>{groupLabel}</strong>
-                      <small>{batches.length} items</small>
+                      <small>
+                        {batches.length} {batches.length === 1 ? 'batch' : 'batches'}
+                      </small>
                     </span>
-                    <ChevronDown size={17} aria-hidden="true" />
                   </div>
                   <div className={styles.grid}>
                     {batches.map((batch) => (
@@ -2017,6 +2258,9 @@ export function PantryManager({
                             dateTime={batch.expiry.date ?? undefined}
                           >
                             {formatExpiryDate(batch)}
+                            {batch.expiry.date && (
+                              <small className={styles.dateContext}>{expiryLabel(batch)}</small>
+                            )}
                           </time>
                           <span
                             className={`${styles.statusChip} ${
@@ -2032,437 +2276,296 @@ export function PantryManager({
                               dashboard.lowStockProductIds.includes(batch.productId),
                             )}
                           </span>
-                          <details className={styles.rowMenu}>
-                            <summary aria-label={`Manage ${batch.product.displayName}`}>
-                              <MoreHorizontal size={20} aria-hidden="true" />
-                            </summary>
-                            <div className={styles.rowMenuPanel}>
-                              <div className={styles.tags}>
-                                <span>{batch.status.replaceAll('_', ' ')}</span>
-                                <span>{batch.expiryPrecision.replaceAll('_', ' ')} date</span>
-                                {batch.approximateState ? (
-                                  <span>Approximate stock</span>
-                                ) : (
-                                  <span>Exact stock</span>
-                                )}
-                                {useFirstIds.has(batch.id) ? (
-                                  <span>Use this batch first</span>
-                                ) : null}
-                                {dashboard.lowStockProductIds.includes(batch.productId) ? (
-                                  <span>Low stock</span>
-                                ) : null}
-                              </div>
-                              {batch.notes ? <p className={styles.notes}>{batch.notes}</p> : null}
-                              <dl className={styles.facts}>
-                                {batch.sublocation ? (
-                                  <>
-                                    <dt>Shelf</dt>
-                                    <dd>{batch.sublocation}</dd>
-                                  </>
-                                ) : null}
-                                {batch.openedDate ? (
-                                  <>
-                                    <dt>Opened</dt>
-                                    <dd>{batch.openedDate}</dd>
-                                  </>
-                                ) : null}
-                                {batch.frozenDate ? (
-                                  <>
-                                    <dt>Frozen</dt>
-                                    <dd>{batch.frozenDate}</dd>
-                                  </>
-                                ) : null}
-                                {batch.thawedDate ? (
-                                  <>
-                                    <dt>Thawed</dt>
-                                    <dd>{batch.thawedDate}</dd>
-                                  </>
-                                ) : null}
-                                {batch.packageCount ? (
-                                  <>
-                                    <dt>Packages</dt>
-                                    <dd>
-                                      {batch.packageCount} × {batch.amountPerPackage ?? '?'}{' '}
-                                      {batch.packageUnit}
-                                    </dd>
-                                  </>
-                                ) : null}
-                              </dl>
-                              <div className={styles.actions}>
-                                {batch.status === 'unopened' ? (
+                          <button
+                            className={styles.rowMenu}
+                            type="button"
+                            aria-label={`Manage ${batch.product.displayName}`}
+                            onClick={() => setSelectedBatchId(batch.id)}
+                          >
+                            <MoreHorizontal size={20} aria-hidden="true" />
+                          </button>
+                          {selectedBatchId === batch.id && (
+                            <AppDialog
+                              className={styles.batchDialog}
+                              onClose={() => {
+                                if (!busy) setSelectedBatchId(null);
+                              }}
+                              aria-labelledby={`batch-title-${batch.id}`}
+                            >
+                              <header className={styles.filterDialogHeader}>
+                                <div>
+                                  <h2 id={`batch-title-${batch.id}`}>
+                                    {batch.product.displayName}
+                                  </h2>
+                                  <p>
+                                    {batch.quantityLabel} remaining · {batch.location.path}
+                                  </p>
+                                </div>
+                                <button
+                                  className={styles.addDialogClose}
+                                  type="button"
+                                  disabled={busy}
+                                  aria-label="Close batch management"
+                                  onClick={() => setSelectedBatchId(null)}
+                                >
+                                  <X size={20} />
+                                </button>
+                              </header>
+                              <div className={styles.rowMenuPanel}>
+                                <div className={styles.tags}>
+                                  <span>{batch.status.replaceAll('_', ' ')}</span>
+                                  <span>{batch.expiryPrecision.replaceAll('_', ' ')} date</span>
+                                  <span>
+                                    {batch.quantityRemaining !== null && !batch.approximateState
+                                      ? 'Known stock'
+                                      : batch.approximateState &&
+                                          batch.approximateState !== 'unknown'
+                                        ? 'Approximate stock'
+                                        : 'Unknown stock'}
+                                  </span>
+                                  {useFirstIds.has(batch.id) ? (
+                                    <span>Use this batch first</span>
+                                  ) : null}
+                                  {dashboard.lowStockProductIds.includes(batch.productId) ? (
+                                    <span>Low stock</span>
+                                  ) : null}
+                                </div>
+                                {batch.notes ? <p className={styles.notes}>{batch.notes}</p> : null}
+                                <dl className={styles.facts}>
+                                  {batch.sublocation ? (
+                                    <>
+                                      <dt>Shelf</dt>
+                                      <dd>{batch.sublocation}</dd>
+                                    </>
+                                  ) : null}
+                                  {batch.openedDate ? (
+                                    <>
+                                      <dt>Opened</dt>
+                                      <dd>{batch.openedDate}</dd>
+                                    </>
+                                  ) : null}
+                                  {batch.frozenDate ? (
+                                    <>
+                                      <dt>Frozen</dt>
+                                      <dd>{batch.frozenDate}</dd>
+                                    </>
+                                  ) : null}
+                                  {batch.thawedDate ? (
+                                    <>
+                                      <dt>Thawed</dt>
+                                      <dd>{batch.thawedDate}</dd>
+                                    </>
+                                  ) : null}
+                                  {batch.packageCount ? (
+                                    <>
+                                      <dt>Packages</dt>
+                                      <dd>
+                                        {batch.packageCount} × {batch.amountPerPackage ?? '?'}{' '}
+                                        {batch.packageUnit}
+                                      </dd>
+                                    </>
+                                  ) : null}
+                                </dl>
+                                <div className={styles.actions}>
+                                  {batch.status === 'unopened' ? (
+                                    <button
+                                      disabled={busy || !canEdit}
+                                      onClick={() =>
+                                        action(
+                                          batch,
+                                          { type: 'open', openedDate: '' },
+                                          'Package opened.',
+                                        )
+                                      }
+                                      type="button"
+                                    >
+                                      <PackageOpen size={15} /> Open package
+                                    </button>
+                                  ) : null}
+                                  {batch.quantityRemaining !== null ? (
+                                    <button
+                                      disabled={busy || !canEdit || batch.quantityRemaining < 1}
+                                      onClick={() =>
+                                        action(batch, { type: 'consume_one' }, 'One item consumed.')
+                                      }
+                                      type="button"
+                                    >
+                                      Use 1 {batch.unit}
+                                    </button>
+                                  ) : null}
                                   <button
                                     disabled={busy || !canEdit}
                                     onClick={() =>
-                                      action(
-                                        batch,
-                                        { type: 'open', openedDate: '' },
-                                        'Package opened.',
-                                      )
+                                      action(batch, { type: 'mark_empty' }, 'Item marked empty.')
                                     }
                                     type="button"
                                   >
-                                    <PackageOpen size={15} /> Open
+                                    Mark empty
                                   </button>
-                                ) : null}
-                                {batch.quantityRemaining !== null ? (
                                   <button
-                                    disabled={busy || !canEdit || batch.quantityRemaining < 1}
+                                    disabled={busy || !canEdit}
                                     onClick={() =>
-                                      action(batch, { type: 'consume_one' }, 'One item consumed.')
+                                      action(batch, { type: 'undo' }, 'Last action undone.')
                                     }
                                     type="button"
                                   >
-                                    −1
+                                    <Undo2 size={15} /> Undo
                                   </button>
-                                ) : null}
-                                <button
-                                  disabled={busy || !canEdit}
-                                  onClick={() =>
-                                    action(batch, { type: 'mark_empty' }, 'Item marked empty.')
-                                  }
-                                  type="button"
-                                >
-                                  Empty
-                                </button>
-                                <button
-                                  disabled={busy || !canEdit}
-                                  onClick={() =>
-                                    action(batch, { type: 'undo' }, 'Last action undone.')
-                                  }
-                                  type="button"
-                                >
-                                  <Undo2 size={15} /> Undo
-                                </button>
-                                <button
-                                  disabled={busy || !canEdit}
-                                  onClick={() => void duplicateBatch(batch)}
-                                  type="button"
-                                >
-                                  Add another batch
-                                </button>
-                              </div>
-                              {batch.quantityRemaining !== null ? (
-                                <form
-                                  className={styles.consume}
-                                  action={async (formData) => {
-                                    await action(
-                                      batch,
-                                      {
-                                        type: 'consume',
-                                        quantity: formData.get('quantity'),
-                                        unit: formData.get('unit'),
-                                        reason: 'Manual consumption',
-                                      },
-                                      'Stock consumed.',
-                                    );
-                                  }}
-                                >
-                                  <input
-                                    aria-label={`Amount of ${batch.product.displayName} consumed`}
-                                    name="quantity"
-                                    type="number"
-                                    min="0.000001"
-                                    step="any"
-                                    required
-                                  />
-                                  <select
-                                    aria-label="Consumption unit"
-                                    name="unit"
-                                    defaultValue={batch.unit}
+                                  <button
+                                    disabled={busy || !canEdit}
+                                    onClick={() => void duplicateBatch(batch)}
+                                    type="button"
                                   >
-                                    {units.map((unit) => (
-                                      <option key={unit}>{unit}</option>
-                                    ))}
-                                  </select>
-                                  <button disabled={busy || !canEdit} type="submit">
-                                    Use amount
+                                    Add another batch
                                   </button>
-                                </form>
-                              ) : null}
-                              <details className={styles.management}>
-                                <summary>Manage batch</summary>
-                                <form
-                                  className={styles.form}
-                                  action={(formData) => editBatch(batch, formData)}
-                                >
-                                  <BatchEditFields batch={batch} dashboard={dashboard} />
-                                  <button disabled={busy || !canEdit} type="submit">
-                                    Save batch details
-                                  </button>
-                                </form>
-                                <div className={styles.actionGrid}>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      await action(
-                                        batch,
-                                        { type: 'move', locationId: formData.get('locationId') },
-                                        'Batch moved.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Move</strong>
-                                    <select
-                                      aria-label={`Move ${batch.product.displayName} to`}
-                                      name="locationId"
-                                      defaultValue={batch.locationId}
-                                    >
-                                      {dashboard.locations.map((location) => (
-                                        <option key={location.id} value={location.id}>
-                                          {location.path}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <button disabled={busy || !canEdit}>Move batch</button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
+                                </div>
+                                {batch.quantityRemaining !== null ? (
+                                  <RetainedForm
+                                    key={`consume:${batch.version}`}
+                                    disabled={busy}
+                                    className={styles.consume}
                                     action={async (formData) => {
                                       await action(
                                         batch,
                                         {
-                                          type: 'freeze',
-                                          frozenDate: formData.get('frozenDate'),
-                                          locationId: formData.get('locationId'),
+                                          type: 'consume',
+                                          quantity: formData.get('quantity'),
+                                          unit: formData.get('unit'),
+                                          reason: 'Manual consumption',
                                         },
-                                        'Batch frozen.',
+                                        'Stock consumed.',
                                       );
                                     }}
                                   >
-                                    <strong>Freeze</strong>
-                                    <input
-                                      aria-label={`Frozen date for ${batch.product.displayName}`}
-                                      name="frozenDate"
-                                      type="date"
-                                    />
-                                    <select
-                                      aria-label={`Freezer location for ${batch.product.displayName}`}
-                                      name="locationId"
-                                      defaultValue=""
+                                    <label>
+                                      <span>Amount to use</span>
+                                      <input
+                                        aria-label={`Amount of ${batch.product.displayName} consumed`}
+                                        name="quantity"
+                                        type="number"
+                                        min="0.000001"
+                                        step="any"
+                                        required
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Unit</span>
+                                      <select
+                                        aria-label="Consumption unit"
+                                        name="unit"
+                                        defaultValue={batch.unit}
+                                      >
+                                        {units.map((unit) => (
+                                          <option key={unit}>{unit}</option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <button disabled={busy || !canEdit} type="submit">
+                                      Use amount
+                                    </button>
+                                  </RetainedForm>
+                                ) : null}
+                                <details className={styles.management}>
+                                  <summary>Manage batch</summary>
+                                  <RetainedForm
+                                    key={`details:${batch.version}`}
+                                    disabled={busy}
+                                    className={styles.form}
+                                    action={(formData) => editBatch(batch, formData)}
+                                  >
+                                    <BatchEditFields batch={batch} dashboard={dashboard} />
+                                    <button disabled={busy || !canEdit} type="submit">
+                                      Save batch details
+                                    </button>
+                                  </RetainedForm>
+                                  <div className={styles.actionGrid}>
+                                    <RetainedForm
+                                      key={`move:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        await action(
+                                          batch,
+                                          { type: 'move', locationId: formData.get('locationId') },
+                                          'Batch moved.',
+                                        );
+                                      }}
                                     >
-                                      <option value="">Keep current location</option>
-                                      {dashboard.locations
-                                        .filter((location) => location.storageType === 'freezer')
-                                        .map((location) => (
+                                      <strong>Move</strong>
+                                      <select
+                                        aria-label={`Move ${batch.product.displayName} to`}
+                                        name="locationId"
+                                        defaultValue={batch.locationId}
+                                      >
+                                        {dashboard.locations.map((location) => (
                                           <option key={location.id} value={location.id}>
                                             {location.path}
                                           </option>
                                         ))}
-                                    </select>
-                                    <button disabled={busy || !canEdit}>Freeze batch</button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      await action(
-                                        batch,
-                                        { type: 'thaw', thawedDate: formData.get('thawedDate') },
-                                        'Batch thawed.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Thaw</strong>
-                                    <input
-                                      aria-label={`Thawed date for ${batch.product.displayName}`}
-                                      name="thawedDate"
-                                      type="date"
-                                    />
-                                    <button disabled={busy || !canEdit}>Thaw batch</button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      const quantityRemaining = nullableNumber(
-                                        formData.get('quantityRemaining'),
-                                      );
-                                      await action(
-                                        batch,
-                                        {
-                                          type: 'correct',
-                                          quantityRemaining,
-                                          unit: formData.get('unit'),
-                                          approximateState:
-                                            quantityRemaining === null
-                                              ? formData.get('approximateState')
-                                              : null,
-                                          reason: formData.get('reason'),
-                                        },
-                                        'Quantity corrected.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Correct quantity</strong>
-                                    <input
-                                      aria-label={`Corrected amount for ${batch.product.displayName}`}
-                                      name="quantityRemaining"
-                                      type="number"
-                                      min="0"
-                                      step="any"
-                                    />
-                                    <select
-                                      aria-label={`Corrected unit for ${batch.product.displayName}`}
-                                      name="unit"
-                                      defaultValue={batch.unit}
+                                      </select>
+                                      <button disabled={busy || !canEdit}>Move batch</button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`freeze:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        await action(
+                                          batch,
+                                          {
+                                            type: 'freeze',
+                                            frozenDate: formData.get('frozenDate'),
+                                            locationId: formData.get('locationId'),
+                                          },
+                                          'Batch frozen.',
+                                        );
+                                      }}
                                     >
-                                      {units.map((unit) => (
-                                        <option key={unit}>{unit}</option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      aria-label={`Corrected approximate amount for ${batch.product.displayName}`}
-                                      name="approximateState"
-                                      defaultValue="unknown"
+                                      <strong>Freeze</strong>
+                                      <input
+                                        aria-label={`Frozen date for ${batch.product.displayName}`}
+                                        name="frozenDate"
+                                        type="date"
+                                      />
+                                      <select
+                                        aria-label={`Freezer location for ${batch.product.displayName}`}
+                                        name="locationId"
+                                        defaultValue=""
+                                      >
+                                        <option value="">Keep current location</option>
+                                        {dashboard.locations
+                                          .filter((location) => location.storageType === 'freezer')
+                                          .map((location) => (
+                                            <option key={location.id} value={location.id}>
+                                              {location.path}
+                                            </option>
+                                          ))}
+                                      </select>
+                                      <button disabled={busy || !canEdit}>Freeze batch</button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`thaw:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        await action(
+                                          batch,
+                                          { type: 'thaw', thawedDate: formData.get('thawedDate') },
+                                          'Batch thawed.',
+                                        );
+                                      }}
                                     >
-                                      {[
-                                        'full',
-                                        'three_quarters',
-                                        'half',
-                                        'quarter',
-                                        'almost_empty',
-                                        'unknown',
-                                      ].map((value) => (
-                                        <option key={value}>{value.replaceAll('_', ' ')}</option>
-                                      ))}
-                                    </select>
-                                    <input
-                                      aria-label={`Correction reason for ${batch.product.displayName}`}
-                                      name="reason"
-                                      defaultValue="Inventory recount"
-                                      required
-                                    />
-                                    <button disabled={busy || !canEdit}>Correct quantity</button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      await action(
-                                        batch,
-                                        {
-                                          type: 'split',
-                                          quantity: formData.get('quantity'),
-                                          unit: formData.get('unit'),
-                                          locationId: formData.get('locationId'),
-                                        },
-                                        'Batch split.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Split batch</strong>
-                                    <input
-                                      aria-label={`Split amount for ${batch.product.displayName}`}
-                                      name="quantity"
-                                      type="number"
-                                      min="0.000001"
-                                      step="any"
-                                      required
-                                    />
-                                    <select
-                                      aria-label={`Split unit for ${batch.product.displayName}`}
-                                      name="unit"
-                                      defaultValue={batch.unit}
-                                    >
-                                      {units.map((unit) => (
-                                        <option key={unit}>{unit}</option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      aria-label={`Split destination for ${batch.product.displayName}`}
-                                      name="locationId"
-                                      defaultValue=""
-                                    >
-                                      <option value="">Keep current location</option>
-                                      {dashboard.locations.map((location) => (
-                                        <option key={location.id} value={location.id}>
-                                          {location.path}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <button
-                                      disabled={
-                                        busy || !canEdit || batch.quantityRemaining === null
-                                      }
-                                    >
-                                      Split batch
-                                    </button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      const target = dashboard.batches.find(
-                                        (candidate) =>
-                                          candidate.id === formData.get('targetBatchId'),
-                                      )!;
-                                      await action(
-                                        batch,
-                                        {
-                                          type: 'combine',
-                                          targetBatchId: target.id,
-                                          targetExpectedVersion: target.version,
-                                        },
-                                        'Batches combined.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Combine compatible batch</strong>
-                                    <select
-                                      aria-label={`Combine ${batch.product.displayName} with`}
-                                      name="targetBatchId"
-                                      defaultValue=""
-                                      required
-                                    >
-                                      <option value="">Choose another batch</option>
-                                      {dashboard.batches
-                                        .filter(
-                                          (candidate) =>
-                                            candidate.id !== batch.id &&
-                                            candidate.productId === batch.productId,
-                                        )
-                                        .map((candidate) => (
-                                          <option key={candidate.id} value={candidate.id}>
-                                            {candidate.quantityLabel} · {candidate.location.path}
-                                          </option>
-                                        ))}
-                                    </select>
-                                    <button disabled={busy || !canEdit}>Combine batches</button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      await action(
-                                        batch,
-                                        { type: 'discard', reason: formData.get('reason') },
-                                        'Batch discarded.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Discard</strong>
-                                    <input
-                                      aria-label={`Discard reason for ${batch.product.displayName}`}
-                                      name="reason"
-                                      placeholder="Reason"
-                                    />
-                                    <button disabled={busy || !canEdit}>Discard batch</button>
-                                  </form>
-                                  <form
-                                    className={styles.form}
-                                    action={async (formData) => {
-                                      await action(
-                                        batch,
-                                        { type: 'donate', reason: formData.get('reason') },
-                                        'Batch donated.',
-                                      );
-                                    }}
-                                  >
-                                    <strong>Donate</strong>
-                                    <input
-                                      aria-label={`Donation reason for ${batch.product.displayName}`}
-                                      name="reason"
-                                      placeholder="Reason"
-                                    />
-                                    <button disabled={busy || !canEdit}>Donate batch</button>
-                                  </form>
-                                  {['depleted', 'discarded', 'donated'].includes(batch.status) ? (
-                                    <form
+                                      <strong>Thaw</strong>
+                                      <input
+                                        aria-label={`Thawed date for ${batch.product.displayName}`}
+                                        name="thawedDate"
+                                        type="date"
+                                      />
+                                      <button disabled={busy || !canEdit}>Thaw batch</button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`correct:${batch.version}`}
+                                      disabled={busy}
                                       className={styles.form}
                                       action={async (formData) => {
                                         const quantityRemaining = nullableNumber(
@@ -2471,28 +2574,29 @@ export function PantryManager({
                                         await action(
                                           batch,
                                           {
-                                            type: 'restore',
+                                            type: 'correct',
                                             quantityRemaining,
                                             unit: formData.get('unit'),
                                             approximateState:
                                               quantityRemaining === null
                                                 ? formData.get('approximateState')
                                                 : null,
+                                            reason: formData.get('reason'),
                                           },
-                                          'Batch restored.',
+                                          'Quantity corrected.',
                                         );
                                       }}
                                     >
-                                      <strong>Restore</strong>
+                                      <strong>Correct quantity</strong>
                                       <input
-                                        aria-label={`Restored amount for ${batch.product.displayName}`}
+                                        aria-label={`Corrected amount for ${batch.product.displayName}`}
                                         name="quantityRemaining"
                                         type="number"
                                         min="0"
                                         step="any"
                                       />
                                       <select
-                                        aria-label={`Restore unit for ${batch.product.displayName}`}
+                                        aria-label={`Corrected unit for ${batch.product.displayName}`}
                                         name="unit"
                                         defaultValue={batch.unit}
                                       >
@@ -2501,7 +2605,7 @@ export function PantryManager({
                                         ))}
                                       </select>
                                       <select
-                                        aria-label={`Restored approximate amount for ${batch.product.displayName}`}
+                                        aria-label={`Corrected approximate amount for ${batch.product.displayName}`}
                                         name="approximateState"
                                         defaultValue="unknown"
                                       >
@@ -2516,28 +2620,235 @@ export function PantryManager({
                                           <option key={value}>{value.replaceAll('_', ' ')}</option>
                                         ))}
                                       </select>
-                                      <button disabled={busy || !canEdit}>Restore batch</button>
-                                    </form>
-                                  ) : null}
-                                </div>
-                                <details>
-                                  <summary>Storage and adjustment history</summary>
-                                  <ol className={styles.timeline}>
-                                    {dashboard.recentEvents
-                                      .filter((event) => event.batchId === batch.id)
-                                      .map((event) => (
-                                        <li key={event.id}>
-                                          <strong>
-                                            {event.reason || event.eventType.replaceAll('_', ' ')}
-                                          </strong>
-                                          <time>{new Date(event.createdAt).toLocaleString()}</time>
-                                        </li>
-                                      ))}
-                                  </ol>
+                                      <input
+                                        aria-label={`Correction reason for ${batch.product.displayName}`}
+                                        name="reason"
+                                        defaultValue="Inventory recount"
+                                        required
+                                      />
+                                      <button disabled={busy || !canEdit}>Correct quantity</button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`split:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        await action(
+                                          batch,
+                                          {
+                                            type: 'split',
+                                            quantity: formData.get('quantity'),
+                                            unit: formData.get('unit'),
+                                            locationId: formData.get('locationId'),
+                                          },
+                                          'Batch split.',
+                                        );
+                                      }}
+                                    >
+                                      <strong>Split batch</strong>
+                                      <input
+                                        aria-label={`Split amount for ${batch.product.displayName}`}
+                                        name="quantity"
+                                        type="number"
+                                        min="0.000001"
+                                        step="any"
+                                        required
+                                      />
+                                      <select
+                                        aria-label={`Split unit for ${batch.product.displayName}`}
+                                        name="unit"
+                                        defaultValue={batch.unit}
+                                      >
+                                        {units.map((unit) => (
+                                          <option key={unit}>{unit}</option>
+                                        ))}
+                                      </select>
+                                      <select
+                                        aria-label={`Split destination for ${batch.product.displayName}`}
+                                        name="locationId"
+                                        defaultValue=""
+                                      >
+                                        <option value="">Keep current location</option>
+                                        {dashboard.locations.map((location) => (
+                                          <option key={location.id} value={location.id}>
+                                            {location.path}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        disabled={
+                                          busy || !canEdit || batch.quantityRemaining === null
+                                        }
+                                      >
+                                        Split batch
+                                      </button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`combine:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        const target = dashboard.batches.find(
+                                          (candidate) =>
+                                            candidate.id === formData.get('targetBatchId'),
+                                        )!;
+                                        await action(
+                                          batch,
+                                          {
+                                            type: 'combine',
+                                            targetBatchId: target.id,
+                                            targetExpectedVersion: target.version,
+                                          },
+                                          'Batches combined.',
+                                        );
+                                      }}
+                                    >
+                                      <strong>Combine compatible batch</strong>
+                                      <select
+                                        aria-label={`Combine ${batch.product.displayName} with`}
+                                        name="targetBatchId"
+                                        defaultValue=""
+                                        required
+                                      >
+                                        <option value="">Choose another batch</option>
+                                        {dashboard.batches
+                                          .filter(
+                                            (candidate) =>
+                                              candidate.id !== batch.id &&
+                                              candidate.productId === batch.productId,
+                                          )
+                                          .map((candidate) => (
+                                            <option key={candidate.id} value={candidate.id}>
+                                              {candidate.quantityLabel} · {candidate.location.path}
+                                            </option>
+                                          ))}
+                                      </select>
+                                      <button disabled={busy || !canEdit}>Combine batches</button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`discard:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        await action(
+                                          batch,
+                                          { type: 'discard', reason: formData.get('reason') },
+                                          'Batch discarded.',
+                                        );
+                                      }}
+                                    >
+                                      <strong>Discard</strong>
+                                      <input
+                                        aria-label={`Discard reason for ${batch.product.displayName}`}
+                                        name="reason"
+                                        placeholder="Reason"
+                                      />
+                                      <button disabled={busy || !canEdit}>Discard batch</button>
+                                    </RetainedForm>
+                                    <RetainedForm
+                                      key={`donate:${batch.version}`}
+                                      disabled={busy}
+                                      className={styles.form}
+                                      action={async (formData) => {
+                                        await action(
+                                          batch,
+                                          { type: 'donate', reason: formData.get('reason') },
+                                          'Batch donated.',
+                                        );
+                                      }}
+                                    >
+                                      <strong>Donate</strong>
+                                      <input
+                                        aria-label={`Donation reason for ${batch.product.displayName}`}
+                                        name="reason"
+                                        placeholder="Reason"
+                                      />
+                                      <button disabled={busy || !canEdit}>Donate batch</button>
+                                    </RetainedForm>
+                                    {['depleted', 'discarded', 'donated'].includes(batch.status) ? (
+                                      <RetainedForm
+                                        key={`restore:${batch.version}`}
+                                        disabled={busy}
+                                        className={styles.form}
+                                        action={async (formData) => {
+                                          const quantityRemaining = nullableNumber(
+                                            formData.get('quantityRemaining'),
+                                          );
+                                          await action(
+                                            batch,
+                                            {
+                                              type: 'restore',
+                                              quantityRemaining,
+                                              unit: formData.get('unit'),
+                                              approximateState:
+                                                quantityRemaining === null
+                                                  ? formData.get('approximateState')
+                                                  : null,
+                                            },
+                                            'Batch restored.',
+                                          );
+                                        }}
+                                      >
+                                        <strong>Restore</strong>
+                                        <input
+                                          aria-label={`Restored amount for ${batch.product.displayName}`}
+                                          name="quantityRemaining"
+                                          type="number"
+                                          min="0"
+                                          step="any"
+                                        />
+                                        <select
+                                          aria-label={`Restore unit for ${batch.product.displayName}`}
+                                          name="unit"
+                                          defaultValue={batch.unit}
+                                        >
+                                          {units.map((unit) => (
+                                            <option key={unit}>{unit}</option>
+                                          ))}
+                                        </select>
+                                        <select
+                                          aria-label={`Restored approximate amount for ${batch.product.displayName}`}
+                                          name="approximateState"
+                                          defaultValue="unknown"
+                                        >
+                                          {[
+                                            'full',
+                                            'three_quarters',
+                                            'half',
+                                            'quarter',
+                                            'almost_empty',
+                                            'unknown',
+                                          ].map((value) => (
+                                            <option key={value}>
+                                              {value.replaceAll('_', ' ')}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button disabled={busy || !canEdit}>Restore batch</button>
+                                      </RetainedForm>
+                                    ) : null}
+                                  </div>
+                                  <details>
+                                    <summary>Storage and adjustment history</summary>
+                                    <ol className={styles.timeline}>
+                                      {dashboard.recentEvents
+                                        .filter((event) => event.batchId === batch.id)
+                                        .map((event) => (
+                                          <li key={event.id}>
+                                            <strong>
+                                              {event.reason || event.eventType.replaceAll('_', ' ')}
+                                            </strong>
+                                            <time>
+                                              {new Date(event.createdAt).toLocaleString()}
+                                            </time>
+                                          </li>
+                                        ))}
+                                    </ol>
+                                  </details>
                                 </details>
-                              </details>
-                            </div>
-                          </details>
+                              </div>
+                            </AppDialog>
+                          )}
                         </div>
                       </article>
                     ))}
@@ -2574,12 +2885,21 @@ export function PantryManager({
           )}
         </section>
 
-        <aside className={styles.sidebar}>
-          <section>
-            <div className={styles.asideTitle}>
-              <Clock3 size={18} />
-              <h2>Recent activity</h2>
-            </div>
+        <aside id="pantry-management" className={styles.sidebar}>
+          <div className={styles.kitchenActions}>
+            <span>
+              <strong>Use what you have</strong>
+            </span>
+            <Link href="/recipes?pantry=ready">Find recipes to cook</Link>
+            <Link href="/lists">Open shopping lists</Link>
+          </div>
+
+          <details className={styles.locationPanel}>
+            <summary className="recipe-disclosure-summary">
+              <span>Recent activity</span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
+
             {dashboard.recentEvents.length ? (
               <ol className={styles.timeline}>
                 {dashboard.recentEvents.slice(0, 4).map((event) => (
@@ -2598,24 +2918,32 @@ export function PantryManager({
             ) : (
               <p className={styles.muted}>Changes will appear here.</p>
             )}
-          </section>
+          </details>
           <details className={styles.locationPanel}>
-            <summary>
-              <MapPin size={18} /> Manage locations
+            <summary className="recipe-disclosure-summary">
+              <span>
+                <MapPin size={18} /> Manage locations
+              </span>
+              <ChevronDown size={18} aria-hidden="true" />
             </summary>
             <div className={styles.managementList}>
               {dashboard.locations.map((location) => (
                 <details key={location.id}>
-                  <summary>
+                  <summary className="recipe-disclosure-summary">
                     <span>
                       <LocationGlyph storageType={location.storageType} /> {location.path}
                     </span>
                     <small>
                       {dashboard.batches.filter((batch) => batch.locationId === location.id).length}{' '}
-                      items
+                      {dashboard.batches.filter((batch) => batch.locationId === location.id)
+                        .length === 1
+                        ? 'batch'
+                        : 'batches'}
                     </small>
+                    <ChevronDown size={18} aria-hidden="true" />
                   </summary>
-                  <form
+                  <RetainedForm
+                    disabled={busy}
                     action={(formData) => editLocation(location, formData)}
                     className={styles.form}
                   >
@@ -2667,11 +2995,11 @@ export function PantryManager({
                       Archive location
                     </label>
                     <button disabled={busy || !canEdit}>Save location</button>
-                  </form>
+                  </RetainedForm>
                 </details>
               ))}
             </div>
-            <form action={addLocation} className={styles.form}>
+            <RetainedForm disabled={busy} action={addLocation} className={styles.form}>
               <label>
                 <span>Name</span>
                 <input name="name" required />
@@ -2704,21 +3032,28 @@ export function PantryManager({
               <button disabled={busy || !canEdit} type="submit">
                 Add location
               </button>
-            </form>
+            </RetainedForm>
           </details>
-          <details className={styles.locationPanel}>
-            <summary>Manage products and staples</summary>
+          <details id="pantry-products" className={styles.locationPanel}>
+            <summary className="recipe-disclosure-summary">
+              <span>Manage products and staples</span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
             <div className={styles.managementList}>
               {dashboard.products.map((product) => (
                 <details key={product.id}>
-                  <summary>{product.displayName}</summary>
-                  <form
+                  <summary className="recipe-disclosure-summary">
+                    <span>{product.displayName}</span>
+                    <ChevronDown size={18} aria-hidden="true" />
+                  </summary>
+                  <RetainedForm
+                    disabled={busy}
                     action={(formData) => editProduct(product, formData)}
                     className={styles.form}
                   >
                     <ProductEditFields product={product} />
                     <button disabled={busy || !canEdit}>Save product</button>
-                  </form>
+                  </RetainedForm>
                 </details>
               ))}
             </div>

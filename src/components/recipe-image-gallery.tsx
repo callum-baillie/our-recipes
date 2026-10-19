@@ -1,11 +1,11 @@
 'use client';
 
-import { ImagePlus, Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { ImagePlus, Sparkles, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 import { LoadingIndicator } from '@/components/skeleton';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 import { useToast } from '@/components/toast-provider';
 import { ClientHeicConversionError, convertHeicFilesInBrowser } from '@/lib/client/heic-conversion';
@@ -27,6 +27,13 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
   const [generating, setGenerating] = useState(false);
   const [editingPhotos, setEditingPhotos] = useState(false);
   const showEditor = editingPhotos;
+  const editorRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (showEditor) {
+      editorRef.current?.scrollIntoView({ block: 'start' });
+      editorRef.current?.querySelector('input')?.focus({ preventScroll: true });
+    }
+  }, [showEditor]);
 
   async function chooseImage(selected: File | null) {
     if (!selected) {
@@ -64,70 +71,98 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
     const formData = new FormData();
     formData.set('image', file);
     formData.set('altText', altText);
-    const response = await fetch(`/api/v1/recipes/${recipeId}/images`, {
-      method: 'POST',
-      body: formData,
-    });
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    setPending(false);
-    if (!response.ok) {
-      const message = body?.error?.message ?? 'We could not add that photo yet.';
+    try {
+      const response = await fetch(`/api/v1/recipes/${recipeId}/images`, {
+        method: 'POST',
+        body: formData,
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      setPending(false);
+      if (!response.ok) {
+        const message = body?.error?.message ?? 'We could not add that photo yet.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      setFile(null);
+      setAltText('');
+      const input = document.getElementById('recipe-image-upload') as HTMLInputElement | null;
+      if (input) input.value = '';
+      setEditingPhotos(false);
+      showToast('Recipe photo added.', 'success');
+      router.refresh();
+    } catch {
+      const message =
+        'The photo request could not be completed. Check the connection and try again.';
       setError(message);
       showToast(message, 'error');
-      return;
+    } finally {
+      setPending(false);
     }
-    setFile(null);
-    setAltText('');
-    const input = document.getElementById('recipe-image-upload') as HTMLInputElement | null;
-    if (input) input.value = '';
-    setEditingPhotos(false);
-    showToast('Recipe photo added.', 'success');
-    router.refresh();
   }
 
   async function remove(imageId: string) {
+    if (!window.confirm('Remove this recipe photo?')) return;
     setPending(true);
     setError(null);
-    const response = await fetch(`/api/v1/recipes/${recipeId}/images/${imageId}`, {
-      method: 'DELETE',
-    });
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    setPending(false);
-    if (!response.ok) {
-      const message = body?.error?.message ?? 'We could not remove that photo yet.';
+    try {
+      const response = await fetch(`/api/v1/recipes/${recipeId}/images/${imageId}`, {
+        method: 'DELETE',
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      setPending(false);
+      if (!response.ok) {
+        const message = body?.error?.message ?? 'We could not remove that photo yet.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      showToast('Recipe photo removed.', 'success');
+      router.refresh();
+    } catch {
+      const message =
+        'The photo request could not be completed. Check the connection and try again.';
       setError(message);
       showToast(message, 'error');
-      return;
+    } finally {
+      setPending(false);
     }
-    showToast('Recipe photo removed.', 'success');
-    router.refresh();
   }
 
   async function generateWithOpenAi() {
     setGenerating(true);
     setError(null);
-    const response = await fetch(`/api/v1/recipes/${recipeId}/images/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirm: true }),
-    });
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    setGenerating(false);
-    if (!response.ok) {
-      const message = body?.error?.message ?? 'OpenAI could not generate a recipe image.';
+    try {
+      const response = await fetch(`/api/v1/recipes/${recipeId}/images/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      setGenerating(false);
+      if (!response.ok) {
+        const message = body?.error?.message ?? 'OpenAI could not generate a recipe image.';
+        setError(message);
+        showToast(message, 'error');
+        return;
+      }
+      setEditingPhotos(false);
+      showToast('Serving image generated and saved.', 'success');
+      router.refresh();
+    } catch {
+      const message =
+        'The photo request could not be completed. Check the connection and try again.';
       setError(message);
       showToast(message, 'error');
-      return;
+    } finally {
+      setGenerating(false);
     }
-    setEditingPhotos(false);
-    showToast('Serving image generated and saved.', 'success');
-    router.refresh();
   }
 
   return (
@@ -135,10 +170,11 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
       <div className="recipe-media-heading">
         <div>
           <p className="eyebrow">RECIPE PHOTOS</p>
-          <h2 id="recipe-photos-heading">Photos</h2>
+          <h2 id="recipe-photos-heading">
+            Photos <small>· {images.length} saved</small>
+          </h2>
         </div>
         <div className="recipe-media-heading-actions">
-          <span>{images.length} saved</span>
           <button
             className="text-button"
             type="button"
@@ -147,12 +183,12 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
             aria-controls="recipe-image-editor"
           >
             <ImagePlus size={16} aria-hidden="true" />
-            {showEditor ? 'Close photo tools' : 'Add/manage photos'}
+            {showEditor ? 'Close photo tools' : 'Manage photos'}
           </button>
         </div>
       </div>
       {images.length > 0 && (
-        <div className="recipe-image-grid">
+        <div className="recipe-image-grid" data-single={images.length === 1}>
           {images.map((image, index) => (
             <figure key={image.id}>
               <Image
@@ -160,36 +196,36 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
                 alt={image.altText || `Photo ${index + 1} of ${recipeTitle}`}
                 width={image.width}
                 height={image.height}
+                loading={index === 0 ? 'eager' : 'lazy'}
                 unoptimized
               />
-              <figcaption>
-                <div className="recipe-image-actions">
-                  <button
-                    className="icon-button"
-                    type="button"
-                    onClick={() => setEditingPhotos((current) => !current)}
-                    aria-expanded={showEditor}
-                    aria-controls="recipe-image-editor"
-                    aria-label={`Edit recipe photos from photo ${index + 1}`}
-                  >
-                    <Pencil size={16} aria-hidden="true" />
-                  </button>
-                  <button
-                    className="icon-button"
-                    type="button"
-                    onClick={() => void remove(image.id)}
-                    disabled={pending}
-                    aria-label={`Remove photo ${index + 1}`}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </button>
-                </div>
-              </figcaption>
+              {!showEditor && /^AI-generated serving image/u.test(image.altText) && (
+                <figcaption>
+                  <span>AI-generated serving image</span>
+                </figcaption>
+              )}
+              {showEditor && (
+                <figcaption>
+                  <span>{image.altText}</span>
+                  <div className="recipe-image-actions">
+                    <button
+                      className="icon-button"
+                      type="button"
+                      onClick={() => void remove(image.id)}
+                      disabled={pending}
+                      aria-label={`Remove photo ${index + 1}`}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </div>
+                </figcaption>
+              )}
             </figure>
           ))}
         </div>
       )}
       <form
+        ref={editorRef}
         className="recipe-image-form"
         id="recipe-image-editor"
         hidden={!showEditor}

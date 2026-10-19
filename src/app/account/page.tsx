@@ -1,6 +1,6 @@
 import { appRoleCan } from '@/lib/domain/permissions';
 import { getAiReadiness } from '@/lib/services/ai-readiness-service';
-import { KitchenInterview } from '@/components/kitchen-interview';
+import { KitchenInterview, kitchenInterviewQuestions } from '@/components/kitchen-interview';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
@@ -15,6 +15,11 @@ export default async function AccountPage() {
   );
   if (!principal) redirect('/sign-in');
   const profile = getHouseholdState().profiles.find((p) => p.id === principal.linkedProfileId);
+  const contextMembers = getHouseholdState().profiles.filter(
+    (member) =>
+      member.id !== principal.linkedProfileId &&
+      Object.values(member.goalContext.kitchenInterview ?? {}).some((value) => Boolean(value)),
+  );
   return (
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
@@ -34,31 +39,30 @@ export default async function AccountPage() {
         />
       )}
       {appRoleCan(principal.accountRole, 'shared.update') &&
-        appRoleCan(principal.role, 'shared.update') && (
+        appRoleCan(principal.role, 'shared.update') &&
+        contextMembers.length > 0 && (
           <section className="settings-card">
             <h2>Your household’s kitchen context</h2>
             <p>
               Food preferences help with shared meals. Each member’s AI sharing settings still
               control what the assistant can read.
             </p>
-            {getHouseholdState()
-              .profiles.filter(
-                (member) =>
-                  member.id !== principal.linkedProfileId && member.goalContext.kitchenInterview,
-              )
-              .map((member) => (
-                <details key={member.id}>
-                  <summary>{member.displayName}</summary>
-                  <dl>
-                    {Object.entries(member.goalContext.kitchenInterview!).map(([key, value]) => (
-                      <div key={key}>
-                        <dt>{key}</dt>
-                        <dd>{value || 'Not answered'}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </details>
-              ))}
+            {contextMembers.map((member) => (
+              <details key={member.id}>
+                <summary>{member.displayName}</summary>
+                <dl>
+                  {Object.entries(member.goalContext.kitchenInterview!).map(([key, value]) => (
+                    <div key={key}>
+                      <dt>
+                        {kitchenInterviewQuestions.find((question) => question.key === key)
+                          ?.title ?? key}
+                      </dt>
+                      <dd>{value || 'Not answered'}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
+            ))}
           </section>
         )}
       <AppearanceSettings />

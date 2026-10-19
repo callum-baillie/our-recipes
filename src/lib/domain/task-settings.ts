@@ -1,3 +1,5 @@
+import { addLocalDateDays, localIsoDate } from './local-date';
+import { validTimeZone } from './regional';
 import { z } from 'zod';
 export const taskSettingsSchema = z
   .object({
@@ -37,3 +39,18 @@ export const taskSettingsSchema = z
     'Authorize paid generation before enabling scheduled AI plans.',
   );
 export type TaskSettings = z.infer<typeof taskSettingsSchema>;
+
+/** A date example, not a promise that a worker has run or that generation will finish then. */
+export function scheduledDraftExample(
+  settings: TaskSettings,
+  now: Date,
+  lastScheduledDate: string | null = null,
+) {
+  if (!validTimeZone(settings.timezone)) return null;
+  const today = localIsoDate(now, settings.timezone);
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const offset = (settings.weekday - weekday + 7) % 7;
+  const runDate = addLocalDateDays(today, offset === 0 && lastScheduledDate === today ? 7 : offset);
+  const start = addLocalDateDays(runDate, settings.aheadDays);
+  return { runDate, start, end: addLocalDateDays(start, settings.days - 1) };
+}

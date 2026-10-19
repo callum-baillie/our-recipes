@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
+import { NutritionGoalDialog } from '@/components/nutrition-goal-dialog';
 import { NutritionAccessPanel } from '@/components/nutrition-access-panel';
 import { NutritionDashboard, type NutritionDashboardProps } from '@/components/nutrition-dashboard';
 import { NutritionHouseholdWorkspace } from '@/components/nutrition-household-workspace';
@@ -226,17 +227,15 @@ describe('Nutrition rendered boundary', () => {
 
   it('labels planned portions separately and exposes the complete view hierarchy', () => {
     const markup = renderToStaticMarkup(createElement(NutritionDashboard, props));
-    expect(markup).toContain('Calories consumed');
-    expect(markup).toContain('not counted as consumed');
+    expect(markup).toContain('No food recorded today');
+    expect(markup).toContain('No personal planned nutrition');
     for (const label of ['Today', 'Food Diary', 'Nutrients', 'Trends', 'Household']) {
       expect(markup).toContain(label);
     }
     expect(markup).not.toContain('>Goals<');
-    expect(markup).toContain('Nothing is assumed');
-    expect(markup).toContain('Daily calorie progress');
-    expect(markup).toContain('Planned calories, not counted as consumed');
-    expect(markup).toContain('Confirmed macro composition');
-    expect(markup).toContain('Table equivalent for confirmed macro composition');
+    expect(markup).toContain('Daily calorie details');
+    expect(markup).toContain('Manage planned portions');
+    expect(markup).not.toContain('0% of configured calorie goal');
   });
 
   it('offers optional goal setup alongside daily tracking when no goals are active', () => {
@@ -248,14 +247,11 @@ describe('Nutrition rendered boundary', () => {
       }),
     );
 
-    expect(markup).toContain('Continue your nutrition setup');
-    expect(markup).toContain('Nutrition profile saved');
-    expect(markup).toContain('Set up daily nutrition goals');
+    expect(markup).toContain('Optional goals and preferences');
+    expect(markup).toContain('Daily nutrient goals');
     expect(markup).toContain('Set daily nutrition goal');
     expect(markup).toContain('Enable weight tracking');
-    expect(markup).toContain('What you will see after setup');
-    expect(markup).toContain('Today at a glance');
-    expect(markup).toContain('Calories consumed');
+    expect(markup).toContain('No food recorded today');
   });
 
   it('places daily calorie goals in the onboarding dialog and shows a saved weight plan', () => {
@@ -273,11 +269,30 @@ describe('Nutrition rendered boundary', () => {
       }),
     );
 
-    expect(markup).toContain('Choose a daily nutrition goal');
-    expect(markup).toContain('Use 1,800 kcal');
-    expect(markup).toContain('Use your saved weight plan');
-    expect(markup).toContain('Calculate a planning target');
-    expect(markup).toContain('Saved target date: 2026-12-01.');
+    expect(markup).toContain('Saved weight direction: loss');
+    expect(markup).toContain('90 kg');
+    expect(markup).toContain('80 kg');
+    const form = renderToStaticMarkup(
+      createElement(NutritionGoalDialog, {
+        open: true,
+        onClose: vi.fn(),
+        onSaved: vi.fn(),
+        profile: props.activeProfile,
+        definitions: props.definitions,
+        goals: [],
+        today: props.today ?? '2026-07-19',
+        goalSetup: {
+          nutritionGoalType: 'loss',
+          currentWeightKilograms: 90,
+          targetWeightKilograms: 80,
+          targetDate: '2026-12-01',
+          profileVersion: 1,
+        },
+      }),
+    );
+    expect(form).toContain('Save goal');
+    expect(form).toContain('Example starting points');
+    expect(form).toContain('Review an estimate from the saved weight direction');
   });
 
   it('offers a weight check-in only when measurement tracking is enabled', () => {
@@ -297,9 +312,8 @@ describe('Nutrition rendered boundary', () => {
       }),
     );
 
-    expect(enabled).toContain('Weight check-in');
-    expect(enabled).toContain('New weigh-in');
-    expect(disabled).not.toContain('Weight check-in');
+    expect(enabled).toContain('Record weight');
+    expect(disabled).not.toContain('Record weight');
     expect(disabled).toContain('Enable weight tracking');
   });
 
@@ -307,10 +321,10 @@ describe('Nutrition rendered boundary', () => {
     const markup = renderToStaticMarkup(
       createElement(NutritionDashboard, { ...props, view: 'nutrients' }),
     );
-    expect(markup).toContain('Today&#x27;s configured nutrient coverage');
-    expect(markup).toContain('minimum · below');
-    expect(markup).toContain('58 g remains to the configured minimum');
-    expect(markup).toContain('Table equivalent for today&#x27;s configured nutrient coverage');
+    expect(markup).toContain('Nutrient coverage');
+    expect(markup).toContain('minimum');
+    expect(markup).toContain('58 g');
+    expect(markup).toContain('Current nutrient comparisons');
   });
 
   it('explains sensitive profile inputs before optional controls and does not claim goals are generated', () => {
@@ -333,11 +347,11 @@ describe('Nutrition rendered boundary', () => {
     expect(markup).toContain('Preview estimated maintenance calories');
     expect(markup).toContain('generic activity field above is never translated automatically');
     expect(markup).toContain('NASEM physical-activity category');
-    expect(markup).toContain('Nutrition display');
-    expect(markup).toContain('Select between 1 and 12 nutrients');
+    expect(markup).toContain('Display and units');
+    expect(markup).toContain('Choose 1–12');
     expect(markup).toContain('Show planned values in Nutrition charts');
     expect(markup).toContain('Show compact Nutrition facts on recipe-library cards');
-    expect(markup).toContain('Select between 1 and 5 factual per-serving values');
+    expect(markup).toContain('Choose 1–5');
     expect(markup).toContain('Show Nutrition previews in the meal planner');
     expect(markup).toContain('do not edit diary entries, meal plans, or goals');
   });
@@ -375,7 +389,9 @@ describe('Nutrition rendered boundary', () => {
     expect(hidden).not.toContain('Planned separately');
     expect(hidden).not.toContain('Planned calories, not counted as consumed');
     expect(hidden).not.toContain('Confirmed and separately planned calories');
-    expect(hidden).toContain('aria-label="Confirmed calories"');
+    expect(hidden).toContain('Daily calorie details');
+    expect(hidden).toContain('Manage planned portions');
+    expect(hidden).not.toContain('Today’s planned estimates');
     const trend = renderToStaticMarkup(
       createElement(NutritionDashboard, {
         ...props,
@@ -508,9 +524,9 @@ describe('Nutrition rendered boundary', () => {
         ],
       }),
     );
-    expect(markup).toContain('Recipe ideas from recorded evidence');
-    expect(markup).toContain('Pantry means available, not eaten');
-    expect(markup).toContain('50% of this gap');
+    expect(markup).toContain('Recipe ideas and contextual review');
+    expect(markup).toContain('do not schedule');
+    expect(markup).toContain('50% of this recorded-average gap');
     expect(markup).toContain('Confirm one grocery item');
     expect(markup).toContain('Dismiss this evidence version');
     expect(markup).not.toContain('good food');
@@ -554,10 +570,31 @@ describe('Nutrition rendered boundary', () => {
         weightTrend: empty,
       }),
     );
-    expect(markup).toContain('Nutrition diary data is required for food trends.');
+    expect(markup).toContain('Recorded nutrition trends');
     expect(markup).toContain('Weight tracking is enabled, but no observations are recorded');
     expect(markup).toContain('Measurement viewer');
     expect(markup).not.toContain('Configured target:');
+  });
+
+  it('opens and focuses recovery tools when their query context changes within the diary route', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const rendered = render(createElement(NutritionDashboard, { ...props, view: 'diary' }));
+    const tools = rendered.container.querySelector<HTMLDetailsElement>('#nutrition-data-tools')!;
+    expect(tools.open).toBe(false);
+    rendered.rerender(
+      createElement(NutritionDashboard, {
+        ...props,
+        view: 'diary',
+        initialTask: 'calculate',
+        returnLogMode: 'recipe',
+      }),
+    );
+    await waitFor(() => expect(tools.open).toBe(true));
+    await waitFor(() => expect(document.activeElement).toBe(tools.querySelector('summary')));
+    expect(screen.getByRole('button', { name: 'Return to food logging' })).toBeTruthy();
   });
 
   it('exposes audited diary lifecycle controls without profile deletion', () => {
@@ -590,16 +627,19 @@ describe('Nutrition rendered boundary', () => {
     );
     expect(screen.queryByRole('button', { name: 'Restore entry' })).toBeNull();
     fireEvent.click(screen.getByLabelText('Show deleted entries'));
-    expect(screen.getByRole('button', { name: 'Restore entry' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Action for Private meal'), {
+      target: { value: 'restore' },
+    });
+    expect(screen.getByRole('button', { name: 'Restore deleted entry' })).toBeTruthy();
     const markup = rendered.container.innerHTML;
-    expect(markup).toContain('Export Nutrition JSON');
+    expect(markup).toContain('Export nutrition data (JSON)');
     expect(markup).toContain('Copy a diary day');
     expect(markup).not.toContain('DELETE Private Avery');
     expect(markup).not.toContain('Permanently delete Nutrition data');
   });
 
   it('exposes linked household profiles only for the explicit reassign exception', () => {
-    const markup = renderToStaticMarkup(
+    const rendered = render(
       createElement(NutritionDashboard, {
         ...props,
         view: 'diary',
@@ -637,7 +677,11 @@ describe('Nutrition rendered boundary', () => {
         },
       }),
     );
-    expect(markup).toContain('Reassign entry');
+    fireEvent.change(screen.getByLabelText('Action for Shared soup'), {
+      target: { value: 'reassign' },
+    });
+    const markup = rendered.container.innerHTML;
+    expect(markup).toContain('Move to another person');
     expect(markup).toContain('Linked Riley');
     expect(markup.match(/Linked Riley/gu)).toHaveLength(1);
   });
@@ -781,9 +825,9 @@ describe('Nutrition rendered boundary', () => {
         ],
       }),
     );
-    expect(markup).toContain('Serving, skipping, and saving leftovers are not consumption');
-    expect(markup).toContain('Served, not yet eaten');
-    expect(markup).toContain('Leftover, not eaten');
+    expect(markup).toContain('serving or saving leftovers does not add diary');
+    expect(markup).toContain('served');
+    expect(markup).toContain('leftover');
     expect(markup).toContain('Confirm eaten');
     expect(markup).toContain('Confirm another portion eaten');
   });

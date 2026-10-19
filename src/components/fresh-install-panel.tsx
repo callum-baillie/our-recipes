@@ -14,9 +14,14 @@ export function FreshInstallPanel() {
   const { showToast } = useToast();
   const [confirmation, setConfirmation] = useState('');
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const lock = useRef(false);
 
   async function reset() {
+    if (lock.current || confirmation !== CONFIRMATION) return;
+    lock.current = true;
     setPending(true);
+    setError('');
     try {
       const response = await fetch('/api/v1/settings/fresh-install', {
         method: 'POST',
@@ -32,6 +37,14 @@ export function FreshInstallPanel() {
       dialogRef.current?.close();
       window.location.replace('/');
     } catch (error) {
+      setError(
+        error instanceof TypeError
+          ? 'Reset outcome could not be confirmed. Reload the installation before trying again.'
+          : error instanceof Error
+            ? error.message
+            : 'The reset outcome is uncertain. Refresh before trying again.',
+      );
+      lock.current = false;
       showToast(
         error instanceof Error ? error.message : 'The database could not be reset safely.',
         'error',
@@ -44,7 +57,8 @@ export function FreshInstallPanel() {
     <SettingsPane
       tone="danger"
       eyebrow="DANGER ZONE"
-      title="Fresh installation"
+      id="danger"
+      title="Erase app data and start over"
       description="Irreversible installation-level actions are kept separate from everyday preferences."
     >
       <SettingsRow
@@ -56,15 +70,19 @@ export function FreshInstallPanel() {
           type="button"
           onClick={() => {
             setConfirmation('');
+            setError('');
             dialogRef.current?.showModal();
           }}
         >
-          <RotateCcw size={17} /> Fresh install
+          <RotateCcw size={17} /> Erase app data
         </button>
       </SettingsRow>
       <dialog
         className="confirmation-dialog settings-dialog"
         ref={dialogRef}
+        onCancel={(event) => {
+          if (lock.current) event.preventDefault();
+        }}
         aria-labelledby="fresh-install-title"
       >
         <form
@@ -77,7 +95,7 @@ export function FreshInstallPanel() {
           <AlertTriangle size={28} aria-hidden="true" />
           <div>
             <p className="eyebrow">FRESH INSTALL</p>
-            <h2 id="fresh-install-title">Need a fresh start?</h2>
+            <h2 id="fresh-install-title">Erase app data and start over</h2>
             <p>
               This removes all your recipes, profiles, meal plans, lists, Pantry stock, and
               Nutrition data, then returns you to the first page to set up the app again. A final
@@ -89,6 +107,7 @@ export function FreshInstallPanel() {
           </div>
           <SettingsField title="Confirmation" description={`Enter ${CONFIRMATION} to continue.`}>
             <input
+              disabled={pending}
               autoFocus
               autoComplete="off"
               value={confirmation}
@@ -96,6 +115,16 @@ export function FreshInstallPanel() {
               placeholder={CONFIRMATION}
             />
           </SettingsField>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          {pending && (
+            <p role="status">
+              Erasing app data… Closing this page does not cancel the server operation.
+            </p>
+          )}
           <div className="dialog-actions">
             <button
               className="text-button"

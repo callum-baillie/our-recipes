@@ -27,6 +27,7 @@ export function RecipeCollectionButton({
   const [collectionId, setCollectionId] = useState('');
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [collectionsLoaded, setCollectionsLoaded] = useState(false);
   const [pending, setPending] = useState(false);
   const [pendingAction, setPendingAction] = useState<'existing' | 'create' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function RecipeCollectionButton({
 
   async function loadCollections() {
     setLoading(true);
+    setCollectionsLoaded(false);
     setError(null);
     try {
       const response = await fetch('/api/v1/collections');
@@ -45,6 +47,7 @@ export function RecipeCollectionButton({
         return;
       }
       setCollections(body.collections);
+      setCollectionsLoaded(true);
       setCollectionId((current) =>
         body.collections!.some((collection) => collection.id === current)
           ? current
@@ -193,47 +196,54 @@ export function RecipeCollectionButton({
           </button>
         </header>
         <div className="recipe-collection-dialog-body">
-          <form className="recipe-collection-existing" onSubmit={assignExisting}>
-            <label>
-              <span>Existing collection</span>
-              <select
-                value={collectionId}
-                disabled={loading || pending || collections.length === 0}
-                aria-busy={loading}
-                onChange={(event) => setCollectionId(event.target.value)}
+          {collections.length > 0 ? (
+            <form className="recipe-collection-existing" onSubmit={assignExisting}>
+              <label>
+                <span>Existing collection</span>
+                <select
+                  value={collectionId}
+                  disabled={loading || pending || collections.length === 0}
+                  aria-busy={loading}
+                  onChange={(event) => setCollectionId(event.target.value)}
+                >
+                  {loading ? (
+                    <option value="">Loading collections…</option>
+                  ) : collections.length ? (
+                    collections.map((collection) => (
+                      <option value={collection.id} key={collection.id}>
+                        {collection.name} · {collection.recipeCount} recipe
+                        {collection.recipeCount === 1 ? '' : 's'}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No collections yet</option>
+                  )}
+                </select>
+              </label>
+              <button
+                className="primary-button compact"
+                type="submit"
+                disabled={loading || pending || !collectionId}
+                aria-busy={pendingAction === 'existing'}
               >
-                {loading ? (
-                  <option value="">Loading collections…</option>
-                ) : collections.length ? (
-                  collections.map((collection) => (
-                    <option value={collection.id} key={collection.id}>
-                      {collection.name} · {collection.recipeCount} recipe
-                      {collection.recipeCount === 1 ? '' : 's'}
-                    </option>
-                  ))
+                {pendingAction === 'existing' ? (
+                  <ButtonSpinner />
                 ) : (
-                  <option value="">No collections yet</option>
-                )}
-              </select>
-            </label>
-            <button
-              className="primary-button compact"
-              type="submit"
-              disabled={loading || pending || !collectionId}
-              aria-busy={pendingAction === 'existing'}
-            >
-              {pendingAction === 'existing' ? (
-                <ButtonSpinner />
-              ) : (
-                <FolderPlus size={16} aria-hidden="true" />
-              )}{' '}
-              {pendingAction === 'existing' ? 'Adding…' : 'Add recipe'}
-            </button>
-          </form>
+                  <FolderPlus size={16} aria-hidden="true" />
+                )}{' '}
+                {pendingAction === 'existing' ? 'Adding…' : 'Add to collection'}
+              </button>
+            </form>
+          ) : null}
 
-          <div className="recipe-collection-divider">
-            <span>or create one</span>
-          </div>
+          {!loading && collectionsLoaded && collections.length === 0 ? (
+            <p className="muted">Create your first collection and add this recipe to it.</p>
+          ) : null}
+          {collections.length > 0 ? (
+            <div className="recipe-collection-divider">
+              <span>or create a collection</span>
+            </div>
+          ) : null}
 
           <form className="recipe-collection-create" onSubmit={createAndAssign}>
             <label>
@@ -247,9 +257,9 @@ export function RecipeCollectionButton({
               />
             </label>
             <button
-              className="text-button"
+              className={collections.length ? 'secondary-button' : 'primary-button compact'}
               type="submit"
-              disabled={pending || !newName.trim()}
+              disabled={loading || pending || !newName.trim()}
               aria-busy={pendingAction === 'create'}
             >
               {pendingAction === 'create' ? (
@@ -263,9 +273,20 @@ export function RecipeCollectionButton({
 
           {loading ? <AsyncSkeleton label="Loading collections" variant="rows" /> : null}
           {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
+            <div>
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+              {!loading && !collectionsLoaded ? (
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => void loadCollections()}
+                >
+                  Retry loading collections
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </dialog>

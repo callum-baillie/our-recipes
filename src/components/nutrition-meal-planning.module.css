@@ -1,182 +1,119 @@
 .panel {
-  padding: clamp(1.15rem, 3vw, 1.8rem);
+  padding: 1.25rem;
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 0.9rem;
-  box-shadow: 0 12px 28px rgb(65 53 39 / 8%);
+  border-radius: 0.8rem;
+  min-width: 0;
 }
-
-.heading,
-.meals > li > header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 1rem;
+.embedded {
+  min-width: 0;
+  padding: 0.5rem 0;
 }
-
-.heading h2,
+.panel h2,
 .meals h3 {
   margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display, Georgia), serif;
 }
-
-.heading p,
+.panel h2 {
+  font-size: var(--panel-title-size);
+}
+.panel > header > p,
 .quality,
-.nutrients,
 .empty {
   color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
-
-.nutrients {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 0.9rem;
-}
-
-.nutrients > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.allocationTools {
-  border-top: 1px solid var(--line);
-  padding-top: 0.7rem;
-}
-
-.allocationTools > summary {
-  cursor: pointer;
-  color: var(--label);
-  font-weight: 800;
-}
-
-.allocationTools[open] > summary {
-  margin-bottom: 0.75rem;
-}
-
-.heading > span {
-  white-space: nowrap;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
 .comparison {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin: 1.2rem 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.7rem;
+  margin: 1rem 0;
 }
-
-.comparison article {
+.comparison > div {
   display: grid;
-  gap: 0.25rem;
-  padding: 0.75rem;
-  background: var(--paper);
-  border-radius: 0.55rem;
+  gap: 0.3rem;
 }
-
-.comparison span {
-  font-size: 0.82rem;
-}
-
 .meals {
   display: grid;
-  gap: 0.9rem;
-  margin: 0;
+  gap: 1rem;
+  margin: 0.5rem 0 0;
   padding: 0;
   list-style: none;
 }
-
 .meals > li {
-  padding: 1rem;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 0.65rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
 }
-
-.meals header span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: capitalize;
-}
-
-.meals dl {
+.meals > li > header {
   display: flex;
-  gap: 0.8rem;
-  margin: 0;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.2rem;
+  justify-content: space-between;
+  align-items: start;
 }
-
-.meals dl div {
-  display: grid;
-  text-align: right;
+.meals > li > header > div {
+  min-width: 0;
+  flex: 1 1 16rem;
 }
-
-.meals dt {
+.meals > li > header > div > span {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.85rem;
 }
-
-.meals dd {
+.meals > li > header > p {
   margin: 0;
-  font-weight: 900;
+  flex: 0 1 17rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
-
-.warning {
-  padding: 0.7rem;
-  background: color-mix(in srgb, var(--tomato) 8%, var(--paper));
-  border-left: 3px solid var(--tomato);
+.meals h3 {
+  margin-top: 0.3rem;
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
 }
-
+.personal {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.8rem 0;
+  font-size: 0.9rem;
+}
+.personal ul {
+  padding-left: 1.2rem;
+  margin: 0;
+  color: var(--muted);
+}
 .allocations {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
 }
-
-.allocations form {
-  display: grid;
-  gap: 0.6rem;
-  padding: 0.8rem;
+.allocationTools > form,
+.allocations > form,
+.allocations > div {
+  margin: 0.7rem 0 0;
+  padding: 0.85rem;
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 0.55rem;
 }
-
-.allocations label {
+.allocationTools label {
   display: grid;
-  gap: 0.3rem;
-  color: var(--label);
-  font-size: 0.78rem;
-  font-weight: 800;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
-
-.formHint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
+.allocationTools input:not([type='checkbox']):not([type='radio']),
+.allocationTools select {
+  min-width: 0;
+  width: 100%;
+  font-size: 1rem;
 }
-
-.status {
-  min-height: 1.4rem;
-  margin: 0.8rem 0 0;
-  color: var(--tomato-dark);
-  font-weight: 800;
-}
-
-@media (max-width: 760px) {
-  .comparison,
-  .allocations {
-    grid-template-columns: 1fr;
-  }
-
-  .heading,
-  .meals > li > header {
-    display: grid;
-  }
-
-  .meals dl div {
-    text-align: left;
-  }
+.warning {
+  padding: 0.7rem;
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 8%, var(--field));
+  line-height: 1.5;
 }

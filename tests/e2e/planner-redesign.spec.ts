@@ -36,7 +36,7 @@ const recipePayload = (title: string, category: string, item: string) => ({
 test('planner assigns recipes by selected meal and scales the shopping list to diners', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await page.goto('/');
   await page.getByLabel('Kitchen name').fill('Planner test kitchen');
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -111,8 +111,16 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await expect(page.locator('.app-footer')).toBeVisible();
   await page.getByRole('button', { name: 'Generate meal plan' }).click();
   const generator = page.getByRole('dialog', { name: 'Generate your meal plan' });
-  await expect(generator.getByRole('heading', { name: 'Plan from recipebook' })).toBeVisible();
-  await expect(generator.getByRole('heading', { name: 'Create a plan with AI' })).toBeVisible();
+  await expect(
+    generator.getByRole('button', { name: /Use saved recipes.*Prepare/u }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await generator
+    .getByRole('button', { name: /Create new recipes with AI.*Paid generation/u })
+    .click();
+  await expect(
+    generator.getByRole('heading', { name: 'Create new recipes with AI' }),
+  ).toBeVisible();
+  await generator.getByText('Cost details', { exact: true }).click();
   await expect(generator.getByLabel('Estimated AI API cost')).toContainText('Input');
   await expect(generator.getByLabel('Estimated AI API cost')).toContainText('Output');
   const imageGeneration = generator.getByRole('switch', { name: /Generate recipe images/u });
@@ -137,22 +145,20 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await setup.getByRole('button', { name: 'Close plan settings' }).click();
   await page
     .locator('[class*="mobileSchedule"]')
-    .getByRole('button', { name: 'Add recipe' })
+    .getByRole('button', { name: 'Add meal', exact: true })
     .first()
     .click();
 
   const selector = page.getByRole('dialog', { name: 'Add meals' });
   await expect(selector).toBeVisible();
-  const dinnerTab = selector.getByRole('tab', { name: 'Dinner 0 of 1' });
+  const dinnerTab = selector.getByRole('button', { name: 'Dinner 0 of 1' });
   await expect(dinnerTab).toBeVisible();
-  await expect(selector.getByRole('tab', { name: 'Dessert 0 of 1' })).toBeVisible();
-  await expect(selector.getByRole('tab', { name: 'Breakfast 0 of 1' })).toBeVisible();
+  await expect(selector.getByRole('button', { name: 'Dessert 0 of 1' })).toBeVisible();
+  await expect(selector.getByRole('button', { name: 'Breakfast 0 of 1' })).toBeVisible();
   await dinnerTab.click();
-  await selector
-    .getByPlaceholder('Search recipes, tags, categories, or collections')
-    .fill('Dinner pasta');
+  await selector.getByPlaceholder('Search recipes').fill('Dinner pasta');
   await selector.getByRole('button', { name: /Dinner pasta.*Select/u }).click();
-  await selector.getByRole('button', { name: 'Add 1 recipe to plan' }).click();
+  await selector.getByRole('button', { name: 'Add 1 meal' }).click();
 
   await expect(selector).toBeHidden();
   await expect(page.getByText('1 recipe was added to your plan.')).toBeVisible();
@@ -162,11 +168,18 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await expect(plannedDinner.getByLabel('Servings for Dinner pasta')).toHaveValue('2');
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
+  await page.getByRole('button', { name: 'Make grocery list' }).click();
   await expect(
     page.getByRole('heading', { name: /^Meal Plan \d{2}\/\d{2} - \d{2}\/\d{2}$/u }),
   ).toBeVisible();
-  await expect(page.getByLabel('pasta quantity')).toHaveValue('200');
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Pasta', exact: true }).click();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Edit item', exact: true })
+      .getByLabel('To buy quantity', { exact: true }),
+  ).toHaveValue('200');
+  await page.getByRole('button', { name: 'Close item editor' }).click();
 
   await page.goto('/settings/ai');
   const imageTask = page

@@ -26,7 +26,7 @@ export const recipePdfExportSchema = exportOptionsSchema.extend({
   servings: z.number().positive().max(1000).optional(),
 });
 
-const calendarDate = z
+export const calendarDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/u)
   .refine((value) => {
@@ -36,8 +36,8 @@ const calendarDate = z
 
 export const mealPlanPdfExportSchema = exportOptionsSchema
   .extend({
-    start: calendarDate,
-    end: calendarDate,
+    start: calendarDateSchema,
+    end: calendarDateSchema,
     includeRecipes: z.boolean().default(true),
   })
   .refine(
@@ -57,6 +57,7 @@ export function exportDateLabel(date: string): string {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`));
 }

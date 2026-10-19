@@ -14,12 +14,8 @@ export default function NotFoundPage() {
         <span className="route-state-icon" aria-hidden="true">
           <SearchX size={26} />
         </span>
-        <p className="eyebrow">NOT FOUND</p>
-        <h1 id="not-found-title">That page is no longer at the table.</h1>
-        <p>
-          The item may have been removed, archived, or opened from an old link. Your other household
-          data is still available.
-        </p>
+        <h1 id="not-found-title">Page not found</h1>
+        <p>Check the address or return to your kitchen to find what you need.</p>
         <div className="route-state-actions">
           <Link className="primary-button" href="/">
             Return to the kitchen

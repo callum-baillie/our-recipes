@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Plus, Search, Trash2, X } from 'lucide-react';
 import { ButtonSpinner, InlineSkeleton } from '@/components/skeleton';
-import { mealTypeLabel, type MealType } from './meal-planner-types';
+import {
+  formatPlannerDate,
+  mealTypeLabel,
+  type MealType,
+  type MealTypeOption,
+} from './meal-planner-types';
 import { comparePlannedMeals } from '@/lib/domain/meal-plan-policy';
 import { parseMealPlanIngredientSnapshot } from '@/lib/domain/meal-plan-snapshot';
 import type { MealPlanOptionInput } from '@/lib/domain/planning';
@@ -49,10 +54,12 @@ export function MealEntryEditor({
   date,
   slot,
   slots,
+  mealTypeOptions,
   meals,
   servings,
   onClose,
   onSaved,
+  onUncertain,
 }: {
   entry?: PlannedMeal;
   initialKind?: string;
@@ -62,10 +69,12 @@ export function MealEntryEditor({
   date: string;
   slot: string;
   slots: string[];
+  mealTypeOptions?: MealTypeOption[];
   meals: PlannedMeal[];
   servings: number;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (context: { date: string; meal: string }) => void;
+  onUncertain?: () => void;
 }) {
   const [sourceMeals, setSourceMeals] = useState(meals);
   const [kind, setKind] = useState(entry?.kind ?? initialKind ?? 'item');
@@ -73,7 +82,7 @@ export function MealEntryEditor({
   const [plannedFor, setDate] = useState(entry?.plannedFor ?? date);
   const [meal, setMeal] = useState(entry?.meal ?? slot);
   const [title, setTitle] = useState(entry?.title || entry?.recipeTitle || '');
-  const [portionCount, setPortions] = useState(entry?.servings ?? Math.max(1, servings));
+  const [portionCount, setPortions] = useState(String(entry?.servings ?? Math.max(1, servings)));
   const [note, setNote] = useState(entry?.note ?? '');
   const [profileIds, setProfileIds] = useState<string[]>(() =>
     entry?.profileIds ? JSON.parse(entry.profileIds) : initialProfileIds,
@@ -94,6 +103,9 @@ export function MealEntryEditor({
     entry?.recipeOverride ? (JSON.parse(entry.recipeOverride) as Adaptation) : null,
   );
   const [adapt, setAdapt] = useState(Boolean(entry?.recipeOverride));
+  const [dirty, setDirty] = useState(false);
+  const [choosePeople, setChoosePeople] = useState(profileIds.length > 0);
+  const [uncertain, setUncertain] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const loading = adapt && !adaptation && !error;
@@ -219,6 +231,16 @@ export function MealEntryEditor({
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (busy || uncertain) return;
+    if (
+      !Number.isInteger(Number(portionCount)) ||
+      Number(portionCount) < 1 ||
+      Number(portionCount) > 100 ||
+      !portionCount.trim()
+    ) {
+      setError('Enter 1 to 100 whole servings.');
+      return;
+    }
     if (kind === 'options' && options.length < 2) {
       setError('Choose at least two recipes or Pantry items.');
       return;
@@ -244,7 +266,7 @@ export function MealEntryEditor({
                     .slice(0, 160)
                 : title,
         ...(kind === 'options' ? { options } : {}),
-        servings: portionCount,
+        servings: Number(portionCount),
         note,
         recipeId: kind === 'recipe' ? (entry?.recipeId ?? '') : '',
         leftoverSourceId: kind === 'leftover' ? sourceId : null,
@@ -273,522 +295,607 @@ export function MealEntryEditor({
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
+        if (response.status >= 500) {
+          setUncertain(true);
+          onUncertain?.();
+          setError(
+            'This save could not be confirmed. Check the calendar before trying again; your entered values are retained here.',
+          );
+          return;
+        }
         const result = await response.json();
         throw new Error(result.error?.message || 'Could not save this meal.');
       }
-      onSaved();
+      onSaved({ date: plannedFor, meal });
       onClose();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Could not save this meal.');
+      if (error instanceof TypeError) {
+        setUncertain(true);
+        onUncertain?.();
+        setError(
+          'This save could not be confirmed. Check the calendar before trying again; your entered values are retained here.',
+        );
+      } else setError(error instanceof Error ? error.message : 'Could not save this meal.');
     } finally {
       setBusy(false);
     }
   }
+  function dismiss() {
+    if (busy) return;
+    if (
+      dirty &&
+      !window.confirm(
+        uncertain
+          ? 'Close this unconfirmed edit? Check the calendar before adding it again.'
+          : 'Discard unsaved changes to this meal?',
+      )
+    )
+      return;
+    onClose();
+  }
   return (
-    <AppDialog className={styles.dialog} onClose={onClose} aria-labelledby="meal-editor-title">
-      <form onSubmit={save}>
+    <AppDialog className={styles.dialog} onClose={dismiss} aria-labelledby="meal-editor-title">
+      <form onSubmit={save} onChangeCapture={() => setDirty(true)}>
         <header>
           <div>
             <h2 id="meal-editor-title">{entry ? 'Edit planned meal' : 'Add a meal'}</h2>
-            <p>A recipe, something simple, or a night off cooking.</p>
+            <p>
+              {entry?.recipeTitle || 'New planned meal'} ·{' '}
+              {formatPlannerDate(plannedFor || date, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}{' '}
+              · {mealTypeLabel(meal, mealTypeOptions)}
+            </p>
           </div>
-          <button type="button" aria-label="Close meal editor" onClick={onClose}>
+          <button type="button" aria-label="Close meal editor" disabled={busy} onClick={dismiss}>
             <X />
           </button>
         </header>
         <div className={styles.content}>
-          {profiles.length > 0 && (
-            <fieldset>
-              <legend>Who is this meal for?</legend>
-              <p>
-                Leave everyone unselected for a shared household meal. Add separate entries in the
-                same slot for different meals.
-              </p>
-              {profiles.map((profile) => (
-                <label
-                  key={profile.id}
-                  style={{ display: 'flex', alignItems: 'center', gap: '.6rem', minHeight: 44 }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={profileIds.includes(profile.id)}
-                    onChange={(event) =>
-                      setProfileIds((current) =>
-                        event.target.checked
-                          ? [...current, profile.id]
-                          : current.filter((id) => id !== profile.id),
-                      )
-                    }
-                  />
-                  {profile.displayName}
-                </label>
-              ))}
-            </fieldset>
-          )}
-          <div className={styles.row}>
-            <label>
-              Date
-              <input
-                required
-                type="date"
-                value={plannedFor}
-                onChange={(event) => {
-                  setDate(event.target.value);
-                  if (kind === 'leftover') setSourceMealsLoaded(false);
-                }}
-              />
-            </label>
-            <label>
-              Meal
-              <select value={meal} onChange={(event) => setMeal(event.target.value)}>
-                {[...new Set([...slots, meal])].map((value) => (
-                  <option key={value} value={value}>
-                    {mealTypeLabel(value as MealType)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label>
-            What’s planned?
-            <select
-              value={kind}
-              onChange={(event) => {
-                const nextKind = event.target.value;
-                setKind(nextKind);
-                if (nextKind === 'leftover') setSourceMealsLoaded(false);
-              }}
-            >
-              {entry?.recipeId ? <option value="recipe">Recipe</option> : null}
-              <option value="item">Single food or drink</option>
-              <option value="options">Options · choose one</option>
-              <option value="fast">Fast · no meal</option>
-              <option value="takeout">Eating out</option>
-              <option value="leftover">Leftovers</option>
-              <option value="custom">Other meal</option>
-            </select>
-          </label>
-          {kind === 'leftover' ? (
-            <>
+          <fieldset className={styles.editableFields} disabled={busy || uncertain}>
+            <div className={styles.row}>
               <label>
-                Use leftovers from
-                <select
+                Date
+                <input
                   required
-                  value={sourceId}
-                  disabled={loadingSourceMeals}
-                  aria-busy={loadingSourceMeals}
-                  onChange={(event) => setSource(event.target.value)}
-                >
-                  <option value="">
-                    {loadingSourceMeals ? 'Loading earlier meals…' : 'Choose the original meal'}
-                  </option>
-                  {sourceMeals
-                    .filter(
-                      (item) =>
-                        item.id !== entry?.id &&
-                        comparePlannedMeals(item, { plannedFor, meal }) <= 0 &&
-                        item.status === 'planned' &&
-                        item.kind !== 'leftover' &&
-                        item.kind !== 'takeout' &&
-                        (Boolean(item.recipeId) || item.kind === 'item'),
-                    )
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.plannedFor} · {mealTypeLabel(item.meal as MealType)} ·{' '}
-                        {item.recipeTitle}
-                      </option>
-                    ))}
+                  type="date"
+                  value={plannedFor}
+                  onChange={(event) => {
+                    setDate(event.target.value);
+                    if (kind === 'leftover') setSourceMealsLoaded(false);
+                  }}
+                />
+              </label>
+              <label>
+                Meal
+                <select value={meal} onChange={(event) => setMeal(event.target.value)}>
+                  {[...new Set([...slots, meal])].map((value) => (
+                    <option key={value} value={value}>
+                      {mealTypeLabel(value as MealType, mealTypeOptions)}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <p>
-                These portions come from the original meal and won’t add ingredients to your
-                shopping list. Include the extra portions when setting that meal’s servings.
-              </p>
-            </>
-          ) : kind === 'options' ? (
-            <section className={styles.optionsPicker} aria-label="Meal alternatives">
-              <p>Choose the recipes or Pantry items that can each stand in for this meal.</p>
-              <label className={styles.optionSearch}>
-                <Search size={18} aria-hidden="true" />
-                <input
-                  value={optionSearch}
-                  onChange={(event) => setOptionSearch(event.target.value)}
-                  placeholder="Search recipes and Pantry items"
-                  aria-label="Search recipes and Pantry items"
-                />
-              </label>
-              {options.length ? (
-                <div className={styles.selectedOptions} aria-label="Selected alternatives">
-                  {options.map((option, index) => (
-                    <div
-                      className={styles.selectedOption}
-                      key={`${option.kind}:${option.kind === 'recipe' ? option.recipeId : option.productId}`}
-                    >
-                      {index ? <span className={styles.optionOr}>or</span> : null}
-                      <span>
-                        <strong>{option.label}</strong>
-                        <small>{option.kind === 'recipe' ? 'Recipe' : 'Pantry item'}</small>
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${option.label}`}
-                        onClick={() =>
-                          setOptions((current) => current.filter((_, i) => i !== index))
-                        }
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className={styles.optionsEmpty}>No alternatives selected yet.</p>
-              )}
-              <div className={styles.optionResults}>
-                <section>
-                  <h3>Recipes</h3>
-                  {matchingRecipes.length ? (
-                    matchingRecipes.map((recipe) => {
-                      const selected = options.some(
-                        (option) => option.kind === 'recipe' && option.recipeId === recipe.id,
-                      );
-                      return (
-                        <button
-                          key={recipe.id}
-                          type="button"
-                          disabled={selected}
-                          onClick={() => addRecipeOption(recipe)}
-                        >
-                          <span>{recipe.title}</span>
-                          {selected ? <Check size={16} /> : <Plus size={16} />}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <p>No matching recipes.</p>
-                  )}
-                </section>
-                <section>
-                  <h3>Pantry items</h3>
-                  {matchingPantryProducts.length ? (
-                    matchingPantryProducts.map((product) => {
-                      const selected = options.some(
-                        (option) => option.kind === 'pantry' && option.productId === product.id,
-                      );
-                      return (
-                        <button
-                          key={product.id}
-                          type="button"
-                          disabled={selected}
-                          onClick={() => addPantryOption(product)}
-                        >
-                          <span>{product.displayName}</span>
-                          {selected ? <Check size={16} /> : <Plus size={16} />}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <p>
-                      {loadingPantryProducts ? (
-                        <>
-                          Loading Pantry items{' '}
-                          <InlineSkeleton label="Loading Pantry options" width="4rem" />
-                        </>
-                      ) : pantryProducts.length ? (
-                        'No matching Pantry items.'
-                      ) : (
-                        'No Pantry items available.'
-                      )}
-                    </p>
-                  )}
-                </section>
-              </div>
-              <p className={styles.optionsHint}>
-                These are alternatives. The planner won’t add every choice to your shopping list.
-              </p>
-            </section>
-          ) : kind === 'fast' ? (
-            <section className={styles.fastNotice}>
-              <strong>Fast</strong>
-              <span>
-                Use this for a fasting period or any other reason you’re not having a meal.
-              </span>
-            </section>
-          ) : (
+            </div>
             <label>
-              {kind === 'takeout' ? 'Restaurant or meal name' : 'Meal or food name'}
-              <input
-                required
-                maxLength={160}
-                readOnly={kind === 'recipe'}
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder={
-                  kind === 'item'
-                    ? 'e.g. Greek yogurt'
-                    : kind === 'takeout'
-                      ? 'e.g. Saffron Indian Kitchen'
-                      : ''
-                }
-              />
+              What’s planned?
+              <select
+                value={kind}
+                onChange={(event) => {
+                  const nextKind = event.target.value;
+                  setKind(nextKind);
+                  if (nextKind === 'leftover') setSourceMealsLoaded(false);
+                }}
+              >
+                {entry?.recipeId ? <option value="recipe">Recipe</option> : null}
+                <option value="item">Single food or drink</option>
+                <option value="options">Options · choose one</option>
+                <option value="fast">Fasting / no meal</option>
+                <option value="takeout">Eating out</option>
+                <option value="leftover">Leftovers</option>
+                <option value="custom">Other meal</option>
+              </select>
             </label>
-          )}
-          <div className={styles.row}>
-            <label>
-              {kind === 'fast' ? 'People fasting' : 'Servings'}
-              <input
-                required
-                type="number"
-                min={1}
-                max={100}
-                value={portionCount}
-                onChange={(event) => setPortions(Number(event.target.value))}
-              />
-            </label>
-            {kind === 'item' ? (
+            {kind === 'leftover' ? (
               <>
                 <label>
-                  Amount per serving
-                  <input
-                    type="number"
-                    min="0.001"
-                    step="any"
-                    value={quantity}
-                    onChange={(event) => setQuantity(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Unit
-                  <input
-                    maxLength={30}
-                    value={unit}
-                    onChange={(event) => setUnit(event.target.value)}
-                  />
-                </label>
-              </>
-            ) : null}
-          </div>
-          {kind === 'item' ? (
-            <p>
-              This food will be included in your planner shopping list. Nutrition stays unknown
-              until you supply nutrition data.
-            </p>
-          ) : null}
-          {kind === 'recipe' ? (
-            <>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={adapt}
-                  onChange={(event) => setAdapt(event.target.checked)}
-                />
-                Adapt the recipe for this meal only
-              </label>
-              <p>
-                Your saved recipe stays unchanged. Turning this off restores its current recipe.
-              </p>
-              {loading ? (
-                <p role="status">
-                  Loading recipe <InlineSkeleton label="Loading original recipe" width="4rem" />
-                </p>
-              ) : null}
-              {adapt && adaptation ? (
-                <section className={styles.adaptation}>
-                  <label>
-                    Adapted recipe title
-                    <input
-                      required
-                      value={adaptation.title}
-                      onChange={(event) =>
-                        setAdaptation({ ...adaptation, title: event.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Recipe yield
-                    <input
-                      required
-                      value={adaptation.servings}
-                      onChange={(event) =>
-                        setAdaptation({ ...adaptation, servings: event.target.value })
-                      }
-                    />
-                  </label>
-                  <p>
-                    Ingredient quantities below are for the recipe yield. Shopping amounts scale to
-                    this meal’s servings. Nutrition will need recalculating after changes.
-                  </p>
-                  {adaptation.ingredientGroups.map((group, g) => (
-                    <fieldset key={g}>
-                      <legend>{group.name || 'Ingredients'}</legend>
-                      {group.ingredients.map((ingredient, i) => (
-                        <div className={styles.ingredient} key={i}>
-                          <input
-                            aria-label="Quantity"
-                            type="number"
-                            min="0.001"
-                            step="any"
-                            value={ingredient.quantity}
-                            onChange={(event) =>
-                              setAdaptation({
-                                ...adaptation,
-                                ingredientGroups: adaptation.ingredientGroups.map((other, index) =>
-                                  index !== g
-                                    ? other
-                                    : {
-                                        ...other,
-                                        ingredients: other.ingredients.map((item, n) =>
-                                          n !== i
-                                            ? item
-                                            : {
-                                                ...item,
-                                                quantity:
-                                                  event.target.value === ''
-                                                    ? ''
-                                                    : Number(event.target.value),
-                                              },
-                                        ),
-                                      },
-                                ),
-                              })
-                            }
-                          />
-                          <input
-                            aria-label="Unit"
-                            value={ingredient.unit}
-                            onChange={(event) =>
-                              setAdaptation({
-                                ...adaptation,
-                                ingredientGroups: adaptation.ingredientGroups.map((other, index) =>
-                                  index !== g
-                                    ? other
-                                    : {
-                                        ...other,
-                                        ingredients: other.ingredients.map((item, n) =>
-                                          n !== i ? item : { ...item, unit: event.target.value },
-                                        ),
-                                      },
-                                ),
-                              })
-                            }
-                          />
-                          <input
-                            aria-label="Ingredient"
-                            required
-                            value={ingredient.item}
-                            onChange={(event) =>
-                              setAdaptation({
-                                ...adaptation,
-                                ingredientGroups: adaptation.ingredientGroups.map((other, index) =>
-                                  index !== g
-                                    ? other
-                                    : {
-                                        ...other,
-                                        ingredients: other.ingredients.map((item, n) =>
-                                          n !== i
-                                            ? item
-                                            : {
-                                                ...item,
-                                                item: event.target.value,
-                                                pantryProductId: '',
-                                              },
-                                        ),
-                                      },
-                                ),
-                              })
-                            }
-                          />
-                          <button
-                            type="button"
-                            aria-label={`Remove ${ingredient.item}`}
-                            disabled={group.ingredients.length === 1}
-                            onClick={() =>
-                              setAdaptation({
-                                ...adaptation,
-                                ingredientGroups: adaptation.ingredientGroups.map((other, index) =>
-                                  index !== g
-                                    ? other
-                                    : {
-                                        ...other,
-                                        ingredients: other.ingredients.filter((_, n) => n !== i),
-                                      },
-                                ),
-                              })
-                            }
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                  Use leftovers from
+                  <select
+                    required
+                    value={sourceId}
+                    disabled={loadingSourceMeals}
+                    aria-busy={loadingSourceMeals}
+                    onChange={(event) => setSource(event.target.value)}
+                  >
+                    <option value="">
+                      {loadingSourceMeals ? 'Loading earlier meals…' : 'Choose the original meal'}
+                    </option>
+                    {sourceMeals
+                      .filter(
+                        (item) =>
+                          item.id !== entry?.id &&
+                          comparePlannedMeals(item, { plannedFor, meal }) <= 0 &&
+                          item.status === 'planned' &&
+                          item.kind !== 'leftover' &&
+                          item.kind !== 'takeout' &&
+                          (Boolean(item.recipeId) || item.kind === 'item'),
+                      )
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.plannedFor} ·{' '}
+                          {mealTypeLabel(item.meal as MealType, mealTypeOptions)} ·{' '}
+                          {item.recipeTitle}
+                        </option>
                       ))}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAdaptation({
-                            ...adaptation,
-                            ingredientGroups: adaptation.ingredientGroups.map((other, index) =>
-                              index !== g
-                                ? other
-                                : {
-                                    ...other,
-                                    ingredients: [
-                                      ...other.ingredients,
-                                      {
-                                        item: '',
-                                        quantity: '',
-                                        unit: '',
-                                        note: '',
-                                        shoppingCategory: 'Other',
-                                      },
-                                    ],
-                                  },
-                            ),
-                          })
-                        }
+                  </select>
+                </label>
+                <p>
+                  These portions come from the original meal and won’t add ingredients to your
+                  shopping list. Include the extra portions when setting that meal’s servings.
+                </p>
+              </>
+            ) : kind === 'options' ? (
+              <section className={styles.optionsPicker} aria-label="Meal alternatives">
+                <p>Choose the recipes or Pantry items that can each stand in for this meal.</p>
+                <label className={styles.optionSearch}>
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    value={optionSearch}
+                    onChange={(event) => setOptionSearch(event.target.value)}
+                    placeholder="Search recipes and Pantry items"
+                    aria-label="Search recipes and Pantry items"
+                  />
+                </label>
+                {options.length ? (
+                  <div className={styles.selectedOptions} aria-label="Selected alternatives">
+                    {options.map((option, index) => (
+                      <div
+                        className={styles.selectedOption}
+                        key={`${option.kind}:${option.kind === 'recipe' ? option.recipeId : option.productId}`}
                       >
-                        <Plus size={16} /> Add ingredient
-                      </button>
-                    </fieldset>
-                  ))}
-                  {adaptation.instructionSections.map((section, index) => (
-                    <label key={index}>
-                      {section.title || 'Instructions'}
-                      <textarea
-                        rows={6}
-                        value={section.steps.join('\n\n')}
+                        {index ? <span className={styles.optionOr}>or</span> : null}
+                        <span>
+                          <strong>{option.label}</strong>
+                          <small>{option.kind === 'recipe' ? 'Recipe' : 'Pantry item'}</small>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${option.label}`}
+                          onClick={() =>
+                            setOptions((current) => current.filter((_, i) => i !== index))
+                          }
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.optionsEmpty}>No alternatives selected yet.</p>
+                )}
+                <div className={styles.optionResults}>
+                  <section>
+                    <h3>Recipes</h3>
+                    {matchingRecipes.length ? (
+                      matchingRecipes.map((recipe) => {
+                        const selected = options.some(
+                          (option) => option.kind === 'recipe' && option.recipeId === recipe.id,
+                        );
+                        return (
+                          <button
+                            key={recipe.id}
+                            type="button"
+                            disabled={selected}
+                            onClick={() => addRecipeOption(recipe)}
+                          >
+                            <span>{recipe.title}</span>
+                            {selected ? <Check size={16} /> : <Plus size={16} />}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p>No matching recipes.</p>
+                    )}
+                  </section>
+                  <section>
+                    <h3>Pantry items</h3>
+                    {matchingPantryProducts.length ? (
+                      matchingPantryProducts.map((product) => {
+                        const selected = options.some(
+                          (option) => option.kind === 'pantry' && option.productId === product.id,
+                        );
+                        return (
+                          <button
+                            key={product.id}
+                            type="button"
+                            disabled={selected}
+                            onClick={() => addPantryOption(product)}
+                          >
+                            <span>{product.displayName}</span>
+                            {selected ? <Check size={16} /> : <Plus size={16} />}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p>
+                        {loadingPantryProducts ? (
+                          <>
+                            Loading Pantry items{' '}
+                            <InlineSkeleton label="Loading Pantry options" width="4rem" />
+                          </>
+                        ) : pantryProducts.length ? (
+                          'No matching Pantry items.'
+                        ) : (
+                          'No Pantry items available.'
+                        )}
+                      </p>
+                    )}
+                  </section>
+                </div>
+                <p className={styles.optionsHint}>
+                  These are alternatives. The planner won’t add every choice to your shopping list.
+                </p>
+              </section>
+            ) : kind === 'fast' ? (
+              <section className={styles.fastNotice}>
+                <strong>Fast</strong>
+                <span>
+                  Use this for a fasting period or any other reason you’re not having a meal.
+                </span>
+              </section>
+            ) : (
+              <label>
+                {kind === 'recipe'
+                  ? 'Recipe · linked to your recipebook'
+                  : kind === 'takeout'
+                    ? 'Restaurant or meal name'
+                    : 'Meal or food name'}
+                <input
+                  required
+                  maxLength={160}
+                  readOnly={kind === 'recipe'}
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder={
+                    kind === 'item'
+                      ? 'e.g. Greek yogurt'
+                      : kind === 'takeout'
+                        ? 'e.g. Saffron Indian Kitchen'
+                        : ''
+                  }
+                />
+              </label>
+            )}
+            <div className={styles.row}>
+              <label>
+                {kind === 'fast' ? 'People fasting' : 'Servings'}
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={portionCount}
+                  onChange={(event) => setPortions(event.target.value)}
+                />
+              </label>
+              {kind === 'item' ? (
+                <>
+                  <label>
+                    Amount per serving
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="any"
+                      value={quantity}
+                      onChange={(event) => setQuantity(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Unit
+                    <input
+                      maxLength={30}
+                      value={unit}
+                      onChange={(event) => setUnit(event.target.value)}
+                    />
+                  </label>
+                </>
+              ) : null}
+            </div>
+            {profiles.length > 0 ? (
+              <fieldset>
+                <legend>Meal audience</legend>
+                <div className={styles.audienceMode}>
+                  <button
+                    type="button"
+                    aria-pressed={!choosePeople}
+                    onClick={() => {
+                      setChoosePeople(false);
+                      setProfileIds([]);
+                      setDirty(true);
+                    }}
+                  >
+                    Shared household meal
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={choosePeople}
+                    onClick={() => {
+                      setChoosePeople(true);
+                      setDirty(true);
+                    }}
+                  >
+                    Choose people
+                  </button>
+                </div>
+                {choosePeople ? (
+                  profiles.map((profile) => (
+                    <label className={styles.check} key={profile.id}>
+                      <input
+                        type="checkbox"
+                        checked={profileIds.includes(profile.id)}
                         onChange={(event) =>
-                          setAdaptation({
-                            ...adaptation,
-                            instructionSections: adaptation.instructionSections.map((item, i) =>
-                              i !== index
-                                ? item
-                                : { ...item, steps: event.target.value.split(/\n\n/u) },
-                            ),
-                          })
+                          setProfileIds((current) =>
+                            event.target.checked
+                              ? [...current, profile.id]
+                              : current.filter((id) => id !== profile.id),
+                          )
                         }
                       />
-                      <small>Separate steps with a blank line.</small>
+                      {profile.displayName}
                     </label>
-                  ))}
-                </section>
-              ) : null}
-            </>
-          ) : null}
-          <label>
-            Notes
-            <textarea
-              maxLength={240}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder={kind === 'fast' ? 'Optional details' : ''}
-            />
-          </label>
-          {error ? <p role="alert">{error}</p> : null}
+                  ))
+                ) : (
+                  <p>Shared with the household. Servings are set separately.</p>
+                )}
+                {choosePeople && !profileIds.length ? (
+                  <p>No specific people selected: this will be a shared household meal.</p>
+                ) : null}
+                <small>Use separate entries for different meals in the same slot.</small>
+              </fieldset>
+            ) : null}
+            {kind === 'item' ? (
+              <p>
+                This food will be included in your planner shopping list. Nutrition stays unknown
+                until you supply nutrition data.
+              </p>
+            ) : null}
+            {kind === 'recipe' ? (
+              <>
+                <label className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={adapt}
+                    onChange={(event) => setAdapt(event.target.checked)}
+                  />
+                  Adapt the recipe for this meal only
+                </label>
+                <p>
+                  Changes apply only to this planned meal. Turning adaptation off uses the saved
+                  recipe; your adaptation draft stays here until you save or cancel.
+                </p>
+                {loading ? (
+                  <p role="status">
+                    Loading recipe <InlineSkeleton label="Loading original recipe" width="4rem" />
+                  </p>
+                ) : null}
+                {adapt && adaptation ? (
+                  <section className={styles.adaptation}>
+                    <label>
+                      Adapted recipe title
+                      <input
+                        required
+                        value={adaptation.title}
+                        onChange={(event) =>
+                          setAdaptation({ ...adaptation, title: event.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Recipe yield
+                      <input
+                        required
+                        value={adaptation.servings}
+                        onChange={(event) =>
+                          setAdaptation({ ...adaptation, servings: event.target.value })
+                        }
+                      />
+                    </label>
+                    <p>
+                      Ingredient quantities below are for the recipe yield. Shopping amounts scale
+                      to this meal’s servings. Nutrition will need recalculating after changes.
+                    </p>
+                    {adaptation.ingredientGroups.map((group, g) => (
+                      <fieldset key={g}>
+                        <legend>{group.name || 'Ingredients'}</legend>
+                        {group.ingredients.map((ingredient, i) => (
+                          <div className={styles.ingredient} key={i}>
+                            <input
+                              aria-label="Quantity"
+                              type="number"
+                              min="0.001"
+                              step="any"
+                              value={ingredient.quantity}
+                              onChange={(event) =>
+                                setAdaptation({
+                                  ...adaptation,
+                                  ingredientGroups: adaptation.ingredientGroups.map(
+                                    (other, index) =>
+                                      index !== g
+                                        ? other
+                                        : {
+                                            ...other,
+                                            ingredients: other.ingredients.map((item, n) =>
+                                              n !== i
+                                                ? item
+                                                : {
+                                                    ...item,
+                                                    quantity:
+                                                      event.target.value === ''
+                                                        ? ''
+                                                        : Number(event.target.value),
+                                                  },
+                                            ),
+                                          },
+                                  ),
+                                })
+                              }
+                            />
+                            <input
+                              aria-label="Unit"
+                              value={ingredient.unit}
+                              onChange={(event) =>
+                                setAdaptation({
+                                  ...adaptation,
+                                  ingredientGroups: adaptation.ingredientGroups.map(
+                                    (other, index) =>
+                                      index !== g
+                                        ? other
+                                        : {
+                                            ...other,
+                                            ingredients: other.ingredients.map((item, n) =>
+                                              n !== i
+                                                ? item
+                                                : { ...item, unit: event.target.value },
+                                            ),
+                                          },
+                                  ),
+                                })
+                              }
+                            />
+                            <input
+                              aria-label="Ingredient"
+                              required
+                              value={ingredient.item}
+                              onChange={(event) =>
+                                setAdaptation({
+                                  ...adaptation,
+                                  ingredientGroups: adaptation.ingredientGroups.map(
+                                    (other, index) =>
+                                      index !== g
+                                        ? other
+                                        : {
+                                            ...other,
+                                            ingredients: other.ingredients.map((item, n) =>
+                                              n !== i
+                                                ? item
+                                                : {
+                                                    ...item,
+                                                    item: event.target.value,
+                                                    pantryProductId: '',
+                                                  },
+                                            ),
+                                          },
+                                  ),
+                                })
+                              }
+                            />
+                            <button
+                              type="button"
+                              aria-label={`Remove ${ingredient.item}`}
+                              disabled={group.ingredients.length === 1}
+                              onClick={() =>
+                                setAdaptation({
+                                  ...adaptation,
+                                  ingredientGroups: adaptation.ingredientGroups.map(
+                                    (other, index) =>
+                                      index !== g
+                                        ? other
+                                        : {
+                                            ...other,
+                                            ingredients: other.ingredients.filter(
+                                              (_, n) => n !== i,
+                                            ),
+                                          },
+                                  ),
+                                })
+                              }
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAdaptation({
+                              ...adaptation,
+                              ingredientGroups: adaptation.ingredientGroups.map((other, index) =>
+                                index !== g
+                                  ? other
+                                  : {
+                                      ...other,
+                                      ingredients: [
+                                        ...other.ingredients,
+                                        {
+                                          item: '',
+                                          quantity: '',
+                                          unit: '',
+                                          note: '',
+                                          shoppingCategory: 'Other',
+                                        },
+                                      ],
+                                    },
+                              ),
+                            })
+                          }
+                        >
+                          <Plus size={16} /> Add ingredient
+                        </button>
+                      </fieldset>
+                    ))}
+                    {adaptation.instructionSections.map((section, index) => (
+                      <label key={index}>
+                        {section.title || 'Instructions'}
+                        <textarea
+                          rows={6}
+                          value={section.steps.join('\n\n')}
+                          onChange={(event) =>
+                            setAdaptation({
+                              ...adaptation,
+                              instructionSections: adaptation.instructionSections.map((item, i) =>
+                                i !== index
+                                  ? item
+                                  : { ...item, steps: event.target.value.split(/\n\n/u) },
+                              ),
+                            })
+                          }
+                        />
+                        <small>Separate steps with a blank line.</small>
+                      </label>
+                    ))}
+                  </section>
+                ) : null}
+              </>
+            ) : null}
+            <label>
+              Notes (optional)
+              <textarea
+                maxLength={240}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder={kind === 'fast' ? 'Optional details' : ''}
+              />
+            </label>
+            {error ? <p role="alert">{error}</p> : null}
+          </fieldset>
         </div>
         <footer>
-          <button type="button" onClick={onClose}>
+          {uncertain ? (
+            <a
+              className="inline-link"
+              href={`/planner?view=day&date=${plannedFor}`}
+              target="_blank"
+              rel="noopener"
+            >
+              Check calendar in new tab
+            </a>
+          ) : null}
+          <button type="button" disabled={busy} onClick={dismiss}>
             Cancel
           </button>
-          <button type="submit" disabled={busy || loading || (adapt && !adaptation)}>
+          <button type="submit" disabled={busy || uncertain || loading || (adapt && !adaptation)}>
             {busy ? <ButtonSpinner /> : null}
             {busy ? 'Saving…' : entry ? 'Save meal' : 'Add meal'}
           </button>

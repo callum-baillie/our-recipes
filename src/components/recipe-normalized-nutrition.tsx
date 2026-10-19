@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import { DecisionAssistance } from '@/components/decision-assistance';
 import styles from '@/components/recipe-normalized-nutrition.module.css';
 import { NutritionVisualMarker } from '@/components/nutrition-visual-marker';
@@ -19,10 +20,9 @@ export function RecipeNormalizedNutrition({
       className={`${styles.panel} normalized-nutrition-banner`}
       aria-labelledby="normalized-nutrition-heading"
     >
-      <summary className={styles.heading}>
+      <summary className={`${styles.heading} recipe-disclosure-summary`}>
         <div>
-          <p className={styles.eyebrow}>INGREDIENT-BASED NUTRITION</p>
-          <h2 id="normalized-nutrition-heading">Nutrition calculation</h2>
+          <h2 id="normalized-nutrition-heading">Ingredient-based calculation</h2>
           {nutrition.status === 'current' && (
             <small>
               {nutrition.values
@@ -37,18 +37,20 @@ export function RecipeNormalizedNutrition({
               · per serving
             </small>
           )}
+          <span className={styles.status} data-status={nutrition.status}>
+            {nutrition.status === 'current'
+              ? 'Current recipe revision'
+              : nutrition.status === 'stale'
+                ? 'Recalculation needed'
+                : 'Not calculated'}
+          </span>
         </div>
-        <span className={styles.status} data-status={nutrition.status}>
-          {nutrition.status === 'current'
-            ? 'Current recipe revision'
-            : nutrition.status === 'stale'
-              ? 'Recalculation needed'
-              : 'Not calculated'}
-        </span>
+        <ChevronDown size={18} aria-hidden="true" />
       </summary>
       {nutrition.status === 'unavailable' ? (
         <p className={styles.callout}>
-          No normalized ingredient calculation is available. Missing values are unknown, never zero.
+          No ingredient-based calculation is available for meal tracking. Missing values are
+          unknown, never zero.
         </p>
       ) : (
         <>

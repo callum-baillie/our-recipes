@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -11,6 +12,18 @@ import { useReducedMotion } from '@/accessibility/use-reduced-motion';
 export function RecipeCard({ recipe }: { recipe: Recipe }) {
   const { state } = useBord();
   const actions = useServerActions();
+  const [saving, setSaving] = React.useState(false);
+  const changeFavorite = async () => {
+    if (saving || state.offline) return;
+    setSaving(true);
+    try {
+      await actions.setFavorite(recipe.id, !favorite);
+    } catch (error) {
+      Alert.alert('Favorite not changed', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
   const favorite = state.favorites.includes(recipe.id);
   const reducedMotion = useReducedMotion();
   return (
@@ -33,15 +46,7 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
           Alert.alert(recipe.title, 'Recipe actions', [
             {
               text: favorite ? 'Remove favorite' : 'Add favorite',
-              onPress: () =>
-                void actions
-                  .setFavorite(recipe.id, !favorite)
-                  .catch((error) =>
-                    Alert.alert(
-                      'Favorite not changed',
-                      error instanceof Error ? error.message : 'Try again.',
-                    ),
-                  ),
+              onPress: () => void changeFavorite(),
             },
             { text: 'Cancel', style: 'cancel' },
           ])
@@ -52,17 +57,18 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
           source={recipe.image}
           transition={reducedMotion ? 0 : 160}
           contentFit="cover"
-          style={{ width: '100%', height: 126 }}
+          cachePolicy="memory-disk"
+          recyclingKey={recipe.id}
+          style={{ width: '100%', aspectRatio: 1.35 }}
           accessibilityLabel={`${recipe.title} cover`}
         />
         <View style={{ padding: tokens.space.sm, gap: 6 }}>
           <StatusPill>{recipe.tags[0] ?? recipe.meal}</StatusPill>
           <Text
-            selectable
             numberOfLines={2}
             style={[
               editorial,
-              { color: tokens.color.ink, fontSize: 18, lineHeight: 19, fontWeight: '700' },
+              { color: tokens.color.ink, fontSize: 19, lineHeight: 23, fontWeight: '700' },
             ]}
           >
             {recipe.title}
@@ -82,16 +88,9 @@ export function RecipeCard({ recipe }: { recipe: Recipe }) {
         accessibilityRole="button"
         accessibilityLabel={favorite ? 'Remove from favorites' : 'Add to favorites'}
         hitSlop={4}
-        onPress={() => {
-          void actions
-            .setFavorite(recipe.id, !favorite)
-            .catch((error) =>
-              Alert.alert(
-                'Favorite not changed',
-                error instanceof Error ? error.message : 'Try again.',
-              ),
-            );
-        }}
+        disabled={saving || state.offline}
+        accessibilityState={{ disabled: saving || state.offline, busy: saving, selected: favorite }}
+        onPress={() => void changeFavorite()}
         style={{
           position: 'absolute',
           top: 8,

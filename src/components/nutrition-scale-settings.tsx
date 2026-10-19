@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { bodyMetricFields, type BodyMetrics } from '@/lib/domain/body-metrics';
-import styles from './nutrition-onboarding-flow.module.css';
+import styles from './nutrition-measurements.module.css';
+import { ChevronDown } from 'lucide-react';
 export type LatestWeighIn = {
   weightKilograms: number;
   measuredAt: string;
@@ -20,15 +21,19 @@ export function NutritionScaleSettings({
   imperial,
   onRecord,
   enabled,
+  canManage = true,
 }: {
   profileId: string;
   latest: LatestWeighIn | null;
   imperial: boolean;
   onRecord: () => void;
   enabled: boolean;
+  canManage?: boolean;
 }) {
-  const [connected, setConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
+  const [connection, setConnection] = useState<'checking' | 'connected' | 'disconnected' | 'error'>(
+    'checking',
+  );
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const router = useRouter();
@@ -39,14 +44,16 @@ export function NutritionScaleSettings({
       cache: 'no-store',
     })
       .then(async (response) => {
-        if (response.ok) setConnected((await response.json()).connected);
+        if (!response.ok) throw new Error('Connection check failed');
+        const data = await response.json();
+        if (!controller.signal.aborted)
+          setConnection(data.connected ? 'connected' : 'disconnected');
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!controller.signal.aborted) setCheckingConnection(false);
+      .catch(() => {
+        if (!controller.signal.aborted) setConnection('error');
       });
     return () => controller.abort();
-  }, [profileId]);
+  }, [profileId, attempt]);
   async function sync() {
     setBusy(true);
     setMessage('');
@@ -69,19 +76,18 @@ export function NutritionScaleSettings({
     }
   }
   return (
-    <section className="nutrition-measurements" aria-label="Weight and body measurements">
+    <section className={styles.panel} aria-label="Weight and body measurements">
       <header>
         <div>
-          <p className="eyebrow">YOUR MEASUREMENTS</p>
-          <h2>Weight & body composition</h2>
+          <h2>Measurements</h2>
         </div>
         <div className={styles.inlineActions}>
-          {enabled ? (
+          {enabled && canManage ? (
             <>
-              <button type="button" className="primary-button" onClick={onRecord}>
-                New weigh-in
+              <button type="button" onClick={onRecord}>
+                Record weight
               </button>
-              {checkingConnection && (
+              {connection === 'checking' && (
                 <button
                   type="button"
                   className="secondary-button"
@@ -92,11 +98,11 @@ export function NutritionScaleSettings({
                   <ButtonSpinner /> Checking scale…
                 </button>
               )}
-              {connected && (
+              {connection === 'connected' && (
                 <button
                   type="button"
                   className="secondary-button"
-                  disabled={busy}
+                  disabled={busy || !canManage}
                   aria-busy={busy}
                   onClick={() => void sync()}
                 >
@@ -105,14 +111,17 @@ export function NutritionScaleSettings({
                 </button>
               )}
             </>
-          ) : (
+          ) : canManage ? (
             <Link href="/account/nutrition#weight-tracking">Enable weight tracking</Link>
+          ) : (
+            <span>Measurements are read only.</span>
           )}
         </div>
       </header>
+      {!canManage && <p className={styles.hint}>Measurements are read only for this profile.</p>}
       {latest ? (
         <>
-          <div className="nutrition-current-weight">
+          <div className={styles.currentWeight}>
             <strong>
               {(latest.weightKilograms * (imperial ? 2.2046226218 : 1)).toFixed(1)}{' '}
               <small>{imperial ? 'lb' : 'kg'}</small>
@@ -126,23 +135,34 @@ export function NutritionScaleSettings({
             </span>
           </div>
           {Object.values(latest.metrics).some((v) => v != null) && (
-            <dl className={styles.review}>
-              {bodyMetricFields
-                .filter((f) => latest.metrics[f.key] != null)
-                .map((f) => (
-                  <div key={f.key}>
-                    <dt>{f.label}</dt>
-                    <dd>
-                      {Number(
-                        (
-                          latest.metrics[f.key]! * (imperial && f.unit === 'kg' ? 2.2046226218 : 1)
-                        ).toFixed(1),
-                      )}{' '}
-                      {imperial && f.unit === 'kg' ? 'lb' : f.unit}
-                    </dd>
-                  </div>
-                ))}
-            </dl>
+            <details>
+              <summary className="recipe-disclosure-summary">
+                Recorded measurements
+                <ChevronDown size={18} />
+              </summary>
+              <p className={styles.hint}>
+                Values from this {latest.sourceType === 'imported' ? 'imported' : 'recorded'}{' '}
+                observation on {new Date(latest.measuredAt).toLocaleDateString()}.
+              </p>
+              <dl className={styles.review}>
+                {bodyMetricFields
+                  .filter((f) => latest.metrics[f.key] != null)
+                  .map((f) => (
+                    <div key={f.key}>
+                      <dt>{f.label}</dt>
+                      <dd>
+                        {Number(
+                          (
+                            latest.metrics[f.key]! *
+                            (imperial && f.unit === 'kg' ? 2.2046226218 : 1)
+                          ).toFixed(1),
+                        )}{' '}
+                        {imperial && f.unit === 'kg' ? 'lb' : f.unit}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+            </details>
           )}
           <BodyCompositionEstimatePanel
             estimate={latest.estimate}
@@ -156,12 +176,37 @@ export function NutritionScaleSettings({
       ) : (
         <p>No weigh-ins yet. Add a measurement or connect your scale to start tracking.</p>
       )}
-      <p className={styles.hint}>
-        {connected ? 'Sync your scale in the VeSync app first. ' : ''}
-        <Link href="/account/integrations">
-          {connected ? 'Manage connection and automatic sync' : 'Connect a scale'}
-        </Link>
-      </p>
+      {connection === 'error' ? (
+        <div className={styles.hint} role="status">
+          <p>The scale connection could not be checked. This does not mean it is disconnected.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setConnection('checking');
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Retry connection check
+          </button>
+          <Link className="inline-link" href="/account/integrations">
+            Integration settings
+          </Link>
+        </div>
+      ) : connection === 'checking' ? (
+        <p className={styles.hint}>Checking scale connection…</p>
+      ) : (
+        <p className={styles.hint}>
+          {connection === 'connected'
+            ? 'Connected. Sync your scale in its app first. '
+            : 'No scale connection is configured. '}
+          <Link className="inline-link" href="/account/integrations">
+            {connection === 'connected' ? 'Manage scale connection' : 'Connect a scale'}
+          </Link>
+        </p>
+      )}
+      <Link className="inline-link" href="/nutrition?view=trends">
+        View measurement trend
+      </Link>
       {message && <p role="status">{message}</p>}
     </section>
   );

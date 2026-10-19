@@ -22,6 +22,7 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
   const labelId = useId();
   const [input, setInput] = useState('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [tagColours, setTagColours] = useState<Record<string, string>>({});
   const [loadingTags, setLoadingTags] = useState(true);
   const normalizedValue = useMemo(() => value.map(normalizeTag).filter(Boolean), [value]);
 
@@ -29,7 +30,15 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
     const controller = new AbortController();
     fetch('/api/v1/tags', { signal: controller.signal })
       .then(async (response) => (response.ok ? response.json() : null))
-      .then((body: { tags?: Array<{ name?: string }> } | null) => {
+      .then((body: { tags?: Array<{ name?: string; color?: string }> } | null) => {
+        if (controller.signal.aborted) return;
+        setTagColours(
+          Object.fromEntries(
+            body?.tags
+              ?.filter((tag) => tag.name && tag.color)
+              .map((tag) => [normalizeTag(tag.name!), tag.color!]) ?? [],
+          ),
+        );
         setAvailableTags(
           body?.tags?.flatMap((tag) => (tag.name ? [normalizeTag(tag.name)] : [])) ?? [],
         );
@@ -64,7 +73,17 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
       {normalizedValue.length > 0 ? (
         <div className="recipe-tag-pill-list" aria-label="Selected recipe tags">
           {normalizedValue.map((tag) => (
-            <span className={`recipe-tag-pill tag-tone-${tagTone(tag)}`} key={tag}>
+            <span
+              className={`recipe-tag-pill${tagColours[tag] ? '' : ` tag-tone-${tagTone(tag)}`}`}
+              key={tag}
+            >
+              {tagColours[tag] && (
+                <i
+                  className="saved-tag-swatch"
+                  style={{ backgroundColor: tagColours[tag] }}
+                  aria-hidden="true"
+                />
+              )}{' '}
               {tag}
               <button
                 type="button"
@@ -106,7 +125,15 @@ export function RecipeTagSelector({ value, onChange }: RecipeTagSelectorProps) {
         <div className="recipe-tag-suggestions" aria-label="Available tags">
           {suggestions.map((tag) => (
             <button type="button" key={tag} onClick={() => addTag(tag)}>
-              <Plus size={13} aria-hidden="true" /> {tag}
+              <Plus size={13} aria-hidden="true" />{' '}
+              {tagColours[tag] && (
+                <i
+                  className="saved-tag-swatch"
+                  style={{ backgroundColor: tagColours[tag] }}
+                  aria-hidden="true"
+                />
+              )}{' '}
+              {tag}
             </button>
           ))}
         </div>

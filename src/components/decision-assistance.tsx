@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
+import { PageHeader } from './page-header';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   DECISION_TASKS,
   type DecisionCard,
@@ -137,12 +138,12 @@ export function SuggestionCard({
       </label>
       <div className={styles.actions}>
         <button type="button" disabled={pending || disabled} onClick={() => feedback('correct')}>
-          Remember my choice
+          {card.task === 'meal_rank' ? 'Remember my assessment' : 'Remember my choice'}
         </button>
         {onChoose && card.task === 'pantry_input' && (
           <button
             type="button"
-            className={styles.primary}
+            className={`${styles.primary} primary-button`}
             disabled={pending || disabled || ['unknown', 'no_match'].includes(choice)}
             onClick={async () => {
               if (await feedback('correct')) onChoose(card, choice);
@@ -154,7 +155,7 @@ export function SuggestionCard({
         {card.apply && (
           <button
             type="button"
-            className={styles.primary}
+            className={`${styles.primary} primary-button`}
             disabled={pending || disabled || choice === 'unknown' || choice === 'no_match'}
             onClick={() => feedback('apply')}
           >
@@ -171,7 +172,7 @@ export function SuggestionCard({
         ) : null}
         {card.href && (
           <Link className={styles.link} href={card.href}>
-            Open source
+            {card.task === 'meal_rank' ? 'Open recipe' : 'Open source'}
           </Link>
         )}
       </div>
@@ -228,6 +229,7 @@ export function DecisionAssistance({
   hideContextHeader = false,
 }: AssistanceProps) {
   const ContextHeading = headingLevel === 3 ? 'h3' : 'h2';
+  const formId = useId();
   const router = useRouter();
   const [expanded, setExpanded] = useState(initiallyExpanded ?? !embedded);
   const [selected, setSelected] = useState<string[]>([]);
@@ -370,16 +372,26 @@ export function DecisionAssistance({
       {embedded && !hideContextHeader && (
         <div className={styles.contextHeader}>
           <div>
-            <span className={styles.badge}>ASSISTED REVIEW</span>
+            {!tasks || tasks.length > 1 ? (
+              <span className={styles.badge}>ASSISTED REVIEW</span>
+            ) : null}
             <ContextHeading>{title ?? DECISION_TASKS[initialTask].label}</ContextHeading>
             <p>{description ?? DECISION_TASKS[initialTask].help}</p>
           </div>
           <button
             type="button"
             aria-expanded={expanded}
-            onClick={() => {
+            onClick={(event) => {
               if (!expanded && !workspace) setWorkspaceLoading(true);
               setExpanded(!expanded);
+              if (!expanded) {
+                const root = event.currentTarget.closest(`.${styles.embedded}`);
+                window.setTimeout(() => {
+                  const field = root?.querySelector<HTMLElement>('select,input,textarea');
+                  field?.focus();
+                  field?.scrollIntoView({ block: 'nearest' });
+                }, 50);
+              }
             }}
           >
             {expanded ? 'Close review' : 'Review here'}
@@ -389,43 +401,45 @@ export function DecisionAssistance({
       {expanded && (
         <>
           {!embedded && (
-            <header className={styles.header}>
-              <p className="eyebrow">KITCHEN ASSISTANCE</p>
-              <h1>A useful next step.</h1>
-              <p>
-                Review suggestions grounded in your saved information. Your corrections are
-                remembered and always take precedence.
-              </p>
-              <Link href="/account/ai">Data sharing and AI settings</Link>
-            </header>
+            <PageHeader
+              title="Kitchen assistance"
+              description="A useful next step, based on your saved information. Review suggestions and choose what to apply."
+              actions={
+                <Link className="inline-link" href="/account/ai">
+                  AI settings
+                </Link>
+              }
+            />
           )}
           <section className={styles.panel}>
             <div className={styles.fields}>
-              <label className={styles.field}>
-                What would you like help with?
-                <select
-                  disabled={pending}
-                  value={task}
-                  onChange={(e) => {
-                    setTask(e.target.value as DecisionTask);
-                    setCards([]);
-                    setNotice('');
-                    setNextOffset(null);
-                    setSelected([]);
-                    setRecipeId(fixedRecipeId ?? '');
-                    setListId(fixedListId ?? '');
-                    setStoreId(fixedStoreId ?? '');
-                  }}
-                >
-                  {Object.entries(DECISION_TASKS)
-                    .filter(([id]) => !tasks || tasks.includes(id as DecisionTask))
-                    .map(([id, value]) => (
-                      <option key={id} value={id}>
-                        {value.label}
-                      </option>
-                    ))}
-                </select>
-              </label>
+              {!tasks || tasks.length > 1 ? (
+                <label className={styles.field}>
+                  What would you like help with?
+                  <select
+                    disabled={pending}
+                    value={task}
+                    onChange={(e) => {
+                      setTask(e.target.value as DecisionTask);
+                      setCards([]);
+                      setNotice('');
+                      setNextOffset(null);
+                      setSelected([]);
+                      setRecipeId(fixedRecipeId ?? '');
+                      setListId(fixedListId ?? '');
+                      setStoreId(fixedStoreId ?? '');
+                    }}
+                  >
+                    {Object.entries(DECISION_TASKS)
+                      .filter(([id]) => !tasks || tasks.includes(id as DecisionTask))
+                      .map(([id, value]) => (
+                        <option key={id} value={id}>
+                          {value.label}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              ) : null}
               {needsRecipe && !fixedRecipeId && (
                 <label className={styles.field}>
                   Recipe
@@ -456,13 +470,15 @@ export function DecisionAssistance({
               )}
               {needsList && !fixedListId && (
                 <label className={styles.field}>
-                  Shopping list
+                  <span id={`${formId}-list-label`}>Shopping list</span>
                   {workspaceLoading ? (
                     <AsyncSkeleton label="Loading shopping lists" variant="select" />
                   ) : (
                     <select
                       disabled={pending || !workspace}
                       value={listId}
+                      aria-labelledby={`${formId}-list-label`}
+                      aria-describedby={!listId ? `${formId}-list-help` : undefined}
                       onChange={(e) => {
                         setListId(e.target.value);
                         clearResults();
@@ -476,6 +492,11 @@ export function DecisionAssistance({
                       ))}
                     </select>
                   )}
+                  {!listId && !workspaceLoading ? (
+                    <small className={styles.helper} id={`${formId}-list-help`}>
+                      Choose a shopping list to review its suggestions.
+                    </small>
+                  ) : null}
                 </label>
               )}
               {task === 'aisles' && !fixedListId && (
@@ -487,6 +508,8 @@ export function DecisionAssistance({
                     <select
                       disabled={pending || !workspace}
                       value={storeId}
+                      aria-label="Store"
+                      aria-describedby={!listId ? `${formId}-store-help` : undefined}
                       onChange={(e) => {
                         setStoreId(e.target.value);
                         clearResults();
@@ -500,13 +523,30 @@ export function DecisionAssistance({
                       ))}
                     </select>
                   )}
+                  {!listId && !workspaceLoading ? (
+                    <small className={styles.helper} id={`${formId}-store-help`}>
+                      Choose a list to use its store, or pick a store here.
+                    </small>
+                  ) : null}
                 </label>
               )}
             </div>
-            <p className={styles.muted}>{DECISION_TASKS[task].help}</p>
+            <p className={styles.muted}>
+              {DECISION_TASKS[task].help}
+              {task === 'pantry_review'
+                ? ' Reviews household stock, including items outside the current view. Suggestions do not change stock automatically.'
+                : task === 'restock'
+                  ? ' Restock amounts are calculated from saved policies and stock; review before applying.'
+                  : ''}
+            </p>
             {inputQuery === undefined && (
               <label className={styles.field}>
-                Details or preferences
+                Details or preferences{' '}
+                {!['nutrition_match', 'pantry_input', 'clarification', 'substitutions'].includes(
+                  task,
+                )
+                  ? '(optional)'
+                  : '(required)'}
                 <textarea
                   disabled={pending}
                   value={query}
@@ -520,7 +560,11 @@ export function DecisionAssistance({
                       ? 'Example: cooked brown rice, 150 g'
                       : task === 'substitutions'
                         ? 'Which ingredient would you like to replace?'
-                        : 'Enter the item, or tell us what matters for this review'
+                        : task === 'pantry_review'
+                          ? 'Optional: check recorded dates for opened packages'
+                          : task === 'restock'
+                            ? 'Optional: items to keep for weekday meals'
+                            : 'Enter the item, or tell us what matters for this review'
                   }
                 />
               </label>
@@ -530,17 +574,24 @@ export function DecisionAssistance({
                 type="checkbox"
                 disabled={pending}
                 checked={paid}
+                aria-labelledby={`${formId}-paid-label`}
+                aria-describedby={`${formId}-paid-help`}
                 onChange={(e) => setPaid(e.target.checked)}
               />
               <span>
-                Allow a paid OpenAI request for new suggestions. Saved decisions are reused when
-                their evidence is unchanged.
+                <strong id={`${formId}-paid-label`}>
+                  Use paid AI when new suggestions are needed
+                </strong>
+                <small className={styles.helper} id={`${formId}-paid-help`}>
+                  Saved suggestions can be reused without a new request. This permission applies to
+                  this review only.
+                </small>
               </span>
             </label>
             <div className={styles.actions}>
               <button
                 type="button"
-                className={styles.primary}
+                className={`${styles.primary} primary-button`}
                 disabled={
                   pending ||
                   !workspace ||
@@ -557,19 +608,18 @@ export function DecisionAssistance({
                   <>
                     <ButtonSpinner /> Reviewing…
                   </>
-                ) : (
+                ) : paid ? (
                   'Review suggestions'
+                ) : (
+                  'Review saved suggestions'
                 )}
               </button>
               {task === 'aisles' && (
-                <Link href="/settings/lists">Edit store route or upload a map</Link>
+                <Link className="inline-link" href="/settings/lists">
+                  Manage store layouts
+                </Link>
               )}
             </div>
-            {!paid && (
-              <small className={styles.muted}>
-                With this unchecked, only existing cached results can be returned.
-              </small>
-            )}
           </section>
           {!workspace && !workspaceLoading ? (
             <button

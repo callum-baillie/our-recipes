@@ -63,8 +63,8 @@
 }
 .profiles {
   display: grid;
-  grid-template-columns: minmax(14rem, 0.32fr) minmax(0, 1fr);
-  overflow: hidden;
+  grid-template-columns: minmax(12rem, 14rem) minmax(0, 1fr);
+  overflow: visible;
 }
 .profileRail {
   padding: 0.9rem 0;
@@ -135,7 +135,7 @@
 }
 .profileFields {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--line);
@@ -166,7 +166,7 @@
 }
 .routeList li {
   display: grid;
-  grid-template-columns: auto 2rem minmax(0, 1fr) auto;
+  grid-template-columns: 44px 1.25rem minmax(0, 1fr) auto;
   gap: 0.55rem;
   align-items: center;
   min-height: 3.7rem;
@@ -192,7 +192,7 @@
 }
 .routeInputs input:first-child {
   font-family: var(--font-serif);
-  font-size: 1.04rem;
+  font-size: 1rem;
 }
 .routeActions {
   display: flex;
@@ -201,8 +201,8 @@
 .routeActions button {
   display: grid;
   place-items: center;
-  width: 2.15rem;
-  height: 2.15rem;
+  width: 44px;
+  height: 44px;
   color: var(--ink);
   background: transparent;
   border: 1px solid var(--line);
@@ -263,72 +263,32 @@
   font-size: 0.85rem;
   font-weight: 700;
 }
-@media (max-width: 1000px) {
-  .preferenceGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .profiles {
-    grid-template-columns: 1fr;
-  }
-  .profileRail {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .profileList {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 700px) {
-  .preferenceGrid,
-  .profileFields,
-  .routeInputs {
-    grid-template-columns: 1fr;
-  }
-  .profileList {
-    grid-template-columns: 1fr;
-  }
-  .routeList li {
-    grid-template-columns: auto 1.7rem minmax(0, 1fr);
-  }
-  .routeActions {
-    grid-column: 3;
-  }
-  .editorFooter {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .editorFooter > div {
-    flex-wrap: wrap;
-  }
-}
 
-/* The route editor can be narrow even on a laptop with the settings sidebar open. */
-@container (max-width: 660px) {
-  .routeInputs {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .routeList li {
-    grid-template-columns: auto 1.7rem minmax(0, 1fr);
-  }
-  .routeActions {
-    grid-column: 3;
-  }
-  .editorFooter {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .editorFooter > div {
-    flex-wrap: wrap;
-  }
+.keywords {
+  min-width: 0;
 }
-
+.keywords > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 0.65rem;
+  font-size: 0.85rem;
+}
+.keywords > label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 500;
+}
+.keywords textarea {
+  width: 100%;
+  resize: vertical;
+}
 .dragHandle {
   display: grid;
   place-items: center;
   touch-action: none;
   user-select: none;
   cursor: grab;
-  width: 40px;
+  width: 44px;
   min-height: 44px;
   padding: 0;
   border: 0;
@@ -355,33 +315,62 @@
 }
 .routeHelp {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   line-height: 1.5;
 }
-@media (max-width: 650px) {
-  .routeList > li {
-    grid-template-columns: 40px 1.5rem minmax(0, 1fr);
+@media (max-width: 1100px) {
+  .profiles {
+    grid-template-columns: minmax(0, 1fr);
+    border: 0;
+  }
+  .profileRail {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0.5rem 0;
+  }
+  .profileList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profileEditor {
+    padding: 0.75rem 0;
+  }
+}
+@container (max-width: 660px) {
+  .routeInputs {
+    display: contents;
+  }
+  .routeInputs > input {
+    grid-column: 3;
+  }
+  .routeList li {
+    grid-template-columns: 44px 1.1rem minmax(0, 1fr);
     gap: 0.3rem;
-    padding: 0.65rem 0.4rem;
   }
   .routeActions {
     grid-column: 3;
     justify-content: flex-end;
   }
-  .routeActions button {
-    min-width: 44px;
-    min-height: 44px;
-    display: grid;
-    place-items: center;
-    padding: 0;
+  .keywords {
+    grid-column: 1 / -1;
+  }
+  .editorFooter {
+    margin: 1rem 0 0;
+    padding: 0.75rem 0;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .editorFooter > div {
+    flex-wrap: wrap;
   }
 }
-.routeList > li {
-  grid-template-columns: 40px 1.5rem minmax(0, 1fr) auto;
-  align-items: center;
-}
-@media (max-width: 650px) {
-  .routeList > li {
-    grid-template-columns: 40px 1.5rem minmax(0, 1fr);
+@media (max-width: 700px) {
+  .profileList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profileRail > p {
+    margin: 0.5rem;
+  }
+  .profileFields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

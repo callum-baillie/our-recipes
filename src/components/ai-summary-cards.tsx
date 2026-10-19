@@ -4,7 +4,6 @@ import {
   BookOpen,
   CalendarRange,
   ChevronDown,
-  ChevronUp,
   Minus,
   ShoppingBasket,
   Sparkles,
@@ -34,6 +33,8 @@ export type AiSummaryCardData = {
   }>;
   caveats: string[];
   createdAt: string;
+  periodStart?: string;
+  periodEnd?: string;
 };
 
 const DOMAIN_META = {
@@ -112,6 +113,15 @@ export function AiSummaryCards({
             <Sparkles size={13} aria-hidden="true" /> AI {meta.label}
           </p>
           <h2 id={summary.id}>{summary.headline}</h2>
+          <small>
+            Generated snapshot ·{' '}
+            <time dateTime={summary.createdAt}>
+              {new Intl.DateTimeFormat(undefined, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }).format(new Date(summary.createdAt))}
+            </time>
+          </small>
         </div>
       </header>
       <p className={styles.summary}>{summary.summary}</p>
@@ -125,8 +135,8 @@ export function AiSummaryCards({
                 <dd>
                   {metric.value}
                   {Trend ? <Trend size={15} aria-label={`${metric.trend} trend`} /> : null}
+                  {metric.context ? <small>{metric.context}</small> : null}
                 </dd>
-                {metric.context ? <small>{metric.context}</small> : null}
               </div>
             );
           })}
@@ -141,9 +151,8 @@ export function AiSummaryCards({
       ) : null}
       {summary.caveats.length ? (
         <details className={styles.caveats}>
-          <summary>
-            Data notes <ChevronDown className={styles.closedIcon} size={15} aria-hidden="true" />
-            <ChevronUp className={styles.openIcon} size={15} aria-hidden="true" />
+          <summary className="recipe-disclosure-summary">
+            <span>Data notes</span> <ChevronDown size={18} aria-hidden="true" />
           </summary>
           <ul>
             {summary.caveats.map((item) => (
@@ -153,13 +162,10 @@ export function AiSummaryCards({
         </details>
       ) : null}
       <footer>
-        <span>
-          Updated{' '}
-          {new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(
-            new Date(summary.createdAt),
-          )}
-        </span>
-        <Link href="/account/ai">Summary settings</Link>
+        <span>Saved AI summary</span>
+        <Link className="inline-link" href="/account/ai">
+          Summary settings
+        </Link>
       </footer>
     </section>
   );

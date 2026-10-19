@@ -3,7 +3,7 @@ const CACHE_PREFIX = 'bord-read-';
 const LEGACY_CACHE_PREFIX = 'our-recipes-read-';
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
 const OFFLINE_URL = '/offline';
-const UPDATE_QUERY_PARAM = '__bord_updated';
+const clientVersions = new Map();
 const IS_UPDATE = Boolean(self.registration.active);
 
 function isSameOriginGet(request) {
@@ -39,12 +39,12 @@ async function networkFirst(request, fallback) {
   try {
     const response = await fetch(request);
     if (!response.ok) {
-      const cached = await (await caches.open(CACHE_NAME)).match(request);
+      const cached = await cachedRead(request);
       return cached ?? response;
     }
     return await cacheResponse(request, response);
   } catch {
-    const cached = await (await caches.open(CACHE_NAME)).match(request);
+    const cached = await cachedRead(request);
     return cached ?? fallback;
   }
 }
@@ -59,45 +59,68 @@ async function deleteOldAppCaches() {
   return oldAppCaches.length;
 }
 
-async function refreshWindowClients() {
+async function notifyWindowClients() {
   await self.clients.claim();
-  const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  await Promise.all(
-    windowClients.map(async (client) => {
-      client.postMessage({ type: 'BORD_UPDATED', version: APP_VERSION });
-      if (typeof client.navigate !== 'function') return;
-      const target = new URL(client.url);
-      if (target.origin !== self.location.origin) return;
-      target.searchParams.set(UPDATE_QUERY_PARAM, APP_VERSION);
-      try {
-        await client.navigate(target.href);
-      } catch {
-        // The message and controllerchange handlers remain as reload fallbacks.
-      }
-    }),
-  );
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of windows) client.postMessage({ type: 'BORD_UPDATED', version: APP_VERSION });
+}
+async function cleanAcknowledgedCaches() {
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  if (windows.every((client) => clientVersions.get(client.id) === APP_VERSION))
+    await deleteOldAppCaches();
+}
+async function offlineFallback() {
+  const cached = await (await caches.open(CACHE_NAME)).match(OFFLINE_URL);
+  if (!cached)
+    return new Response('Kitchen unavailable. Reconnect and try again.', { status: 503 });
+  const headers = new Headers(cached.headers);
+  headers.set('X-Bord-Offline', '1');
+  return new Response(cached.body, {
+    status: cached.status,
+    statusText: cached.statusText,
+    headers,
+  });
+}
+async function cachedRead(request) {
+  const current = await (await caches.open(CACHE_NAME)).match(request);
+  if (current) return current;
+  // Keep existing tabs readable until every tab has adopted the new app version.
+  for (const key of await caches.keys()) {
+    if (key.startsWith(CACHE_PREFIX) || key.startsWith(LEGACY_CACHE_PREFIX)) {
+      const previous = await (await caches.open(key)).match(request);
+      if (previous) return previous;
+    }
+  }
 }
 
+async function cacheOfflineShell() {
+  const cache = await caches.open(CACHE_NAME);
+  await cache.add(new Request(OFFLINE_URL, { cache: 'reload' }));
+  const shell = await cache.match(OFFLINE_URL);
+  if (!shell) throw new Error('Offline shell was not cached');
+  const html = await shell.text();
+  const assets = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/gu)]
+    .map((match) => new URL(match[1], self.location.origin))
+    .filter(
+      (url) => url.origin === self.location.origin && url.pathname.startsWith('/_next/static/'),
+    );
+  // The recovery button needs the offline route's client bundle as well as its HTML.
+  await cache.addAll([...new Set(assets.map((url) => url.href))]);
+}
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.add(new Request(OFFLINE_URL, { cache: 'reload' })))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(cacheOfflineShell().then(() => (IS_UPDATE ? undefined : self.skipWaiting())));
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    deleteOldAppCaches().then(async (deletedCacheCount) => {
-      if (IS_UPDATE || deletedCacheCount > 0) await refreshWindowClients();
-      else await self.clients.claim();
-    }),
-  );
+  event.waitUntil(IS_UPDATE ? notifyWindowClients() : self.clients.claim());
 });
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') event.waitUntil(self.skipWaiting());
+  if (event.data?.type === 'BORD_CLIENT_READY' && event.source?.id) {
+    clientVersions.set(event.source.id, event.data.version);
+    event.waitUntil(cleanAcknowledgedCaches());
+  }
   if (event.data?.type === 'CLEAR_AUTH_CACHES') {
     event.waitUntil(
       caches
@@ -121,8 +144,8 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       isOfflineRecipeNavigation(url)
-        ? networkFirst(request, caches.match(OFFLINE_URL))
-        : fetch(request).catch(() => caches.match(OFFLINE_URL)),
+        ? networkFirst(request, offlineFallback())
+        : fetch(request).catch(() => offlineFallback()),
     );
     return;
   }

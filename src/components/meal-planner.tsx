@@ -1,4 +1,14 @@
 'use client';
+import { formatRecipeDuration } from '@/lib/domain/recipe-duration';
+import {
+  plannerFocus,
+  shiftPlannerFocus,
+  planningRangeError,
+  nextMealDate,
+  plannerMealOptions,
+} from '@/lib/domain/planner-workflow';
+import { DismissibleDetails } from './dismissible-details';
+import { useEffect, useRef } from 'react';
 import { AppDialog } from './app-dialog';
 import cardStyles from './meal-planner-card.module.css';
 import settingsStyles from './meal-plan-settings.module.css';
@@ -51,11 +61,9 @@ import { AiMealPlanGenerator } from '@/components/ai-meal-plan-generator';
 import { AiSummaryCards, type AiSummaryCardData } from '@/components/ai-summary-cards';
 import { MealPlanRecipeSelector } from '@/components/meal-plan-recipe-selector';
 import { ButtonSpinner, InlineSkeleton, LoadingIndicator } from '@/components/skeleton';
-import { InlineAlert } from '@/components/inline-alert';
 import {
   addPlannerDays,
   formatPlannerDate,
-  MEAL_OPTIONS,
   mealTypeLabel,
   plannerDates,
   type MealType,
@@ -81,6 +89,8 @@ type MealPlannerProps = {
   previousWeekStart: string;
   nextWeekStart: string;
   today?: string;
+  focusDate?: string;
+  nutritionProfileName?: string;
   nutritionByDate?: Record<string, Record<string, number>>;
   nutritionGoals?: Array<{
     nutrientCode: string;
@@ -89,7 +99,13 @@ type MealPlannerProps = {
     minimum: number | null;
     maximum: number | null;
   }>;
-  pantrySummary?: { covered: number; total: number; missing: number };
+  pantrySummary?: {
+    covered: number;
+    total: number;
+    missing: number;
+    short?: number;
+    uncertain?: number;
+  };
   pantryStatusByMeal?: Record<string, 'covered' | 'shortage' | 'uncertain' | 'unknown'>;
   defaultDuration?: 3 | 5 | 7 | 14;
   defaultMealTypes?: MealType[];
@@ -176,6 +192,7 @@ function mealLabel(meal: string): string {
 }
 
 function humanRange(start: string, end: string): string {
+  if (!start || !end) return 'Choose planning dates';
   const startLabel = formatPlannerDate(start, { month: 'short', day: 'numeric' });
   const endLabel = formatPlannerDate(end, { month: 'short', day: 'numeric', year: 'numeric' });
   return `${startLabel} – ${endLabel}`;
@@ -192,7 +209,7 @@ function goalBoundary(
 ): number | null {
   if (!goal) return null;
   if (goal.kind === 'range' || goal.kind === 'limit') return goal.maximum;
-  return goal.value;
+  return goal.kind === 'minimum' ? (goal.value ?? goal.minimum) : goal.value;
 }
 
 function number(value: number | undefined, maximumFractionDigits = 0): string {
@@ -277,47 +294,29 @@ function MealThumbnail({ meal, recipes }: { meal: PlannedMeal; recipes: RecipeLi
 function PlannedMealCard({
   meal,
   compact = false,
+  unconfirmed = false,
   profiles,
   recipes,
   busy,
-  dates,
-  weekMeals,
-  mealTypes,
   pantryStatus,
-  onRemove,
-  onRefreshRecipe,
-  onEdit,
-  onStatus,
   onServings,
-  onDuplicate,
-  onMove,
-  onSwap,
+  onActions,
   onDragStart,
 }: {
   meal: PlannedMeal;
   compact?: boolean;
+  unconfirmed?: boolean;
   profiles: Array<{ id: string; displayName: string }>;
   recipes: RecipeListItem[];
   busy: boolean;
-  dates: string[];
-  weekMeals: PlannedMeal[];
-  mealTypes: MealTypeOption[];
   pantryStatus: 'covered' | 'shortage' | 'uncertain' | 'unknown';
-  onRemove: (id: string) => void;
-  onRefreshRecipe: (id: string) => void;
-  onEdit: (meal: PlannedMeal) => void;
-  onStatus: (id: string, status: 'planned' | 'skipped' | 'cancelled') => void;
   onServings: (meal: PlannedMeal, servings: number) => void;
-  onDuplicate: (meal: PlannedMeal) => void;
-  onMove: (meal: PlannedMeal, date: string, mealType: MealType) => void;
-  onSwap: (meal: PlannedMeal, target: PlannedMeal) => void;
+  onActions: (meal: PlannedMeal) => void;
   onDragStart: (mealId: string) => void;
 }) {
   const recipe = recipeForMeal(meal, recipes);
   const alternatives = mealOptions(meal);
   const totalMinutes = recipe ? recipe.prepMinutes + recipe.cookMinutes + recipe.restMinutes : null;
-  const [moveTarget, setMoveTarget] = useState(`${meal.plannedFor}:${meal.meal}`);
-  const [swapTarget, setSwapTarget] = useState('');
   const pantryLabel = {
     covered: 'Pantry covered',
     shortage: 'Pantry items missing',
@@ -328,7 +327,7 @@ function PlannedMealCard({
   return (
     <article
       className={`${cardStyles.plannedMeal} ${compact ? cardStyles.compact : ''}`}
-      draggable={!busy}
+      draggable={!busy && !unconfirmed}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', meal.id);
@@ -393,7 +392,9 @@ function PlannedMealCard({
               .join(', ') || 'selected members'}
           </small>
         ) : (
-          <small className={cardStyles.audience}>Shared household meal</small>
+          <small className={`${cardStyles.audience} ${cardStyles.sharedAudience}`}>
+            Shared household meal
+          </small>
         )}
         {meal.kind === 'leftover' ||
         meal.kind === 'takeout' ||
@@ -422,7 +423,7 @@ function PlannedMealCard({
               min={1}
               max={100}
               defaultValue={meal.servings}
-              disabled={busy}
+              disabled={busy || unconfirmed}
               onBlur={(event) => {
                 const next = Number(event.currentTarget.value);
                 if (next !== meal.servings && next >= 1 && next <= 100) onServings(meal, next);
@@ -435,43 +436,127 @@ function PlannedMealCard({
           </label>
           {totalMinutes ? (
             <span className={cardStyles.duration}>
-              <Clock3 size={16} aria-hidden="true" /> {totalMinutes}m
+              <Clock3 size={16} aria-hidden="true" /> {formatRecipeDuration(totalMinutes)}
             </span>
           ) : null}
         </span>
       </div>
-      <details
-        className={cardStyles.mealActions}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.currentTarget.open = false;
-            event.currentTarget.querySelector('summary')?.focus();
-          }
+      <button
+        className={cardStyles.mealActionTrigger}
+        type="button"
+        data-meal-actions={meal.id}
+        aria-haspopup="dialog"
+        aria-label={`Actions for ${meal.recipeTitle}`}
+        onClick={() => {
+          onActions(meal);
         }}
       >
-        <summary aria-label={`Actions for ${meal.recipeTitle}`} title="Meal actions">
-          <Ellipsis size={17} aria-hidden="true" />
-        </summary>
+        <Ellipsis size={18} aria-hidden="true" />
+      </button>
+    </article>
+  );
+}
+
+type PlannedMealActionsProps = {
+  meal: PlannedMeal;
+  busy: boolean;
+  unconfirmed?: boolean;
+  dates: string[];
+  weekMeals: PlannedMeal[];
+  mealTypes: MealTypeOption[];
+  pantryStatus: 'covered' | 'shortage' | 'uncertain' | 'unknown';
+  onRemove: (id: string) => void;
+  onRefreshRecipe: (id: string) => void;
+  onEdit: (meal: PlannedMeal) => void;
+  onStatus: (id: string, status: 'planned' | 'skipped' | 'cancelled') => void;
+  onDuplicate: (meal: PlannedMeal) => void;
+  onMove: (meal: PlannedMeal, date: string, mealType: MealType) => void;
+  onSwap: (meal: PlannedMeal, target: PlannedMeal) => void;
+  onClose: () => void;
+};
+function PlannedMealActions({
+  meal,
+  busy,
+  unconfirmed,
+  dates,
+  weekMeals,
+  mealTypes,
+  pantryStatus,
+  onRemove,
+  onRefreshRecipe,
+  onEdit,
+  onStatus,
+  onDuplicate,
+  onMove,
+  onSwap,
+  onClose,
+}: PlannedMealActionsProps) {
+  const [moveTarget, setMoveTarget] = useState(`${meal.plannedFor}:${meal.meal}`);
+  const [swapTarget, setSwapTarget] = useState('');
+  const pantryLabel = {
+    covered: 'Pantry covered',
+    shortage: 'Pantry items missing',
+    uncertain: 'Pantry coverage uncertain',
+    unknown: 'Pantry coverage not calculated',
+  }[pantryStatus];
+  return (
+    <AppDialog
+      className={cardStyles.actionDialog}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      aria-label={`Actions for ${meal.recipeTitle}`}
+    >
+      <header>
         <div>
-          <button
-            type="button"
-            onClick={(event) => {
-              const menu = event.currentTarget.closest('details');
-              if (menu) {
-                menu.open = false;
-                menu.querySelector('summary')?.focus();
-              }
-            }}
-            aria-label="Close meal actions"
-          >
-            Close menu <X size={18} />
-          </button>
-          <button type="button" disabled={busy} onClick={() => onEdit(meal)}>
-            Edit meal{meal.recipeId ? ' / adapt recipe' : ''}
-          </button>
-          <button type="button" disabled={busy} onClick={() => onDuplicate(meal)}>
-            <CopyPlus size={14} aria-hidden="true" /> Duplicate to next day
-          </button>
+          <h2>{meal.recipeTitle}</h2>
+          <p>
+            {formatPlannerDate(meal.plannedFor, {
+              weekday: 'long',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}{' '}
+            · {mealTypeLabel(meal.meal, mealTypes)}
+          </p>
+          <small>{pantryLabel}</small>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          aria-label="Close meal actions"
+          onClick={() => onClose()}
+        >
+          <X size={20} />
+        </button>
+      </header>
+      <div className={cardStyles.actionBody}>
+        {unconfirmed ? (
+          <p role="alert">
+            A calendar change could not be confirmed. Refresh before making another change.{' '}
+            <button type="button" onClick={() => window.location.reload()}>
+              Refresh calendar
+            </button>
+          </p>
+        ) : null}
+        <button
+          type="button"
+          disabled={busy || unconfirmed}
+          onClick={() => {
+            onClose();
+            onEdit(meal);
+          }}
+        >
+          Edit meal{meal.recipeId ? ' / adapt recipe' : ''}
+        </button>
+        <button type="button" disabled={busy || unconfirmed} onClick={() => onDuplicate(meal)}>
+          <CopyPlus size={14} aria-hidden="true" /> Duplicate to next day
+        </button>
+        <details className={cardStyles.reschedule}>
+          <summary className="recipe-disclosure-summary">
+            <span>Reschedule or swap</span>
+            <ChevronDown size={18} />
+          </summary>
           <div className={cardStyles.mealActionGroup}>
             <span>
               <Move size={14} aria-hidden="true" /> Move to
@@ -484,14 +569,20 @@ function PlannedMealCard({
               {dates.flatMap((date) =>
                 mealTypes.map((option) => (
                   <option key={`${date}:${option.value}`} value={`${date}:${option.value}`}>
-                    {formatPlannerDate(date, { weekday: 'short' })} · {option.label}
+                    {formatPlannerDate(date, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    · {option.label}
                   </option>
                 )),
               )}
             </select>
             <button
               type="button"
-              disabled={busy || moveTarget === `${meal.plannedFor}:${meal.meal}`}
+              disabled={busy || unconfirmed || moveTarget === `${meal.plannedFor}:${meal.meal}`}
               onClick={() => {
                 const [date, mealType] = moveTarget.split(':') as [string, MealType];
                 onMove(meal, date, mealType);
@@ -503,7 +594,7 @@ function PlannedMealCard({
           {dates[dates.indexOf(meal.plannedFor) - 1] ? (
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || unconfirmed}
               onClick={() =>
                 onMove(meal, dates[dates.indexOf(meal.plannedFor) - 1]!, meal.meal as MealType)
               }
@@ -514,7 +605,7 @@ function PlannedMealCard({
           {dates[dates.indexOf(meal.plannedFor) + 1] ? (
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || unconfirmed}
               onClick={() =>
                 onMove(meal, dates[dates.indexOf(meal.plannedFor) + 1]!, meal.meal as MealType)
               }
@@ -536,14 +627,19 @@ function PlannedMealCard({
                 .filter((candidate) => candidate.id !== meal.id)
                 .map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {formatPlannerDate(candidate.plannedFor, { weekday: 'short' })} ·{' '}
-                    {mealLabel(candidate.meal)} · {candidate.recipeTitle}
+                    {formatPlannerDate(candidate.plannedFor, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    · {mealLabel(candidate.meal)} · {candidate.recipeTitle}
                   </option>
                 ))}
             </select>
             <button
               type="button"
-              disabled={busy || !swapTarget}
+              disabled={busy || unconfirmed || !swapTarget}
               onClick={() => {
                 const target = weekMeals.find((candidate) => candidate.id === swapTarget);
                 if (target) onSwap(meal, target);
@@ -552,52 +648,191 @@ function PlannedMealCard({
               Swap
             </button>
           </div>
-          {meal.effectiveStatus === 'cooked' ? (
-            <span>Cooked</span>
-          ) : (
-            <label>
-              <span>Status</span>
-              <select
-                aria-label={`Status for ${meal.recipeTitle}`}
-                value={meal.status}
-                disabled={busy}
-                onChange={(event) =>
-                  onStatus(meal.id, event.target.value as 'planned' | 'skipped' | 'cancelled')
-                }
-              >
-                <option value="planned">Planned</option>
-                <option value="skipped">Skipped</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </label>
-          )}
-          {meal.recipeId &&
-          meal.kind !== 'leftover' &&
-          meal.status === 'planned' &&
-          meal.effectiveStatus !== 'cooked' ? (
-            <Link
-              href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
-              aria-label={`Make ${meal.recipeTitle} from this planned meal`}
+        </details>
+        {meal.effectiveStatus === 'cooked' ? (
+          <span>Cooked</span>
+        ) : (
+          <label>
+            <span>Status · saves immediately</span>
+            <select
+              aria-label={`Status for ${meal.recipeTitle}`}
+              value={meal.status}
+              disabled={busy || unconfirmed}
+              onChange={(event) =>
+                onStatus(meal.id, event.target.value as 'planned' | 'skipped' | 'cancelled')
+              }
             >
-              Make this meal
-            </Link>
-          ) : null}
-          {meal.recipeChangedSincePlanning && meal.kind !== 'leftover' ? (
-            <button type="button" disabled={busy} onClick={() => onRefreshRecipe(meal.id)}>
-              Refresh recipe
-            </button>
-          ) : null}
-          <button
-            className={cardStyles.destructiveAction}
-            type="button"
-            disabled={busy}
-            onClick={() => onRemove(meal.id)}
+              <option value="planned">Planned</option>
+              <option value="skipped">Skipped</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+        )}
+        {meal.recipeId &&
+        meal.kind !== 'leftover' &&
+        meal.status === 'planned' &&
+        meal.effectiveStatus !== 'cooked' ? (
+          <Link
+            href={`/recipes/${meal.recipeId}/cook?mealPlanEntryId=${meal.id}`}
+            aria-label={`Make ${meal.recipeTitle} from this planned meal`}
           >
-            <Trash2 size={14} aria-hidden="true" /> Remove
+            Cook this meal
+          </Link>
+        ) : null}
+        {meal.recipeChangedSincePlanning && meal.kind !== 'leftover' ? (
+          <button
+            type="button"
+            disabled={busy || unconfirmed}
+            onClick={() => onRefreshRecipe(meal.id)}
+          >
+            Refresh recipe
           </button>
+        ) : null}
+        <button
+          className={cardStyles.destructiveAction}
+          type="button"
+          disabled={busy || unconfirmed}
+          onClick={() => onRemove(meal.id)}
+        >
+          <Trash2 size={14} aria-hidden="true" /> Remove
+        </button>
+      </div>
+    </AppDialog>
+  );
+}
+
+function NutritionPreview({
+  nutrition,
+  profileName,
+  period,
+  busy,
+}: {
+  nutrition: Array<{
+    code: string;
+    label: string;
+    unit: string;
+    value: number | undefined;
+    target: number | null;
+    goalLabel: string;
+    goalKind?: string;
+    knownDays: number;
+    progress: number;
+  }>;
+  profileName: string;
+  period: string;
+  busy: boolean;
+}) {
+  return (
+    <section className={styles.insightCard}>
+      <h3>Nutrition preview</h3>
+      <p className={styles.railDescription}>
+        {profileName} · {period}. Daily averages use days with known values for each nutrient.
+      </p>
+      {busy ? (
+        <InlineSkeleton label="Updating nutrition preview" width="100%" />
+      ) : nutrition.some((item) => item.value !== undefined) ? (
+        <div className={styles.nutrientGrid}>
+          {nutrition.map((item) => (
+            <div className={styles.nutritionLine} key={item.code}>
+              <strong>{item.label}</strong>
+              <span>
+                {number(item.value)} {item.unit}
+              </span>
+              <small>
+                {item.value === undefined
+                  ? 'Unknown'
+                  : `${item.knownDays} ${item.knownDays === 1 ? 'day' : 'days'} with data`}
+              </small>
+              {item.goalLabel ? <small>{item.goalLabel}</small> : null}
+              {item.value !== undefined && item.target && item.goalKind === 'target' ? (
+                <progress
+                  aria-label={`${item.label} compared with target`}
+                  max={100}
+                  value={item.progress}
+                />
+              ) : null}
+            </div>
+          ))}
         </div>
-      </details>
-    </article>
+      ) : (
+        <p className={styles.summaryEmpty}>No planned nutrition data for this person and period.</p>
+      )}
+      <p className={styles.railDescription}>
+        Planned estimates, not logged meals. Missing values remain unknown.
+      </p>
+      <Link className="inline-link" href="/nutrition?view=overview">
+        View full nutrition
+      </Link>
+    </section>
+  );
+}
+function PantryPreview({
+  summary,
+  meals,
+  busy,
+  period,
+  onGenerate,
+  generating,
+}: {
+  summary: NonNullable<MealPlannerProps['pantrySummary']>;
+  meals: number;
+  busy: boolean;
+  period: string;
+  onGenerate: () => void;
+  generating: boolean;
+}) {
+  return (
+    <section className={styles.insightCard}>
+      <h3>Pantry and shopping</h3>
+      <p className={styles.railDescription}>{period}</p>
+      {busy ? (
+        <InlineSkeleton label="Updating Pantry coverage" width="100%" />
+      ) : summary.total > 0 ? (
+        <>
+          <dl className={styles.coverageCounts}>
+            <div>
+              <dt>Covered</dt>
+              <dd>{summary.covered}</dd>
+            </div>
+            <div>
+              <dt>Short</dt>
+              <dd>{summary.short ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Needs review</dt>
+              <dd>{summary.uncertain ?? Math.max(0, summary.missing - (summary.short ?? 0))}</dd>
+            </div>
+          </dl>
+          <p className={styles.railDescription}>
+            {summary.total} ingredient demand {summary.total === 1 ? 'entry' : 'entries'}. Needs
+            review includes unmatched or unconvertible amounts.
+          </p>
+        </>
+      ) : (
+        <p className={styles.summaryEmpty}>
+          {meals
+            ? 'Pantry coverage is not available for these meals yet.'
+            : 'Add a meal to calculate coverage.'}
+        </p>
+      )}
+      <Link className="inline-link" href="/pantry">
+        View pantry
+      </Link>
+      <button
+        className={styles.shoppingButton}
+        type="button"
+        disabled={busy || generating || !meals}
+        onClick={onGenerate}
+      >
+        {generating ? (
+          <LoadingIndicator label="Creating grocery list" />
+        ) : (
+          <ShoppingBasket size={18} aria-hidden="true" />
+        )}{' '}
+        Make grocery list
+      </button>
+      <small>Creates a Pantry-aware list for the displayed period.</small>
+    </section>
   );
 }
 
@@ -609,9 +844,10 @@ export function MealPlanner({
   profiles,
   collections,
   collectionMemberships,
-  previousWeekStart,
   nextWeekStart,
   today = weekStart,
+  focusDate,
+  nutritionProfileName = 'Active person',
   nutritionByDate = {},
   nutritionGoals = [],
   pantrySummary = { covered: 0, total: 0, missing: 0 },
@@ -626,6 +862,25 @@ export function MealPlanner({
   initialAiSummary,
 }: MealPlannerProps) {
   const router = useRouter();
+  const [agendaMode, setAgendaMode] = useState(false);
+  useEffect(() => {
+    const measure = () => {
+      const fontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const next = window.innerWidth / fontSize < 75;
+      setAgendaMode((current) => (current === next ? current : next));
+    };
+    const frame = window.requestAnimationFrame(measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(document.documentElement);
+    const header = document.querySelector('.app-header-shell');
+    if (header) observer?.observe(header);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
   const [startDate, setStartDate] = useState(weekStart);
   const [endDate, setEndDate] = useState(
     () => plannerDates(weekStart, defaultDuration).at(-1) ?? weekEnd,
@@ -633,6 +888,13 @@ export function MealPlanner({
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const [mealTypeSettingsOpen, setMealTypeSettingsOpen] = useState(false);
   const [mealTypePreferences, setMealTypePreferences] = useState(mealPlanPreferences);
+  const [mealTypeDraft, setMealTypeDraft] = useState(mealPlanPreferences);
+  const rangeTriggerRef = useRef<HTMLButtonElement>(null);
+  const customMealInputRef = useRef<HTMLInputElement>(null);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [generatorReturnToSettings, setGeneratorReturnToSettings] = useState(false);
+  const [mobileReviewOpen, setMobileReviewOpen] = useState(false);
+  const [setupLoaded, setSetupLoaded] = useState(false);
   const [customMealName, setCustomMealName] = useState('');
   const [preferencesBusy, setPreferencesBusy] = useState(false);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
@@ -640,20 +902,26 @@ export function MealPlanner({
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>(() =>
     profiles.map((profile) => profile.id),
   );
+  const addMealRef = useRef<HTMLButtonElement>(null);
+  const [activeMealActions, setActiveMealActions] = useState<PlannedMeal | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [mealEditor, setMealEditor] = useState<{ entry?: PlannedMeal; kind?: string } | null>(null);
+  const [mealEditor, setMealEditor] = useState<{
+    entry?: PlannedMeal;
+    kind?: string;
+    target?: { date: string; meal: MealType };
+  } | null>(null);
+  const editorCommittedRef = useRef(false);
   const [pickerContext, setPickerContext] = useState<{ date: string; meal: MealType } | null>(null);
   const [draggedMealId, setDraggedMealId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileNutritionOpen, setMobileNutritionOpen] = useState(false);
-  const [selectedMobileDate, setSelectedMobileDate] = useState(() => {
-    if (today >= weekStart && today <= weekEnd) return today;
-    return (
-      meals.find((meal) => meal.plannedFor >= weekStart && meal.plannedFor <= weekEnd)
-        ?.plannedFor ?? weekStart
-    );
-  });
+  const selectedMobileDate = plannerFocus(focusDate, weekStart, weekEnd, today);
+  const [unconfirmedChange, setUnconfirmedChange] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [feedbackDestination, setFeedbackDestination] = useState<{
+    date: string;
+    label: string;
+  } | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<MealHistoryCommand[]>([]);
@@ -663,17 +931,62 @@ export function MealPlanner({
     () => plannerDates(weekStart, inclusivePlannerDays(weekStart, weekEnd)),
     [weekEnd, weekStart],
   );
-  const setupValid = Boolean(startDate && selectedMeals.length && selectedProfileIds.length);
+  const rangeError = planningRangeError(startDate, endDate);
+  const setupValid =
+    !rangeError &&
+    selectedMeals.length > 0 &&
+    selectedMeals.length <= 5 &&
+    selectedProfileIds.length > 0;
+  const typeDraftDirty = JSON.stringify(mealTypeDraft) !== JSON.stringify(mealTypePreferences);
+  const setupKey = 'bord-planner-setup-v1';
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(setupKey) ?? 'null');
+        if (
+          saved &&
+          !planningRangeError(saved.startDate, saved.endDate) &&
+          Array.isArray(saved.meals) &&
+          saved.meals.length <= 20 &&
+          saved.meals.every((value: unknown) => typeof value === 'string' && value.length <= 80) &&
+          Array.isArray(saved.people) &&
+          saved.people.length <= 20
+        ) {
+          setStartDate(saved.startDate);
+          setEndDate(saved.endDate);
+          setSelectedMeals(saved.meals);
+          setSelectedProfileIds(
+            saved.people.filter((id: string) => profiles.some((profile) => profile.id === id)),
+          );
+        }
+      } catch {
+        /* Setup remains usable when session storage is unavailable. */
+      }
+      setSetupLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // Restore only once per mounted calendar; subsequent prop refreshes must retain local setup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!setupLoaded) return;
+    try {
+      sessionStorage.setItem(
+        setupKey,
+        JSON.stringify({ startDate, endDate, meals: selectedMeals, people: selectedProfileIds }),
+      );
+    } catch {
+      /* Temporary setup is still available while this page stays open. */
+    }
+  }, [setupLoaded, startDate, endDate, selectedMeals, selectedProfileIds]);
   const selectedProfiles = profiles.filter((profile) => selectedProfileIds.includes(profile.id));
   const duration = inclusivePlannerDays(startDate, endDate);
   const selectedPlanEnd = endDate;
-  const mealTypeOptions: MealTypeOption[] = [
-    ...MEAL_OPTIONS,
-    ...mealTypePreferences.customMealTypes.map((option) => ({
-      ...option,
-      defaultVisible: false,
-    })),
-  ];
+  const mealTypeOptions = plannerMealOptions(mealTypePreferences, [
+    ...selectedMeals,
+    ...meals.map((meal) => meal.meal),
+  ]);
+  const draftTypeOptions = plannerMealOptions(mealTypeDraft, []);
   const scheduleMeals = mealTypeOptions.filter(
     (option) =>
       mealTypePreferences.visibleMealTypes.includes(option.value) ||
@@ -703,17 +1016,23 @@ export function MealPlanner({
     { code: 'total_fat', label: 'Fat', unit: 'g' },
   ].map((item) => {
     const value = nutrientAverage(item.code);
-    const target = goalBoundary(nutritionGoals.find((goal) => goal.nutrientCode === item.code));
+    const goal = nutritionGoals.find((goal) => goal.nutrientCode === item.code);
+    const target = goalBoundary(goal);
+    const goalLabel = !goal
+      ? ''
+      : goal.kind === 'range'
+        ? `Range ${number(goal.minimum ?? undefined)}–${number(goal.maximum ?? undefined)} ${item.unit}`
+        : `${goal.kind === 'minimum' ? 'Minimum' : goal.kind === 'limit' ? 'Limit' : 'Target'} ${number(target ?? undefined)} ${item.unit}`;
     return {
       ...item,
       value,
       target,
+      goalLabel,
+      goalKind: goal?.kind,
+      knownDays: plannedDays.filter((day) => Number.isFinite(day[item.code])).length,
       progress: value !== undefined && target ? Math.min(100, (value / target) * 100) : 0,
     };
   });
-  const coveragePercent = pantrySummary.total
-    ? Math.round((pantrySummary.covered / pantrySummary.total) * 100)
-    : 0;
   const summaryBusy = Boolean(busyAction && busyAction !== 'shopping-list');
   const totalServings = meals.reduce((total, meal) => total + meal.servings, 0);
   const recipesUsed = new Set(meals.flatMap((meal) => (meal.recipeId ? [meal.recipeId] : []))).size;
@@ -727,20 +1046,57 @@ export function MealPlanner({
     router.push(`/planner?view=${mode}&date=${anchor}`);
   }
 
+  function returnToMealAction(id: string) {
+    window.requestAnimationFrame(() => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>('[data-meal-actions]')).find(
+        (element) => element.dataset.mealActions === id && element.getClientRects().length > 0,
+      );
+      (target ?? addMealRef.current)?.focus();
+    });
+  }
+  function closeMealActions() {
+    if (busyAction) return;
+    const id = activeMealActions?.id;
+    setActiveMealActions(null);
+    if (id) returnToMealAction(id);
+  }
+  const refreshedActionMeal = activeMealActions
+    ? meals.find((meal) => meal.id === activeMealActions.id)
+    : undefined;
+  const actionMeal =
+    refreshedActionMeal &&
+    activeMealActions &&
+    new Date(refreshedActionMeal.updatedAt).getTime() >=
+      new Date(activeMealActions.updatedAt).getTime()
+      ? refreshedActionMeal
+      : activeMealActions;
+
   function recordHistory(command: MealHistoryCommand) {
     setUndoStack((current) => [...current.slice(-19), command]);
     setRedoStack([]);
   }
 
+  async function calendarRequest(input: RequestInfo | URL, init: RequestInit) {
+    setFeedbackDestination(null);
+    try {
+      const response = await fetch(input, init);
+      if (response.status >= 500) setUnconfirmedChange(true);
+      return response;
+    } catch (error) {
+      setUnconfirmedChange(true);
+      throw error;
+    }
+  }
+
   async function deleteHistoryEntries(ids: string[]) {
     for (const id of ids) {
-      const response = await fetch(`/api/v1/meal-plan/${id}`, { method: 'DELETE' });
+      const response = await calendarRequest(`/api/v1/meal-plan/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('A meal changed before it could be removed.');
     }
   }
 
   async function restoreHistoryEntries(entries: MealEntrySnapshot[]): Promise<string[]> {
-    const response = await fetch('/api/v1/meal-plan/batch', {
+    const response = await calendarRequest('/api/v1/meal-plan/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries }),
@@ -782,7 +1138,7 @@ export function MealPlanner({
         }
       } else if (command.kind === 'updated') {
         const desired = direction === 'undo' ? command.before : command.after;
-        const response = await fetch(`/api/v1/meal-plan/${command.id}`, {
+        const response = await calendarRequest(`/api/v1/meal-plan/${command.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...desired, expectedUpdatedAt: command.currentUpdatedAt }),
@@ -799,7 +1155,7 @@ export function MealPlanner({
           currentUpdatedAt: new Date(body.meal.updatedAt).toISOString(),
         };
       } else if (command.kind === 'status') {
-        const response = await fetch(`/api/v1/meal-plan/${command.id}`, {
+        const response = await calendarRequest(`/api/v1/meal-plan/${command.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: direction === 'undo' ? command.before : command.after }),
@@ -807,7 +1163,7 @@ export function MealPlanner({
         if (!response.ok) throw new Error('That meal status could not be restored.');
         nextCommand = { ...command };
       } else {
-        const response = await fetch('/api/v1/meal-plan/swap', {
+        const response = await calendarRequest('/api/v1/meal-plan/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -853,15 +1209,41 @@ export function MealPlanner({
     }
   }
 
-  function confirmSaved() {
-    router.refresh();
-    setFeedback('All planner changes are saved.');
+  function closeSettings() {
+    if (preferencesBusy) return;
+    if (
+      mealTypeSettingsOpen &&
+      typeDraftDirty &&
+      !window.confirm('Discard unsaved meal type changes?')
+    )
+      return;
+    setMealTypeDraft(mealTypePreferences);
+    setMealTypeSettingsOpen(false);
+    setSettingsOpen(false);
+  }
+  function openGenerator(fromSettings = false) {
+    if (!setupValid) return;
+    setGeneratorReturnToSettings(fromSettings);
+    setSettingsOpen(false);
+    setGeneratorOpen(true);
+  }
+  function selectCalendarDate(date: string) {
+    navigatePeriod(date);
   }
 
   function openRecipePicker(
     date = selectedMobileDate,
     meal: MealType = selectedMeals[0] ?? 'dinner',
   ) {
+    if (unconfirmedChange) {
+      setFeedback('Refresh the calendar to check the unconfirmed change before adding meals.');
+      return;
+    }
+    if (!selectedProfileIds.length) {
+      setSettingsOpen(true);
+      setFeedback('Choose at least one person before adding meals.');
+      return;
+    }
     setPickerContext({ date, meal });
     setSelectorOpen(true);
   }
@@ -873,7 +1255,7 @@ export function MealPlanner({
   }
 
   function toggleVisibleMealType(meal: MealType) {
-    setMealTypePreferences((current) => {
+    setMealTypeDraft((current) => {
       const visibleMealTypes = current.visibleMealTypes.includes(meal)
         ? current.visibleMealTypes.filter((item) => item !== meal)
         : [...current.visibleMealTypes, meal];
@@ -883,20 +1265,39 @@ export function MealPlanner({
 
   function addCustomMealType() {
     const label = customMealName.trim();
-    if (!label) return;
+    setPreferencesError(null);
+    if (!label) {
+      setPreferencesError('Enter a meal type name.');
+      return;
+    }
+    if (mealTypeDraft.customMealTypes.length >= 10) {
+      setPreferencesError('You can have up to 10 custom meal types.');
+      return;
+    }
+    if (
+      draftTypeOptions.some(
+        (option) => option.label.toLocaleLowerCase() === label.toLocaleLowerCase(),
+      )
+    ) {
+      setPreferencesError('That meal type name already exists.');
+      return;
+    }
     const base = label
       .toLocaleLowerCase()
       .replace(/[^a-z0-9]+/gu, '-')
       .replace(/^-|-$/gu, '')
       .slice(0, 32);
-    if (!base) return;
+    if (!base) {
+      setPreferencesError('Include a letter or number in the name.');
+      return;
+    }
     let value = `custom-${base}`;
     let suffix = 2;
-    while (mealTypeOptions.some((option) => option.value === value)) {
+    while (draftTypeOptions.some((option) => option.value === value)) {
       value = `custom-${base}-${suffix}`;
       suffix += 1;
     }
-    setMealTypePreferences((current) => ({
+    setMealTypeDraft((current) => ({
       ...current,
       customMealTypes: [...current.customMealTypes, { value, label }],
       visibleMealTypes: [...current.visibleMealTypes, value],
@@ -905,23 +1306,24 @@ export function MealPlanner({
   }
 
   function removeCustomMealType(meal: MealType) {
-    setMealTypePreferences((current) => ({
+    customMealInputRef.current?.focus();
+    setMealTypeDraft((current) => ({
       ...current,
       customMealTypes: current.customMealTypes.filter((option) => option.value !== meal),
       visibleMealTypes: current.visibleMealTypes.filter((value) => value !== meal),
       defaultMealTypes: current.defaultMealTypes.filter((value) => value !== meal),
     }));
-    setSelectedMeals((current) => current.filter((value) => value !== meal));
   }
 
   async function saveMealTypePreferences() {
+    const submitted = mealTypeDraft;
     setPreferencesBusy(true);
     try {
       setPreferencesError(null);
       const response = await fetch('/api/v1/settings/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: 'mealPlan', values: mealTypePreferences }),
+        body: JSON.stringify({ category: 'mealPlan', values: submitted }),
       });
       const body = (await response.json().catch(() => null)) as {
         error?: { message?: string };
@@ -931,8 +1333,10 @@ export function MealPlanner({
         return;
       }
       setSelectedMeals((current) =>
-        current.filter((meal) => mealTypePreferences.visibleMealTypes.includes(meal)),
+        current.filter((meal) => submitted.visibleMealTypes.includes(meal)),
       );
+      setMealTypePreferences(submitted);
+      setMealTypeDraft(submitted);
       setMealTypeSettingsOpen(false);
       setFeedback('Meal types saved.');
       router.refresh();
@@ -985,7 +1389,7 @@ export function MealPlanner({
     setBusyAction(meal.id);
     try {
       setError(null);
-      const response = await fetch(`/api/v1/meal-plan/${meal.id}`, {
+      const response = await calendarRequest(`/api/v1/meal-plan/${meal.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload(meal, overrides)),
@@ -1006,6 +1410,15 @@ export function MealPlanner({
         after: mealEntrySnapshot(body.meal),
         currentUpdatedAt: new Date(body.meal.updatedAt).toISOString(),
       });
+      setActiveMealActions((current) => (current?.id === body.meal!.id ? body.meal! : current));
+      if (
+        overrides.plannedFor &&
+        (overrides.plannedFor < weekStart || overrides.plannedFor > weekEnd)
+      ) {
+        setActiveMealActions(null);
+        setFeedbackDestination({ date: overrides.plannedFor, label: 'View moved meal' });
+        window.requestAnimationFrame(() => addMealRef.current?.focus());
+      }
       setFeedback(successMessage);
       router.refresh();
     } catch {
@@ -1018,12 +1431,11 @@ export function MealPlanner({
   }
 
   async function duplicateMeal(meal: PlannedMeal) {
-    const currentIndex = dates.indexOf(meal.plannedFor);
-    const targetDate = dates[Math.min(dates.length - 1, currentIndex + 1)] ?? meal.plannedFor;
+    const targetDate = nextMealDate(meal.plannedFor);
     setBusyAction(meal.id);
     try {
       setError(null);
-      const response = await fetch('/api/v1/meal-plan', {
+      const response = await calendarRequest('/api/v1/meal-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1052,7 +1464,11 @@ export function MealPlanner({
         entries: [mealEntrySnapshot(body.meal)],
         ids: [body.meal.id],
       });
-      setFeedback(`Meal duplicated to ${formatPlannerDate(targetDate, { weekday: 'long' })}.`);
+      setFeedback(
+        `Meal duplicated to ${formatPlannerDate(targetDate, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}.`,
+      );
+      if (targetDate > weekEnd || targetDate < weekStart)
+        setFeedbackDestination({ date: targetDate, label: 'View duplicated meal' });
       router.refresh();
     } catch {
       setError(
@@ -1067,7 +1483,7 @@ export function MealPlanner({
     setBusyAction(source.id);
     try {
       setError(null);
-      const response = await fetch('/api/v1/meal-plan/swap', {
+      const response = await calendarRequest('/api/v1/meal-plan/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1105,6 +1521,9 @@ export function MealPlanner({
         sourceUpdatedAt: new Date(nextSource.updatedAt).toISOString(),
         targetUpdatedAt: new Date(nextTarget.updatedAt).toISOString(),
       });
+      setActiveMealActions((current) =>
+        current ? (body.meals!.find((meal) => meal.id === current.id) ?? current) : null,
+      );
       setFeedback('Meals swapped.');
       router.refresh();
     } catch {
@@ -1152,7 +1571,7 @@ export function MealPlanner({
     const index = dates.indexOf(selectedMobileDate);
     const target = dates[index + amount];
     if (target) {
-      setSelectedMobileDate(target);
+      selectCalendarDate(target);
       return;
     }
     navigatePeriod(addPlannerDays(selectedMobileDate, amount), 'day');
@@ -1163,7 +1582,7 @@ export function MealPlanner({
       navigateMobileDay(amount);
       return;
     }
-    navigatePeriod(amount === -1 ? previousWeekStart : nextWeekStart, viewMode);
+    navigatePeriod(shiftPlannerFocus(selectedMobileDate, viewMode, amount), viewMode);
   }
 
   async function copyWeek() {
@@ -1171,7 +1590,7 @@ export function MealPlanner({
     try {
       setError(null);
       setFeedback(null);
-      const response = await fetch('/api/v1/meal-plan/duplicate', {
+      const response = await calendarRequest('/api/v1/meal-plan/duplicate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ weekStart, destinationWeekStart: nextWeekStart }),
@@ -1196,7 +1615,7 @@ export function MealPlanner({
     setBusyAction(id);
     try {
       setError(null);
-      const response = await fetch(`/api/v1/meal-plan/${id}`, { method: 'DELETE' });
+      const response = await calendarRequest(`/api/v1/meal-plan/${id}`, { method: 'DELETE' });
       if (!response.ok) {
         setError('We could not remove that meal. Try again.');
         return;
@@ -1207,6 +1626,8 @@ export function MealPlanner({
         entries: [mealEntrySnapshot(meal)],
         ids: [meal.id],
       });
+      setActiveMealActions((current) => (current?.id === id ? null : current));
+      window.requestAnimationFrame(() => addMealRef.current?.focus());
       setFeedback('Meal removed from the plan.');
       router.refresh();
     } catch {
@@ -1224,7 +1645,7 @@ export function MealPlanner({
     setBusyAction(id);
     try {
       setError(null);
-      const response = await fetch(`/api/v1/meal-plan/${id}`, {
+      const response = await calendarRequest(`/api/v1/meal-plan/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -1244,6 +1665,7 @@ export function MealPlanner({
         before: meal.status,
         after: status,
       });
+      setActiveMealActions((current) => (current?.id === id ? body.meal! : current));
       setFeedback(`Meal marked ${status}.`);
       router.refresh();
     } catch {
@@ -1259,7 +1681,9 @@ export function MealPlanner({
     setBusyAction(id);
     try {
       setError(null);
-      const response = await fetch(`/api/v1/meal-plan/${id}/refresh-recipe`, { method: 'POST' });
+      const response = await calendarRequest(`/api/v1/meal-plan/${id}/refresh-recipe`, {
+        method: 'POST',
+      });
       if (!response.ok) {
         setError('We could not refresh that planned recipe. Try again.');
         return;
@@ -1327,16 +1751,16 @@ export function MealPlanner({
         density="compact"
         title="Meal planner"
         titleId="planner-page-title"
-        eyebrow="MEAL PLANNER"
-        description="Choose your meals, check what you have, and make your shopping list."
+        description="Your household meal calendar."
         actions={
           <div className={styles.headerActions}>
             {' '}
             <button
+              ref={addMealRef}
               className={styles.addMealsButton}
               type="button"
-              onClick={() => openRecipePicker(weekStart)}
-              disabled={!recipes.length}
+              disabled={unconfirmedChange}
+              onClick={() => openRecipePicker(selectedMobileDate)}
             >
               <Plus size={17} /> Add a meal
             </button>
@@ -1346,7 +1770,7 @@ export function MealPlanner({
               aria-expanded={settingsOpen}
               aria-controls="planner-settings-panel"
               aria-haspopup="dialog"
-              onClick={() => setSettingsOpen((value) => !value)}
+              onClick={() => setSettingsOpen(true)}
             >
               Plan settings
             </button>
@@ -1373,7 +1797,7 @@ export function MealPlanner({
             type="button"
             aria-label={`Previous ${viewMode}`}
             title={`Previous ${viewMode}`}
-            onClick={() => navigatePeriod(previousWeekStart)}
+            onClick={() => navigatePeriod(shiftPlannerFocus(selectedMobileDate, viewMode, -1))}
           >
             <ChevronLeft size={18} aria-hidden="true" /> <span>Previous</span>
           </button>
@@ -1383,7 +1807,7 @@ export function MealPlanner({
                 type="button"
                 key={mode}
                 aria-pressed={viewMode === mode}
-                onClick={() => navigatePeriod(weekStart, mode)}
+                onClick={() => navigatePeriod(selectedMobileDate, mode)}
               >
                 {mode.charAt(0).toLocaleUpperCase() + mode.slice(1)}
               </button>
@@ -1393,15 +1817,28 @@ export function MealPlanner({
             type="button"
             aria-label={`Next ${viewMode}`}
             title={`Next ${viewMode}`}
-            onClick={() => navigatePeriod(nextWeekStart)}
+            onClick={() => navigatePeriod(shiftPlannerFocus(selectedMobileDate, viewMode, 1))}
           >
             <span>Next</span> <ChevronRight size={18} aria-hidden="true" />
           </button>
         </div>
+        <button type="button" onClick={() => navigatePeriod(today)}>
+          Today
+        </button>
+        <label className={styles.dateJump}>
+          Go to date
+          <input
+            type="date"
+            value={selectedMobileDate}
+            onChange={(event) => {
+              if (event.target.value) navigatePeriod(event.target.value);
+            }}
+          />
+        </label>
         <div className={styles.historyControls} aria-label="Planner save history">
           <button
             type="button"
-            disabled={!undoStack.length || Boolean(busyAction)}
+            disabled={!undoStack.length || Boolean(busyAction) || unconfirmedChange}
             title={undoStack.length ? `Undo ${undoStack.at(-1)?.label}` : 'Nothing to undo'}
             aria-label="Undo last planner change"
             onClick={() => void runHistory('undo')}
@@ -1410,67 +1847,94 @@ export function MealPlanner({
           </button>
           <button
             type="button"
-            disabled={!redoStack.length || Boolean(busyAction)}
+            disabled={!redoStack.length || Boolean(busyAction) || unconfirmedChange}
             title={redoStack.length ? `Redo ${redoStack.at(-1)?.label}` : 'Nothing to redo'}
             aria-label="Redo last planner change"
             onClick={() => void runHistory('redo')}
           >
             <Redo2 size={17} aria-hidden="true" /> <span>Redo</span>
           </button>
+          <span role="status" className={styles.saveStatus}>
+            <Save size={17} aria-hidden="true" />
+            {busyAction
+              ? 'Saving…'
+              : error || unconfirmedChange
+                ? 'Needs attention'
+                : 'Calendar saved'}
+          </span>
           <button
             type="button"
             disabled={Boolean(busyAction)}
-            title="Planner changes save automatically"
-            aria-label="Confirm planner changes are saved"
-            onClick={confirmSaved}
+            onClick={() => window.location.reload()}
           >
-            <Save size={17} aria-hidden="true" />
-            <span>{busyAction ? 'Saving' : 'Saved'}</span>
+            Refresh
           </button>
         </div>
-        <details className={styles.moreActions}>
-          <summary title="More planner actions">
-            <Ellipsis size={18} aria-hidden="true" /> More actions
-          </summary>
+        <DismissibleDetails
+          className={styles.moreActions}
+          viewportPanel
+          summary={
+            <>
+              <Ellipsis size={18} aria-hidden="true" /> More actions
+            </>
+          }
+        >
           <div>
             <button
               type="button"
-              disabled={viewMode !== 'week' || Boolean(busyAction) || !meals.length}
-              onClick={copyWeek}
+              disabled={
+                viewMode !== 'week' || Boolean(busyAction) || unconfirmedChange || !meals.length
+              }
+              data-menu-close
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Add copies to ${humanRange(nextWeekStart, addPlannerDays(nextWeekStart, 6))}? Existing meals stay. Copies start as planned; this action has no Undo.`,
+                  )
+                )
+                  void copyWeek();
+              }}
             >
-              <Copy size={16} aria-hidden="true" /> Copy week
+              <Copy size={16} aria-hidden="true" /> Copy to next week
             </button>
+            <p>
+              Adds meals to {humanRange(nextWeekStart, addPlannerDays(nextWeekStart, 6))}, including
+              occupied dates. Copies start as planned; this action has no Undo.
+            </p>
           </div>
-        </details>
+        </DismissibleDetails>
       </div>
-      <div className={`${styles.plannerLayout} ${styles.refinedPlanner} planner-workspace-grid`}>
+      <div
+        className={`${styles.plannerLayout} ${agendaMode ? styles.agendaMode : ''} planner-workspace-grid`}
+        data-planner-layout={agendaMode ? 'agenda' : 'calendar'}
+      >
         {settingsOpen && (
           <AppDialog
             className={settingsStyles.dialog}
             id="planner-settings-panel"
-            onClose={() => setSettingsOpen(false)}
+            onClose={closeSettings}
             aria-labelledby="planner-settings-title"
             aria-describedby="planner-settings-description"
           >
             <div className={settingsStyles.setupHeading}>
               <div>
-                <p className={settingsStyles.railEyebrow}>PLAN SETTINGS</p>
                 <h2 id="planner-settings-title">Plan settings</h2>
                 <p id="planner-settings-description" className={settingsStyles.railDescription}>
-                  Choose when, what, and who you’re planning for.
+                  Defaults for new meals and generation. Existing meals keep their dates, people and
+                  portions.
                 </p>
               </div>
               <button
                 type="button"
                 aria-label="Close plan settings"
-                onClick={() => setSettingsOpen(false)}
+                disabled={preferencesBusy}
+                onClick={closeSettings}
               >
                 <X size={20} aria-hidden="true" />
               </button>
             </div>
 
             <div className={settingsStyles.content}>
-              {preferencesError && <InlineAlert tone="error">{preferencesError}</InlineAlert>}
               <fieldset className={settingsStyles.setupStep}>
                 <legend>
                   <span>1</span> Date range
@@ -1482,10 +1946,12 @@ export function MealPlanner({
                       event.preventDefault();
                       event.stopPropagation();
                       setRangePickerOpen(false);
+                      rangeTriggerRef.current?.focus();
                     }
                   }}
                 >
                   <button
+                    ref={rangeTriggerRef}
                     className={settingsStyles.dateRangeVisual}
                     type="button"
                     aria-expanded={rangePickerOpen}
@@ -1531,9 +1997,13 @@ export function MealPlanner({
                         <input
                           type="date"
                           value={startDate}
+                          aria-describedby="planner-range-help"
                           onInput={(event) => {
                             const nextStart = event.currentTarget.value;
-                            if (!nextStart) return;
+                            if (!nextStart) {
+                              setStartDate('');
+                              return;
+                            }
                             const maximumEnd = addPlannerDays(nextStart, 13);
                             setStartDate(nextStart);
                             setEndDate((currentEnd) => {
@@ -1550,25 +2020,43 @@ export function MealPlanner({
                         <input
                           type="date"
                           min={startDate}
-                          max={addPlannerDays(startDate, 13)}
+                          max={startDate ? addPlannerDays(startDate, 13) : undefined}
+                          aria-invalid={Boolean(rangeError)}
+                          aria-describedby="planner-range-help"
                           value={endDate}
                           onInput={(event) => {
-                            if (event.currentTarget.value) setEndDate(event.currentTarget.value);
+                            setEndDate(event.currentTarget.value);
                           }}
                           required
                         />
                       </label>
                       <div className={settingsStyles.dateRangePickerFooter}>
                         <span>
-                          {duration} {duration === 1 ? 'day' : 'days'} selected
+                          {rangeError
+                            ? 'Invalid date range'
+                            : `${duration} ${duration === 1 ? 'day' : 'days'} selected`}
                         </span>
-                        <button type="button" onClick={() => setRangePickerOpen(false)}>
-                          Done
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRangePickerOpen(false);
+                            rangeTriggerRef.current?.focus();
+                          }}
+                        >
+                          Close date range
                         </button>
                       </div>
                     </div>
                   ) : null}
                 </div>
+                <p
+                  id="planner-range-help"
+                  className={settingsStyles.railDescription}
+                  role={rangeError ? 'alert' : undefined}
+                >
+                  {rangeError ??
+                    '1–14 days for new planning. Changing the start adjusts the end to these bounds; the visible calendar stays unchanged.'}
+                </p>
               </fieldset>
 
               <fieldset className={settingsStyles.setupStep}>
@@ -1578,11 +2066,20 @@ export function MealPlanner({
                   <button
                     className={settingsStyles.legendAction}
                     type="button"
+                    disabled={preferencesBusy}
                     aria-expanded={mealTypeSettingsOpen}
                     aria-controls="planner-meal-type-settings"
-                    onClick={() => setMealTypeSettingsOpen((open) => !open)}
+                    onClick={() => {
+                      if (mealTypeSettingsOpen) {
+                        if (typeDraftDirty && !window.confirm('Discard unsaved meal type changes?'))
+                          return;
+                        setMealTypeDraft(mealTypePreferences);
+                      } else setMealTypeDraft(mealTypePreferences);
+                      setPreferencesError(null);
+                      setMealTypeSettingsOpen((open) => !open);
+                    }}
                   >
-                    Edit types
+                    Manage meal types
                   </button>
                 </legend>
                 {mealTypeSettingsOpen ? (
@@ -1595,31 +2092,47 @@ export function MealPlanner({
                     <div className={settingsStyles.mealTypeSettingsHeader}>
                       <div>
                         <strong>Meal types</strong>
-                        <span>Choose which rows appear in your planner.</span>
+                        <span>
+                          Household row preferences. Rows with existing meals or current planning
+                          selections remain accessible.
+                        </span>
                       </div>
                       <button
                         type="button"
                         aria-label="Close meal type settings"
-                        onClick={() => setMealTypeSettingsOpen(false)}
+                        disabled={preferencesBusy}
+                        onClick={() => {
+                          if (
+                            typeDraftDirty &&
+                            !window.confirm('Discard unsaved meal type changes?')
+                          )
+                            return;
+                          setMealTypeDraft(mealTypePreferences);
+                          setMealTypeSettingsOpen(false);
+                        }}
                       >
                         <X size={16} aria-hidden="true" />
                       </button>
                     </div>
                     <div className={settingsStyles.mealTypeOptionList}>
-                      {mealTypeOptions.map((option) => (
-                        <label key={option.value}>
-                          <input
-                            type="checkbox"
-                            checked={mealTypePreferences.visibleMealTypes.includes(option.value)}
-                            onChange={() => toggleVisibleMealType(option.value)}
-                          />
-                          <span>
-                            <strong>{option.label}</strong>
-                            {option.description ? <small>{option.description}</small> : null}
-                          </span>
+                      {draftTypeOptions.map((option) => (
+                        <div key={option.value} className={settingsStyles.typeRow}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              disabled={preferencesBusy}
+                              checked={mealTypeDraft.visibleMealTypes.includes(option.value)}
+                              onChange={() => toggleVisibleMealType(option.value)}
+                            />
+                            <span>
+                              <strong>{option.label}</strong>
+                              {option.description ? <small>{option.description}</small> : null}
+                            </span>
+                          </label>
                           {option.value.startsWith('custom-') ? (
                             <button
                               type="button"
+                              disabled={preferencesBusy}
                               aria-label={`Remove custom meal type ${option.label}`}
                               onClick={(event) => {
                                 event.preventDefault();
@@ -1629,13 +2142,17 @@ export function MealPlanner({
                               <Trash2 size={14} aria-hidden="true" />
                             </button>
                           ) : null}
-                        </label>
+                        </div>
                       ))}
                     </div>
-                    <div className={settingsStyles.customMealTypeForm}>
+                    <fieldset
+                      disabled={preferencesBusy}
+                      className={settingsStyles.customMealTypeForm}
+                    >
                       <label>
                         <span>Custom meal type</span>
                         <input
+                          ref={customMealInputRef}
                           value={customMealName}
                           maxLength={48}
                           placeholder="e.g. Afternoon tea"
@@ -1649,16 +2166,29 @@ export function MealPlanner({
                       >
                         Add
                       </button>
-                    </div>
+                    </fieldset>
+                    {preferencesError ? <p role="alert">{preferencesError}</p> : null}
                     <button
                       className={settingsStyles.mealTypeSaveButton}
                       aria-busy={preferencesBusy}
                       type="button"
-                      disabled={preferencesBusy || !mealTypePreferences.visibleMealTypes.length}
+                      disabled={
+                        preferencesBusy || !typeDraftDirty || !mealTypeDraft.visibleMealTypes.length
+                      }
                       onClick={() => void saveMealTypePreferences()}
                     >
                       {preferencesBusy && <ButtonSpinner />}
                       {preferencesBusy ? 'Saving…' : 'Save meal types'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={preferencesBusy}
+                      onClick={() => {
+                        setMealTypeDraft(mealTypePreferences);
+                        setMealTypeSettingsOpen(false);
+                      }}
+                    >
+                      Cancel type changes
                     </button>
                   </div>
                 ) : null}
@@ -1683,14 +2213,17 @@ export function MealPlanner({
                 <legend>
                   <span>3</span>
                   <span className={settingsStyles.stepTitle}>Who&apos;s eating?</span>
-                  <Link className={settingsStyles.legendAction} href="/settings/profiles">
-                    Add New +
+                  <Link
+                    className={settingsStyles.legendAction}
+                    href={`/settings/profiles?plannerReturn=${encodeURIComponent(`/planner?view=${viewMode}&date=${selectedMobileDate}`)}`}
+                  >
+                    Manage people
                   </Link>
                 </legend>
                 {profiles.length ? (
                   <div className={settingsStyles.profileChoiceWrap}>
                     <div className={settingsStyles.profileChoices}>
-                      {profiles.map((profile, index) => {
+                      {profiles.map((profile) => {
                         const selected = selectedProfileIds.includes(profile.id);
                         return (
                           <label key={profile.id}>
@@ -1699,10 +2232,7 @@ export function MealPlanner({
                               checked={selected}
                               onChange={() => toggleProfile(profile.id)}
                             />
-                            <span
-                              className={`${settingsStyles.profileAvatar} ${styles[`profileAvatar${(index % 4) + 1}`]}`}
-                              aria-hidden="true"
-                            >
+                            <span className={settingsStyles.profileAvatar} aria-hidden="true">
                               {profileInitial(profile.displayName)}
                             </span>
                             <span>{profile.displayName}</span>
@@ -1732,27 +2262,45 @@ export function MealPlanner({
                 <span>
                   {selectedProfiles.length} {selectedProfiles.length === 1 ? 'person' : 'people'} ·{' '}
                   {selectedProfiles.length} {selectedProfiles.length === 1 ? 'serving' : 'servings'}{' '}
-                  per meal
+                  by default for new meals
                 </span>
               </p>
               <div className={settingsStyles.autoPlanAction}>
-                <AiMealPlanGenerator
-                  weekStart={startDate}
-                  weekEnd={selectedPlanEnd}
-                  mealSlots={selectedMeals}
-                  profiles={selectedProfiles}
-                  label="Generate meal plan"
-                  disabled={!setupValid}
-                  aiModel={aiMealPlanModel}
-                  imageGenerationEnabled={aiImageGenerationEnabled}
-                />
+                <button
+                  type="button"
+                  disabled={!setupValid || mealTypeSettingsOpen || unconfirmedChange}
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setPickerContext(null);
+                    setSelectorOpen(true);
+                  }}
+                >
+                  Choose meals for range
+                </button>
+                <button
+                  type="button"
+                  disabled={!setupValid || mealTypeSettingsOpen || unconfirmedChange}
+                  className={settingsStyles.generateButton}
+                  onClick={() => openGenerator(true)}
+                >
+                  Generate meal plan
+                </button>
+                {!setupValid ? (
+                  <p role="status">
+                    {rangeError ??
+                      (!selectedMeals.length || selectedMeals.length > 5
+                        ? 'Choose 1 to 5 meal types for generation.'
+                        : 'Choose at least one person.')}
+                  </p>
+                ) : null}
               </div>
               <button
                 className={settingsStyles.doneButton}
                 type="button"
-                onClick={() => setSettingsOpen(false)}
+                disabled={preferencesBusy}
+                onClick={closeSettings}
               >
-                Done
+                Close settings
               </button>
             </div>
           </AppDialog>
@@ -1765,11 +2313,24 @@ export function MealPlanner({
           {feedback ? (
             <div className={styles.feedback} role="status">
               <Check size={18} aria-hidden="true" /> {feedback}
+              {feedbackDestination ? (
+                <Link
+                  className="inline-link"
+                  href={`/planner?view=day&date=${feedbackDestination.date}`}
+                >
+                  {feedbackDestination.label}
+                </Link>
+              ) : null}
             </div>
           ) : null}
           {error ? (
             <p className={styles.error} role="alert">
-              {error}
+              {error}{' '}
+              {unconfirmedChange ? (
+                <button type="button" onClick={() => window.location.reload()}>
+                  Refresh calendar
+                </button>
+              ) : null}
             </p>
           ) : null}
 
@@ -1831,11 +2392,64 @@ export function MealPlanner({
                 </div>
               </div>
             </div>
+            <div className={styles.mobileDateTools}>
+              <button type="button" onClick={() => navigatePeriod(today)}>
+                Today
+              </button>
+              <label>
+                Go to date
+                <input
+                  type="date"
+                  value={selectedMobileDate}
+                  onChange={(event) => {
+                    if (event.target.value) navigatePeriod(event.target.value);
+                  }}
+                />
+              </label>
+            </div>
+            {viewMode !== 'day' ? (
+              <div
+                className={viewMode === 'month' ? styles.mobileMonthDates : styles.mobileWeekDates}
+                role="group"
+                aria-label={`Choose a date in this ${viewMode}`}
+              >
+                {viewMode === 'month'
+                  ? monthWeekdayLabels.map((label) => (
+                      <span key={label} aria-hidden="true">
+                        {label}
+                      </span>
+                    ))
+                  : null}
+                {viewMode === 'month'
+                  ? Array.from({ length: monthLeadingDays }, (_, index) => (
+                      <span key={`blank-${index}`} />
+                    ))
+                  : null}
+                {dates.map((date) => (
+                  <button
+                    type="button"
+                    key={date}
+                    aria-pressed={date === selectedMobileDate}
+                    aria-current={date === today ? 'date' : undefined}
+                    aria-label={`${formatPlannerDate(date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, ${meals.filter((meal) => meal.plannedFor === date).length} meals${date === today ? ', today' : ''}`}
+                    onClick={() => selectCalendarDate(date)}
+                  >
+                    {viewMode === 'week' ? (
+                      <small>{formatPlannerDate(date, { weekday: 'short' })}</small>
+                    ) : null}
+                    <strong>{formatPlannerDate(date, { day: 'numeric' })}</strong>
+                    <span aria-hidden="true">
+                      {meals.some((meal) => meal.plannedFor === date) ? '•' : ' '}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className={styles.mobileCommandActions}>
               <div className={styles.mobileHistoryControls} aria-label="Planner save history">
                 <button
                   type="button"
-                  disabled={!undoStack.length || Boolean(busyAction)}
+                  disabled={!undoStack.length || Boolean(busyAction) || unconfirmedChange}
                   aria-label="Undo last planner change"
                   title={undoStack.length ? `Undo ${undoStack.at(-1)?.label}` : 'Nothing to undo'}
                   onClick={() => void runHistory('undo')}
@@ -1844,22 +2458,20 @@ export function MealPlanner({
                 </button>
                 <button
                   type="button"
-                  disabled={!redoStack.length || Boolean(busyAction)}
+                  disabled={!redoStack.length || Boolean(busyAction) || unconfirmedChange}
                   aria-label="Redo last planner change"
                   title={redoStack.length ? `Redo ${redoStack.at(-1)?.label}` : 'Nothing to redo'}
                   onClick={() => void runHistory('redo')}
                 >
                   <Redo2 size={18} aria-hidden="true" />
                 </button>
-                <button
-                  type="button"
-                  disabled={Boolean(busyAction)}
-                  aria-label="Confirm planner changes are saved"
-                  title="Planner changes save automatically"
-                  onClick={confirmSaved}
-                >
-                  <Save size={18} aria-hidden="true" />
-                </button>
+                <span role="status" className={styles.saveStatus}>
+                  {busyAction
+                    ? 'Saving…'
+                    : error || unconfirmedChange
+                      ? 'Needs attention'
+                      : 'Saved'}
+                </span>
               </div>
 
               <button
@@ -1867,23 +2479,20 @@ export function MealPlanner({
                 type="button"
                 aria-expanded={mobileNutritionOpen}
                 aria-controls="mobile-nutrition-panel"
-                aria-label={`${mobileNutritionOpen ? 'Hide' : 'Show'} nutrition and Pantry details`}
+                aria-label={`${mobileNutritionOpen ? 'Hide' : 'Show'} plan overview`}
                 title={`${mobileNutritionOpen ? 'Hide' : 'Show'} nutrition and Pantry details`}
                 onClick={() => setMobileNutritionOpen((current) => !current)}
               >
-                <Salad size={19} aria-hidden="true" /> <span>Nutrition</span>
+                <Salad size={19} aria-hidden="true" /> <span>Plan overview</span>
               </button>
-              <AiMealPlanGenerator
-                weekStart={startDate}
-                weekEnd={selectedPlanEnd}
-                mealSlots={selectedMeals}
-                profiles={selectedProfiles}
-                label="Generate meal plan"
-                triggerClassName={styles.mobileAddButton}
+              <button
+                className={styles.mobileAddButton}
+                type="button"
                 disabled={!setupValid}
-                aiModel={aiMealPlanModel}
-                imageGenerationEnabled={aiImageGenerationEnabled}
-              />
+                onClick={() => openGenerator()}
+              >
+                Generate meal plan
+              </button>
             </div>
           </section>
 
@@ -1893,75 +2502,60 @@ export function MealPlanner({
               className={styles.mobileInsights}
               aria-label="Nutrition and Pantry details"
             >
-              <section
-                className={styles.mobileNutritionCard}
-                aria-labelledby="mobile-nutrition-title"
-              >
-                <header>
-                  <strong id="mobile-nutrition-title">
-                    <Salad size={19} aria-hidden="true" /> Nutrition preview
-                  </strong>
-                  <span>
-                    {number(nutrition[0].value)}
-                    {nutrition[0].target ? ` / ${number(nutrition[0].target)}` : ''} kcal
-                  </span>
-                </header>
-                {summaryBusy ? (
-                  <div className={styles.summarySkeleton} aria-label="Updating nutrition preview">
-                    <InlineSkeleton label="Updating nutrition" width="100%" />
-                    <InlineSkeleton label="Updating nutrition" width="86%" />
-                  </div>
-                ) : plannedDays.length ? (
-                  <div>
-                    {nutrition.map((item) => (
-                      <div key={item.code}>
-                        <strong>{item.label}</strong>
-                        <span>
-                          {number(item.value)}
-                          {item.target ? ` / ${number(item.target)}` : ''} {item.unit}
-                        </span>
-                        <i>
-                          <b style={{ width: `${item.progress}%` }} />
-                        </i>
-                        <small>{item.target ? `${Math.round(item.progress)}%` : 'No goal'}</small>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={styles.summaryEmpty}>No nutrition data yet</p>
-                )}
-              </section>
-              <section className={styles.mobilePantryCard} aria-labelledby="mobile-pantry-title">
-                {summaryBusy ? (
-                  <div className={styles.summarySkeleton} aria-label="Updating Pantry coverage">
-                    <InlineSkeleton label="Updating Pantry coverage" width="100%" />
-                    <InlineSkeleton label="Updating Pantry coverage" width="72%" />
-                  </div>
-                ) : meals.length ? (
-                  <>
-                    <div
-                      className={styles.coverageRing}
-                      style={{ '--coverage': `${coveragePercent}%` } as CSSProperties}
-                    >
-                      <span>{coveragePercent}%</span>
-                    </div>
-                    <p id="mobile-pantry-title">pantry covered</p>
-                    <span>{pantrySummary.missing} ingredients missing</span>
-                    <Link href="/pantry">
-                      View missing items <ChevronRight size={18} aria-hidden="true" />
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <p id="mobile-pantry-title" className={styles.summaryEmpty}>
-                      Add meals to calculate coverage
-                    </p>
-                    <button type="button" disabled>
-                      View missing items
-                    </button>
-                  </>
-                )}
-              </section>
+              <KitchenPrintDialog kind="meal-plan" start={weekStart} end={weekEnd} />
+              <NutritionPreview
+                nutrition={nutrition}
+                profileName={nutritionProfileName}
+                period={humanRange(weekStart, weekEnd)}
+                busy={summaryBusy}
+              />
+              <PantryPreview
+                summary={pantrySummary}
+                meals={meals.length}
+                period={humanRange(weekStart, weekEnd)}
+                busy={summaryBusy}
+                generating={busyAction === 'shopping-list'}
+                onGenerate={() => void generateList()}
+              />
+              <button type="button" onClick={() => setMobileReviewOpen(true)}>
+                Compare saved recipes
+              </button>
+              {viewMode === 'week' ? (
+                <button
+                  type="button"
+                  disabled={Boolean(busyAction) || unconfirmedChange || !meals.length}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Add copies to ${humanRange(nextWeekStart, addPlannerDays(nextWeekStart, 6))}? Existing meals stay; copies start as planned. This action has no Undo.`,
+                      )
+                    )
+                      void copyWeek();
+                  }}
+                >
+                  Copy to next week
+                </button>
+              ) : null}
+              {initialAiSummary ? (
+                <details className={styles.planningNotes}>
+                  <summary className="recipe-disclosure-summary">
+                    <span>AI planning summary</span>
+                    <ChevronDown size={18} />
+                  </summary>
+                  <p>
+                    Saved planning insight
+                    {initialAiSummary.periodStart && initialAiSummary.periodEnd
+                      ? ` for ${humanRange(initialAiSummary.periodStart, initialAiSummary.periodEnd)}`
+                      : ''}
+                    . This snapshot does not follow the visible calendar.
+                  </p>
+                  <AiSummaryCards
+                    domain="meal_plans"
+                    placement="rail"
+                    initialSummary={initialAiSummary}
+                  />
+                </details>
+              ) : null}
             </div>
           ) : null}
 
@@ -1985,7 +2579,8 @@ export function MealPlanner({
                     <header>
                       <button
                         type="button"
-                        aria-label={`Open ${formatPlannerDate(date, { month: 'long', day: 'numeric' })} day view`}
+                        aria-current={date === today ? 'date' : undefined}
+                        aria-label={`Open ${formatPlannerDate(date, { month: 'long', day: 'numeric', year: 'numeric' })} day view`}
                         onClick={() => navigatePeriod(date, 'day')}
                       >
                         {formatPlannerDate(date, { day: 'numeric' })}
@@ -1999,17 +2594,23 @@ export function MealPlanner({
                       </button>
                     </header>
                     <div>
-                      {dayMeals.slice(0, 3).map((meal) => (
+                      {dayMeals.slice(0, 2).map((meal) => (
                         <button
                           type="button"
                           key={meal.id}
                           onClick={() => navigatePeriod(date, 'day')}
                         >
-                          <span>{mealLabel(meal.meal)}</span>
+                          <span>{mealTypeLabel(meal.meal, mealTypeOptions)}</span>
                           <strong>{meal.recipeTitle}</strong>
                         </button>
                       ))}
-                      {dayMeals.length > 3 ? <small>+{dayMeals.length - 3} more</small> : null}
+                      {dayMeals.length > 0 ? (
+                        <button type="button" onClick={() => navigatePeriod(date, 'day')}>
+                          {dayMeals.length === 1
+                            ? 'View 1 meal'
+                            : `View all ${dayMeals.length} meals`}
+                        </button>
+                      ) : null}
                     </div>
                   </section>
                 );
@@ -2060,26 +2661,12 @@ export function MealPlanner({
                               meal={meal}
                               recipes={recipes}
                               busy={Boolean(busyAction)}
-                              dates={dates}
-                              weekMeals={meals}
-                              mealTypes={scheduleMeals}
+                              unconfirmed={unconfirmedChange}
                               pantryStatus={pantryStatusByMeal[meal.id] ?? 'unknown'}
-                              onRemove={removeMeal}
-                              onRefreshRecipe={refreshPlannedRecipe}
-                              onEdit={(entry) => setMealEditor({ entry })}
-                              onStatus={updateMealStatus}
+                              onActions={setActiveMealActions}
                               onServings={(entry, servings) =>
                                 void updateMealEntry(entry, { servings }, 'Serving count updated.')
                               }
-                              onDuplicate={(entry) => void duplicateMeal(entry)}
-                              onMove={(entry, targetDate, targetMeal) =>
-                                void updateMealEntry(
-                                  entry,
-                                  { plannedFor: targetDate, meal: targetMeal },
-                                  'Meal moved.',
-                                )
-                              }
-                              onSwap={(entry, target) => void swapMeals(entry, target)}
                               onDragStart={setDraggedMealId}
                             />
                           ))
@@ -2096,7 +2683,7 @@ export function MealPlanner({
                             onClick={() => openRecipePicker(date, option.value)}
                           >
                             <Plus size={18} aria-hidden="true" />
-                            <span>Add recipe</span>
+                            <span>Add meal</span>
                           </button>
                         )}
                       </div>
@@ -2108,6 +2695,14 @@ export function MealPlanner({
           )}
 
           <div className={styles.mobileSchedule}>
+            <h2 aria-live="polite">
+              {formatPlannerDate(selectedMobileDate, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </h2>
             {scheduleMeals.map((option) => {
               const slotMeals = selectedDayMeals.filter((meal) => meal.meal === option.value);
               return (
@@ -2130,26 +2725,12 @@ export function MealPlanner({
                           meal={meal}
                           recipes={recipes}
                           busy={Boolean(busyAction)}
-                          dates={dates}
-                          weekMeals={meals}
-                          mealTypes={scheduleMeals}
+                          unconfirmed={unconfirmedChange}
                           pantryStatus={pantryStatusByMeal[meal.id] ?? 'unknown'}
-                          onRemove={removeMeal}
-                          onRefreshRecipe={refreshPlannedRecipe}
-                          onEdit={(entry) => setMealEditor({ entry })}
-                          onStatus={updateMealStatus}
+                          onActions={setActiveMealActions}
                           onServings={(entry, servings) =>
                             void updateMealEntry(entry, { servings }, 'Serving count updated.')
                           }
-                          onDuplicate={(entry) => void duplicateMeal(entry)}
-                          onMove={(entry, targetDate, targetMeal) =>
-                            void updateMealEntry(
-                              entry,
-                              { plannedFor: targetDate, meal: targetMeal },
-                              'Meal moved.',
-                            )
-                          }
-                          onSwap={(entry, target) => void swapMeals(entry, target)}
                           onDragStart={setDraggedMealId}
                         />
                       ))
@@ -2158,7 +2739,7 @@ export function MealPlanner({
                         type="button"
                         onClick={() => openRecipePicker(selectedMobileDate, option.value)}
                       >
-                        <Plus size={25} aria-hidden="true" /> Add recipe
+                        <Plus size={25} aria-hidden="true" /> Add meal
                       </button>
                     )}
                   </div>
@@ -2170,7 +2751,7 @@ export function MealPlanner({
 
         <aside className={styles.insightsRail} aria-label="Plan overview and shopping">
           <section
-            className={`${styles.insightCard} ${styles.planOverviewCard}`}
+            className={styles.insightCard}
             aria-label={`${mealLabel(viewMode)} plan at a glance`}
           >
             <header className={styles.planOverviewHeader}>
@@ -2197,111 +2778,45 @@ export function MealPlanner({
               </div>
             </div>
           </section>{' '}
-          <section className={styles.insightCard}>
-            <header>
-              <h3>Ready to shop?</h3>
-            </header>
-            {summaryBusy ? (
-              <div className={styles.summarySkeleton} aria-label="Updating Pantry coverage">
-                <InlineSkeleton label="Updating Pantry coverage" width="100%" />
-                <InlineSkeleton label="Updating Pantry coverage" width="70%" />
-              </div>
-            ) : meals.length && pantrySummary.total > 0 ? (
-              <>
-                <div className={styles.pantryCoverage}>
-                  <div
-                    className={styles.coverageRing}
-                    style={{ '--coverage': `${coveragePercent}%` } as CSSProperties}
-                  />
-                  <p>
-                    <strong>{coveragePercent}%</strong>
-                    <span>covered by pantry</span>
-                  </p>
-                </div>
-                <p className={styles.missingIngredients}>
-                  {pantrySummary.missing} ingredients missing
-                </p>
-                <Link className={styles.railButton} href="/pantry">
-                  View pantry
-                </Link>
-              </>
-            ) : (
-              <>
-                <p className={styles.summaryEmpty}>
-                  {meals.length
-                    ? 'Pantry coverage is not available for these meals yet.'
-                    : 'Add a meal to see what you already have.'}
-                </p>
-              </>
-            )}
-            <button
-              className={`${styles.shoppingButton} ${styles.railGroceryButton}`}
-              type="button"
-              disabled={Boolean(busyAction) || !meals.length}
-              onClick={generateList}
-            >
-              {busyAction === 'shopping-list' ? (
-                <LoadingIndicator label="Generating shopping list" />
-              ) : (
-                <ShoppingBasket size={17} aria-hidden="true" />
-              )}
-              <span aria-hidden="true">Make grocery list</span>
-              <span className="sr-only">Make Pantry-aware grocery list</span>
-            </button>
-          </section>{' '}
-          <section className={styles.insightCard}>
-            <header>
-              <h3>Nutrition preview</h3>
-              <span>Daily average from recorded nutrient values</span>
-            </header>
-            {summaryBusy ? (
-              <div className={styles.summarySkeleton} aria-label="Updating nutrition preview">
-                <InlineSkeleton label="Updating nutrition" width="100%" />
-                <InlineSkeleton label="Updating nutrition" width="82%" />
-                <InlineSkeleton label="Updating nutrition" width="91%" />
-              </div>
-            ) : plannedDays.length ? (
-              nutrition.map((item) => (
-                <div className={styles.nutritionLine} key={item.code}>
-                  <span>
-                    <strong>{item.label}</strong>
-                    <small>
-                      {number(item.value)}
-                      {item.target ? ` / ${number(item.target)}` : ''} {item.unit}
-                    </small>
-                  </span>
-                  {item.value !== undefined && (
-                    <i aria-hidden="true">
-                      <b style={{ width: `${item.progress}%` }} />
-                    </i>
-                  )}
-                </div>
-              ))
-            ) : (
-              <p className={styles.summaryEmpty}>No nutrition data yet</p>
-            )}
-            <p className={styles.railDescription}>
-              Missing nutrients remain unknown. Planned totals are estimates, not logged meals.
-            </p>
-            <Link href="/nutrition?view=overview">
-              View full nutrition <ChevronRight size={16} aria-hidden="true" />
-            </Link>
-          </section>{' '}
+          <PantryPreview
+            summary={pantrySummary}
+            meals={meals.length}
+            period={humanRange(weekStart, weekEnd)}
+            busy={summaryBusy}
+            generating={busyAction === 'shopping-list'}
+            onGenerate={() => void generateList()}
+          />
+          <NutritionPreview
+            nutrition={nutrition}
+            profileName={nutritionProfileName}
+            period={humanRange(weekStart, weekEnd)}
+            busy={summaryBusy}
+          />
           <section className={styles.assistanceSection} aria-label="Meal suggestions">
             <DecisionAssistance
               headingLevel={3}
               embedded
               initialTask="meal_rank"
               tasks={['meal_rank']}
-              title="Choose the next meal"
-              description="Compare saved recipes using your shared preferences, nutrition and pantry evidence before adding them to the calendar."
+              title="Find a meal"
+              description="Compare saved recipes using permitted profile and pantry information. Remembering a choice records your assessment; add a meal separately to schedule it."
             />
           </section>
-          {meals.length > 0 && (
+          {initialAiSummary && (
             <details className={styles.planningNotes}>
-              <summary>Planning notes</summary>
+              <summary className="recipe-disclosure-summary">
+                <span>AI planning summary</span>
+                <ChevronDown size={18} />
+              </summary>
+              <p>
+                Saved planning insight
+                {initialAiSummary.periodStart && initialAiSummary.periodEnd
+                  ? ` for ${humanRange(initialAiSummary.periodStart, initialAiSummary.periodEnd)}`
+                  : ''}
+                . This snapshot does not follow the visible calendar.
+              </p>
 
-              {meals.length ? (
+              {initialAiSummary ? (
                 <AiSummaryCards
                   domain="meal_plans"
                   placement="rail"
@@ -2313,6 +2828,89 @@ export function MealPlanner({
         </aside>
       </div>
 
+      {actionMeal ? (
+        <PlannedMealActions
+          key={`${actionMeal.id}:${actionMeal.plannedFor}:${actionMeal.meal}`}
+          meal={actionMeal}
+          busy={Boolean(busyAction)}
+          unconfirmed={unconfirmedChange}
+          dates={dates}
+          weekMeals={meals}
+          mealTypes={scheduleMeals}
+          pantryStatus={pantryStatusByMeal[actionMeal.id] ?? 'unknown'}
+          onClose={closeMealActions}
+          onRemove={removeMeal}
+          onRefreshRecipe={refreshPlannedRecipe}
+          onEdit={(entry) => {
+            setActiveMealActions(null);
+            setMealEditor({ entry });
+          }}
+          onStatus={updateMealStatus}
+          onDuplicate={(entry) => void duplicateMeal(entry)}
+          onMove={(entry, date, meal) =>
+            void updateMealEntry(
+              entry,
+              { plannedFor: date, meal },
+              `Meal moved to ${formatPlannerDate(date, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} · ${mealTypeLabel(meal, mealTypeOptions)}.`,
+            )
+          }
+          onSwap={(entry, target) => void swapMeals(entry, target)}
+        />
+      ) : null}
+      <AiMealPlanGenerator
+        weekStart={startDate}
+        weekEnd={selectedPlanEnd}
+        mealSlots={selectedMeals}
+        profiles={selectedProfiles}
+        disabled={!setupValid}
+        mealTypeOptions={mealTypeOptions}
+        aiModel={aiMealPlanModel}
+        imageGenerationEnabled={aiImageGenerationEnabled}
+        open={generatorOpen}
+        onOpenChange={(open) => {
+          setGeneratorOpen(open);
+          if (!open && generatorReturnToSettings) setSettingsOpen(true);
+        }}
+        onEditSettings={() => {
+          setGeneratorOpen(false);
+          setSettingsOpen(true);
+        }}
+        hideTrigger
+      />
+      {mobileReviewOpen ? (
+        <AppDialog
+          aria-labelledby="planner-meal-review-title"
+          onClose={() => setMobileReviewOpen(false)}
+          className={styles.reviewDialog}
+        >
+          <header>
+            <h2 id="planner-meal-review-title">Compare saved recipes</h2>
+            <button
+              type="button"
+              aria-label="Close meal comparison"
+              onClick={() => setMobileReviewOpen(false)}
+            >
+              <X />
+            </button>
+          </header>
+          <div>
+            <p>
+              Ranks saved recipes using permitted profile and Pantry information. Remembering an
+              assessment does not schedule a meal.
+            </p>
+            <DecisionAssistance
+              headingLevel={3}
+              embedded
+              initiallyExpanded
+              hideContextHeader
+              initialTask="meal_rank"
+              tasks={['meal_rank']}
+              title="Find a meal"
+              description="Ranks saved recipes using permitted profile and pantry information. Remembering a choice records your assessment; add a meal separately to schedule it."
+            />
+          </div>
+        </AppDialog>
+      ) : null}
       {mealEditor ? (
         <MealEntryEditor
           profiles={profiles}
@@ -2322,13 +2920,30 @@ export function MealPlanner({
           entry={mealEditor.entry}
           initialKind={mealEditor.kind}
           recipes={recipes.map(({ id, title }) => ({ id, title }))}
-          date={pickerContext?.date ?? startDate}
-          slot={pickerContext?.meal ?? selectedMeals[0] ?? 'dinner'}
+          date={mealEditor.target?.date ?? pickerContext?.date ?? startDate}
+          slot={mealEditor.target?.meal ?? pickerContext?.meal ?? selectedMeals[0] ?? 'dinner'}
+          mealTypeOptions={mealTypeOptions}
           slots={selectedMeals}
           meals={meals}
           servings={selectedProfiles.length}
-          onClose={() => setMealEditor(null)}
-          onSaved={() => {
+          onClose={() => {
+            if (mealEditor.target && !editorCommittedRef.current) setSelectorOpen(true);
+            if (mealEditor.entry) returnToMealAction(mealEditor.entry.id);
+            setMealEditor(null);
+          }}
+          onUncertain={() => {
+            editorCommittedRef.current = true;
+            setUnconfirmedChange(true);
+            setError('A meal save could not be confirmed. Check the calendar before trying again.');
+          }}
+          onSaved={(context) => {
+            editorCommittedRef.current = true;
+            setError(null);
+            setFeedback(
+              `Meal saved for ${formatPlannerDate(context.date, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} · ${mealTypeLabel(context.meal, mealTypeOptions)}.`,
+            );
+            if (context.date < weekStart || context.date > weekEnd)
+              setFeedbackDestination({ date: context.date, label: 'View saved meal' });
             setUndoStack([]);
             setRedoStack([]);
             router.refresh();
@@ -2336,9 +2951,10 @@ export function MealPlanner({
         />
       ) : null}
       <MealPlanRecipeSelector
-        onOtherKind={(kind) => {
+        onOtherKind={(kind, context) => {
+          editorCommittedRef.current = false;
           setSelectorOpen(false);
-          setMealEditor({ kind });
+          setMealEditor({ kind, target: context });
         }}
         key={`${startDate}-${duration}-${selectedMeals.join('-')}-${pickerContext?.date ?? ''}-${pickerContext?.meal ?? ''}`}
         open={selectorOpen}
@@ -2349,6 +2965,7 @@ export function MealPlanner({
             ? [...selectedMeals, pickerContext.meal]
             : selectedMeals
         }
+        mealTypeOptions={mealTypeOptions}
         recipes={recipes}
         collections={collections}
         collectionMemberships={collectionMemberships}
@@ -2357,6 +2974,12 @@ export function MealPlanner({
         profileNames={selectedProfiles.map((profile) => profile.displayName)}
         initialDate={pickerContext?.date}
         initialMealType={pickerContext?.meal}
+        onUncertain={() => {
+          setUnconfirmedChange(true);
+          setError(
+            'An addition could not be confirmed. Check the calendar before submitting it again.',
+          );
+        }}
         onClose={() => setSelectorOpen(false)}
         onSaved={handleRecipesSaved}
       />

@@ -1,3 +1,4 @@
+export const metadata = { title: 'Sign in' };
 import { BordLockup } from '@/components/bord-brand';
 import { SignInForm } from '@/components/auth-forms';
 

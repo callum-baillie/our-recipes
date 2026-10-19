@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, Cloud, FileCheck2, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertCircle, FileCheck2, ShieldCheck, Sparkles } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 
 import { ImportReviewForm } from '@/components/import-review-form';
@@ -610,34 +610,12 @@ export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' 
   return (
     <section className="import-layout">
       <aside className="import-intro">
-        <h2>Add from an image.</h2>
+        <h2>From file to recipe</h2>
         <p>
-          Upload a recipe photo, a set of scans, or a PDF. We prepare it carefully and show you an
-          editable draft before anything is saved.
+          Choose files and prepare previews on this device. Creating a review draft uploads the
+          source to Bòrd; AI processing sends it to OpenAI when selected. Confirm the reviewed draft
+          to add the recipe.
         </p>
-        <div className="import-trust-list">
-          <div>
-            <LockKeyhole size={22} aria-hidden="true" />
-            <span>
-              <strong>Prepared locally</strong>
-              <small>Files are checked and iPhone photos are converted on this device.</small>
-            </span>
-          </div>
-          <div>
-            <Cloud size={22} aria-hidden="true" />
-            <span>
-              <strong>Request only when you choose</strong>
-              <small>OpenAI receives prepared scans only after the review action.</small>
-            </span>
-          </div>
-          <div>
-            <FileCheck2 size={22} aria-hidden="true" />
-            <span>
-              <strong>Nothing saved until you confirm</strong>
-              <small>The result stays editable before it joins your library.</small>
-            </span>
-          </div>
-        </div>
       </aside>
       <div className="import-options">
         {initialMode === 'jsonld' ? (

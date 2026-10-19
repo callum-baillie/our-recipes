@@ -1,5 +1,6 @@
 'use client';
 
+import { radioKeys } from './radio-keys';
 import { Check, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { startTransition, useSyncExternalStore } from 'react';
@@ -109,13 +110,19 @@ function AppearanceChoices({
       {section !== 'mode' && (
         <fieldset>
           <legend className={section ? 'sr-only' : undefined}>Color theme</legend>
-          <div className="appearance-palette-grid" role="radiogroup" aria-label="Color theme">
+          <div
+            className="appearance-palette-grid"
+            role="radiogroup"
+            onKeyDown={radioKeys}
+            aria-label="Color theme"
+          >
             {PALETTE_IDS.map((id) => (
               <button
                 key={id}
                 type="button"
                 role="radio"
                 aria-checked={palette === id}
+                tabIndex={palette === id ? 0 : -1}
                 className={palette === id ? 'appearance-palette selected' : 'appearance-palette'}
                 title={PALETTES[id].label}
                 onClick={() => changePalette(id)}
@@ -144,7 +151,12 @@ function AppearanceChoices({
       {section !== 'palette' && (
         <fieldset>
           <legend className={section ? 'sr-only' : undefined}>Light or dark</legend>
-          <div className="appearance-mode-grid" role="radiogroup" aria-label="Light or dark">
+          <div
+            className="appearance-mode-grid"
+            role="radiogroup"
+            onKeyDown={radioKeys}
+            aria-label="Light or dark"
+          >
             {COLOR_MODES.map((id) => {
               const Icon = id === 'system' ? Monitor : id === 'dark' ? Moon : Sun;
               return (
@@ -153,13 +165,13 @@ function AppearanceChoices({
                   type="button"
                   role="radio"
                   aria-checked={mode === id}
+                  tabIndex={mode === id ? 0 : -1}
                   className={mode === id ? 'appearance-mode selected' : 'appearance-mode'}
                   onClick={() => changeMode(id)}
                 >
                   <Icon size={16} aria-hidden="true" />
-                  {id === 'system'
-                    ? `System (${effectiveMode})`
-                    : `${id[0]!.toUpperCase()}${id.slice(1)}`}
+                  {id === 'system' ? 'System' : `${id[0]!.toUpperCase()}${id.slice(1)}`}
+                  {id === 'system' ? <small>Currently {effectiveMode}</small> : null}
                 </button>
               );
             })}

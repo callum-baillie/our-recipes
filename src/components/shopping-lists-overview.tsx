@@ -1,4 +1,5 @@
 'use client';
+import { DismissibleDetails } from './dismissible-details';
 import { PageHeader } from '@/components/page-header';
 
 import {
@@ -7,13 +8,13 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   Clock3,
   MoreHorizontal,
   Package,
   PieChart,
   Search,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -32,10 +33,10 @@ type ListFilter = 'all' | 'active' | 'planned' | 'completed' | 'archived';
 type ListSort = 'updated' | 'name' | 'remaining';
 
 const FILTERS: Array<{ key: ListFilter; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'active', label: 'Active' },
-  { key: 'planned', label: 'Planned' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'all', label: 'Current lists' },
+  { key: 'active', label: 'Items remaining' },
+  { key: 'planned', label: 'From plans' },
+  { key: 'completed', label: 'All items sourced' },
   { key: 'archived', label: 'Archived' },
 ];
 
@@ -83,6 +84,8 @@ export function ShoppingListsOverview({
   const [filter, setFilter] = useState<ListFilter>('all');
   const [sort, setSort] = useState<ListSort>('updated');
   const [descending, setDescending] = useState(true);
+  const [nameError, setNameError] = useState('');
+  const [copyId, setCopyId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const activeLists = lists.filter((list) => !list.archivedAt);
@@ -124,6 +127,11 @@ export function ShoppingListsOverview({
   async function createList(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
+    if (!name.trim()) {
+      setNameError('Enter a list name.');
+      return;
+    }
+    setNameError('');
     setBusy('create');
     setPendingAction('create');
     try {
@@ -153,6 +161,11 @@ export function ShoppingListsOverview({
     nextName?: string,
   ) {
     if (busy) return;
+    if (action === 'rename' && !nextName?.trim()) {
+      setNameError('Enter a list name.');
+      return;
+    }
+    setNameError('');
     setBusy(listId);
     setPendingAction(action);
     try {
@@ -161,8 +174,10 @@ export function ShoppingListsOverview({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'rename' ? { action, name: nextName } : { action }),
       });
+      const result = await response.json().catch(() => null);
       if (!response.ok) {
-        showToast('The list change could not be saved.', 'error');
+        setNameError(result?.error?.message ?? 'The list change could not be saved.');
+        showToast(result?.error?.message ?? 'The list change could not be saved.', 'error');
         return;
       }
       showToast(
@@ -179,6 +194,13 @@ export function ShoppingListsOverview({
                   : 'Shopping list renamed.',
         'success',
       );
+      if (action === 'duplicate' && result?.list?.id) setCopyId(result.list.id);
+      document
+        .querySelectorAll<HTMLDetailsElement>(`.${styles.cardActions} details[open]`)
+        .forEach((details) => {
+          details.open = false;
+          details.querySelector('summary')?.focus();
+        });
       setEditingId(null);
       router.refresh();
     } catch {
@@ -222,6 +244,14 @@ export function ShoppingListsOverview({
         eyebrow="HOUSEHOLD SHOPPING"
         description="Make a list, shop by aisle, and bring your groceries into the pantry."
       />
+      {copyId && (
+        <p role="status">
+          List duplicated.{' '}
+          <Link className="inline-link" href={`/lists/${copyId}`}>
+            Open the copy
+          </Link>
+        </p>
+      )}
       <div className={styles.layout}>
         <div className={styles.mainColumn}>
           {activeLists.find((list) => list.isAutomaticRestockTarget)
@@ -243,44 +273,56 @@ export function ShoppingListsOverview({
                 );
               })()
             : null}
-          <section className={styles.createPanel} aria-labelledby="create-list-heading">
+          <details className={styles.createPanel} open={!lists.length}>
+            <summary className="recipe-disclosure-summary">
+              <span>New list</span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
             <h2 className="sr-only" id="create-list-heading">
               Create a shopping list
             </h2>
-            <div className={styles.createTabs} aria-label="Shopping list creation options">
+            <div className={styles.createTabs}>
               <span>
                 <ClipboardList size={18} aria-hidden="true" /> Manual list
               </span>
               <Link href="/planner">
-                <CalendarDays size={18} aria-hidden="true" /> From planner
+                <CalendarDays size={18} aria-hidden="true" /> Open planner
               </Link>
             </div>
             <form id="new-shopping-list" className={styles.createForm} onSubmit={createList}>
               <label>
-                <span className="sr-only">Give your list a name</span>
+                <span>List name</span>
                 <input
                   value={name}
                   maxLength={120}
-                  placeholder="Give your list a name..."
+                  placeholder="e.g. Weekend market"
+                  aria-invalid={!!nameError}
+                  aria-describedby={nameError ? 'new-list-error' : undefined}
                   required
                   onChange={(event) => setName(event.target.value)}
                 />
-                <small>e.g. Weekend market</small>
+                {nameError && (
+                  <small id="new-list-error" role="alert">
+                    {nameError}
+                  </small>
+                )}
               </label>
-              <button type="submit" aria-busy={busy === 'create'} disabled={busy !== null}>
-                {busy === 'create' ? <ButtonSpinner /> : null}
-                {busy === 'create' ? 'Creating…' : 'Create list'}
-              </button>
               <label className={styles.nextShopOption}>
                 <input
                   type="checkbox"
                   checked={makeNextShop}
                   onChange={(event) => setMakeNextShop(event.target.checked)}
                 />{' '}
-                Make this the Next shop
+                <span>
+                  Use as Next shop<small>New automatic-restock items go to this list.</small>
+                </span>
               </label>
+              <button type="submit" aria-busy={busy === 'create'} disabled={busy !== null}>
+                {busy === 'create' ? <ButtonSpinner /> : null}
+                {busy === 'create' ? 'Creating…' : 'Create list'}
+              </button>
             </form>
-          </section>
+          </details>
 
           <section className={styles.listWorkspace} aria-labelledby="shopping-lists-heading">
             <h2 className="sr-only" id="shopping-lists-heading">
@@ -312,9 +354,13 @@ export function ShoppingListsOverview({
               <label className={styles.sortField}>
                 <span>Sort by:</span>
                 <select value={sort} onChange={(event) => setSort(event.target.value as ListSort)}>
-                  <option value="updated">Updated</option>
-                  <option value="name">Name</option>
-                  <option value="remaining">Remaining</option>
+                  <option value="updated">
+                    {descending ? 'Recently updated' : 'Oldest update'}
+                  </option>
+                  <option value="name">{descending ? 'Name Z–A' : 'Name A–Z'}</option>
+                  <option value="remaining">
+                    {descending ? 'Most remaining' : 'Fewest remaining'}
+                  </option>
                 </select>
               </label>
               <button
@@ -327,6 +373,21 @@ export function ShoppingListsOverview({
               </button>
             </div>
 
+            <p className={styles.resultCount}>
+              {visibleLists.length} matching {visibleLists.length === 1 ? 'list' : 'lists'}
+              {(query || filter !== 'all') && (
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    setFilter('all');
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </p>
             {visibleLists.length ? (
               <div className={styles.cardGrid}>
                 {visibleLists.map((list) => {
@@ -347,29 +408,23 @@ export function ShoppingListsOverview({
                               <ClipboardList size={20} />
                             )}
                           </span>
-                          <span>
-                            {shoppingListSourceLabel(list.sourceKind).toLocaleUpperCase()}
-                          </span>
+                          <span>{shoppingListSourceLabel(list.sourceKind)}</span>
                         </div>
                         <h3>{list.name}</h3>
                         {list.isAutomaticRestockTarget ? <strong>Next shop</strong> : null}
                         <p>
-                          <strong>{list.needsAttentionCount}</strong> to find
+                          <strong>
+                            {list.sourcedCount} of {list.itemCount} sourced
+                          </strong>{' '}
+                          · {list.needsAttentionCount} to find
                           {list.inCartCount ? ` · ${list.inCartCount} in cart` : ''}
                         </p>
                         <div className={styles.progressRow}>
                           <span aria-label={`${sourcedPercent}% of items sourced`}>
                             <i style={{ width: `${sourcedPercent}%` }} />
                           </span>
-                          <b>{sourcedPercent}%</b>
                         </div>
                         <dl>
-                          <div>
-                            <dt>
-                              <Package size={15} aria-hidden="true" /> Items
-                            </dt>
-                            <dd>{list.itemCount}</dd>
-                          </div>
                           <div>
                             <dt>
                               <Clock3 size={15} aria-hidden="true" /> Updated
@@ -391,7 +446,20 @@ export function ShoppingListsOverview({
                         >
                           <label>
                             <span className="sr-only">Rename {list.name}</span>
-                            <input name="name" defaultValue={list.name} maxLength={120} required />
+                            <input
+                              name="name"
+                              defaultValue={list.name}
+                              maxLength={120}
+                              required
+                              autoFocus
+                              aria-invalid={!!nameError}
+                              aria-describedby={nameError ? `rename-error-${list.id}` : undefined}
+                            />
+                            {nameError && (
+                              <small id={`rename-error-${list.id}`} role="alert">
+                                {nameError}
+                              </small>
+                            )}
                           </label>
                           <button
                             type="submit"
@@ -409,22 +477,6 @@ export function ShoppingListsOverview({
                         </form>
                       ) : (
                         <footer className={styles.cardActions}>
-                          <button type="button" onClick={() => setEditingId(list.id)}>
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            aria-busy={busy === list.id && pendingAction === 'duplicate'}
-                            disabled={busy !== null}
-                            onClick={() => void manage(list.id, 'duplicate')}
-                          >
-                            {busy === list.id && pendingAction === 'duplicate' ? (
-                              <ButtonSpinner />
-                            ) : null}
-                            {busy === list.id && pendingAction === 'duplicate'
-                              ? 'Duplicating…'
-                              : 'Duplicate'}
-                          </button>
                           {!list.isAutomaticRestockTarget && !list.archivedAt ? (
                             <button
                               type="button"
@@ -448,11 +500,30 @@ export function ShoppingListsOverview({
                                 : 'Make Next shop'}
                             </button>
                           ) : null}
-                          <details>
-                            <summary aria-label={`More actions for ${list.name}`}>
-                              <MoreHorizontal size={20} aria-hidden="true" />
-                            </summary>
+                          <DismissibleDetails
+                            className={styles.cardMenu}
+                            viewportPanel
+                            summaryAriaLabel={`More actions for ${list.name}`}
+                            summary={<MoreHorizontal size={20} aria-hidden="true" />}
+                          >
                             <div>
+                              {' '}
+                              <button type="button" onClick={() => setEditingId(list.id)}>
+                                Rename
+                              </button>
+                              <button
+                                type="button"
+                                aria-busy={busy === list.id && pendingAction === 'duplicate'}
+                                disabled={busy !== null}
+                                onClick={() => void manage(list.id, 'duplicate')}
+                              >
+                                {busy === list.id && pendingAction === 'duplicate' ? (
+                                  <ButtonSpinner />
+                                ) : null}
+                                {busy === list.id && pendingAction === 'duplicate'
+                                  ? 'Duplicating…'
+                                  : 'Duplicate'}
+                              </button>
                               <button
                                 type="button"
                                 aria-busy={
@@ -480,21 +551,27 @@ export function ShoppingListsOverview({
                                     : 'Archive'}
                               </button>
                               {list.isAutomaticRestockTarget ? (
-                                <button
-                                  type="button"
-                                  disabled={busy !== null}
-                                  aria-busy={busy === list.id && pendingAction === 'complete'}
-                                  onClick={() => void manage(list.id, 'complete')}
-                                >
-                                  {busy === list.id && pendingAction === 'complete' ? (
-                                    <ButtonSpinner />
-                                  ) : (
-                                    <CheckCircle2 size={15} aria-hidden="true" />
-                                  )}{' '}
-                                  {busy === list.id && pendingAction === 'complete'
-                                    ? 'Completing…'
-                                    : 'Complete trip'}
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={busy !== null}
+                                    aria-busy={busy === list.id && pendingAction === 'complete'}
+                                    onClick={() => void manage(list.id, 'complete')}
+                                  >
+                                    {busy === list.id && pendingAction === 'complete' ? (
+                                      <ButtonSpinner />
+                                    ) : (
+                                      <CheckCircle2 size={15} aria-hidden="true" />
+                                    )}{' '}
+                                    {busy === list.id && pendingAction === 'complete'
+                                      ? 'Completing…'
+                                      : 'Complete trip'}
+                                  </button>
+                                  <small className={styles.tripHelp}>
+                                    Moves cart items to Sourced, archives this list and clears Next
+                                    shop. Unresolved items stay unresolved.
+                                  </small>
+                                </>
                               ) : null}
                               <button
                                 type="button"
@@ -520,7 +597,7 @@ export function ShoppingListsOverview({
                                   : 'Delete'}
                               </button>
                             </div>
-                          </details>
+                          </DismissibleDetails>
                         </footer>
                       )}
                     </article>
@@ -539,6 +616,18 @@ export function ShoppingListsOverview({
                       ? 'Try another filter or search term.'
                       : 'Create a manual list or build one from meals in the planner.'}
                   </p>
+                  {!activeLists.length && archivedLists.length > 0 && filter !== 'archived' && (
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => {
+                        setQuery('');
+                        setFilter('archived');
+                      }}
+                    >
+                      View archived lists
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -548,30 +637,30 @@ export function ShoppingListsOverview({
         <aside className={styles.rail} aria-label="Shopping list insights">
           <section className={styles.railPanel}>
             <h2>
-              <PieChart size={19} aria-hidden="true" /> List insights
+              <PieChart size={19} aria-hidden="true" /> Household totals
             </h2>
             <dl className={styles.insights}>
               <div>
                 <dt>
-                  <Package size={17} aria-hidden="true" /> Active lists
+                  <Package size={17} aria-hidden="true" /> Current lists
                 </dt>
                 <dd>{activeLists.length}</dd>
               </div>
               <div>
                 <dt>
-                  <Clock3 size={17} aria-hidden="true" /> Items remaining
+                  <Clock3 size={17} aria-hidden="true" /> Open item rows
                 </dt>
                 <dd>{remainingCount}</dd>
               </div>
               <div>
                 <dt>
-                  <CalendarDays size={17} aria-hidden="true" /> From planner
+                  <CalendarDays size={17} aria-hidden="true" /> From plans
                 </dt>
                 <dd>{plannedLists.length}</dd>
               </div>
               <div>
                 <dt>
-                  <CheckCircle2 size={17} aria-hidden="true" /> Completed
+                  <CheckCircle2 size={17} aria-hidden="true" /> All items sourced
                 </dt>
                 <dd>{completedLists.length}</dd>
               </div>
@@ -582,9 +671,6 @@ export function ShoppingListsOverview({
                 <dd>{archivedLists.length}</dd>
               </div>
             </dl>
-            <button className={styles.railLink} type="button" onClick={() => setFilter('all')}>
-              View all insights <ArrowRight size={15} aria-hidden="true" />
-            </button>
           </section>
 
           {lists.length ? (
@@ -597,7 +683,7 @@ export function ShoppingListsOverview({
 
           <section className={styles.railPanel}>
             <h2>
-              <Clock3 size={19} aria-hidden="true" /> Recent activity
+              <Clock3 size={19} aria-hidden="true" /> Recently updated lists
             </h2>
             {recentLists.length ? (
               <ul className={styles.activityList}>
@@ -626,21 +712,8 @@ export function ShoppingListsOverview({
                 ))}
               </ul>
             ) : (
-              <p className={styles.railEmpty}>Activity appears after you create a list.</p>
+              <p className={styles.railEmpty}>Recently updated lists appear here.</p>
             )}
-            <button className={styles.railLink} type="button" onClick={() => setFilter('all')}>
-              View all activity <ArrowRight size={15} aria-hidden="true" />
-            </button>
-          </section>
-
-          <section className={`${styles.railPanel} ${styles.plannerPanel}`}>
-            <h2>
-              <CalendarDays size={19} aria-hidden="true" /> Planner suggestions
-            </h2>
-            <p>Generate a shopping list from meals already on your plan.</p>
-            <Link href="/planner">
-              <Sparkles size={16} aria-hidden="true" /> Generate from planner
-            </Link>
           </section>
         </aside>
       </div>

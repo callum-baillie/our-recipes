@@ -9,7 +9,7 @@ export default function TaskQueuePage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="BACKGROUND TASKS"
-        title="Task queue"
+        title="Background processing"
         description="Shared processing infrastructure for recipes, images, and scheduled meal-plan drafts."
       />
       <SettingsPane
@@ -22,30 +22,37 @@ export default function TaskQueuePage() {
         >
           <output>{queue.backend === 'redis' ? 'Redis / BullMQ' : 'Built-in SQLite queue'}</output>
         </SettingsRow>
-        <SettingsRow title="Worker status">
+        <SettingsRow title="Worker configuration">
           <output>
             {process.env.NODE_ENV !== 'production'
               ? 'Inactive in development'
               : queue.enabled
-                ? 'Enabled'
+                ? 'Enabled in configuration'
                 : 'Disabled'}
           </output>
         </SettingsRow>
-        <SettingsRow title="Transport status">
+        <SettingsRow title="Transport connection">
           <output>{queue.connected ? 'Available' : 'Waiting for Redis'}</output>
         </SettingsRow>
-        <SettingsSubsection
-          title="Optional Redis service"
-          description="For a separate self-hosted queue transport, use docker-compose.queue.yml and set QUEUE_BACKEND=redis and REDIS_URL in the server environment. Credentials stay on the server."
-        />
+        <details className="settings-disclosure">
+          <summary>Technical setup</summary>
+          <SettingsSubsection
+            title="Technical setup · optional Redis service"
+            description="For a separate self-hosted queue transport, use docker-compose.queue.yml and set QUEUE_BACKEND=redis and REDIS_URL in the server environment. Credentials stay on the server."
+          />
+        </details>
+        <p>
+          Configuration and transport availability do not establish a live worker heartbeat or
+          successful job execution.
+        </p>
       </SettingsPane>
       <SettingsPane title="Personal automation">
         <SettingsRow
           title="Schedules & processing preferences"
           description="Choose Direct or Batch processing, schedule meal-plan drafts, and review your background tasks."
         >
-          <Link className="text-button" href="/account/automation">
-            Open my automation
+          <Link className="secondary-button" href="/account/automation">
+            View my tasks and schedules
           </Link>
         </SettingsRow>
       </SettingsPane>

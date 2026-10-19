@@ -1,6 +1,5 @@
 'use client';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { SettingsSectionNav } from './settings-section-nav';
 import { UserRound, HeartPulse, Sparkles, Plug, Workflow, ShieldCheck } from 'lucide-react';
 const links = [
   { href: '/account', label: 'My profile', icon: UserRound },
@@ -11,15 +10,5 @@ const links = [
   { href: '/account/security', label: 'Account security', icon: ShieldCheck },
 ];
 export function AccountNav() {
-  const pathname = usePathname();
-  return (
-    <nav>
-      {links.map(({ href, label, icon: Icon }) => (
-        <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined}>
-          <Icon size={16} aria-hidden="true" />
-          {label}
-        </Link>
-      ))}
-    </nav>
-  );
+  return <SettingsSectionNav scope="Account" links={links} />;
 }

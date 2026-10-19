@@ -241,7 +241,7 @@ export const aiActionDecisionSchema = z
           })
           .strict(),
       )
-      .max(35)
+      .max(280)
       .default([]),
   })
   .strict();
@@ -287,7 +287,7 @@ export const aiMealPlanGenerationRequestSchema = z
       planLeftovers: false,
       generateRecipeImages: false,
     }),
-    fixedMeals: z.array(aiFixedMealSchema).max(35).default([]),
+    fixedMeals: z.array(aiFixedMealSchema).max(70).default([]),
     instructions: z.string().trim().max(2_000).default(''),
   })
   .strict()
@@ -322,7 +322,7 @@ export const aiMealPlanLeftoverLinkSchema = z
 
 export const aiMealPlanCandidateSchema = z
   .object({
-    newRecipes: z.array(generatedRecipeSchema).max(35),
+    newRecipes: z.array(generatedRecipeSchema).max(70),
     entries: z
       .array(
         z
@@ -339,9 +339,9 @@ export const aiMealPlanCandidateSchema = z
           .strict(),
       )
       .min(1)
-      .max(35),
-    allocations: z.array(aiMealPlanAllocationSchema).max(700).default([]),
-    leftoverLinks: z.array(aiMealPlanLeftoverLinkSchema).max(35).default([]),
+      .max(70),
+    allocations: z.array(aiMealPlanAllocationSchema).max(1400).default([]),
+    leftoverLinks: z.array(aiMealPlanLeftoverLinkSchema).max(70).default([]),
     warnings: z.array(z.string().trim().min(1).max(240)).max(20),
     assumptions: z.array(z.string().trim().min(1).max(240)).max(20),
   })
@@ -354,7 +354,7 @@ export const aiMealPlanStructuredOutputSchema = z
       .array(
         z.object({ key: z.string().min(1).max(80), recipe: aiStructuredRecipeSchema }).strict(),
       )
-      .max(35),
+      .max(70),
     entries: z
       .array(
         z
@@ -370,7 +370,7 @@ export const aiMealPlanStructuredOutputSchema = z
           .strict(),
       )
       .min(1)
-      .max(35),
+      .max(70),
     warnings: z.array(z.string().min(1).max(240)).max(20),
     assumptions: z.array(z.string().min(1).max(240)).max(20),
   })

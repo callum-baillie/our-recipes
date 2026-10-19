@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { AsyncSkeleton, ButtonSpinner } from './skeleton';
 import {
   BookOpen,
@@ -11,7 +12,12 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from './page-header';
-import { exportOptionsSchema, type PdfExportOptions } from '@/lib/domain/pdf-export';
+import {
+  calendarDateSchema,
+  exportDateLabel,
+  exportOptionsSchema,
+  type PdfExportOptions,
+} from '@/lib/domain/pdf-export';
 import { localIsoDate } from '@/lib/domain/local-date';
 import styles from './print-workspace.module.css';
 type Choice = { id: string; name: string };
@@ -22,6 +28,13 @@ const kinds = [
   { value: 'shopping-list', label: 'Grocery lists', icon: ShoppingBasket },
   { value: 'pantry', label: 'Pantry inventory', icon: Package },
 ] as const;
+type Prepared = {
+  url: string;
+  fingerprint: string;
+  filename: string;
+  identity: string;
+  preparedAt: string;
+};
 export function PrintWorkspace({
   initial,
   recipes,
@@ -30,7 +43,7 @@ export function PrintWorkspace({
   locations,
 }: {
   initial: Record<string, string>;
-  recipes: { id: string; title: string }[];
+  recipes: { id: string; title: string; servings?: string }[];
   lists: Choice[];
   stores: Choice[];
   locations: Choice[];
@@ -38,11 +51,13 @@ export function PrintWorkspace({
   const [kind, setKind] = useState<Kind>(
     kinds.some((item) => item.value === initial.kind) ? (initial.kind as Kind) : 'recipes',
   );
-  const [selected, setSelected] = useState(
-    initial.recipes
-      ?.split(',')
-      .filter((id) => recipes.some((recipe) => recipe.id === id))
-      .slice(0, 100) ?? [],
+  const [selected, setSelected] = useState<string[]>(
+    [
+      ...new Set(
+        initial.recipes?.split(',').filter((id) => recipes.some((recipe) => recipe.id === id)) ??
+          [],
+      ),
+    ].slice(0, 100),
   );
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState<PdfExportOptions>(() => exportOptionsSchema.parse({}));
@@ -58,29 +73,77 @@ export function PrintWorkspace({
   const [countColumn, setCountColumn] = useState(true);
   const [listId, setListId] = useState(initial.list ?? lists[0]?.id ?? '');
   const [locationId, setLocationId] = useState('');
-  const [servings, setServings] = useState('');
-  const [preview, setPreview] = useState<{
-    url: string;
-    fingerprint: string;
-    filename: string;
+  const [servingDrafts, setServingDrafts] = useState<Record<string, string>>({});
+  const [selectionNotice, setSelectionNotice] = useState('');
+  const [preview, setPreview] = useState<Prepared | null>(null);
+  const [operation, setOperation] = useState<{ format: 'pdf' | 'zip'; identity: string } | null>(
+    null,
+  );
+  const [failure, setFailure] = useState<{
+    format: 'pdf' | 'zip';
+    message: string;
+    identity: string;
   } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [zipStatus, setZipStatus] = useState('');
+  const [printStatus, setPrintStatus] = useState('');
   const objectUrl = useRef<string | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const lock = useRef(false);
   const frame = useRef<HTMLIFrameElement>(null);
+  const single = selected.length === 1 ? selected[0] : undefined;
+  const servings = single ? (servingDrafts[single] ?? '') : '';
+  const servingError =
+    servings !== '' &&
+    (!Number.isFinite(Number(servings)) || Number(servings) <= 0 || Number(servings) > 1000)
+      ? 'Enter a yield greater than 0 and no more than 1,000, or leave it blank for the original yield.'
+      : '';
+  const datesValid =
+    calendarDateSchema.safeParse(start).success && calendarDateSchema.safeParse(end).success;
+  const days = datesValid ? Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1 : 0;
+  const calendarValid = datesValid && days > 0;
+  const rangeError = !datesValid
+    ? 'Enter a real first and last day.'
+    : days < 1
+      ? 'The last day must be on or after the first day.'
+      : days > 56
+        ? 'PDF and ZIP schedules support 1–56 days. Shorten the range; calendar export has its own scope.'
+        : '';
+  const recipeSections = kind === 'recipes' || (kind === 'meal-plan' && includeRecipes);
   const common = {
     ...options,
     organizeByStore:
       options.organizeByStore &&
-      (kind === 'shopping-list' ||
-        (options.includeIngredients &&
-          (kind === 'recipes' || (kind === 'meal-plan' && includeRecipes)))),
-    format: 'pdf',
+      (kind === 'shopping-list' || (recipeSections && options.includeIngredients)),
+    format: 'pdf' as const,
   };
+  const routeError =
+    common.organizeByStore && !stores.some((store) => store.id === options.storeId)
+      ? stores.length
+        ? 'Choose an available store for this export.'
+        : 'No saved stores are available. Add a store in Household settings, or turn off the route override.'
+      : '';
+  const sourceError =
+    kind === 'recipes'
+      ? !selected.length
+        ? recipes.length
+          ? 'Choose at least one recipe.'
+          : 'Your recipebook has no recipes to print.'
+        : servingError
+      : kind === 'shopping-list' && !lists.some((list) => list.id === listId)
+        ? listId
+          ? 'This list is unavailable or archived. Choose an available list explicitly.'
+          : 'There are no available grocery lists to print.'
+        : kind === 'meal-plan'
+          ? rangeError
+          : '';
+  const valid = !sourceError && !routeError;
   const payload =
     kind === 'recipes'
-      ? { ...common, recipeIds: selected, ...(servings ? { servings: Number(servings) } : {}) }
+      ? {
+          ...common,
+          recipeIds: selected,
+          ...(single && servings && !servingError ? { servings: Number(servings) } : {}),
+        }
       : kind === 'meal-plan'
         ? { ...common, start, end, includeRecipes }
         : {
@@ -97,20 +160,39 @@ export function PrintWorkspace({
         ? '/api/v1/meal-plan/export/pdf'
         : kind === 'pantry'
           ? '/api/v1/pantry/export/pdf'
-          : `/api/v1/shopping-lists/${listId}/export/pdf`;
+          : `/api/v1/shopping-lists/${encodeURIComponent(listId)}/export/pdf`;
   const fingerprint = JSON.stringify({ endpoint, payload });
-  const valid =
-    kind === 'recipes' ? selected.length > 0 : kind === 'shopping-list' ? !!listId : true;
-  const stale = preview?.fingerprint !== fingerprint;
+  const stale = !valid || preview?.fingerprint !== fingerprint;
+  const period = calendarValid
+    ? `${exportDateLabel(start)} – ${exportDateLabel(end)} · ${days} ${days === 1 ? 'day' : 'days'} · ${Math.ceil(days / 7)} seven-day ${days <= 7 ? 'section' : 'sections'}`
+    : 'Choose a date range';
+  const context =
+    kind === 'recipes'
+      ? `${selected.length} ${selected.length === 1 ? 'recipe' : 'recipes'} selected${single ? ` · ${recipes.find((r) => r.id === single)?.title ?? ''}` : ' · selection order'}`
+      : kind === 'meal-plan'
+        ? period
+        : kind === 'pantry'
+          ? `Active stock batches · ${locations.find((location) => location.id === locationId)?.name ?? 'All locations'}${locationId ? ' · this location only' : ''}`
+          : (lists.find((list) => list.id === listId)?.name ?? 'Unavailable grocery list');
+  const identity = `${kinds.find((item) => item.value === kind)!.label} · ${context} · ${options.paper}`;
+  const matches = recipes.filter((recipe) =>
+    recipe.title.toLowerCase().includes(query.toLowerCase()),
+  );
+  const hiddenSelected = selected.filter(
+    (id) => !matches.some((recipe) => recipe.id === id),
+  ).length;
   function option<K extends keyof PdfExportOptions>(key: K, value: PdfExportOptions[K]) {
     setOptions((current) => ({ ...current, [key]: value }));
   }
   async function generate(format: 'pdf' | 'zip' = 'pdf') {
-    controller.current?.abort();
+    if (lock.current || !valid) return;
+    lock.current = true;
     const abort = new AbortController();
     controller.current = abort;
-    setBusy(true);
-    setError('');
+    setOperation({ format, identity });
+    setFailure(null);
+    setPrintStatus('');
+    if (format === 'zip') setZipStatus('');
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -120,7 +202,9 @@ export function PrintWorkspace({
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.error?.message ?? 'The print pack could not be prepared.');
+        throw new Error(
+          body?.error?.message ?? `The ${format.toUpperCase()} could not be prepared. Try again.`,
+        );
       }
       const blob = await response.blob();
       if (abort.signal.aborted) return;
@@ -134,16 +218,24 @@ export function PrintWorkspace({
         link.download = filename;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setZipStatus(`ZIP prepared; download started. ${identity}.`);
       } else {
         if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
         objectUrl.current = url;
-        setPreview({ url, fingerprint, filename });
+        setPreview({ url, fingerprint, filename, identity, preparedAt: new Date().toISOString() });
       }
     } catch (cause) {
       if (!abort.signal.aborted)
-        setError(cause instanceof Error ? cause.message : 'Export failed.');
+        setFailure({
+          format,
+          identity,
+          message: cause instanceof Error ? cause.message : 'Export failed. Try again.',
+        });
     } finally {
-      if (!abort.signal.aborted) setBusy(false);
+      if (!abort.signal.aborted) {
+        lock.current = false;
+        setOperation(null);
+      }
     }
   }
   useEffect(
@@ -153,7 +245,6 @@ export function PrintWorkspace({
     },
     [],
   );
-  // First preview is requested once; subsequent expensive renders are explicit.
   const initialPreview = useRef(false);
   useEffect(() => {
     if (initialPreview.current || !valid) return;
@@ -185,20 +276,68 @@ export function PrintWorkspace({
       {label}
     </label>
   );
-  const matches = recipes.filter((recipe) =>
-    recipe.title.toLowerCase().includes(query.toLowerCase()),
+  const storeControl = common.organizeByStore ? (
+    <div className={styles.suboptions}>
+      <label>
+        <span id="print-store-label">Store</span>
+        <select
+          aria-labelledby="print-store-label"
+          value={options.storeId ?? ''}
+          onChange={(event) => option('storeId', event.target.value || undefined)}
+          aria-invalid={!!routeError}
+          aria-describedby="print-route-help"
+        >
+          <option value="">Choose a store</option>
+          {stores.map((store) => (
+            <option value={store.id} key={store.id}>
+              {store.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p id="print-route-help">
+        {routeError ||
+          'Uses saved aisle routes and item mappings for this export only. Unassigned items stay together.'}
+      </p>
+    </div>
+  ) : null;
+  const updateAction = (
+    <button
+      type="button"
+      className={stale ? 'primary-button' : 'secondary-button'}
+      disabled={!!operation || !valid}
+      onClick={() => void generate()}
+    >
+      {operation?.format === 'pdf' ? <ButtonSpinner /> : <RefreshCw size={17} />}
+      {operation?.format === 'pdf' ? 'Preparing PDF…' : stale ? 'Update preview' : 'Refresh PDF'}
+    </button>
   );
   return (
     <main className={styles.page}>
       <PageHeader
         title="Export & print"
-        description="Choose what goes on paper, preview it, then print or download."
+        description="Prepare a document, then open, print or download it."
       />
+      <div className={styles.context}>
+        <p>
+          {context} · {options.paper}
+        </p>
+        <nav aria-label="Print workspace sections">
+          <a href="#print-options">Options</a>
+          <a href="#print-output">Document & downloads</a>
+        </nav>
+      </div>
       <div className={styles.workspace}>
-        <aside className={styles.sidebar} aria-label="Print options">
+        <aside
+          id="print-options"
+          tabIndex={-1}
+          className={styles.sidebar}
+          aria-label="Print options"
+        >
           <nav className={styles.types} aria-label="Document type">
             {kinds.map((item) => (
               <button
+                type="button"
                 key={item.value}
                 onClick={() => setKind(item.value)}
                 aria-pressed={kind === item.value}
@@ -209,10 +348,11 @@ export function PrintWorkspace({
             ))}
           </nav>
           <section>
-            <h2>Paper & download</h2>
+            <h2>Paper</h2>
             <label>
-              Paper size
+              <span id="print-paper-label">Paper size</span>
               <select
+                aria-labelledby="print-paper-label"
                 value={options.paper}
                 onChange={(event) => option('paper', event.target.value as 'A4' | 'Letter')}
               >
@@ -223,9 +363,11 @@ export function PrintWorkspace({
           </section>
           {kind === 'recipes' && (
             <section>
-              <h2>
-                Recipe cards <small>{selected.length}/100</small>
-              </h2>
+              <h2>Choose recipes</h2>
+              <p>
+                {selected.length} {selected.length === 1 ? 'recipe' : 'recipes'} selected · up to
+                100
+              </p>
               <input
                 aria-label="Find recipes to print"
                 type="search"
@@ -233,18 +375,42 @@ export function PrintWorkspace({
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Find recipes…"
               />
+              <p>
+                {matches.length} matching {matches.length === 1 ? 'recipe' : 'recipes'}
+                {hiddenSelected ? ` · ${hiddenSelected} selected outside this search` : ''}
+              </p>
               <div className={styles.selectionActions}>
                 <button
-                  onClick={() =>
-                    setSelected((current) =>
-                      [...new Set([...current, ...matches.map((item) => item.id)])].slice(0, 100),
-                    )
-                  }
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    const additions = matches.filter((item) => !selected.includes(item.id));
+                    const added = additions.slice(0, 100 - selected.length);
+                    setSelected((current) => [...current, ...added.map((item) => item.id)]);
+                    setSelectionNotice(
+                      `Added ${added.length} matching recipes.${additions.length > added.length ? ' The 100-card limit leaves some matches unselected.' : ''}`,
+                    );
+                  }}
                 >
-                  Select matching (up to 100)
+                  Add matching recipes
                 </button>
-                <button onClick={() => setSelected([])}>Clear</button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setSelected([]);
+                    setSelectionNotice(
+                      'All selections cleared, including those outside this search.',
+                    );
+                  }}
+                >
+                  Clear all selections
+                </button>
               </div>
+              {selectionNotice && <p role="status">{selectionNotice}</p>}
+              {selected.length >= 100 && (
+                <p>100-card limit reached. Deselect a recipe to add another.</p>
+              )}
               <div className={styles.recipeChoices}>
                 {matches.map((recipe) => (
                   <label className={styles.check} key={recipe.id}>
@@ -264,18 +430,66 @@ export function PrintWorkspace({
                   </label>
                 ))}
               </div>
-              {selected.length === 1 && (
+              {!matches.length && (
+                <p>
+                  {recipes.length ? (
+                    <>
+                      No recipes match.{' '}
+                      <button type="button" className="text-button" onClick={() => setQuery('')}>
+                        Clear search
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Your recipebook is empty. <Link href="/recipes">Open recipes</Link>
+                    </>
+                  )}
+                </p>
+              )}
+              {!!selected.length && (
+                <details className={styles.disclosure}>
+                  <summary>Review selected recipes ({selected.length})</summary>
+                  <p>Cards follow this selection order.</p>
+                  <ol>
+                    {selected.map((id) => (
+                      <li key={id}>
+                        {recipes.find((r) => r.id === id)?.title}
+                        <button
+                          type="button"
+                          className="text-button"
+                          aria-label={`Remove ${recipes.find((r) => r.id === id)?.title}`}
+                          onClick={() =>
+                            setSelected((current) => current.filter((value) => value !== id))
+                          }
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+              {single && (
                 <label>
-                  Servings
+                  <span id="print-serving-label">Yield for this exported card</span>
                   <input
                     type="number"
                     min="0.01"
                     max="1000"
                     step="any"
                     value={servings}
-                    onChange={(event) => setServings(event.target.value)}
-                    placeholder="Original recipe servings"
+                    onChange={(event) =>
+                      setServingDrafts((current) => ({ ...current, [single]: event.target.value }))
+                    }
+                    placeholder="Original recipe yield"
+                    aria-labelledby="print-serving-label"
+                    aria-invalid={!!servingError}
+                    aria-describedby="print-serving-help"
                   />
+                  <small id="print-serving-help">
+                    {servingError ||
+                      `Original yield: ${recipes.find((r) => r.id === single)?.servings || 'not recorded'}. Blank keeps the original yield. Quantities stay unchanged if its base yield is not numeric.`}
+                  </small>
                 </label>
               )}
             </section>
@@ -289,6 +503,7 @@ export function PrintWorkspace({
                   type="date"
                   value={start}
                   onChange={(event) => setStart(event.target.value)}
+                  aria-describedby="print-range-help"
                 />
               </label>
               <label>
@@ -298,47 +513,68 @@ export function PrintWorkspace({
                   min={start}
                   value={end}
                   onChange={(event) => setEnd(event.target.value)}
+                  aria-invalid={!!rangeError}
+                  aria-describedby="print-range-help"
                 />
               </label>
-              <p>Up to eight weeks, with each seven-day schedule on its own page.</p>
+              <p id="print-range-help">{rangeError || period}</p>
+              <p>
+                Seven-day sections start on First day; dense content can continue onto another page.
+              </p>
               <label className={styles.check}>
                 <input
                   type="checkbox"
                   checked={includeRecipes}
                   onChange={(event) => setIncludeRecipes(event.target.checked)}
                 />
-                Include separate recipe cards
+                Append recipe cards to the schedule
               </label>
-              <a
-                href={`/api/v1/meal-plan/export?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`}
-              >
-                Download calendar (.ics)
-              </a>
+              <p>
+                {includeRecipes
+                  ? 'PDF: schedule followed by recipe cards. ZIP: schedule PDF, individual card PDFs and a README.'
+                  : 'Schedule only. Existing saved meal content is unchanged.'}
+              </p>
+              <Link href="/planner">Review planned meals</Link>
             </section>
           )}
-          {(kind === 'recipes' || (kind === 'meal-plan' && includeRecipes)) && (
+          {recipeSections && (
             <section>
-              <h2>Recipe sections</h2>
+              <h2>Recipe content</h2>
               {check('includeIngredients', 'Ingredients')}
               {options.includeIngredients && (
                 <div className={styles.suboptions}>
-                  {check('ingredientCheckboxes', 'Checkboxes for shopping')}
-                  {check('organizeByStore', 'Order ingredients by store')}
+                  {check('ingredientCheckboxes', 'Ingredient checkboxes')}
+                  {check('organizeByStore', 'Group ingredients by store aisle')}
+                  <p>Store grouping retains the original ingredient group names.</p>
+                  {storeControl}
                 </div>
               )}
-              {check('includeMethod', 'Numbered method')}
-              {check('includeImage', 'Recipe photo')}
-              {check('includeNutrition', 'Nutrition information')}
-              {check('includeEquipment', 'Equipment')}
-              {check('includeSource', 'Recipe source')}
+              {check('includeMethod', 'Cooking method (numbered)')}
+              <details className={styles.disclosure}>
+                <summary>Optional recipe details</summary>
+                {check('includeImage', 'Recipe photo')}
+                {check('includeNutrition', 'Recipe-provided nutrition per serving')}
+                {check('includeEquipment', 'Equipment')}
+                {check('includeSource', 'Recipe source')}
+              </details>
             </section>
           )}
           {kind === 'shopping-list' && (
             <section>
               <h2>Grocery list</h2>
               <label>
-                List
-                <select value={listId} onChange={(event) => setListId(event.target.value)}>
+                <span id="print-list-label">List</span>
+                <select
+                  aria-labelledby="print-list-label"
+                  value={listId}
+                  onChange={(event) => setListId(event.target.value)}
+                  aria-invalid={!!sourceError}
+                >
+                  {!lists.some((list) => list.id === listId) && (
+                    <option value={listId}>
+                      {listId ? 'Requested list unavailable or archived' : 'No available lists'}
+                    </option>
+                  )}
                   {lists.map((list) => (
                     <option value={list.id} key={list.id}>
                       {list.name}
@@ -346,42 +582,34 @@ export function PrintWorkspace({
                   ))}
                 </select>
               </label>
+              {sourceError && (
+                <p>
+                  {sourceError} <Link href="/lists">Open lists</Link>
+                </p>
+              )}
               <label className={styles.check}>
                 <input
                   type="checkbox"
                   checked={includeChecked}
                   onChange={(event) => setIncludeChecked(event.target.checked)}
                 />
-                Include checked items
+                Include completed (checked) items
               </label>
-              {check('organizeByStore', 'Use a store route')}
-            </section>
-          )}
-          {common.organizeByStore && kind !== 'pantry' && (
-            <section>
-              <label>
-                Store
-                <select
-                  value={options.storeId ?? ''}
-                  onChange={(event) => option('storeId', event.target.value || undefined)}
-                >
-                  <option value="">Choose a store</option>
-                  {stores.map((store) => (
-                    <option value={store.id} key={store.id}>
-                      {store.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p>Uses your saved aisle route and item mappings. Unassigned items stay together.</p>
+              <p>Default order uses saved list aisles and its store route where available.</p>
+              {check('organizeByStore', 'Choose another store route for this export')}
+              {storeControl}
             </section>
           )}
           {kind === 'pantry' && (
             <section>
-              <h2>Inventory sheet</h2>
+              <h2>Stock batches</h2>
               <label>
-                Location
-                <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+                <span id="print-location-label">Location</span>
+                <select
+                  aria-labelledby="print-location-label"
+                  value={locationId}
+                  onChange={(event) => setLocationId(event.target.value)}
+                >
                   <option value="">All locations</option>
                   {locations.map((location) => (
                     <option value={location.id} key={location.id}>
@@ -390,13 +618,17 @@ export function PrintWorkspace({
                   ))}
                 </select>
               </label>
+              <p>
+                Active batches only. A selected location includes that location, without its
+                descendants. Pantry browsing filters are not carried here.
+              </p>
               <label className={styles.check}>
                 <input
                   type="checkbox"
                   checked={includeDates}
                   onChange={(event) => setIncludeDates(event.target.checked)}
                 />
-                Recorded expiry dates
+                Include date details
               </label>
               <label className={styles.check}>
                 <input
@@ -408,107 +640,215 @@ export function PrintWorkspace({
               </label>
             </section>
           )}
-          <section>{check('includeNotes', 'Notes and kitchen tips')}</section>
-          {kind === 'recipes' && selected.length === 1 && (
-            <details>
-              <summary>Other formats</summary>
-              <a href={`/api/v1/recipes/${selected[0]}/export`} download>
-                JSON-LD
+          <section>
+            {check(
+              'includeNotes',
+              kind === 'pantry'
+                ? 'Include stock notes'
+                : kind === 'shopping-list'
+                  ? 'Include list and item notes'
+                  : 'Include recipe and meal notes',
+            )}
+          </section>
+          {kind === 'recipes' && single && (
+            <details className={styles.disclosure}>
+              <summary>Other recipe formats</summary>
+              <p>
+                Exports the saved recipe itself. These files do not inherit PDF sections or the
+                yield override.
+              </p>
+              <a href={`/api/v1/recipes/${single}/export`} download>
+                Download JSON-LD
               </a>
-              <a href={`/api/v1/recipes/${selected[0]}/export/markdown`} download>
-                Markdown
+              <a href={`/api/v1/recipes/${single}/export/markdown`} download>
+                Download Markdown
               </a>
             </details>
           )}
-          <button
-            className={styles.primary}
-            disabled={busy || !valid}
-            onClick={() => void generate()}
-          >
-            {busy ? <ButtonSpinner /> : <RefreshCw size={17} />}
-            {busy ? 'Preparing PDF…' : stale ? 'Update preview' : 'Refresh preview'}
-          </button>
+          <div className={styles.prepare}>
+            {(sourceError || routeError) && <p role="status">{sourceError || routeError}</p>}
+            {updateAction}
+            <a href="#print-output">Go to document & downloads</a>
+          </div>
         </aside>
-        <section className={styles.preview} aria-label="PDF preview" aria-busy={busy}>
+        <section
+          id="print-output"
+          tabIndex={-1}
+          className={styles.preview}
+          aria-label="PDF preview"
+          aria-busy={operation?.format === 'pdf'}
+        >
           <header>
-            <p role="status">
-              {busy
-                ? 'Preparing your print pack…'
-                : preview
-                  ? stale
-                    ? 'Options changed — update the preview.'
-                    : 'Preview is up to date.'
-                  : 'Select content to preview.'}
-            </p>
-            <div>
-              {preview && (
-                <>
-                  <a href={preview.url} target="_blank" rel="noreferrer">
-                    {stale ? 'Open previous preview' : 'Open PDF'}
-                  </a>
-                  {stale ? (
-                    <button disabled title="Update the preview to download your changed options">
-                      <Download size={17} />
-                      Download PDF
-                    </button>
-                  ) : (
-                    <a href={preview.url} download={preview.filename}>
-                      <Download size={17} />
-                      Download PDF
-                    </a>
-                  )}
-                  <button
-                    disabled={busy || stale}
-                    onClick={() => {
-                      try {
-                        frame.current?.contentWindow?.focus();
-                        frame.current?.contentWindow?.print();
-                      } catch {
-                        window.open(preview.url, '_blank', 'noopener');
-                      }
-                    }}
-                  >
-                    <Printer size={17} />
-                    Print
-                  </button>
-                </>
-              )}
-              <button disabled={busy || !valid} onClick={() => void generate('zip')}>
-                Download ZIP
-              </button>
-            </div>
+            <h2>Prepared document</h2>
+            <a href="#print-options">Back to options</a>
           </header>
-          {error && (
-            <p role="alert" className={styles.error}>
-              {error}
+          <p role="status">
+            {operation?.format === 'pdf'
+              ? `Preparing PDF · ${operation.identity}`
+              : preview
+                ? stale
+                  ? 'Previous PDF · options changed. Update the preview for these options.'
+                  : 'PDF prepared · matches these options.'
+                : valid
+                  ? 'Ready to prepare a PDF.'
+                  : 'Choose valid content in Options to prepare a PDF.'}
+          </p>
+          {preview && (
+            <p className={styles.hint}>
+              {preview.identity}
+              <br />
+              Prepared{' '}
+              <time dateTime={preview.preparedAt}>
+                {new Date(preview.preparedAt).toLocaleString()}
+              </time>
+              . Household data may have changed since preparation.
             </p>
           )}
-          <div className={styles.previewDocument}>
-            {busy ? (
-              <AsyncSkeleton
-                className={styles.documentLoading}
-                label="Preparing printable document"
-                variant="panel"
-              />
-            ) : null}
-            {preview ? (
-              <iframe ref={frame} src={preview.url} title="Your printable PDF" />
-            ) : (
-              <div className={styles.empty}>
-                <Printer size={44} />
-                <h2>{busy ? 'Preparing your preview' : 'Your print preview'}</h2>
+          {preview && (
+            <div className={styles.outputActions}>
+              <a
+                className={!stale ? 'primary-button' : 'secondary-button'}
+                href={preview.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {stale ? 'Open previous PDF' : 'Open PDF'}
+              </a>
+              {stale ? (
+                <button type="button" className="secondary-button" disabled>
+                  Download PDF
+                </button>
+              ) : (
+                <a className="secondary-button" href={preview.url} download={preview.filename}>
+                  <Download size={17} />
+                  Download PDF
+                </a>
+              )}
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!!operation || stale}
+                onClick={() => {
+                  try {
+                    if (!frame.current?.contentWindow) throw new Error('No viewer');
+                    frame.current.contentWindow.focus();
+                    frame.current.contentWindow.print();
+                    setPrintStatus(
+                      'Print requested. If no print menu appears, use Open PDF and its share/print menu.',
+                    );
+                  } catch {
+                    setPrintStatus(
+                      'Embedded printing is unavailable. Use Open PDF and its share/print menu.',
+                    );
+                  }
+                }}
+              >
+                <Printer size={17} />
+                Print PDF
+              </button>
+            </div>
+          )}
+          <p className={styles.hint}>
+            Prepared does not confirm that this browser has displayed the PDF pages. Use Open PDF if
+            the embedded viewer is blank or cannot print.
+          </p>
+          {printStatus && <p role="status">{printStatus}</p>}
+          {failure?.format === 'pdf' && (
+            <div role="alert" className={styles.error}>
+              <p>{failure.message}</p>
+              <p>
+                {failure.identity}.{' '}
+                {preview
+                  ? 'The previous PDF is retained; its preparation time and option match are shown above.'
+                  : 'No PDF was prepared.'}
+              </p>
+              <a href="#print-options">Review options</a> ·{' '}
+              <button
+                type="button"
+                className="text-button"
+                disabled={!!operation || !valid}
+                onClick={() => void generate()}
+              >
+                Try PDF again
+              </button>
+            </div>
+          )}
+          <details className={styles.viewer} open>
+            <summary>Embedded PDF viewer</summary>
+            <div className={styles.previewDocument}>
+              {operation?.format === 'pdf' && (
+                <AsyncSkeleton
+                  className={styles.documentLoading}
+                  label="Preparing PDF"
+                  variant="panel"
+                />
+              )}
+              {preview ? (
+                <iframe ref={frame} src={preview.url} title={preview.identity} />
+              ) : (
+                <div className={styles.empty}>
+                  <Printer size={36} />
+                  <h3>
+                    {operation?.format === 'pdf' ? 'Preparing your PDF' : 'No prepared document'}
+                  </h3>
+                  <p>
+                    {sourceError || routeError || 'Your prepared document will be available here.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </details>
+          <section className={styles.formats}>
+            <h2>Additional downloads</h2>
+            <p>
+              {kind === 'recipes'
+                ? 'ZIP builds separate PDFs for the selected recipe cards using current options.'
+                : kind === 'meal-plan'
+                  ? 'ZIP builds the schedule PDF and any included individual recipe-card PDFs using current options.'
+                  : 'ZIP wraps this document in a single-PDF archive using current options.'}{' '}
+              This is not an app backup.
+            </p>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!!operation || !valid}
+              onClick={() => void generate('zip')}
+            >
+              {operation?.format === 'zip' && <ButtonSpinner />}
+              {operation?.format === 'zip' ? 'Preparing ZIP…' : 'Build & download ZIP'}
+            </button>
+            {operation?.format === 'zip' && (
+              <p role="status">
+                Preparing ZIP · {operation.identity}. The prepared PDF above is unchanged.
+              </p>
+            )}
+            {zipStatus && <p role="status">{zipStatus}</p>}
+            {failure?.format === 'zip' && (
+              <p role="alert" className={styles.error}>
+                {failure.message} · {failure.identity}. The PDF above is unchanged.
+              </p>
+            )}
+            {kind === 'meal-plan' && (
+              <div>
+                <h3>Calendar file</h3>
                 <p>
-                  {valid
-                    ? 'Your document will appear here.'
-                    : 'Choose at least one recipe or a shopping list to begin.'}
+                  Active planned meals as all-day events for the chosen dates. Independent of paper,
+                  appended cards and PDF sections; printable schedules may also include cooked
+                  meals.
                 </p>
+                {calendarValid ? (
+                  <a
+                    className="secondary-button"
+                    href={`/api/v1/meal-plan/export?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`}
+                  >
+                    Download calendar (.ics)
+                  </a>
+                ) : (
+                  <p>Choose real dates in chronological order to download a calendar.</p>
+                )}
               </div>
             )}
-          </div>
-          <p className={styles.hint}>
-            If your mobile browser cannot display or print the embedded PDF, use Open PDF and its
-            share/print menu.
-          </p>
+          </section>
         </section>
       </div>
     </main>

@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, type ComponentPropsWithoutRef } from 'react';
+import { useEffect, useRef, type RefObject, type ComponentPropsWithoutRef } from 'react';
 import { useModalSurface } from './use-modal-surface';
 import styles from './app-dialog.module.css';
 
 type AppDialogProps = Omit<ComponentPropsWithoutRef<'dialog'>, 'open' | 'onClose'> & {
   open?: boolean;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   onClose: () => void;
 };
 
@@ -13,12 +14,13 @@ type AppDialogProps = Omit<ComponentPropsWithoutRef<'dialog'>, 'open' | 'onClose
 export function AppDialog({
   open = true,
   onClose,
+  returnFocusRef,
   className = '',
   children,
   ...props
 }: AppDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const modal = useModalSurface({ open, onClose, panelRef: dialogRef });
+  const modal = useModalSurface({ open, onClose, panelRef: dialogRef, returnFocusRef });
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!open || !dialog) return;

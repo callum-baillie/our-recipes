@@ -1,3 +1,4 @@
+import { effectivePlanEntries } from '@/lib/domain/planner-workflow';
 import { prepareAppActions, confirmAppActions } from '@/lib/services/ai-app-action-service';
 import type { RequestPrincipal } from '@/lib/services/auth-service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +16,11 @@ import {
   mealPlanLeftoverLinks,
   recipeImages,
 } from '@/lib/db/schema';
-import { aiMealPlanCandidateSchema, type AiSummaryBundleOutput } from '@/lib/domain/ai-assistant';
+import {
+  aiActionDecisionSchema,
+  aiMealPlanCandidateSchema,
+  type AiSummaryBundleOutput,
+} from '@/lib/domain/ai-assistant';
 import { recipeInputSchema } from '@/lib/domain/recipe';
 import type {
   AiAssistantProvider,
@@ -594,6 +599,136 @@ describe('AI assistant services', () => {
     ]);
   });
 
+  it.each(
+    [0, 1, 2].flatMap((saved) =>
+      [false, true].flatMap((fallback) =>
+        [false, true].map((repeats) => ({ saved, fallback, repeats })),
+      ),
+    ),
+  )(
+    'handles saved coverage $saved, fallback $fallback, repeats $repeats',
+    async ({ saved, fallback, repeats }) => {
+      const profile = setupProfile();
+      for (let index = 0; index < saved; index++)
+        createRecipe({ ...recipe, title: `Saved dinner ${index}` }, profile.id);
+      const generate = vi.spyOn(provider, 'generateMealPlan').mockImplementation(async () => {
+        const firstGeneratedDate = saved && !repeats ? '2026-07-21' : '2026-07-20';
+        const generatedDates =
+          firstGeneratedDate === '2026-07-21' ? [firstGeneratedDate] : ['2026-07-20', '2026-07-21'];
+        return aiMealPlanCandidateSchema.parse({
+          newRecipes: generatedDates.map((date, index) => ({
+            key: `new-${index}`,
+            recipe: { ...recipe, title: `New dinner ${index}` },
+          })),
+          entries: generatedDates.map((plannedFor, index) => ({
+            plannedFor,
+            meal: 'dinner',
+            existingRecipeId: null,
+            newRecipeKey: `new-${index}`,
+            title: `New dinner ${index}`,
+            servings: 1,
+            note: '',
+          })),
+          warnings: [],
+          assumptions: [],
+        });
+      });
+      const request = {
+        mode: 'recipebook',
+        startDate: '2026-07-20',
+        endDate: '2026-07-21',
+        mealSlots: ['dinner'],
+        servings: 1,
+        sourceMode: 'existing',
+        selectedProfileIds: [profile.id],
+        options: {
+          followNutrition: false,
+          generateMissingRecipes: fallback,
+          easyGroceryList: true,
+          allowRepeatingMeals: repeats,
+          planLeftovers: false,
+        },
+        fixedMeals: [],
+        instructions: '',
+      };
+      if (!saved && !fallback) {
+        await expect(
+          generateAiMealPlanProposal({ actorProfileId: profile.id, request }),
+        ).rejects.toThrow('No saved recipes');
+        expect(generate).not.toHaveBeenCalled();
+        return;
+      }
+      const result = await generateAiMealPlanProposal({ actorProfileId: profile.id, request });
+      const savedSlots = repeats && saved ? 2 : Math.min(2, saved);
+      expect(generate).toHaveBeenCalledTimes(fallback && savedSlots < 2 ? 1 : 0);
+      expect(result.candidate.entries).toHaveLength(fallback ? 2 : savedSlots);
+      expect(result.candidate.assumptions.at(-1)).toContain(
+        result.candidate.entries.length === 2 ? 'Every requested' : 'remain unfilled',
+      );
+      expect(listPlannedMeals('2026-07-20', '2026-07-21')).toHaveLength(0);
+    },
+  );
+
+  it('prepares all 14 days and five requested types without exceeding an inconsistent candidate bound', async () => {
+    const profile = setupProfile();
+    createRecipe(recipe, profile.id);
+    const generate = vi.spyOn(provider, 'generateMealPlan');
+    const result = await generateAiMealPlanProposal({
+      actorProfileId: profile.id,
+      request: {
+        mode: 'recipebook',
+        startDate: '2026-07-20',
+        endDate: '2026-08-02',
+        mealSlots: ['breakfast', 'lunch', 'dinner', 'dessert', 'snack'],
+        servings: 1,
+        sourceMode: 'existing',
+        selectedProfileIds: [profile.id],
+        options: {
+          followNutrition: false,
+          generateMissingRecipes: true,
+          easyGroceryList: false,
+          allowRepeatingMeals: true,
+          planLeftovers: false,
+        },
+      },
+    });
+    expect(result.candidate.entries).toHaveLength(70);
+    expect(generate).not.toHaveBeenCalled();
+    await decideAiAction(result.proposal.id, profile.id, 'confirm');
+    expect(listPlannedMeals('2026-07-20', '2026-08-02')).toHaveLength(70);
+    const review = await generateAiMealPlanProposal({
+      actorProfileId: profile.id,
+      request: {
+        mode: 'recipebook',
+        startDate: '2026-07-20',
+        endDate: '2026-08-02',
+        mealSlots: ['breakfast', 'lunch', 'dinner', 'dessert', 'snack'],
+        servings: 1,
+        sourceMode: 'existing',
+        selectedProfileIds: [profile.id],
+        options: {
+          followNutrition: false,
+          generateMissingRecipes: false,
+          easyGroceryList: false,
+          allowRepeatingMeals: true,
+          planLeftovers: false,
+        },
+      },
+    });
+    const conflicts = (review.proposal.preview as { conflicts: Array<{ entryId: string }> })
+      .conflicts;
+    const decision = aiActionDecisionSchema.parse({
+      decision: 'confirm',
+      conflictResolutions: conflicts.map((conflict) => ({
+        entryId: conflict.entryId,
+        resolution: 'keep',
+      })),
+    });
+    expect(decision.conflictResolutions).toHaveLength(70);
+    await decideAiAction(review.proposal.id, profile.id, 'confirm', decision.conflictResolutions);
+    expect(listPlannedMeals('2026-07-20', '2026-08-02')).toHaveLength(70);
+  });
+
   it('requires an explicit keep or replace choice for occupied slots', async () => {
     const profile = setupProfile();
     createRecipe(recipe, profile.id);
@@ -639,6 +774,78 @@ describe('AI assistant services', () => {
     expect(listPlannedMeals('2026-07-20', '2026-07-20')).toMatchObject([
       { recipeTitle: 'Existing supper' },
     ]);
+  });
+
+  it('matches a mixed Keep/Replace preview when multiple existing meals occupy one slot', async () => {
+    const profile = setupProfile();
+    createRecipe(recipe, profile.id);
+    const kept = addMealPlanEntryWithNutrition(
+      {
+        plannedFor: '2026-07-20',
+        meal: 'dinner',
+        recipeId: '',
+        kind: 'custom',
+        title: 'Retained household supper',
+        servings: 1,
+        note: '',
+      },
+      profile.id,
+    );
+    const removed = addMealPlanEntryWithNutrition(
+      {
+        plannedFor: '2026-07-20',
+        meal: 'dinner',
+        recipeId: '',
+        kind: 'custom',
+        title: 'Replaced household supper',
+        servings: 1,
+        note: '',
+      },
+      profile.id,
+    );
+    const result = await generateAiMealPlanProposal({
+      actorProfileId: profile.id,
+      request: {
+        mode: 'recipebook',
+        startDate: '2026-07-20',
+        endDate: '2026-07-20',
+        mealSlots: ['dinner'],
+        servings: 1,
+        sourceMode: 'existing',
+        selectedProfileIds: [profile.id],
+        options: {
+          followNutrition: false,
+          generateMissingRecipes: false,
+          easyGroceryList: false,
+          allowRepeatingMeals: false,
+          planLeftovers: false,
+        },
+      },
+    });
+    const conflicts = (
+      result.proposal.preview as {
+        conflicts: Array<{ entryId: string; plannedFor: string; meal: string; title: string }>;
+      }
+    ).conflicts;
+    const resolutions = { [kept.id]: 'keep' as const, [removed.id]: 'replace' as const };
+    expect(effectivePlanEntries(result.candidate.entries, conflicts, resolutions)[0]).toMatchObject(
+      { inserted: false, kept: [{ entryId: kept.id }], removed: [{ entryId: removed.id }] },
+    );
+    await decideAiAction(
+      result.proposal.id,
+      profile.id,
+      'confirm',
+      Object.entries(resolutions).map(([entryId, resolution]) => ({ entryId, resolution })),
+    );
+    const acknowledged = listPlannedMeals('2026-07-20', '2026-07-20');
+    expect(acknowledged.filter((entry) => entry.status === 'planned')).toMatchObject([
+      { id: kept.id, recipeTitle: 'Retained household supper' },
+    ]);
+    expect(acknowledged.find((entry) => entry.id === removed.id)).toMatchObject({
+      status: 'cancelled',
+    });
+    expect(acknowledged).toHaveLength(2);
+    expect(listRecipes()).toHaveLength(1);
   });
 
   it('links next-day lunch to an enlarged dinner without creating duplicate recipes', async () => {

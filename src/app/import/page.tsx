@@ -12,12 +12,11 @@ export default async function ImportPage({
 }) {
   const { mode } = await searchParams;
   return (
-    <main className="recipe-page import-page">
+    <main className="workspace-page import-page" data-width="focused">
       <PageHeader
         className="import-page-heading"
-        title="Import recipes"
-        eyebrow="GROW YOUR COOKBOOK"
-        description="Bring recipes into your library, then review the details before saving."
+        title="Photos or PDF"
+        description="Prepare a review draft from recipe photos or a PDF."
         toolbarRight={<RecipebookNav current="import" />}
       />
       <ImportWizard initialMode={mode === 'jsonld' ? 'jsonld' : 'files'} />

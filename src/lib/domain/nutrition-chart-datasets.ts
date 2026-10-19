@@ -23,6 +23,57 @@ function boundary(goal: ChartGoal) {
   return goal.maximum;
 }
 
+export function nutritionGoalComparison(
+  goals: ChartGoal[],
+  date: string,
+  code: string,
+  amount: number | null,
+) {
+  const matching = goals.filter((goal) => goal.nutrientCode === code && current(goal, date));
+  const goal = matching.length === 1 ? matching[0]! : null;
+  const status =
+    matching.length > 1
+      ? ('ambiguous_goal' as const)
+      : amount === null
+        ? ('no_data' as const)
+        : goal
+          ? ('ready' as const)
+          : ('no_goal' as const);
+  const format = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const description =
+    matching.length > 1
+      ? 'Multiple current goals; choose which version to keep before comparing.'
+      : amount === null
+        ? 'No recorded value for this nutrient.'
+        : !goal
+          ? 'Recorded amount; no current goal comparison.'
+          : goal.kind === 'range'
+            ? amount < goal.minimum!
+              ? `${format(goal.minimum! - amount)} ${goal.unit} below the ${format(goal.minimum!)}–${format(goal.maximum!)} ${goal.unit} range.`
+              : amount > goal.maximum!
+                ? `${format(amount - goal.maximum!)} ${goal.unit} above the ${format(goal.minimum!)}–${format(goal.maximum!)} ${goal.unit} range.`
+                : `Within the ${format(goal.minimum!)}–${format(goal.maximum!)} ${goal.unit} range.`
+            : goal.kind === 'limit'
+              ? amount > goal.maximum!
+                ? `${format(amount - goal.maximum!)} ${goal.unit} above the ${format(goal.maximum!)} ${goal.unit} limit.`
+                : `${format(goal.maximum! - amount)} ${goal.unit} before the ${format(goal.maximum!)} ${goal.unit} limit.`
+              : amount < goal.value!
+                ? `${format(goal.value! - amount)} ${goal.unit} below the ${format(goal.value!)} ${goal.unit} ${goal.kind}.`
+                : amount === goal.value
+                  ? `At the ${format(goal.value!)} ${goal.unit} ${goal.kind}.`
+                  : `${format(amount - goal.value!)} ${goal.unit} above the ${format(goal.value!)} ${goal.unit} ${goal.kind}.`;
+  return {
+    status,
+    goal,
+    description,
+    amount,
+    visualPercent:
+      amount !== null && goal && boundary(goal)
+        ? Math.min(100, Math.max(0, (amount / boundary(goal)!) * 100))
+        : null,
+  };
+}
+
 export function buildNutritionChartDatasets(input: {
   profileLabel: string;
   date: string;
@@ -172,7 +223,23 @@ export function buildNutritionChartDatasets(input: {
       };
     });
 
-  return { calorie, macroComposition, coverage };
+  const comparisons = Object.fromEntries(
+    [
+      ...new Set([
+        'energy_kcal',
+        'protein',
+        'carbohydrate',
+        'total_fat',
+        ...input.goals.map((goal) => goal.nutrientCode),
+        ...Object.keys(input.confirmed),
+      ]),
+    ].map((code) => [
+      code,
+      nutritionGoalComparison(input.goals, input.date, code, input.confirmed[code] ?? null),
+    ]),
+  );
+  calorie.takeaway = `${comparisons.energy_kcal!.description} Comparisons are based on confirmed intake only.`;
+  return { calorie, macroComposition, coverage, comparisons };
 }
 
 export type NutritionChartDatasets = ReturnType<typeof buildNutritionChartDatasets>;

@@ -461,21 +461,22 @@
 
 .itemIdentity {
   display: grid;
-  grid-template-columns: minmax(8rem, 1.2fr) minmax(13rem, 1fr) minmax(5rem, 0.55fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas: 'name amount' 'badges amount' 'original amount';
   gap: 0.75rem;
   align-items: center;
   min-width: 0;
 }
 
 .itemIdentityGrouped {
-  grid-template-columns: minmax(8rem, 1fr) minmax(13rem, 1fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
 }
 
 .itemIdentity strong {
   overflow: hidden;
   font-size: 0.88rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .itemIdentity span {
@@ -493,9 +494,9 @@
 
 .itemIdentity .buyAmount {
   color: var(--ink);
-  font-size: 1rem;
-  font-weight: 850;
-  line-height: 1.15;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .itemIdentity .pantryAmount {
@@ -508,10 +509,10 @@
 .itemIdentity .quantityCalculation {
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.64rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .itemIdentity .quantitySummaryEstimate .pantryAmount {
@@ -637,24 +638,6 @@
   font-size: 0.62rem;
 }
 
-.itemEditor {
-  position: absolute;
-  z-index: 8;
-  top: 2rem;
-  right: 0;
-  display: grid;
-  grid-template-columns: 1fr 5rem 5rem;
-  gap: 0.45rem;
-  width: min(30rem, calc(100vw - 3rem));
-  padding: 0.75rem;
-  border: 1px solid var(--list-line);
-  border-radius: 0.65rem;
-  background: var(--field);
-  box-shadow: 0 14px 32px rgb(31 38 30 / 15%);
-}
-
-.itemEditor input,
-.itemEditor select,
 .retryControls select {
   min-width: 0;
   min-height: 2.3rem;
@@ -663,17 +646,6 @@
   border: 1px solid var(--list-line);
   border-radius: 0.4rem;
   background: var(--field);
-}
-
-.itemEditor select {
-  grid-column: 1 / -1;
-}
-
-.itemEditor button {
-  display: inline-flex;
-  gap: 0.3rem;
-  align-items: center;
-  font-size: 0.72rem;
 }
 
 .provenance,
@@ -1180,8 +1152,8 @@
   overflow: hidden;
   color: var(--muted);
   font-size: 0.68rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .substituteResults > button {
@@ -1591,7 +1563,6 @@
     font-size: 0.78rem;
   }
 
-  .desktopSort,
   .sideRail {
     display: none;
   }
@@ -1653,6 +1624,7 @@
   .itemIdentity {
     display: grid;
     grid-template-columns: 1fr;
+    grid-template-areas: 'name' 'original' 'badges' 'amount';
     gap: 0.2rem;
   }
 
@@ -1674,7 +1646,7 @@
 
   .itemIdentity .quantityCalculation {
     max-width: 100%;
-    font-size: 0.62rem;
+    font-size: 0.8rem;
     white-space: normal;
   }
 
@@ -1704,7 +1676,7 @@
     align-content: center;
     min-height: 3.65rem;
     padding: 0.3rem;
-    font-size: 0.64rem;
+    font-size: 0.85rem;
   }
 
   .stateButton svg {
@@ -1718,7 +1690,9 @@
   }
 
   .itemMenu {
-    display: none;
+    display: inline-flex;
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
   .provenance,
@@ -1985,7 +1959,6 @@
 }
 .focusedShopping .sideRail,
 .focusedShopping .itemThumb,
-.focusedShopping .quantityCalculation,
 .focusedShopping .itemIdentity > span:has(.aisleBadge),
 .focusedShopping .inCartButton {
   display: none;
@@ -2143,8 +2116,8 @@
   min-height: 2.75rem;
   padding: 0.35rem 0.55rem;
   color: var(--list-green-dark);
-  font-size: 0.72rem;
-  font-weight: 750;
+  font-size: 0.85rem;
+  font-weight: 650;
   white-space: nowrap;
   border: 1px solid var(--list-line);
   border-radius: 0.65rem;
@@ -2189,7 +2162,7 @@
 }
 
 .focusedShopping .item {
-  grid-template-columns: minmax(0, 1fr) 9rem 8.5rem 8.5rem auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 0.55rem;
 }
 
@@ -2332,7 +2305,7 @@
 
   .quickActions {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.25rem;
   }
 
@@ -2343,7 +2316,7 @@
     min-width: 0;
     min-height: 3.15rem;
     padding: 0.25rem 0.1rem;
-    font-size: 0.58rem;
+    font-size: 0.85rem;
   }
 
   .quickActions svg {
@@ -2358,6 +2331,8 @@
   }
 
   .shoppingModeSwitch button {
+    min-width: 0;
+    flex-wrap: wrap;
     width: 100%;
     min-height: 2.9rem;
     padding-inline: 0.4rem;
@@ -2379,7 +2354,7 @@
     min-width: 0;
     min-height: 3rem;
     padding: 0.35rem;
-    font-size: 0.64rem;
+    font-size: 0.85rem;
   }
 
   .focusedShopping .cantFindButton {
@@ -2402,7 +2377,7 @@
     min-height: 3.25rem;
     gap: 0.1rem;
     padding-inline: 0.2rem;
-    font-size: 0.64rem;
+    font-size: 0.85rem;
   }
 
   .shoppingMode .mobileDock > button:not(.dockMetric) {
@@ -2473,4 +2448,223 @@
     font-size: 0.78rem;
     line-height: 1.4;
   }
+}
+
+.itemIdentity > strong {
+  grid-area: name;
+  line-height: 1.35;
+}
+.itemIdentity > span:not(.quantitySummary) {
+  grid-area: badges;
+}
+.itemIdentity > .quantitySummary {
+  grid-area: amount;
+}
+.itemIdentity > .requestedItem {
+  grid-area: original;
+}
+.itemMenu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--field);
+  color: var(--ink);
+}
+.cantFindButton {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+}
+.toolsDisclosure {
+  min-width: 0;
+}
+.toolsDisclosure > summary {
+  font-size: 0.9rem;
+}
+.toolsDisclosure .quickActions {
+  margin-top: 0.5rem;
+}
+.aisleNavigation {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+.aisleNavigation a,
+.aisleNavigation button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.4rem 0.7rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.aisleGroup {
+  scroll-margin-top: 8rem;
+}
+.resultScope {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.editDialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.editDialog > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex: 0 0 auto;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.editDialog h2 {
+  margin: 0;
+  font-size: var(--panel-title-size);
+}
+.editDialog header p {
+  margin: 0.4rem 0 0;
+  overflow-wrap: anywhere;
+}
+.editDialog > header button {
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  color: var(--ink);
+  background: var(--field);
+}
+.editDialog > form {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editBody {
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+.editBody label {
+  display: grid;
+  gap: 0.35rem;
+}
+.editBody p {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+}
+.editDialog footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+}
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.editActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+}
+.mobileDock > button:last-child {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+@media (max-width: 650px) {
+  .shoppingMode .item {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+    gap: 0.4rem;
+    padding: 0.7rem 0;
+  }
+  .shoppingMode .itemIdentity {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    grid-template-columns: 1fr;
+    grid-template-areas: 'name' 'original' 'badges' 'amount';
+  }
+  .shoppingMode .itemThumb {
+    display: none;
+  }
+  .shoppingMode .sourceToggle {
+    grid-column: 1 / -1;
+  }
+  .shoppingMode .itemMenu {
+    grid-column: auto;
+  }
+  .shoppingMode .stateButton {
+    font-size: 0.85rem;
+    min-height: 44px;
+    display: inline-flex;
+    justify-content: center;
+    gap: 0.35rem;
+  }
+  .shoppingMode .desktopSort {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .desktopSort label {
+    flex: 1;
+    min-width: 8rem;
+  }
+  .shoppingMode .mobileDock {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .shoppingMode .mobileDock > button {
+    font-size: 0.9rem;
+    min-height: 48px;
+  }
+  .shoppingMode .mobileDock > button:nth-child(2),
+  .shoppingMode .mobileDock > button:nth-child(3) {
+    display: none;
+  }
+}
+
+.sourcedActions {
+  grid-column: 1 / -1;
+}
+.sourcedActions summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.sourcedActions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.sourcedActions button {
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
 }

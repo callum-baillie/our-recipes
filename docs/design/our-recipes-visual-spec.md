@@ -29,11 +29,11 @@ The initial established-home screen uses a quiet centered masthead, a small text
 
 ## Recipe-photo surface
 
-Recipe photos sit beneath the recipe introduction in a warm, bounded gallery rather than becoming a dashboard asset. The first row pairs the editorial “A little visual memory” heading with the saved count. Each image uses a stable 4:3 crop and retains an adjacent text description plus a clearly labeled removal control. The add-photo form stays on the same surface so the local-only constraint remains visible. On narrow screens the header actions remain compact, the gallery becomes a single column, and the form fields stack without clipping.
+Recipe photos sit beneath the recipe introduction in a warm, bounded gallery rather than becoming a dashboard asset. The first row pairs the editorial “A little visual memory” heading with the saved count. Images use a deliberate 4:3 treatment, with a bounded single-photo frame on desktop. Descriptions remain available to assistive technology; one Manage photos entry reveals upload and clearly labelled removal controls. Generated serving images are identified explicitly. The add-photo form stays on the same surface so the local-only constraint remains visible. On narrow screens the header actions remain compact, the gallery becomes a single column, and the form fields stack without clipping.
 
 ## Offline fallback
 
-The offline fallback is a calm, centered kitchen-note surface rather than a browser error. It explains that previously opened recipes remain readable but makes no promise that an uncached recipe, a new change, or a plan/list update has been saved. The message and retry link use the established editorial palette and retain visible keyboard focus.
+The offline fallback is a calm, centered kitchen-note surface rather than a browser error. It explains that some eligible recipe pages cached on this device may remain readable, and that changes require a connection and are never queued. The message and retry link use the established editorial palette and retain visible keyboard focus.
 
 ## Accessibility and responsive rules
 
@@ -44,3 +44,11 @@ The offline fallback is a calm, centered kitchen-note surface rather than a brow
 - At 850px, navigation simplifies and feature cards stack; at 520px, all form grids stack and the type scale reduces without horizontal scrolling.
 - Recipe print media uses neutral white paper and a 12mm margin that fits both US Letter and A4; navigation and on-screen controls are omitted from the printed card.
 - The visual acceptance path is: inspect the supplied concept, exercise first-run setup with keyboard and pointer, capture desktop/mobile and dark-scheme screenshots, render Letter/A4 PDFs, and run axe in Playwright.
+
+### Pantry and shopping refinement contracts
+
+[Pantry and shopping UI contracts](pantry-shopping-workflows.md) define card containment, date/stock distinctions, count recovery and version review, catalog/manual entry, current versus generated totals, and the focused shopping shell. Reuse the shared heading, disclosure, dialog and semantic action tokens; keep physical stock, shopping intent, cart state and Pantry intake distinct.
+
+### Meal planner refinement contracts
+
+[Meal planner UI contracts](meal-planner-workflows.md) define mobile date access, calendar/card density, setup and household-preference drafts, modal handoff, truthful Pantry/nutrition previews, reviewed generation and saved insight scope. Keep the desktop workspace intentional and use the shared semantic colours and dialog foundations.

@@ -1,8 +1,9 @@
 .workspaceShell {
   width: 100%;
-  height: calc(100dvh - 5.5rem);
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   background: var(--page);
 }
 
@@ -96,7 +97,15 @@
   }
 
   .workspaceShell :global(.planner-workspace-center) {
-    padding-right: max(0.75rem, env(safe-area-inset-right));
-    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+  }
+}
+
+/* On short desktops the workspace itself scrolls, so a large header cannot collapse the calendar. */
+@media (min-width: 901px) and (max-height: 45rem) {
+  .workspaceShell > :global(.recipe-page) {
+    height: auto;
+    min-height: 100%;
   }
 }

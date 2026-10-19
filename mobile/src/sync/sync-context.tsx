@@ -1,3 +1,4 @@
+import { localDate } from '@/data/planner';
 import * as React from 'react';
 import { AppState } from 'react-native';
 import type {
@@ -29,6 +30,10 @@ type SyncContextValue = {
 const SyncContext = React.createContext<SyncContextValue | null>(null);
 
 type LibraryRecipe = {
+  createdAt?: string;
+  updatedAt?: string;
+  lastCookedAt?: string | null;
+  personalRating?: number | null;
   id: string;
   title: string;
   summary: string;
@@ -41,8 +46,8 @@ type LibraryRecipe = {
   isFavorite: boolean;
 };
 
-type RecipeDetail = LibraryRecipe & {
-  revision?: number;
+export type RecipeDetail = LibraryRecipe & {
+  currentRevision: number;
   ingredientGroups: {
     ingredients: { quantity: number | null; unit: string; item: string; note: string }[];
   }[];
@@ -99,6 +104,7 @@ type ShoppingSummary = {
   isAutomaticRestockTarget?: boolean;
 };
 type ShoppingDetail = ShoppingSummary & {
+  settings?: ShoppingList['settings'];
   supermarketProfile?: { id: string; name: string; locationLabel?: string } | null;
   aisles: { id: string; name: string }[];
   isAutomaticRestockTarget?: boolean;
@@ -123,8 +129,8 @@ function todayRange() {
   const end = new Date();
   end.setDate(end.getDate() + 365);
   return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start: localDate(start),
+    end: localDate(end),
   };
 }
 
@@ -144,7 +150,7 @@ function pantryIcon(category = '') {
 
 const fallbackRecipeImage = require('../../assets/design-pack/paper.png');
 
-function mapRecipe(
+export function mapRecipe(
   detail: RecipeDetail,
   assetSource: (path: string) => Recipe['image'] | undefined,
 ): Recipe {
@@ -153,14 +159,19 @@ function mapRecipe(
   const categories = instructionSteps.map((step) => step.category);
   return {
     id: detail.id,
-    revision: detail.revision,
+    revision: detail.currentRevision,
+    createdAt: detail.createdAt,
+    updatedAt: detail.updatedAt,
+    personalRating: detail.personalRating,
+    lastCookedAt: detail.lastCookedAt,
     title: detail.title,
-    subtitle: detail.summary || 'A recipe from your Bòrd household.',
+    subtitle: detail.summary,
     minutes: detail.prepMinutes + detail.cookMinutes + detail.restMinutes,
     prepMinutes: detail.prepMinutes,
     cookMinutes: detail.cookMinutes,
     restMinutes: detail.restMinutes,
-    servings: Number.isFinite(servings) ? servings : 1,
+    servings: Number.isFinite(servings) && servings > 0 ? servings : 1,
+    servingsLabel: detail.servings,
     meal: detail.category || 'Recipe',
     image:
       (detail.images?.[0]
@@ -222,11 +233,17 @@ async function mapInBatches<T, R>(
 }
 
 export function SyncProvider({ children }: React.PropsWithChildren) {
-  const { status, request, requestNdjson, assetSource } = useAuth();
+  const { status, request, requestNdjson, assetSource, instanceUrl, user } = useAuth();
   const { state, dispatch, hydrated } = useBord();
   const [refreshing, setRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const activeRequest = React.useRef<Promise<void> | null>(null);
+  const scope = `${instanceUrl}:${user?.id}:${status}`;
+  const scopeRef = React.useRef(scope);
+  if (scopeRef.current !== scope) {
+    scopeRef.current = scope;
+    activeRequest.current = null;
+  }
   const lastSyncedRef = React.useRef(state.lastSyncedAt);
 
   React.useEffect(() => {
@@ -236,6 +253,8 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
   const refresh = React.useCallback(async () => {
     if (status !== 'authenticated') return;
     if (activeRequest.current) return activeRequest.current;
+    const requestScope = scope;
+    const isCurrent = () => requestScope === scopeRef.current;
     const operation = (async () => {
       setRefreshing(true);
       setError(null);
@@ -243,10 +262,13 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
         const firstPage = await request<{
           library: { recipes: LibraryRecipe[]; totalPages: number };
         }>('/api/v1/recipes?page=1');
-        const additionalPages = await Promise.all(
-          Array.from({ length: Math.max(0, firstPage.library.totalPages - 1) }, (_, index) =>
-            request<{ library: { recipes: LibraryRecipe[] } }>(`/api/v1/recipes?page=${index + 2}`),
+        const additionalPages = await mapInBatches(
+          Array.from(
+            { length: Math.max(0, firstPage.library.totalPages - 1) },
+            (_, index) => index + 2,
           ),
+          (page) =>
+            request<{ library: { recipes: LibraryRecipe[] } }>(`/api/v1/recipes?page=${page}`),
         );
         const library = [
           ...firstPage.library.recipes,
@@ -387,8 +409,19 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           time: '',
           servings: meal.servings,
         }));
-        const mappedRecipes = recipeDetails.map((recipe) => mapRecipe(recipe, assetSource));
+        const libraryById = new Map(library.map((recipe) => [recipe.id, recipe]));
+        const mappedRecipes = recipeDetails.map((recipe) =>
+          mapRecipe(
+            {
+              ...recipe,
+              personalRating: libraryById.get(recipe.id)?.personalRating,
+              lastCookedAt: libraryById.get(recipe.id)?.lastCookedAt,
+            },
+            assetSource,
+          ),
+        );
         const lists: ShoppingList[] = listDetails.map((list) => ({
+          settings: list.settings,
           id: list.id,
           name: list.name,
           status: list.archivedAt ? 'completed' : 'active',
@@ -428,6 +461,7 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           household: household.comparison,
           profileDetails: Object.fromEntries(nutritionDetailPairs),
         };
+        if (!isCurrent()) return;
         dispatch({
           type: 'server-sync',
           payload: {
@@ -445,22 +479,27 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           },
         });
       } catch (syncError) {
+        if (!isCurrent()) return;
         const message = syncError instanceof Error ? syncError.message : 'Bòrd could not refresh.';
         setError(message);
         dispatch({ type: 'set-offline', value: true });
       } finally {
-        setRefreshing(false);
-        activeRequest.current = null;
+        if (isCurrent()) {
+          setRefreshing(false);
+          activeRequest.current = null;
+        }
       }
     })();
     activeRequest.current = operation;
     return operation;
-  }, [assetSource, dispatch, request, requestNdjson, status]);
+  }, [assetSource, dispatch, request, requestNdjson, status, scope]);
 
   React.useEffect(() => {
     if (!hydrated || status !== 'authenticated') return;
     void refresh();
-    const interval = setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') void refresh();
+    }, REFRESH_INTERVAL_MS);
     const subscription = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
       const age = lastSyncedRef.current

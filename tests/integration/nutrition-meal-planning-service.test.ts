@@ -154,6 +154,20 @@ describe('private planned nutrition projection', () => {
     });
   }
 
+  it('does not manufacture zero nutrient days when no personal planned portion exists', () => {
+    const range = { start: '2026-07-19', end: '2026-07-25' };
+    const empty = getNutritionMealProjection(ownerProfileId, ownerPrincipalId, range);
+    expect(empty.totalsByDate).toEqual({});
+    expect(empty.meals[0]!.plannedValues).toBeNull();
+    const allocation = allocate(ownerProfileId, ownerPrincipalId, 1);
+    const planned = getNutritionMealProjection(ownerProfileId, ownerPrincipalId, range);
+    expect(planned.totalsByDate['2026-07-20']!.energy_kcal).toBe(400);
+    allocate(ownerProfileId, ownerPrincipalId, 1, allocation, 'skipped');
+    const skipped = getNutritionMealProjection(ownerProfileId, ownerPrincipalId, range);
+    expect(skipped.totalsByDate).toEqual({});
+    expect(skipped.meals[0]!.ownAllocations[0]!.state).toBe('skipped');
+  });
+
   it('projects uneven fractional portions and exposes only hidden aggregate assignment', () => {
     const first = allocate(ownerProfileId, ownerPrincipalId, 1);
     allocate(ownerProfileId, ownerPrincipalId, 1.5, first, 'served');

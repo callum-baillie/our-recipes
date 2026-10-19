@@ -1,4 +1,5 @@
 'use client';
+import { radioKeys } from './radio-keys';
 import { emptyKitchenInterview, kitchenInterviewQuestions } from './kitchen-interview';
 
 import {
@@ -26,7 +27,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { NutritionOnboardingFlow } from './nutrition-onboarding-flow';
@@ -65,6 +66,7 @@ import {
   SCOTTISH_STOVIES_RECIPE,
 } from '@/lib/domain/example-recipes';
 
+const profileColorNames = ['Terracotta', 'Sage', 'Amber', 'Teal', 'Violet', 'Rose'];
 const profileColors = ['#A85032', '#5B713E', '#D1863A', '#466F75', '#76558C', '#9B5C70'];
 const maximumSetupProfiles = 12;
 
@@ -154,34 +156,13 @@ function RichProfileTypeSelect({
     profileTypeOptions.findIndex((option) => option.value === value),
   );
   const [open, setOpen] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const selectedOption = profileTypeOptions[selectedIndex]!;
   const listboxId = `${id}-listbox`;
 
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutsidePointer(event: PointerEvent) {
-      const target = event.target as Node;
-      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
-        setOpen(false);
-      }
-    }
-    function closeOnViewportChange(event: Event) {
-      if (event.type === 'scroll' && menuRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
-    }
-    document.addEventListener('pointerdown', closeOnOutsidePointer);
-    window.addEventListener('resize', closeOnViewportChange);
-    window.addEventListener('scroll', closeOnViewportChange, true);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      window.removeEventListener('resize', closeOnViewportChange);
-      window.removeEventListener('scroll', closeOnViewportChange, true);
-    };
-  }, [open]);
-
-  function openMenu() {
+  const positionMenu = useCallback(() => {
     const trigger = triggerRef.current;
     if (trigger) {
       const rect = trigger.getBoundingClientRect();
@@ -213,6 +194,34 @@ function RichProfileTypeSelect({
             },
       );
     }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    }
+    function closeOnViewportChange(event: Event) {
+      if (event.type === 'scroll' && menuRef.current?.contains(event.target as Node)) return;
+      // Anchor scrolling can finish just after opening. Reposition within the active modal.
+      positionMenu();
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    window.addEventListener('resize', closeOnViewportChange);
+    window.addEventListener('scroll', closeOnViewportChange, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      window.removeEventListener('resize', closeOnViewportChange);
+      window.removeEventListener('scroll', closeOnViewportChange, true);
+    };
+  }, [open, positionMenu]);
+
+  function openMenu() {
+    setPortalRoot(triggerRef.current?.closest('dialog') ?? document.body);
+    positionMenu();
     setActiveIndex(selectedIndex);
     setOpen(true);
   }
@@ -314,7 +323,7 @@ function RichProfileTypeSelect({
                 </button>
               ))}
             </div>,
-            document.body,
+            portalRoot ?? document.body,
           )
         : null}
     </div>
@@ -449,12 +458,16 @@ export function OnboardingWizard({
   mode,
   onCancel,
   onProfileCreated,
+  onDismissStateChange,
+  onCommitted,
   aiEnabled = false,
 }: {
   mode: 'initial' | 'profile';
   aiEnabled?: boolean;
   onCancel?: () => void;
   onProfileCreated?: (profile: ProfileRecord) => void;
+  onCommitted?: () => void;
+  onDismissStateChange?: (state: { dirty: boolean; pending: boolean; completion: boolean }) => void;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -492,7 +505,27 @@ export function OnboardingWizard({
     createdProfile?: ProfileRecord;
   } | null>(null);
   const [recoveryCodesSaved, setRecoveryCodesSaved] = useState(false);
+  const stepSurface = useRef<HTMLDivElement>(null);
   const currentStep = steps[stepIndex]!;
+  useEffect(() => {
+    onDismissStateChange?.({
+      dirty:
+        stepIndex > 0 ||
+        profileDrafts.some((draft) =>
+          Boolean(
+            draft.profile.displayName.trim() ||
+            draft.credentials.email ||
+            draft.credentials.passphrase,
+          ),
+        ),
+      pending: submitting,
+      completion: Boolean(securityCompletion),
+    });
+  }, [onDismissStateChange, stepIndex, profileDrafts, submitting, securityCompletion]);
+  useEffect(() => {
+    stepSurface.current?.focus();
+    stepSurface.current?.scrollIntoView({ block: 'start' });
+  }, [stepIndex]);
   const activeDraft = profileDrafts[activeProfileIndex]!;
   const { role, profile, credentials, nutrition } = activeDraft;
   const activeProfileType =
@@ -588,6 +621,16 @@ export function OnboardingWizard({
     const message = currentStepError();
     if (message) {
       setError(message);
+      const surface = stepSurface.current;
+      const invalid = surface?.querySelector<HTMLInputElement>(
+        'input:invalid, select:invalid, textarea:invalid',
+      );
+      if (invalid) {
+        invalid.setAttribute('aria-describedby', 'onboarding-error');
+        invalid.setAttribute('aria-invalid', 'true');
+      }
+      (invalid ?? surface)?.focus();
+      invalid?.reportValidity();
       return;
     }
     setError(null);
@@ -715,6 +758,7 @@ export function OnboardingWizard({
           requiresEmailVerification: Boolean(body?.requiresEmailVerification),
         });
       } else if (body?.profile) {
+        onCommitted?.();
         const recoveryEntries = Array.isArray(body.recoveryCodes) ? body.recoveryCodes : [];
         setSecurityCompletion({
           groups: [
@@ -729,7 +773,13 @@ export function OnboardingWizard({
         });
       }
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : 'Onboarding could not be saved.';
+      const message =
+        caught instanceof TypeError
+          ? 'Creation outcome could not be confirmed. Check household members before retrying; closing does not undo a completed request.'
+          : caught instanceof Error
+            ? caught.message
+            : 'Onboarding could not be saved.';
+      if (caught instanceof TypeError) onCommitted?.();
       setError(message);
       showToast(message, 'error');
     } finally {
@@ -770,7 +820,11 @@ export function OnboardingWizard({
         <div className="onboarding-heading">
           <ShieldCheck size={25} aria-hidden="true" />
           <div>
-            <p className="eyebrow">SECURITY SETUP COMPLETE</p>
+            <p className="eyebrow">
+              {mode === 'profile'
+                ? 'PROFILE CREATED · FINISH SECURITY SETUP'
+                : 'KITCHEN CREATED · FINISH SECURITY SETUP'}
+            </p>
             <h2>Save your recovery codes.</h2>
             <p>
               Each code works once if email recovery is unavailable. Bòrd will not show these codes
@@ -832,7 +886,18 @@ export function OnboardingWizard({
             {mode === 'initial' ? 'WELCOME TO YOUR KITCHEN' : 'NEW PROFILE'}
           </p>
           <span>
-            Step {stepIndex + 1} of {steps.length}
+            Step {stepIndex + 1} of {steps.length} ·{' '}
+            {
+              {
+                app: 'Kitchen identity',
+                appearance: 'Appearance',
+                profile: 'Identity and sign-in',
+                nutrition: 'Nutrition preferences',
+                goals: 'Cooking goals',
+                recipe: 'First recipe',
+                review: 'Review before creating',
+              }[currentStep]
+            }
           </span>
         </div>
         <div className="onboarding-progress-track" aria-hidden="true">
@@ -840,749 +905,769 @@ export function OnboardingWizard({
         </div>
       </header>
 
-      <div className="onboarding-step" aria-live="polite">
-        {currentStep === 'app' ? (
-          <>
-            <div className="onboarding-heading">
-              <Sparkles size={25} aria-hidden="true" />
-              <div>
-                <h2>Name your kitchen.</h2>
-                <p>Bòrd is the default. Choose another name if it feels more like home.</p>
-              </div>
-            </div>
-            <div className="field-grid">
-              <label className="full-width-field">
-                <span>Kitchen name</span>
-                <input
-                  value={kitchenName}
-                  maxLength={80}
-                  onChange={(event) => setKitchenName(event.target.value)}
-                />
-                <small>Your kitchen name appears in the header and install icon.</small>
-              </label>
-            </div>
-            <BrandIconPicker selected={brandIcon} onSelect={setBrandIcon} />
-          </>
-        ) : null}
-
-        {currentStep === 'appearance' ? (
-          <>
-            <div className="onboarding-heading">
-              <Sparkles size={25} aria-hidden="true" />
-              <div>
-                <h2>Choose how the app feels.</h2>
-                <p>Theme choices belong to this browser and can change at any time.</p>
-              </div>
-            </div>
-            <AppearanceSettings />
-          </>
-        ) : null}
-
-        {currentStep === 'profile' ? (
-          <>
-            <div className="onboarding-heading">
-              <UserRound size={25} aria-hidden="true" />
-              <div>
-                <h2>
-                  {mode === 'initial' && activeProfileIndex === 0
-                    ? 'Create your first profile.'
-                    : mode === 'initial'
-                      ? 'Add another profile.'
-                      : 'Who is joining the kitchen?'}
-                </h2>
-                <p>
-                  Profiles personalize units, history, planning, and Nutrition. Each profile has its
-                  own sign-in and a password for profile switching.
-                </p>
-              </div>
-            </div>
-            <section className="onboarding-profile-identity" aria-label="Profile identity">
-              <div className="onboarding-avatar-editor">
-                <div className="onboarding-avatar-preview" aria-label="Avatar preview">
-                  <span
-                    className="onboarding-avatar-initial"
-                    style={{ backgroundColor: profile.color }}
-                    aria-hidden="true"
-                  >
-                    {avatarInitial(profile.displayName)}
-                  </span>
-                  <span>
-                    <small>Avatar preview</small>
-                    <strong>{profile.displayName.trim() || 'Your name'}</strong>
-                    <span>{activeProfileType.label}</span>
-                  </span>
+      <fieldset className="settings-form-fields" disabled={submitting}>
+        <div ref={stepSurface} tabIndex={-1} className="onboarding-step" aria-live="polite">
+          {error ? (
+            <p id="onboarding-error" className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {currentStep === 'app' ? (
+            <>
+              <div className="onboarding-heading">
+                <Sparkles size={25} aria-hidden="true" />
+                <div>
+                  <h2>Name your kitchen.</h2>
+                  <p>Bòrd is the default. Choose another name if it feels more like home.</p>
                 </div>
-                <fieldset className="onboarding-color-fieldset">
-                  <legend>Avatar color</legend>
-                  <div className="color-options" role="radiogroup" aria-label="Avatar color">
-                    {profileColors.map((color) => (
-                      <button
-                        className={
-                          profile.color === color ? 'color-swatch selected' : 'color-swatch'
-                        }
-                        type="button"
-                        key={color}
-                        style={{ '--swatch': color } as React.CSSProperties}
-                        role="radio"
-                        aria-checked={profile.color === color}
-                        aria-label={`Use ${color} for the avatar`}
-                        onClick={() => setProfile({ ...profile, color })}
-                      >
-                        {profile.color === color ? (
-                          <Check size={14} strokeWidth={3} aria-hidden="true" />
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
               </div>
-              <div className="onboarding-profile-identity-fields">
-                <label>
-                  <span>Display name</span>
+              <div className="field-grid">
+                <label className="full-width-field">
+                  <span>Kitchen name</span>
                   <input
-                    autoComplete="name"
-                    value={profile.displayName}
-                    onChange={(event) =>
-                      setProfile({ ...profile, displayName: event.target.value })
-                    }
+                    value={kitchenName}
+                    maxLength={80}
+                    onChange={(event) => setKitchenName(event.target.value)}
                   />
-                  <small>This name appears in the profile switcher and household activity.</small>
+                  <small>Your kitchen name appears in the header and install icon.</small>
                 </label>
-                <label>
-                  <span>Email</span>
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    inputMode="email"
-                    value={credentials.email}
-                    onChange={(event) =>
-                      setCredentials({ ...credentials, email: event.target.value })
-                    }
-                  />
-                  <small>Used for this profile&apos;s full sign-in and account recovery.</small>
-                </label>
-                <label>
-                  <span>Passphrase</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    minLength={8}
-                    maxLength={128}
-                    value={credentials.passphrase}
-                    onChange={(event) =>
-                      setCredentials({ ...credentials, passphrase: event.target.value })
-                    }
-                  />
-                  <small>Use at least 8 characters. A passphrase protects remote sign-in.</small>
-                </label>
+              </div>
+              <BrandIconPicker selected={brandIcon} onSelect={setBrandIcon} />
+            </>
+          ) : null}
 
-                <label>
-                  <span>Access role</span>
-                  <select
-                    value={mode === 'initial' && activeProfileIndex === 0 ? 'admin' : role}
-                    disabled={mode === 'initial' && activeProfileIndex === 0}
-                    onChange={(event) => setRole(event.target.value as AppRole)}
-                  >
-                    {accessRoleOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
+          {currentStep === 'appearance' ? (
+            <>
+              <div className="onboarding-heading">
+                <Sparkles size={25} aria-hidden="true" />
+                <div>
+                  <h2>Choose how the app feels.</h2>
+                  <p>Theme choices belong to this browser and can change at any time.</p>
+                </div>
+              </div>
+              <AppearanceSettings />
+            </>
+          ) : null}
+
+          {currentStep === 'profile' ? (
+            <>
+              <div className="onboarding-heading">
+                <UserRound size={25} aria-hidden="true" />
+                <div>
+                  <h2>
                     {mode === 'initial' && activeProfileIndex === 0
-                      ? 'The first profile is always an admin.'
-                      : accessRoleOptions.find((option) => option.value === role)?.description}
-                  </small>
-                </label>
-                <div className="onboarding-profile-type-field">
-                  <span
-                    className="onboarding-field-label"
-                    id={`profile-type-label-${activeDraft.localId}`}
-                  >
-                    Profile type
-                  </span>
-                  <RichProfileTypeSelect
-                    id={`profile-type-${activeDraft.localId}`}
-                    labelId={`profile-type-label-${activeDraft.localId}`}
-                    describedBy={`profile-type-description-${activeDraft.localId}`}
-                    value={nutrition.profileType}
-                    onChange={(profileType) => setNutrition({ ...nutrition, profileType })}
-                  />
+                      ? 'Create your first profile.'
+                      : mode === 'initial'
+                        ? 'Add another profile.'
+                        : 'Who is joining the kitchen?'}
+                  </h2>
+                  <p>
+                    Profiles personalize units, history, planning, and Nutrition. Each profile has
+                    its own sign-in and a password for profile switching.
+                  </p>
                 </div>
-                <div
-                  className="onboarding-profile-type-description"
-                  id={`profile-type-description-${activeDraft.localId}`}
-                  aria-live="polite"
-                >
-                  <small>
-                    <ShieldCheck size={14} aria-hidden="true" /> {activeProfileType.access}
-                  </small>
-                </div>
-                <p className="onboarding-profile-type-note">
-                  Access role controls permissions. Profile type only changes planning and Nutrition
-                  context. A password can switch to an equal or lower role; moving up requires a
-                  full sign-in.
-                </p>
               </div>
-            </section>
-            <div className="field-grid two-columns">
-              <label>
-                <span>Units</span>
-                <select
-                  value={profile.units}
-                  onChange={(event) => {
-                    const units = event.target.value as ProfileInput['units'];
-                    updateActiveDraft((draft) => ({
-                      ...draft,
-                      profile: { ...draft.profile, units },
-                      heightUnit: units,
-                      heightPrimary: '',
-                      heightSecondary: '',
-                      weightUnit: units,
-                      weightPrimary: '',
-                      weightSecondary: '',
-                    }));
-                  }}
-                >
-                  <option value="imperial">US customary</option>
-                  <option value="metric">Metric</option>
-                </select>
-              </label>
-              <label>
-                <span>Temperature</span>
-                <select
-                  value={profile.temperatureUnit}
-                  onChange={(event) =>
-                    setProfile({
-                      ...profile,
-                      temperatureUnit: event.target.value as ProfileInput['temperatureUnit'],
-                    })
-                  }
-                >
-                  <option value="F">Fahrenheit</option>
-                  <option value="C">Celsius</option>
-                </select>
-              </label>
-            </div>
-          </>
-        ) : null}
-
-        {currentStep === 'nutrition' ? (
-          <NutritionOnboardingFlow
-            key={activeDraft.localId}
-            value={canonicalNutrition}
-            units={profile.units}
-            timeZone={profile.timezone}
-            onBack={() => {
-              setError(null);
-              setStepIndex((current) => current - 1);
-            }}
-            onComplete={next}
-            onChange={(value) =>
-              updateActiveDraft((draft) => ({
-                ...draft,
-                nutrition: value,
-                heightUnit: 'metric',
-                heightPrimary:
-                  value.heightCentimeters === null ? '' : String(value.heightCentimeters),
-                heightSecondary: '',
-                weightUnit: 'metric',
-                weightPrimary:
-                  value.currentWeightKilograms === null ? '' : String(value.currentWeightKilograms),
-                weightSecondary: '',
-                targetWeight:
-                  value.targetWeightKilograms === null ? '' : String(value.targetWeightKilograms),
-                dietaryPreferences: value.dietaryPreferences,
-                foodAllergies: value.foodAllergies,
-                dietaryExclusions: value.dietaryExclusions,
-              }))
-            }
-          />
-        ) : null}
-
-        {currentStep === 'goals' ? (
-          <>
-            <div className="onboarding-heading">
-              <Sparkles size={25} aria-hidden="true" />
-              <div>
-                <h2>What should the app help with?</h2>
-                <p>
-                  Take a moment to think about what would genuinely make food and mealtimes feel
-                  better. There are no right answers, and everything can be changed later.
-                </p>
-              </div>
-            </div>
-            <div className="onboarding-goal-reflection">
-              <section
-                className="onboarding-goal-section onboarding-goal-focus-section"
-                aria-labelledby="goal-focus-title"
-              >
-                <div className="onboarding-goal-question">
-                  <span aria-hidden="true">1</span>
-                  <div>
-                    <h3 id="goal-focus-title">What would make the biggest difference?</h3>
-                    <p>Choose the outcomes that feel most useful right now.</p>
-                  </div>
-                </div>
-                <div className="onboarding-goal-options">
-                  {profileGoalFocusOptions.map((option) => {
-                    const selected = goalContext.focusAreas.includes(option.value);
-                    const atLimit = goalContext.focusAreas.length >= 8;
-                    return (
-                      <button
-                        className={
-                          selected ? 'onboarding-goal-option selected' : 'onboarding-goal-option'
-                        }
-                        type="button"
-                        role="checkbox"
-                        aria-checked={selected}
-                        disabled={!selected && atLimit}
-                        key={option.value}
-                        onClick={() => toggleGoalFocus(option.value)}
-                      >
-                        <span className="onboarding-goal-option-icon">
-                          <GoalFocusIcon focus={option.value} />
-                        </span>
-                        <span>
-                          <strong>{option.label}</strong>
-                          <small>{option.description}</small>
-                        </span>
-                        <span className="onboarding-goal-option-check" aria-hidden="true">
-                          {selected ? <Check size={14} strokeWidth={3} /> : null}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="onboarding-goal-selection-note" aria-live="polite">
-                  {goalContext.focusAreas.length
-                    ? `${goalContext.focusAreas.length} selected`
-                    : 'Choose any that resonate with you'}
-                </p>
-              </section>
-
-              <div className="onboarding-goal-writing-grid">
-                <label className="onboarding-goal-section">
-                  <span className="onboarding-goal-question">
-                    <span aria-hidden="true">2</span>
+              <section className="onboarding-profile-identity" aria-label="Profile identity">
+                <div className="onboarding-avatar-editor">
+                  <div className="onboarding-avatar-preview" aria-label="Avatar preview">
+                    <span
+                      className="onboarding-avatar-initial"
+                      style={{ backgroundColor: profile.color }}
+                      aria-hidden="true"
+                    >
+                      {avatarInitial(profile.displayName)}
+                    </span>
                     <span>
-                      <strong>Why does this matter to you right now?</strong>
+                      <small>Avatar preview</small>
+                      <strong>{profile.displayName.trim() || 'Your name'}</strong>
+                      <span>{activeProfileType.label}</span>
+                    </span>
+                  </div>
+                  <fieldset className="onboarding-color-fieldset">
+                    <legend>Avatar color</legend>
+                    <div
+                      className="color-options"
+                      role="radiogroup"
+                      onKeyDown={radioKeys}
+                      aria-label="Avatar color"
+                    >
+                      {profileColors.map((color) => (
+                        <button
+                          className={
+                            profile.color === color ? 'color-swatch selected' : 'color-swatch'
+                          }
+                          type="button"
+                          key={color}
+                          style={{ '--swatch': color } as React.CSSProperties}
+                          role="radio"
+                          aria-checked={profile.color === color}
+                          tabIndex={profile.color === color ? 0 : -1}
+                          aria-label={`Use ${profileColorNames[profileColors.indexOf(color)]} for the avatar`}
+                          onClick={() => setProfile({ ...profile, color })}
+                        >
+                          {profile.color === color ? (
+                            <Check size={14} strokeWidth={3} aria-hidden="true" />
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                </div>
+                <div className="onboarding-profile-identity-fields">
+                  <label>
+                    <span>Display name</span>
+                    <input
+                      required
+                      maxLength={80}
+                      autoComplete="name"
+                      value={profile.displayName}
+                      onChange={(event) =>
+                        setProfile({ ...profile, displayName: event.target.value })
+                      }
+                    />
+                    <small>This name appears in the profile switcher and household activity.</small>
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      inputMode="email"
+                      value={credentials.email}
+                      onChange={(event) =>
+                        setCredentials({ ...credentials, email: event.target.value })
+                      }
+                    />
+                    <small>Used for this profile&apos;s full sign-in and account recovery.</small>
+                  </label>
+                  <label>
+                    <span>Passphrase</span>
+                    <input
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      minLength={8}
+                      maxLength={128}
+                      value={credentials.passphrase}
+                      onChange={(event) =>
+                        setCredentials({ ...credentials, passphrase: event.target.value })
+                      }
+                    />
+                    <small>Use at least 8 characters. A passphrase protects remote sign-in.</small>
+                  </label>
+
+                  <label>
+                    <span>Access role</span>
+                    <select
+                      value={mode === 'initial' && activeProfileIndex === 0 ? 'admin' : role}
+                      disabled={mode === 'initial' && activeProfileIndex === 0}
+                      onChange={(event) => setRole(event.target.value as AppRole)}
+                    >
+                      {accessRoleOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small>
+                      {mode === 'initial' && activeProfileIndex === 0
+                        ? 'The first profile is always an admin.'
+                        : accessRoleOptions.find((option) => option.value === role)?.description}
+                    </small>
+                  </label>
+                  <div className="onboarding-profile-type-field">
+                    <span
+                      className="onboarding-field-label"
+                      id={`profile-type-label-${activeDraft.localId}`}
+                    >
+                      Profile type
+                    </span>
+                    <RichProfileTypeSelect
+                      id={`profile-type-${activeDraft.localId}`}
+                      labelId={`profile-type-label-${activeDraft.localId}`}
+                      describedBy={`profile-type-description-${activeDraft.localId}`}
+                      value={nutrition.profileType}
+                      onChange={(profileType) => setNutrition({ ...nutrition, profileType })}
+                    />
+                  </div>
+                  <div
+                    className="onboarding-profile-type-description"
+                    id={`profile-type-description-${activeDraft.localId}`}
+                    aria-live="polite"
+                  >
+                    <small>
+                      <ShieldCheck size={14} aria-hidden="true" /> {activeProfileType.access}
+                    </small>
+                  </div>
+                  <p className="onboarding-profile-type-note">
+                    Access role controls permissions. Profile type only changes planning and
+                    Nutrition context. A password can switch to an equal or lower role; moving up
+                    requires a full sign-in.
+                  </p>
+                </div>
+              </section>
+              <div className="field-grid two-columns">
+                <label>
+                  <span>Units</span>
+                  <select
+                    value={profile.units}
+                    onChange={(event) => {
+                      const units = event.target.value as ProfileInput['units'];
+                      updateActiveDraft((draft) => ({
+                        ...draft,
+                        profile: { ...draft.profile, units },
+                        heightUnit: units,
+                        heightPrimary: '',
+                        heightSecondary: '',
+                        weightUnit: units,
+                        weightPrimary: '',
+                        weightSecondary: '',
+                      }));
+                    }}
+                  >
+                    <option value="imperial">US customary</option>
+                    <option value="metric">Metric</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Temperature</span>
+                  <select
+                    value={profile.temperatureUnit}
+                    onChange={(event) =>
+                      setProfile({
+                        ...profile,
+                        temperatureUnit: event.target.value as ProfileInput['temperatureUnit'],
+                      })
+                    }
+                  >
+                    <option value="F">Fahrenheit</option>
+                    <option value="C">Celsius</option>
+                  </select>
+                </label>
+              </div>
+            </>
+          ) : null}
+
+          {currentStep === 'nutrition' ? (
+            <NutritionOnboardingFlow
+              key={activeDraft.localId}
+              value={canonicalNutrition}
+              units={profile.units}
+              timeZone={profile.timezone}
+              onBack={() => {
+                setError(null);
+                setStepIndex((current) => current - 1);
+              }}
+              onComplete={next}
+              onChange={(value) =>
+                updateActiveDraft((draft) => ({
+                  ...draft,
+                  nutrition: value,
+                  heightUnit: 'metric',
+                  heightPrimary:
+                    value.heightCentimeters === null ? '' : String(value.heightCentimeters),
+                  heightSecondary: '',
+                  weightUnit: 'metric',
+                  weightPrimary:
+                    value.currentWeightKilograms === null
+                      ? ''
+                      : String(value.currentWeightKilograms),
+                  weightSecondary: '',
+                  targetWeight:
+                    value.targetWeightKilograms === null ? '' : String(value.targetWeightKilograms),
+                  dietaryPreferences: value.dietaryPreferences,
+                  foodAllergies: value.foodAllergies,
+                  dietaryExclusions: value.dietaryExclusions,
+                }))
+              }
+            />
+          ) : null}
+
+          {currentStep === 'goals' ? (
+            <>
+              <div className="onboarding-heading">
+                <Sparkles size={25} aria-hidden="true" />
+                <div>
+                  <h2>What should the app help with?</h2>
+                  <p>
+                    Take a moment to think about what would genuinely make food and mealtimes feel
+                    better. There are no right answers, and everything can be changed later.
+                  </p>
+                </div>
+              </div>
+              <div className="onboarding-goal-reflection">
+                <section
+                  className="onboarding-goal-section onboarding-goal-focus-section"
+                  aria-labelledby="goal-focus-title"
+                >
+                  <div className="onboarding-goal-question">
+                    <span aria-hidden="true">1</span>
+                    <div>
+                      <h3 id="goal-focus-title">What would make the biggest difference?</h3>
+                      <p>Choose the outcomes that feel most useful right now.</p>
+                    </div>
+                  </div>
+                  <div className="onboarding-goal-options">
+                    {profileGoalFocusOptions.map((option) => {
+                      const selected = goalContext.focusAreas.includes(option.value);
+                      const atLimit = goalContext.focusAreas.length >= 8;
+                      return (
+                        <button
+                          className={
+                            selected ? 'onboarding-goal-option selected' : 'onboarding-goal-option'
+                          }
+                          type="button"
+                          role="checkbox"
+                          aria-checked={selected}
+                          disabled={!selected && atLimit}
+                          key={option.value}
+                          onClick={() => toggleGoalFocus(option.value)}
+                        >
+                          <span className="onboarding-goal-option-icon">
+                            <GoalFocusIcon focus={option.value} />
+                          </span>
+                          <span>
+                            <strong>{option.label}</strong>
+                            <small>{option.description}</small>
+                          </span>
+                          <span className="onboarding-goal-option-check" aria-hidden="true">
+                            {selected ? <Check size={14} strokeWidth={3} /> : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="onboarding-goal-selection-note" aria-live="polite">
+                    {goalContext.focusAreas.length
+                      ? `${goalContext.focusAreas.length} selected`
+                      : 'Choose any that resonate with you'}
+                  </p>
+                </section>
+
+                <div className="onboarding-goal-writing-grid">
+                  <label className="onboarding-goal-section">
+                    <span className="onboarding-goal-question">
+                      <span aria-hidden="true">2</span>
+                      <span>
+                        <strong>Why does this matter to you right now?</strong>
+                        <small>
+                          A little context helps the app understand the reason behind the goal.
+                        </small>
+                      </span>
+                    </span>
+                    <textarea
+                      rows={4}
+                      maxLength={800}
+                      value={goalContext.motivation}
+                      placeholder="Maybe you want more energy, less stress around food, or to feel more confident cooking for yourself."
+                      onChange={(event) => setGoalContext({ motivation: event.target.value })}
+                    />
+                    <small className="onboarding-goal-count">
+                      {goalContext.motivation.length} / 800
+                    </small>
+                  </label>
+
+                  <label className="onboarding-goal-section">
+                    <span className="onboarding-goal-question">
+                      <span aria-hidden="true">3</span>
+                      <span>
+                        <strong>What tends to get in the way?</strong>
+                        <small>Name the friction, not a personal failing.</small>
+                      </span>
+                    </span>
+                    <textarea
+                      rows={4}
+                      maxLength={800}
+                      value={goalContext.challenges}
+                      placeholder="Busy evenings, decision fatigue, a tight budget, unused groceries, or not knowing where to begin."
+                      onChange={(event) => setGoalContext({ challenges: event.target.value })}
+                    />
+                    <small className="onboarding-goal-count">
+                      {goalContext.challenges.length} / 800
+                    </small>
+                  </label>
+                </div>
+
+                <label className="onboarding-goal-section onboarding-goal-success">
+                  <span className="onboarding-goal-question">
+                    <span aria-hidden="true">4</span>
+                    <span>
+                      <strong>Imagine this is working well. What feels different?</strong>
                       <small>
-                        A little context helps the app understand the reason behind the goal.
+                        Describe the everyday change you would notice—not just a number.
                       </small>
                     </span>
                   </span>
                   <textarea
                     rows={4}
                     maxLength={800}
-                    value={goalContext.motivation}
-                    placeholder="Maybe you want more energy, less stress around food, or to feel more confident cooking for yourself."
-                    onChange={(event) => setGoalContext({ motivation: event.target.value })}
+                    value={goalContext.successVision}
+                    placeholder="For example: dinner feels calmer, grocery trips are quicker, I waste less, and I have steady energy through the afternoon."
+                    onChange={(event) => setGoalContext({ successVision: event.target.value })}
                   />
                   <small className="onboarding-goal-count">
-                    {goalContext.motivation.length} / 800
+                    {goalContext.successVision.length} / 800
                   </small>
                 </label>
 
-                <label className="onboarding-goal-section">
+                <label className="onboarding-goal-section onboarding-goals">
                   <span className="onboarding-goal-question">
-                    <span aria-hidden="true">3</span>
+                    <span aria-hidden="true">5</span>
                     <span>
-                      <strong>What tends to get in the way?</strong>
-                      <small>Name the friction, not a personal failing.</small>
+                      <strong>Anything else you want the app to remember?</strong>
+                      <small>
+                        Add a personal goal, food ritual, or detail that did not fit above.
+                      </small>
                     </span>
                   </span>
                   <textarea
-                    rows={4}
-                    maxLength={800}
-                    value={goalContext.challenges}
-                    placeholder="Busy evenings, decision fatigue, a tight budget, unused groceries, or not knowing where to begin."
-                    onChange={(event) => setGoalContext({ challenges: event.target.value })}
+                    rows={3}
+                    maxLength={2000}
+                    value={profile.mainGoals ?? ''}
+                    placeholder="I would love to learn to bake bread, keep Sunday dinners special, or try one new recipe each week."
+                    onChange={(event) => setProfile({ ...profile, mainGoals: event.target.value })}
                   />
                   <small className="onboarding-goal-count">
-                    {goalContext.challenges.length} / 800
+                    {(profile.mainGoals ?? '').length} / 2000
                   </small>
                 </label>
-              </div>
 
-              <label className="onboarding-goal-section onboarding-goal-success">
-                <span className="onboarding-goal-question">
-                  <span aria-hidden="true">4</span>
-                  <span>
-                    <strong>Imagine this is working well. What feels different?</strong>
-                    <small>Describe the everyday change you would notice—not just a number.</small>
-                  </span>
-                </span>
-                <textarea
-                  rows={4}
-                  maxLength={800}
-                  value={goalContext.successVision}
-                  placeholder="For example: dinner feels calmer, grocery trips are quicker, I waste less, and I have steady energy through the afternoon."
-                  onChange={(event) => setGoalContext({ successVision: event.target.value })}
-                />
-                <small className="onboarding-goal-count">
-                  {goalContext.successVision.length} / 800
-                </small>
-              </label>
-
-              <label className="onboarding-goal-section onboarding-goals">
-                <span className="onboarding-goal-question">
-                  <span aria-hidden="true">5</span>
-                  <span>
-                    <strong>Anything else you want the app to remember?</strong>
-                    <small>
-                      Add a personal goal, food ritual, or detail that did not fit above.
-                    </small>
-                  </span>
-                </span>
-                <textarea
-                  rows={3}
-                  maxLength={2000}
-                  value={profile.mainGoals ?? ''}
-                  placeholder="I would love to learn to bake bread, keep Sunday dinners special, or try one new recipe each week."
-                  onChange={(event) => setProfile({ ...profile, mainGoals: event.target.value })}
-                />
-                <small className="onboarding-goal-count">
-                  {(profile.mainGoals ?? '').length} / 2000
-                </small>
-              </label>
-
-              {aiEnabled && (
-                <section className="onboarding-goal-section">
-                  <h3>Meet your Kitchen Assistant</h3>
-                  <p>
-                    A few food questions help make your plans personal. You can revisit this
-                    interview in your profile.
-                  </p>
-                  {kitchenInterviewQuestions
-                    .filter((_, index) => index === interviewStep)
-                    .map((question) => (
-                      <div key={question.key}>
-                        <label>
-                          <strong>{question.title}</strong>
-                          <p>{question.help}</p>
-                          <textarea
-                            rows={3}
-                            maxLength={question.key === 'taste' ? 500 : 800}
-                            value={goalContext.kitchenInterview?.[question.key] ?? ''}
-                            onChange={(event) =>
-                              setGoalContext({
-                                kitchenInterview: {
-                                  ...emptyKitchenInterview,
-                                  ...goalContext.kitchenInterview,
-                                  [question.key]: event.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </label>
-                        {question.key === 'desserts' &&
-                          /sweet/i.test(goalContext.kitchenInterview?.taste ?? '') && (
-                            <p>
-                              Which sweet treats do you enjoy, and how often would you like them
-                              suggested?
-                            </p>
-                          )}
-                      </div>
-                    ))}
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      disabled={interviewStep === 0}
-                      onClick={() => setInterviewStep((step) => step - 1)}
-                    >
-                      Previous question
-                    </button>
-                    <span>
-                      {interviewStep + 1} / {kitchenInterviewQuestions.length}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={interviewStep === kitchenInterviewQuestions.length - 1}
-                      onClick={() => setInterviewStep((step) => step + 1)}
-                    >
-                      Next question
-                    </button>
-                  </div>
-                </section>
-              )}
-              <p className="onboarding-goal-privacy-note">
-                <ShieldCheck size={16} aria-hidden="true" />
-                These answers personalize this household profile; profiles are not separate private
-                accounts. Sharing them with AI is a separate, optional setting and is off by
-                default.
-              </p>
-            </div>
-          </>
-        ) : null}
-
-        {currentStep === 'recipe' ? (
-          <>
-            <div className="onboarding-heading">
-              <BookOpen size={25} aria-hidden="true" />
-              <div>
-                <h2>Add your first recipe.</h2>
-                <p>
-                  Begin with a polished example or continue into the recipe flow that suits you.
+                {aiEnabled && (
+                  <section className="onboarding-goal-section">
+                    <h3>Meet your Kitchen Assistant</h3>
+                    <p>
+                      A few food questions help make your plans personal. You can revisit this
+                      interview in your profile.
+                    </p>
+                    {kitchenInterviewQuestions
+                      .filter((_, index) => index === interviewStep)
+                      .map((question) => (
+                        <div key={question.key}>
+                          <label>
+                            <strong>{question.title}</strong>
+                            <p>{question.help}</p>
+                            <textarea
+                              rows={3}
+                              maxLength={question.key === 'taste' ? 500 : 800}
+                              value={goalContext.kitchenInterview?.[question.key] ?? ''}
+                              onChange={(event) =>
+                                setGoalContext({
+                                  kitchenInterview: {
+                                    ...emptyKitchenInterview,
+                                    ...goalContext.kitchenInterview,
+                                    [question.key]: event.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </label>
+                          {question.key === 'desserts' &&
+                            /sweet/i.test(goalContext.kitchenInterview?.taste ?? '') && (
+                              <p>
+                                Which sweet treats do you enjoy, and how often would you like them
+                                suggested?
+                              </p>
+                            )}
+                        </div>
+                      ))}
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        disabled={interviewStep === 0}
+                        onClick={() => setInterviewStep((step) => step - 1)}
+                      >
+                        Previous question
+                      </button>
+                      <span>
+                        {interviewStep + 1} / {kitchenInterviewQuestions.length}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={interviewStep === kitchenInterviewQuestions.length - 1}
+                        onClick={() => setInterviewStep((step) => step + 1)}
+                      >
+                        Next question
+                      </button>
+                    </div>
+                  </section>
+                )}
+                <p className="onboarding-goal-privacy-note">
+                  <ShieldCheck size={16} aria-hidden="true" />
+                  These answers personalize this household profile; profiles are not separate
+                  private accounts. Sharing them with AI is a separate, optional setting and is off
+                  by default.
                 </p>
               </div>
-            </div>
-            <div
-              className="onboarding-recipe-options"
-              role="radiogroup"
-              aria-label="Choose how to create your first recipe"
-            >
-              {firstRecipeOptions.map((option) => {
-                const Icon = option.icon;
-                const selected = firstRecipeChoice === option.value;
-                return (
-                  <button
-                    className={`onboarding-recipe-option${selected ? ' selected' : ''}`}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    key={option.value}
-                    onClick={() => setFirstRecipeChoice(option.value)}
-                  >
-                    <span className="onboarding-recipe-option-icon" aria-hidden="true">
-                      <Icon size={20} />
-                    </span>
-                    <span>
-                      <strong>{option.label}</strong>
-                      <small>{option.description}</small>
-                    </span>
-                    <span className="onboarding-recipe-radio" aria-hidden="true">
-                      {selected ? <Check size={14} /> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            </>
+          ) : null}
 
-            {firstRecipeChoice === 'example' ? (
-              <article className="onboarding-example-recipe">
-                <div className="onboarding-example-image">
-                  <Image
-                    src={SCOTTISH_STOVIES_IMAGE_PATH}
-                    alt={SCOTTISH_STOVIES_IMAGE_ALT}
-                    fill
-                    sizes="(max-width: 700px) 100vw, 360px"
-                    priority
-                  />
-                </div>
-                <div className="onboarding-example-copy">
-                  <p className="eyebrow">BÒRD STARTER RECIPE</p>
-                  <h3>{SCOTTISH_STOVIES_RECIPE.title}</h3>
-                  <p>{SCOTTISH_STOVIES_RECIPE.summary}</p>
-                  <dl>
-                    <div>
-                      <dt>Serves</dt>
-                      <dd>6</dd>
-                    </div>
-                    <div>
-                      <dt>Time</dt>
-                      <dd>1 hr 25 min</dd>
-                    </div>
-                    <div>
-                      <dt>Estimate</dt>
-                      <dd>320 kcal</dd>
-                    </div>
-                  </dl>
-                  <p className="onboarding-example-note">
-                    Includes measured ingredients, equipment, eight detailed steps, source notes,
-                    and estimated nutrition. You can edit everything later.
-                  </p>
-                </div>
-              </article>
-            ) : (
-              <>
-                {firstRecipeChoice === 'import' ? (
-                  <fieldset className="onboarding-import-methods">
-                    <legend>What are you importing?</legend>
-                    <div role="radiogroup" aria-label="Recipe import method">
-                      {[
-                        { value: 'url', label: 'From URL' },
-                        { value: 'text', label: 'Paste recipe' },
-                        { value: 'json', label: 'Paste JSON-LD' },
-                      ].map((option) => (
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={firstRecipeImportMode === option.value}
-                          className={firstRecipeImportMode === option.value ? 'selected' : ''}
-                          key={option.value}
-                          onClick={() =>
-                            setFirstRecipeImportMode(option.value as 'url' | 'text' | 'json')
-                          }
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
-                ) : null}
-                <div className="setup-note onboarding-recipe-follow-up" role="note">
-                  <span aria-hidden="true">✦</span>
+          {currentStep === 'recipe' ? (
+            <>
+              <div className="onboarding-heading">
+                <BookOpen size={25} aria-hidden="true" />
+                <div>
+                  <h2>Add your first recipe.</h2>
                   <p>
-                    <strong>Your kitchen will be created first.</strong> Then Bòrd will open the
-                    selected recipe flow with your new profile active.
+                    Begin with a polished example or continue into the recipe flow that suits you.
                   </p>
                 </div>
-              </>
-            )}
-          </>
-        ) : null}
-
-        {currentStep === 'review' ? (
-          <>
-            <div className="onboarding-heading">
-              <Check size={25} aria-hidden="true" />
-              <div>
-                <h2>Ready to begin.</h2>
-                <p>Review the essentials. Every answer remains editable in Settings.</p>
               </div>
-            </div>
-            <section
-              className="onboarding-profile-roster"
-              aria-labelledby="onboarding-profiles-title"
-            >
-              <div className="onboarding-profile-roster-heading">
-                <h3 id="onboarding-profiles-title">Profiles</h3>
-                <span>{profileDrafts.length} ready</span>
-              </div>
-              <div className="onboarding-profile-review-list">
-                {profileDrafts.map((draft, index) => {
-                  const profileType = profileTypeOptions.find(
-                    (option) => option.value === draft.nutrition.profileType,
-                  );
+              <div
+                className="onboarding-recipe-options"
+                role="radiogroup"
+                onKeyDown={radioKeys}
+                aria-label="Choose how to create your first recipe"
+              >
+                {firstRecipeOptions.map((option) => {
+                  const Icon = option.icon;
+                  const selected = firstRecipeChoice === option.value;
                   return (
-                    <article className="onboarding-profile-review-card" key={draft.localId}>
-                      <span
-                        className="onboarding-avatar-initial compact"
-                        style={{ backgroundColor: draft.profile.color }}
-                        aria-hidden="true"
-                      >
-                        {avatarInitial(draft.profile.displayName)}
+                    <button
+                      className={`onboarding-recipe-option${selected ? ' selected' : ''}`}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      key={option.value}
+                      onClick={() => setFirstRecipeChoice(option.value)}
+                    >
+                      <span className="onboarding-recipe-option-icon" aria-hidden="true">
+                        <Icon size={20} />
                       </span>
-                      <span className="onboarding-profile-review-copy">
-                        <strong>{draft.profile.displayName}</strong>
-                        <span>
-                          {profileType?.label ?? 'Adult'} ·{' '}
-                          {draft.profile.units === 'imperial' ? 'US customary' : 'Metric'} ·{' '}
-                          {draft.profile.temperatureUnit === 'F' ? 'Fahrenheit' : 'Celsius'}
-                        </span>
-                        <small>
-                          {summarizeProfileGoals(
-                            draft.profile.goalContext,
-                            draft.profile.mainGoals,
-                          )}
-                        </small>
+                      <span>
+                        <strong>{option.label}</strong>
+                        <small>{option.description}</small>
                       </span>
-                      <span className="onboarding-profile-review-actions">
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => editProfile(index)}
-                          aria-label={`Edit ${draft.profile.displayName}`}
-                        >
-                          <Pencil size={14} aria-hidden="true" /> Edit
-                        </button>
-                        {index > 0 ? (
-                          <button
-                            className="text-button danger-text-button"
-                            type="button"
-                            onClick={() => removeAdditionalProfile(index)}
-                            aria-label={`Remove ${draft.profile.displayName}`}
-                          >
-                            <Trash2 size={14} aria-hidden="true" /> Remove
-                          </button>
-                        ) : null}
+                      <span className="onboarding-recipe-radio" aria-hidden="true">
+                        {selected ? <Check size={14} /> : null}
                       </span>
-                    </article>
+                    </button>
                   );
                 })}
               </div>
-              {mode === 'initial' && profileDrafts.length < maximumSetupProfiles ? (
-                <button className="secondary-button" type="button" onClick={addAnotherProfile}>
-                  <Plus size={17} aria-hidden="true" /> Add another profile
-                </button>
-              ) : null}
-            </section>
-            <dl className="onboarding-review">
-              {mode === 'initial' ? (
+
+              {firstRecipeChoice === 'example' ? (
+                <article className="onboarding-example-recipe">
+                  <div className="onboarding-example-image">
+                    <Image
+                      src={SCOTTISH_STOVIES_IMAGE_PATH}
+                      alt={SCOTTISH_STOVIES_IMAGE_ALT}
+                      fill
+                      sizes="(max-width: 700px) 100vw, 360px"
+                      priority
+                    />
+                  </div>
+                  <div className="onboarding-example-copy">
+                    <p className="eyebrow">BÒRD STARTER RECIPE</p>
+                    <h3>{SCOTTISH_STOVIES_RECIPE.title}</h3>
+                    <p>{SCOTTISH_STOVIES_RECIPE.summary}</p>
+                    <dl>
+                      <div>
+                        <dt>Serves</dt>
+                        <dd>6</dd>
+                      </div>
+                      <div>
+                        <dt>Time</dt>
+                        <dd>1 hr 25 min</dd>
+                      </div>
+                      <div>
+                        <dt>Estimate</dt>
+                        <dd>320 kcal</dd>
+                      </div>
+                    </dl>
+                    <p className="onboarding-example-note">
+                      Includes measured ingredients, equipment, eight detailed steps, source notes,
+                      and estimated nutrition. You can edit everything later.
+                    </p>
+                  </div>
+                </article>
+              ) : (
+                <>
+                  {firstRecipeChoice === 'import' ? (
+                    <fieldset className="onboarding-import-methods">
+                      <legend>What are you importing?</legend>
+                      <div role="radiogroup" aria-label="Recipe import method">
+                        {[
+                          { value: 'url', label: 'From URL' },
+                          { value: 'text', label: 'Paste recipe' },
+                          { value: 'json', label: 'Paste JSON-LD' },
+                        ].map((option) => (
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={firstRecipeImportMode === option.value}
+                            tabIndex={firstRecipeImportMode === option.value ? 0 : -1}
+                            className={firstRecipeImportMode === option.value ? 'selected' : ''}
+                            key={option.value}
+                            onClick={() =>
+                              setFirstRecipeImportMode(option.value as 'url' | 'text' | 'json')
+                            }
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ) : null}
+                  <div className="setup-note onboarding-recipe-follow-up" role="note">
+                    <span aria-hidden="true">✦</span>
+                    <p>
+                      <strong>Your kitchen will be created first.</strong> Then Bòrd will open the
+                      selected recipe flow with your new profile active.
+                    </p>
+                  </div>
+                </>
+              )}
+            </>
+          ) : null}
+
+          {currentStep === 'review' ? (
+            <>
+              <div className="onboarding-heading">
+                <Check size={25} aria-hidden="true" />
                 <div>
-                  <dt>Kitchen</dt>
-                  <dd>{kitchenName}</dd>
+                  <h2>Ready to begin.</h2>
+                  <p>Review the essentials. Every answer remains editable in Settings.</p>
                 </div>
-              ) : null}
-              <div>
-                <dt>Profiles</dt>
-                <dd>{profileDrafts.length}</dd>
               </div>
-              <div>
-                <dt>Nutrition goals</dt>
-                <dd>
-                  {
-                    profileDrafts.filter((draft) => draft.nutrition.nutritionGoalType !== 'none')
-                      .length
-                  }{' '}
-                  configured
-                </dd>
-              </div>
-              <div>
-                <dt>Dietary notes</dt>
-                <dd>
-                  {
-                    profileDrafts.filter((draft) => {
-                      const details = canonicalNutritionForDraft(draft);
-                      return (
-                        details.dietaryPreferences.length +
-                          details.foodAllergies.length +
-                          details.dietaryExclusions.length >
-                        0
-                      );
-                    }).length
-                  }{' '}
-                  configured
-                </dd>
-              </div>
-              <div>
-                <dt>Personal goals</dt>
-                <dd>
-                  {
-                    profileDrafts.filter((draft) =>
-                      hasProfileGoalContext(draft.profile.goalContext, draft.profile.mainGoals),
-                    ).length
-                  }{' '}
-                  configured
-                </dd>
-              </div>
-              {mode === 'initial' ? (
+              <section
+                className="onboarding-profile-roster"
+                aria-labelledby="onboarding-profiles-title"
+              >
+                <div className="onboarding-profile-roster-heading">
+                  <h3 id="onboarding-profiles-title">Profiles</h3>
+                  <span>{profileDrafts.length} ready</span>
+                </div>
+                <div className="onboarding-profile-review-list">
+                  {profileDrafts.map((draft, index) => {
+                    const profileType = profileTypeOptions.find(
+                      (option) => option.value === draft.nutrition.profileType,
+                    );
+                    return (
+                      <article className="onboarding-profile-review-card" key={draft.localId}>
+                        <span
+                          className="onboarding-avatar-initial compact"
+                          style={{ backgroundColor: draft.profile.color }}
+                          aria-hidden="true"
+                        >
+                          {avatarInitial(draft.profile.displayName)}
+                        </span>
+                        <span className="onboarding-profile-review-copy">
+                          <strong>{draft.profile.displayName}</strong>
+                          <span>
+                            {profileType?.label ?? 'Adult'} ·{' '}
+                            {draft.profile.units === 'imperial' ? 'US customary' : 'Metric'} ·{' '}
+                            {draft.profile.temperatureUnit === 'F' ? 'Fahrenheit' : 'Celsius'}
+                          </span>
+                          <small>
+                            {summarizeProfileGoals(
+                              draft.profile.goalContext,
+                              draft.profile.mainGoals,
+                            )}
+                          </small>
+                        </span>
+                        <span className="onboarding-profile-review-actions">
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => editProfile(index)}
+                            aria-label={`Edit ${draft.profile.displayName}`}
+                          >
+                            <Pencil size={14} aria-hidden="true" /> Edit
+                          </button>
+                          {index > 0 ? (
+                            <button
+                              className="text-button danger-text-button"
+                              type="button"
+                              onClick={() => removeAdditionalProfile(index)}
+                              aria-label={`Remove ${draft.profile.displayName}`}
+                            >
+                              <Trash2 size={14} aria-hidden="true" /> Remove
+                            </button>
+                          ) : null}
+                        </span>
+                      </article>
+                    );
+                  })}
+                </div>
+                {mode === 'initial' && profileDrafts.length < maximumSetupProfiles ? (
+                  <button className="secondary-button" type="button" onClick={addAnotherProfile}>
+                    <Plus size={17} aria-hidden="true" /> Add another profile
+                  </button>
+                ) : null}
+              </section>
+              <dl className="onboarding-review">
+                {mode === 'initial' ? (
+                  <div>
+                    <dt>Kitchen</dt>
+                    <dd>{kitchenName}</dd>
+                  </div>
+                ) : null}
                 <div>
-                  <dt>First recipe</dt>
+                  <dt>Profiles</dt>
+                  <dd>{profileDrafts.length}</dd>
+                </div>
+                <div>
+                  <dt>Nutrition goals</dt>
                   <dd>
-                    {firstRecipeOptions.find((option) => option.value === firstRecipeChoice)?.label}
+                    {
+                      profileDrafts.filter((draft) => draft.nutrition.nutritionGoalType !== 'none')
+                        .length
+                    }{' '}
+                    configured
                   </dd>
                 </div>
-              ) : null}
-            </dl>
-            <div className="setup-note" role="note">
-              <span aria-hidden="true">✦</span>
-              <p>
-                <strong>Trusted household reminder.</strong> Profiles personalize the app but do not
-                restrict access. Keep this installation on a trusted network.
-              </p>
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+                <div>
+                  <dt>Dietary notes</dt>
+                  <dd>
+                    {
+                      profileDrafts.filter((draft) => {
+                        const details = canonicalNutritionForDraft(draft);
+                        return (
+                          details.dietaryPreferences.length +
+                            details.foodAllergies.length +
+                            details.dietaryExclusions.length >
+                          0
+                        );
+                      }).length
+                    }{' '}
+                    configured
+                  </dd>
+                </div>
+                <div>
+                  <dt>Personal goals</dt>
+                  <dd>
+                    {
+                      profileDrafts.filter((draft) =>
+                        hasProfileGoalContext(draft.profile.goalContext, draft.profile.mainGoals),
+                      ).length
+                    }{' '}
+                    configured
+                  </dd>
+                </div>
+                {mode === 'initial' ? (
+                  <div>
+                    <dt>First recipe</dt>
+                    <dd>
+                      {
+                        firstRecipeOptions.find((option) => option.value === firstRecipeChoice)
+                          ?.label
+                      }
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="setup-note" role="note">
+                <span aria-hidden="true">✦</span>
+                <p>
+                  <strong>Trusted household reminder.</strong> Profiles personalize the app but do
+                  not restrict access. Keep this installation on a trusted network.
+                </p>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </fieldset>
       {currentStep !== 'nutrition' ? (
         <footer className="onboarding-actions">
           {stepIndex > 0 ? (

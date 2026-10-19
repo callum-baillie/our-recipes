@@ -1,3 +1,6 @@
+import { cookies } from 'next/headers';
+import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { getProfile } from '@/lib/services/household-service';
 import { PageHeader } from '@/components/page-header';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -32,6 +35,8 @@ export default async function ShoppingListPage({
   const list = getShoppingList((await params).listId);
   if (!list) notFound();
   const restored = (await searchParams).restored === '1';
+  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const locale = actor.profileId ? getProfile(actor.profileId)?.locale : undefined;
   return (
     <main className={`${styles.page} shopping-list-focus-page`}>
       <header className={styles.mobileHeader}>
@@ -45,7 +50,7 @@ export default async function ShoppingListPage({
         description={
           <>
             {list.weekStart
-              ? `${list.weekStart} — ${list.weekEnd}`
+              ? `${new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(`${list.weekStart}T12:00:00`))} — ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(`${list.weekEnd}T12:00:00`))}`
               : 'A list for this shopping trip'}
             {list.isAutomaticRestockTarget ? ' · Next shop' : ''}
           </>

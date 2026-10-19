@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { cookies } from 'next/headers';
 
@@ -10,7 +11,17 @@ import { listHouseholdGuardianAssignments } from '@/lib/services/nutrition-profi
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProfileSettingsPage() {
+export default async function ProfileSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plannerReturn?: string }>;
+}) {
+  const { plannerReturn } = await searchParams;
+  const returnHref =
+    plannerReturn &&
+    /^\/planner\?view=(day|week|month)&date=\d{4}-\d{2}-\d{2}$/u.test(plannerReturn)
+      ? plannerReturn
+      : null;
   const state = getHouseholdState(true);
   const accessAccounts = listProfileAccessAccounts();
   const accessByProfile = new Map(accessAccounts.map((account) => [account.profileId, account]));
@@ -18,6 +29,13 @@ export default async function ProfileSettingsPage() {
   return (
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
+        aside={
+          returnHref ? (
+            <Link className="inline-link" href={returnHref}>
+              Back to configured plan
+            </Link>
+          ) : undefined
+        }
         eyebrow="PROFILE SETTINGS"
         title="Household members & roles"
         description="Manage household members, account roles, guardian assignments, and archived profiles."

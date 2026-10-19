@@ -120,7 +120,7 @@ export function StoreMapUpload({ onUse }: { onUse: (sections: Section[]) => void
       }),
     );
     setMessage(
-      'Your supplied Walmart order is in the editor, starting at the right-hand grocery entrance. Save the supermarket to apply it. No AI request was made.',
+      'Walmart template copied to the route draft. This editable example does not confirm this store’s entrance or layout. Save the store to apply it. No AI request was made.',
     );
   }
   return (
@@ -133,7 +133,7 @@ export function StoreMapUpload({ onUse }: { onUse: (sections: Section[]) => void
         store. Saved store routes only change when you save the editor.
       </p>
       <label className={styles.field}>
-        Store map
+        Choose map · PNG, JPEG or WebP · Up to 6 MB
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp"
@@ -163,11 +163,17 @@ export function StoreMapUpload({ onUse }: { onUse: (sections: Section[]) => void
           }}
         >
           <option value="grocery_first">Grocery entrance → produce through alcohol</option>
-          <option value="walmart">Your preferred Walmart department order</option>
+          <option value="walmart">Walmart template order</option>
           <option value="map_order">Follow the map’s suggested order</option>
         </select>
       </label>
-      <small>{GROCERY_ROUTE_PREFIX.join(' → ')}</small>
+      <small>
+        {preset === 'grocery_first'
+          ? GROCERY_ROUTE_PREFIX.join(' → ')
+          : preset === 'walmart'
+            ? 'Use the editable Walmart department template as a route preference; confirm the actual entrance.'
+            : 'Follow the department order identified on the supplied map; review every section.'}
+      </small>
       <label className={styles.field}>
         Entrance or route notes
         <textarea
@@ -190,7 +196,8 @@ export function StoreMapUpload({ onUse }: { onUse: (sections: Section[]) => void
         />
         <span>
           Allow paid image analysis and entrance selection with OpenAI. The image is sent for
-          analysis; cached maps avoid repeat requests.
+          analysis. When image review is enabled, a saved review can be reused without paid consent.
+          A cache miss needs permission before new analysis.
         </span>
       </label>
       <div className={styles.actions}>
@@ -200,10 +207,14 @@ export function StoreMapUpload({ onUse }: { onUse: (sections: Section[]) => void
           disabled={!image || pending}
           onClick={analyze}
         >
-          {pending ? 'Working…' : 'Suggest a route'}
+          {pending
+            ? 'Working…'
+            : paid
+              ? 'Review map and suggest route'
+              : 'Check for a saved map review'}
         </button>
         <button type="button" disabled={pending} onClick={example}>
-          Use your Walmart order without AI
+          Use Walmart template
         </button>
       </div>
       {draft && (

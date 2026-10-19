@@ -241,7 +241,20 @@
     mask-image: linear-gradient(to right, transparent, #000 6%, #000 90%, transparent);
   }
   .results {
-    gap: 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .summary {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .sort {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+  .actions {
+    grid-row: 2;
   }
   .summary {
     font-size: 0.75rem;
@@ -249,12 +262,31 @@
   .actions {
     gap: 0;
   }
-  .actions :global(.action-label) {
-    display: none;
+  .actions {
+    order: 3;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    gap: 0.4rem;
   }
   .sort select {
-    max-width: 8.5rem;
-    font-size: 0.78rem;
+    max-width: none;
+    width: 100%;
+    font-size: 0.85rem;
     padding-left: 0.5rem;
   }
+}
+
+.results[data-density='compact'] {
+  padding-block: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 0;
+}
+.results[data-density='compact'] .actions {
+  order: 0;
+  flex: 0 0 auto;
+}
+.results[data-density='compact'] .sort {
+  flex: 1 1 8rem;
+  min-width: 0;
+  max-width: 14rem;
 }

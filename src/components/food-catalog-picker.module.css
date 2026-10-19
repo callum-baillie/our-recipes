@@ -57,6 +57,9 @@
   background: var(--page);
   border-bottom: 1px solid var(--line);
 }
+.dialogHeader h2 {
+  font-size: var(--panel-title-size);
+}
 .dialogHeader h2,
 .dialogHeader p {
   margin: 0;
@@ -68,8 +71,9 @@
 .closeButton {
   display: grid;
   place-items: center;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -139,8 +143,8 @@
   gap: 0.4rem;
   border: 0;
   border-radius: 0.65rem;
-  background: var(--leaf);
-  color: var(--on-primary);
+  background: var(--tomato);
+  color: var(--on-accent);
   padding: 0.72rem 0.9rem;
   font: inherit;
   font-weight: 800;
@@ -407,7 +411,7 @@
     align-items: end;
   }
   .dialog {
-    max-height: 94vh;
+    max-height: calc(var(--dialog-viewport-height, 100dvh) - max(0.5rem, env(safe-area-inset-top)));
     border-radius: 1rem 1rem 0 0;
   }
   .lookupForm {
@@ -433,7 +437,7 @@
   }
   .tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     scrollbar-width: none;
   }
   .tabs button {
@@ -680,4 +684,14 @@
 .result .placeholder {
   background: var(--surface-hover);
   color: var(--muted);
+}
+
+.cameraStart .rapidToggle {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.rapidToggle small {
+  display: block;
+  font-weight: 400;
+  margin-top: 0.2rem;
 }

@@ -10,7 +10,8 @@
 }
 .card h3 {
   margin: 0.3rem 0;
-  font-size: 1rem;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
 }
 .card small,
 .row span {
@@ -84,9 +85,9 @@
   cursor: pointer;
 }
 .actions button:first-child {
-  background: var(--leaf);
-  color: var(--on-primary);
-  border-color: var(--leaf);
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
   flex: 1;
 }
 .actions button:disabled {
@@ -110,4 +111,20 @@
 }
 .reviewValues dd {
   margin: 0.2rem 0 0.2rem 0.5rem;
+}
+
+.card summary {
+  gap: 0.5rem;
+  color: var(--leaf);
+  font-weight: 650;
+}
+.card summary > svg {
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.card details[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.badge[data-status='partial'] {
+  color: var(--warning);
 }

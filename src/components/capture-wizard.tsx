@@ -1,8 +1,10 @@
 'use client';
 
 import { ChevronLeft, FileText, Link2, ShieldCheck, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 
+import { PageHeader } from '@/components/page-header';
+import Link from 'next/link';
 import { RecipeForm } from '@/components/recipe-form';
 import { AsyncSkeleton, LoadingIndicator } from '@/components/skeleton';
 import { useToast } from '@/components/toast-provider';
@@ -12,10 +14,20 @@ import type { CaptureCandidate, CaptureDraft } from '@/lib/domain/capture';
 export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' | 'url' }) {
   const { showToast } = useToast();
   const [kind, setKind] = useState<'text' | 'url'>(initialKind);
-  const [value, setValue] = useState('');
+  const [values, setValues] = useState({ text: '', url: '' });
+  const [errors, setErrors] = useState<Record<'text' | 'url', string | null>>({
+    text: null,
+    url: null,
+  });
+  const value = values[kind];
+  const setValue = (value: string) => setValues((current) => ({ ...current, [kind]: value }));
+  const error = errors[kind];
+  const setError = (error: string | null) =>
+    setErrors((current) => ({ ...current, [kind]: error }));
+  const inputId = useId();
+  const requestPending = useRef(false);
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [candidates, setCandidates] = useState<CaptureCandidate[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [aiPending, setAiPending] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
@@ -42,7 +54,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
         error?: { message?: string };
       } | null;
       if (!response.ok || !body?.candidate) {
-        const message = body?.error?.message ?? 'OpenAI could not normalize this recipe.';
+        const message = body?.error?.message ?? 'OpenAI could not organize this recipe.';
         setError(message);
         showToast(message, 'error');
         return;
@@ -71,6 +83,18 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
   }
 
   async function createDraft(candidateIndex?: number) {
+    if (requestPending.current) return;
+    if (kind === 'text' && value.trim().length < 20) return;
+    if (kind === 'url') {
+      try {
+        const url = new URL(value);
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+      } catch {
+        setError('Enter a valid public recipe link beginning with https://.');
+        return;
+      }
+    }
+    requestPending.current = true;
     setPending(true);
     setError(null);
     try {
@@ -96,7 +120,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
       }
       if (body.candidates) {
         setCandidates(body.candidates);
-        showToast('Choose the recipe you want to normalize.', 'info');
+        showToast('Choose the recipe you want to organize.', 'info');
         return;
       }
       if (body.draft) {
@@ -112,6 +136,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
       setError(message);
       showToast(message, 'error');
     } finally {
+      requestPending.current = false;
       setPending(false);
     }
   }
@@ -152,7 +177,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
                 type="button"
                 onClick={() => void askOpenAiToReview()}
               >
-                <Sparkles size={16} aria-hidden="true" /> Try AI normalization again
+                <Sparkles size={16} aria-hidden="true" /> Try AI review again
               </button>
               <span>You can also edit the locally prepared draft below.</span>
             </div>
@@ -220,43 +245,55 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
 
   return (
     <section className="capture-layout">
-      <div className="capture-intro">
-        <p className="eyebrow">{kind === 'text' ? 'PASTE OR DESCRIBE' : 'FROM A PUBLIC URL'}</p>
-        <h1>
-          {kind === 'text' ? 'Turn your notes into a recipe.' : 'Bring a recipe in from the web.'}
-        </h1>
-        <p>
-          {kind === 'text'
-            ? 'Paste a complete recipe or describe what you want. OpenAI will organize it into an editable review draft.'
-            : 'We safely read the public page, then OpenAI organizes the recipe you choose into an editable draft.'}
-        </p>
-      </div>
-      <div className="capture-card">
-        <div className="capture-tabs" role="tablist">
+      <PageHeader
+        title={kind === 'text' ? 'Text or idea' : 'Recipe link'}
+        description={
+          kind === 'text'
+            ? 'Paste a recipe or describe an idea to create an editable draft.'
+            : 'Import a public recipe link into an editable draft.'
+        }
+        leading={
+          <Link className="inline-link" href="/recipes">
+            Back to recipes
+          </Link>
+        }
+      />
+      <form
+        className="capture-card"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          void createDraft();
+        }}
+      >
+        <div className="capture-tabs" role="group" aria-label="Recipe input method">
           <button
             type="button"
-            role="tab"
-            aria-selected={kind === 'text'}
+            aria-pressed={kind === 'text'}
+            disabled={pending || aiPending}
             onClick={() => setKind('text')}
           >
-            <FileText size={17} /> Paste / AI
+            <FileText size={17} /> Text or idea
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={kind === 'url'}
+            aria-pressed={kind === 'url'}
+            disabled={pending || aiPending}
             onClick={() => setKind('url')}
           >
-            <Link2 size={17} /> From URL
+            <Link2 size={17} /> Recipe link
           </button>
         </div>
         {kind === 'text' ? (
           <label>
             <span>Recipe text or request</span>
             <textarea
+              id={inputId}
+              aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
+              aria-invalid={Boolean(error)}
               value={value}
               onChange={(event) => setValue(event.target.value)}
-              rows={12}
+              rows={5}
               placeholder={
                 'Paste a recipe here, or describe one: “Create a quick lemon pasta for four…”'
               }
@@ -267,17 +304,24 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
             <span>Public recipe URL</span>
             <input
               type="url"
+              id={inputId}
+              aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
+              aria-invalid={Boolean(error)}
               value={value}
               onChange={(event) => setValue(event.target.value)}
               placeholder="https://example.com/recipe"
             />
           </label>
         )}
+        <p id={`${inputId}-help`} className="capture-safety">
+          {kind === 'text'
+            ? value.trim().length < 20
+              ? `At least 20 characters needed (${value.trim().length}/20).`
+              : 'Ready to create a review draft.'
+            : 'Use a public recipe link. You can edit the imported details before adding the recipe.'}
+        </p>
         <p className="capture-safety">
-          <ShieldCheck size={16} />
-          {kind === 'url'
-            ? 'URLs are fetched with private-network, redirect, type, timeout, and size limits. Page scripts never run.'
-            : 'One paid OpenAI request starts only when you press the button. Nothing is saved until you confirm the draft.'}
+          The button starts paid AI processing. Review the draft before adding it to your library.
         </p>
         <label className="ai-improve-choice">
           <input
@@ -287,23 +331,22 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
           />
           <span>
             <strong>
-              <Sparkles size={17} aria-hidden="true" /> AI Improve
+              <Sparkles size={17} aria-hidden="true" /> Refine instructions and estimates
             </strong>
             <small>
-              Keep the ingredients, while OpenAI fixes spelling, clarifies and completes the steps,
-              and fills responsible timing and serving estimates.
+              Optional refinements to steps, timing and servings, keeping the supplied ingredients.
+              Review all changes.
             </small>
           </span>
         </label>
         {error && (
-          <p className="form-error" role="alert">
+          <p id={`${inputId}-error`} className="form-error" role="alert">
             {error}
           </p>
         )}
         <button
           className="primary-button"
-          type="button"
-          onClick={() => void createDraft()}
+          type="submit"
           disabled={pending || value.trim().length < (kind === 'text' ? 20 : 1)}
         >
           {pending ? <LoadingIndicator label="Preparing recipe" /> : <Sparkles size={17} />}
@@ -312,10 +355,10 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
               ? 'Reading recipe page…'
               : 'Preparing recipe…'
             : kind === 'url'
-              ? 'Find and normalize with AI'
-              : 'Normalize with OpenAI'}
+              ? 'Import recipe with AI'
+              : 'Create draft with AI'}
         </button>
-      </div>
+      </form>
     </section>
   );
 }

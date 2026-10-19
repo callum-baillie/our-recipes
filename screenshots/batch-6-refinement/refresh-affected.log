@@ -1,0 +1,6 @@
+PASS desktop /account/ai
+PASS desktop /settings/system
+PASS desktop /settings/lists
+PASS mobile /account/ai
+PASS mobile /settings/system
+PASS mobile /settings/lists

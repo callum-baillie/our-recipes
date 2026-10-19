@@ -276,7 +276,7 @@ export function getNutritionMealProjection(
           };
     const presentation = presentRecipeNutrition(first.current_recipe_revision ?? 0, calculation);
     const plannedValues =
-      presentation.status === 'current'
+      presentation.status === 'current' && plannedServings > 0
         ? scaleMealNutrients(values, first.serving_count, plannedServings)
         : null;
     if (plannedValues) {

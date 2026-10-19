@@ -211,7 +211,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
     (response) =>
       response.url().endsWith(`/items/${itemId}`) && response.request().method() === 'PATCH',
   );
-  await page.getByRole('button', { name: 'In cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Add to cart', exact: true }).click();
   expect((await checkedResponse).status()).toBe(200);
   await page.getByRole('button', { name: 'Unpack groceries into Pantry' }).click();
   await expect(page.getByText('Unpack into Pantry', { exact: true })).toBeVisible();

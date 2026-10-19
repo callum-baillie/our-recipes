@@ -7,7 +7,7 @@ export default async function AssistancePage({
 }) {
   const task = decisionTaskSchema.safeParse((await searchParams).task);
   return (
-    <main>
+    <main className="workspace-page" data-width="focused">
       <DecisionAssistance initialTask={task.success ? task.data : 'aisles'} />
     </main>
   );

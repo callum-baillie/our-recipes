@@ -133,6 +133,11 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Save preferences' }).click();
   await expect(page.locator('.toast').filter({ hasText: 'List preferences saved.' })).toBeVisible();
   await page.goto('/recipes/new');
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await expect(page.getByRole('heading', { name: 'New recipe' })).toBeVisible();
   await expect(page.getByLabel('Recipe name')).toBeVisible();
   await page.goto('/settings/profiles');
@@ -162,23 +167,28 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(jonProfile.getByRole('button', { name: 'Archive', exact: true })).toBeVisible();
   await page.goto('/tags');
   await expect(page.getByRole('heading', { name: 'Tags', exact: true })).toBeVisible();
+  await page.getByText('Add a tag', { exact: true }).click();
   await page.getByLabel('Tag name').fill('freezer-friendly');
   await page.getByRole('button', { name: 'Add tag' }).click();
   await expect(page.getByText('freezer-friendly', { exact: true })).toBeVisible();
   await page.getByLabel('Tag name').fill('weeknight');
   await page.getByRole('button', { name: 'Add tag' }).click();
-  const freezerTag = page.locator('.tag-row', { hasText: 'freezer-friendly' });
+  const freezerTag = page.locator('article', { hasText: 'freezer-friendly' });
+  await freezerTag.getByRole('button', { name: 'Edit freezer-friendly', exact: true }).click();
   await freezerTag.getByLabel('Rename freezer-friendly').fill('freezer');
   await freezerTag.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('freezer', { exact: true })).toBeVisible();
-  const renamedFreezerTag = page.locator('.tag-row', { hasText: 'freezer' });
+  const renamedFreezerTag = page.locator('article', { hasText: 'freezer' });
+  await renamedFreezerTag.locator('summary').click();
+  await renamedFreezerTag.getByRole('button', { name: 'Merge', exact: true }).click();
   await renamedFreezerTag.getByLabel('Merge freezer into').fill('weeknight');
-  await renamedFreezerTag.getByRole('button', { name: 'Merge' }).click();
+  await renamedFreezerTag.getByRole('button', { name: 'Confirm merge' }).click();
   await expect(
     page.locator('.toast').filter({ hasText: 'freezer merged into weeknight.' }),
   ).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('freezer', { exact: true })).not.toBeVisible({ timeout: 30_000 });
-  const weeknightTag = page.locator('.tag-row', { hasText: 'weeknight' });
+  const weeknightTag = page.locator('article', { hasText: 'weeknight' });
+  await weeknightTag.locator('summary').click();
   page.once('dialog', (dialog) => dialog.accept());
   await weeknightTag.getByRole('button', { name: 'Remove' }).click();
   await expect(page.locator('.toast').filter({ hasText: 'weeknight removed.' })).toBeVisible({
@@ -517,9 +527,9 @@ test('a fresh household can complete the supported local release acceptance work
       }),
     });
   });
-  await page.getByRole('tab', { name: 'From URL' }).click();
+  await page.getByRole('button', { name: 'Recipe link', exact: true }).click();
   await page.getByLabel('Public recipe URL').fill('https://recipes.example.test/soup');
-  await page.getByRole('button', { name: 'Find and normalize with AI' }).click();
+  await page.getByRole('button', { name: 'Import recipe with AI' }).click();
   await expect(page.getByRole('heading', { name: 'Structured URL soup' })).toBeVisible();
   await page.getByRole('button', { name: 'Review with AI' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
@@ -532,7 +542,7 @@ test('a fresh household can complete the supported local release acceptance work
     .fill(
       'Weeknight tomato soup\nIngredients\n2 tbsp olive oil\ncrushed tomatoes\nMethod\n1. Simmer the tomatoes until glossy.',
     );
-  await page.getByRole('button', { name: 'Normalize with OpenAI' }).click();
+  await page.getByRole('button', { name: 'Create draft with AI' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
   await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
   await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
@@ -574,7 +584,7 @@ test('a fresh household can complete the supported local release acceptance work
   })
     .png()
     .toBuffer();
-  await page.getByRole('button', { name: 'Add/manage photos' }).click();
+  await page.getByRole('button', { name: 'Manage photos' }).click();
   await page.getByLabel('Add a recipe photo').setInputFiles({
     name: 'tomato-soup.png',
     mimeType: 'image/png',
@@ -593,7 +603,7 @@ test('a fresh household can complete the supported local release acceptance work
     .filter({ hasText: 'Weeknight tomato soup' })
     .first();
   const likeReaction = homeRecipeCard.getByRole('button', {
-    name: 'Like this recipe (score 3)',
+    name: 'Like this recipe',
   });
   const savedReaction = page.waitForResponse(
     (response) =>
@@ -613,11 +623,9 @@ test('a fresh household can complete the supported local release acceptance work
       .locator('.recipe-summary-card')
       .filter({ hasText: 'Weeknight tomato soup' })
       .first()
-      .getByRole('button', { name: 'Like this recipe (score 3)' }),
+      .getByRole('button', { name: 'Like this recipe' }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await homeRecipeCard
-    .getByRole('button', { name: 'Mark this recipe as a staple (score 5)' })
-    .click();
+  await homeRecipeCard.getByRole('button', { name: 'Mark this recipe as a staple' }).click();
   await page.goto(recipeUrl);
   await expect(
     page.getByRole('button', { name: 'Rate 5 out of 5 stars', exact: true }),
@@ -629,6 +637,11 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByText('Current collection cover')).toBeVisible();
   await page.goto(recipeUrl);
   await page.getByRole('link', { name: 'Edit recipe' }).click();
+  await page.locator('.editor-optional').evaluateAll((nodes) =>
+    nodes.forEach((node) => {
+      (node as HTMLDetailsElement).open = true;
+    }),
+  );
   await page.getByLabel('Cook minutes').fill('30');
   await page.getByLabel('Original author (optional)').fill('Callum');
   await page.getByLabel('Cooking method (optional)').fill('oven-roasted');
@@ -643,17 +656,17 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Add method section' }).click();
   await page.getByLabel('Section title (optional)').nth(3).fill('Finish');
   await page.getByLabel('Method section 2, step 1').fill('Ladle and serve with basil.');
-  await page.getByRole('button', { name: 'Save a new revision' }).click();
+  await page.getByRole('button', { name: 'Save changes' }).last().click();
   await expect(page.getByText('Revision 2')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'To serve' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Finish' })).toBeVisible();
   await expect(page.getByText('Oven-Roasted', { exact: true })).toBeVisible();
   await expect(page.getByText('Sheet pan', { exact: true })).toBeVisible();
-  await page.getByText('Nutrition information', { exact: true }).click();
+  await page.getByText('Recipe-source nutrition', { exact: true }).click();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Rate 5 out of 5 stars', exact: true }).click();
   await page.getByLabel('Personal note').fill('Use extra basil next time.');
-  await page.getByRole('button', { name: 'Save note' }).click();
+  await page.getByRole('button', { name: 'Save rating and note' }).click();
   await expect(page.locator('.recipe-personal-preference [role="status"]')).toHaveText(
     'Saved for your profile.',
   );
@@ -668,12 +681,12 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.locator('.recipe-revision-badge')).toHaveText('Revision 3');
   await expect(page.getByText('Oven-Roasted', { exact: true })).not.toBeVisible();
   await page.getByRole('link', { name: 'Cook this recipe' }).click();
-  await expect(page.getByRole('button', { name: 'Favorite' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clear positive reaction' })).toBeVisible();
   await page.getByRole('button', { name: 'Start cooking' }).click();
   await page.getByLabel('Timer minutes').fill('1');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Add timer', exact: true }).click();
   await expect(page.getByText('1:00')).toBeVisible();
-  await page.getByRole('button', { name: 'Finish cooking' }).click();
+  await page.getByRole('button', { name: 'Finish cooking', exact: true }).last().click();
   await page.getByRole('link', { name: '← Recipe details' }).click();
   await page.goto('/planner');
   await page.getByRole('button', { name: 'Plan settings', exact: true }).click();

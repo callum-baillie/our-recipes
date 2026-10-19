@@ -14,15 +14,16 @@ const repository = createExpoRepository();
 export function BordStore({ children }: React.PropsWithChildren) {
   const { instanceUrl, status, user } = useAuth();
   const [state, dispatch] = React.useReducer(bordReducer, initialState);
-  const [hydrated, setHydrated] = React.useState(false);
+  const [hydratedScope, setHydratedScope] = React.useState<string | null>(null);
   const scope =
     status === 'authenticated' && instanceUrl && user
       ? `${encodeURIComponent(instanceUrl)}:${encodeURIComponent(user.id)}`
       : null;
+  const hydrated = scope !== null && hydratedScope === scope;
   React.useEffect(() => {
     let cancelled = false;
     dispatch({ type: 'hydrate', state: initialState });
-    setHydrated(false);
+    setHydratedScope(null);
     if (!scope) return;
     repository
       .read(scope)
@@ -40,15 +41,24 @@ export function BordStore({ children }: React.PropsWithChildren) {
           });
         }
       })
+      .catch(() => {
+        /* A failed cache read must not prevent online startup. */
+      })
       .finally(() => {
-        if (!cancelled) setHydrated(true);
+        if (!cancelled) setHydratedScope(scope);
       });
     return () => {
       cancelled = true;
     };
   }, [scope]);
   React.useEffect(() => {
-    if (hydrated && scope) void repository.write(scope, state);
+    if (!hydrated || !scope) return;
+    const timeout = setTimeout(() => {
+      void repository.write(scope, state).catch(() => {
+        /* Server remains authoritative. */
+      });
+    }, 300);
+    return () => clearTimeout(timeout);
   }, [hydrated, scope, state]);
   return <BordContext value={{ state, dispatch, hydrated }}>{children}</BordContext>;
 }

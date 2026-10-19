@@ -57,6 +57,10 @@ export function CollectionManager({
       setDescription('');
       showToast('Collection created.', 'success');
       router.refresh();
+    } catch {
+      const message = 'We could not reach the recipe server. Try again.';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setPending(false);
       setPendingAction(null);
@@ -90,6 +94,10 @@ export function CollectionManager({
       }
       setCollections(body.collections);
       router.refresh();
+    } catch {
+      const message = 'We could not reach the recipe server. Try again.';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setPending(false);
       setPendingAction(null);
@@ -116,6 +124,10 @@ export function CollectionManager({
       setCollections((current) => current.filter((candidate) => candidate.id !== collection.id));
       showToast(`${collection.name} removed.`, 'success');
       router.refresh();
+    } catch {
+      const message = 'We could not reach the recipe server. Try again.';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setPending(false);
       setPendingAction(null);
@@ -123,7 +135,7 @@ export function CollectionManager({
   }
 
   return (
-    <main className="recipe-page collection-page">
+    <main className="recipe-page recipebook-page collection-page">
       <div className="collection-page-shell">
         <PageHeader
           title="Collections"
@@ -134,7 +146,7 @@ export function CollectionManager({
 
         <section className="collection-create-panel" aria-labelledby="create-collection-title">
           <div className="collection-create-heading">
-            <h2 id="create-collection-title">Start a collection</h2>
+            <h2 id="create-collection-title">Create a collection</h2>
           </div>
           <form className="collection-create-form" onSubmit={create}>
             <label>
@@ -202,7 +214,10 @@ export function CollectionManager({
                   </p>
                   <h2>{collection.name}</h2>
                   <span>
-                    {collection.description || 'A shared shelf, ready for its first recipe.'}
+                    {collection.description ||
+                      (collection.recipeCount
+                        ? 'A shared shelf for your saved recipes.'
+                        : 'A shared shelf, ready for its first recipe.')}
                   </span>
                 </div>
                 <div className="collection-card-actions">
@@ -296,10 +311,10 @@ export function CollectionManager({
               <FolderPlus size={22} />
             </span>
             <div>
-              <h2 id="collection-empty-title">Make the first shelf.</h2>
+              <h2 id="collection-empty-title">No collections yet.</h2>
               <p>
-                Collections are a calm way to gather seasonal menus, favorites, and family
-                traditions.
+                Group weeknight meals, seasonal menus or family favorites in your first collection
+                above.
               </p>
             </div>
           </section>

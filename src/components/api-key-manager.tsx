@@ -75,6 +75,10 @@ export function ApiKeyManager({
     { type: 'create' } | { type: 'rotate' | 'revoke' | 'enable'; apiKeyId: string } | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+  const lock = useRef(false);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState('');
+  const [creating, setCreating] = useState(initialKeys.length === 0);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -106,6 +110,16 @@ export function ApiKeyManager({
     init: RequestInit,
     action: Exclude<typeof pendingAction, null>,
   ): Promise<Record<string, unknown> | null> {
+    if (
+      lock.current ||
+      (revealedSecret && (action.type === 'create' || action.type === 'rotate'))
+    ) {
+      secretPanel.current?.focus();
+      secretPanel.current?.scrollIntoView({ block: 'center' });
+      return null;
+    }
+    lock.current = true;
+    setErrorKey(action.type === 'create' ? null : action.apiKeyId);
     setPending(true);
     setPendingAction(action);
     setError(null);
@@ -131,6 +145,7 @@ export function ApiKeyManager({
       showToast(message, 'error');
       return null;
     } finally {
+      lock.current = false;
       setPending(false);
       setPendingAction(null);
     }
@@ -152,13 +167,16 @@ export function ApiKeyManager({
     setKeys((current) => [apiKey, ...current]);
     setRevealedSecret({ name: apiKey.name, value: secret });
     setName('');
+    setPermissions(initialPermissions());
+    setExpiresInDays(90);
+    setCopyStatus('');
     showToast('API key created. Copy it now.', 'success');
   }
 
   async function setEnabled(apiKey: ApiKeyDto, enabled: boolean) {
     if (
       !enabled &&
-      !window.confirm(`Revoke “${apiKey.name}”? Existing clients will stop working.`)
+      !window.confirm(`Disable “${apiKey.name}”? Existing clients will stop working.`)
     ) {
       return;
     }
@@ -178,6 +196,11 @@ export function ApiKeyManager({
   }
 
   async function rotateKey(apiKey: ApiKeyDto) {
+    if (revealedSecret) {
+      secretPanel.current?.focus();
+      secretPanel.current?.scrollIntoView({ block: 'center' });
+      return;
+    }
     if (
       !window.confirm(
         `Rotate “${apiKey.name}”? The current secret will be revoked as soon as the replacement is created.`,
@@ -209,8 +232,10 @@ export function ApiKeyManager({
     if (!revealedSecret) return;
     try {
       await navigator.clipboard.writeText(revealedSecret.value);
+      setCopyStatus('API key copied.');
       showToast('API key copied.', 'success');
     } catch {
+      setCopyStatus('Copy was unavailable. Select the key manually.');
       showToast('Copy was unavailable. Select the key manually.', 'error');
     }
   }
@@ -245,6 +270,7 @@ export function ApiKeyManager({
           <h2 id="new-api-key-heading">{revealedSecret.name}</h2>
           <p>This secret is shown once. Store it in the integration&apos;s server environment.</p>
           <code>{revealedSecret.value}</code>
+          {copyStatus && <p role="status">{copyStatus}</p>}
           <div className="settings-inline-actions">
             <button className="primary-button" type="button" onClick={copySecret}>
               <Copy size={16} aria-hidden="true" />
@@ -261,111 +287,139 @@ export function ApiKeyManager({
         </section>
       ) : null}
 
-      <form className="settings-form" onSubmit={createKey}>
-        <SettingsPane
-          title="Create API key"
-          description="Choose a name, expiry, and the permissions this integration needs."
-          icon={<KeyRound size={20} />}
-        >
-          <div className="settings-fields">
-            <SettingsField
-              description="Use a name that identifies the script or app using this key."
-              title="Name"
+      <details
+        className="settings-disclosure"
+        open={creating}
+        onToggle={(e) => setCreating(e.currentTarget.open)}
+      >
+        <summary>Create key</summary>
+        <form className="settings-form" onSubmit={createKey}>
+          <fieldset className="settings-form-fields" disabled={pending}>
+            <SettingsPane
+              title="Create API key"
+              description="Choose a name, expiry, and the permissions this integration needs."
+              icon={<KeyRound size={20} />}
             >
-              <input
-                required
-                maxLength={64}
-                placeholder="Kitchen dashboard"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </SettingsField>
-            <SettingsField
-              description="The key stops working after this period."
-              title="Expires after"
-            >
-              <select
-                value={expiresInDays}
-                onChange={(event) => setExpiresInDays(Number(event.target.value))}
-              >
-                <option value={30}>30 days</option>
-                <option value={90}>90 days</option>
-                <option value={180}>180 days</option>
-                <option value={365}>365 days</option>
-              </select>
-            </SettingsField>
-          </div>
-          <aside className="api-least-privilege">
-            <ShieldCheck size={18} aria-hidden="true" />
-            <span>
-              <strong>Start with least privilege.</strong> Grant only what this integration needs.
-            </span>
-          </aside>
-          <fieldset className="api-scope-grid">
-            <legend>Permissions</legend>
-            <div className="api-scope-header" aria-hidden="true">
-              <span>Resource</span>
-              {actions.map((action) => (
-                <span key={action.id}>{action.label}</span>
-              ))}
-            </div>
-            {resources.map((resource) => {
-              const ResourceIcon = resource.icon;
-              return (
-                <div className="api-scope-row" key={resource.id}>
-                  <strong>
-                    <ResourceIcon size={15} aria-hidden="true" />
-                    {resource.label}
-                  </strong>
+              <div className="settings-fields">
+                <SettingsField
+                  description="Use a name that identifies the script or app using this key."
+                  title="Name"
+                >
+                  <input
+                    required
+                    maxLength={64}
+                    placeholder="Kitchen dashboard"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </SettingsField>
+                <SettingsField
+                  description="The key stops working after this period."
+                  title="Expires after"
+                >
+                  <select
+                    value={expiresInDays}
+                    onChange={(event) => setExpiresInDays(Number(event.target.value))}
+                  >
+                    <option value={30}>30 days</option>
+                    <option value={90}>90 days</option>
+                    <option value={180}>180 days</option>
+                    <option value={365}>365 days</option>
+                  </select>
+                </SettingsField>
+              </div>
+              <aside className="api-least-privilege">
+                <ShieldCheck size={18} aria-hidden="true" />
+                <span>
+                  <strong>Start with least privilege.</strong> Grant only what this integration
+                  needs.
+                </span>
+              </aside>
+              <fieldset className="api-scope-grid">
+                <legend>Permissions</legend>
+                <div className="api-scope-header" aria-hidden="true">
+                  <span>Resource</span>
                   {actions.map((action) => (
-                    <label key={action.id}>
-                      <span className="api-permission-label">{action.label}</span>
-                      {resource.id === 'settings' &&
-                      (action.id === 'create' || action.id === 'delete') ? (
-                        <span aria-label={`${action.label} is not available for workflow settings`}>
-                          —
-                        </span>
-                      ) : (
-                        <input
-                          type="checkbox"
-                          aria-label={`${action.label} ${resource.label}`}
-                          checked={(permissions[resource.id] ?? []).includes(action.id)}
-                          onChange={() => togglePermission(resource.id, action.id)}
-                        />
-                      )}
-                    </label>
+                    <span key={action.id}>{action.label}</span>
                   ))}
                 </div>
-              );
-            })}
+                {resources.map((resource) => {
+                  const ResourceIcon = resource.icon;
+                  return (
+                    <div className="api-scope-row" key={resource.id}>
+                      <strong>
+                        <ResourceIcon size={15} aria-hidden="true" />
+                        {resource.label}
+                      </strong>
+                      {actions.map((action) => (
+                        <label key={action.id}>
+                          <span className="api-permission-label">{action.label}</span>
+                          {resource.id === 'settings' &&
+                          (action.id === 'create' || action.id === 'delete') ? (
+                            <span
+                              aria-label={`${action.label} is not available for workflow settings`}
+                            >
+                              —
+                            </span>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              aria-label={`${action.label} ${resource.label}`}
+                              checked={(permissions[resource.id] ?? []).includes(action.id)}
+                              onChange={() => togglePermission(resource.id, action.id)}
+                            />
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  );
+                })}
+              </fieldset>
+              {error && !errorKey ? (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <p>
+                Access to grant:{' '}
+                {Object.entries(permissions)
+                  .filter(([, granted]) => granted.length)
+                  .map(
+                    ([id, granted]) =>
+                      `${resources.find((resource) => resource.id === id)?.label ?? id}: ${granted.join(', ')}`,
+                  )
+                  .join(' · ') || 'None'}{' '}
+                · Expires after {expiresInDays} days. New drafts start with read permissions.
+              </p>
+              {revealedSecret && (
+                <p>
+                  Acknowledge the current one-time secret before creating or rotating another key.
+                </p>
+              )}
+              <SettingsActionBar>
+                {' '}
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={pending || needsConfirmation || Boolean(revealedSecret)}
+                  aria-busy={pendingAction?.type === 'create'}
+                >
+                  {pendingAction?.type === 'create' ? (
+                    <ButtonSpinner />
+                  ) : (
+                    <Plus size={16} aria-hidden="true" />
+                  )}{' '}
+                  {pendingAction?.type === 'create' ? 'Creating…' : 'Create key'}
+                </button>
+              </SettingsActionBar>
+            </SettingsPane>
           </fieldset>
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <SettingsActionBar>
-            {' '}
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={pending || needsConfirmation || Boolean(revealedSecret)}
-              aria-busy={pendingAction?.type === 'create'}
-            >
-              {pendingAction?.type === 'create' ? (
-                <ButtonSpinner />
-              ) : (
-                <Plus size={16} aria-hidden="true" />
-              )}{' '}
-              {pendingAction?.type === 'create' ? 'Creating…' : 'Create key'}
-            </button>
-          </SettingsActionBar>
-        </SettingsPane>
-      </form>
+        </form>
+      </details>
 
       <SettingsPane
         title="Existing API keys"
-        description="Review access and rotate or revoke keys without revealing their stored secrets."
+        description="Review access. Disable is reversible; enabling does not extend an expired key. Rotation disables the old secret."
       >
         <SettingsSubsection title="Issued keys">
           {keys.length === 0 ? (
@@ -383,7 +437,9 @@ export function ApiKeyManager({
                     <code>{apiKey.start}…</code>
                     <p>
                       {!apiKey.enabled
-                        ? 'Revoked'
+                        ? apiKey.expiresAt && new Date(apiKey.expiresAt).getTime() <= now
+                          ? 'Disabled · Expired'
+                          : 'Disabled'
                         : apiKey.expiresAt && new Date(apiKey.expiresAt).getTime() <= now
                           ? 'Expired'
                           : 'Active'}{' '}
@@ -396,17 +452,25 @@ export function ApiKeyManager({
                     </p>
                     <small>
                       {Object.entries(apiKey.permissions)
-                        .map(([resource, granted]) => `${resource}: ${granted.join(', ')}`)
+                        .map(
+                          ([resource, granted]) =>
+                            `${resources.find((item) => item.id === resource)?.label ?? resource}: ${granted.join(', ')}`,
+                        )
                         .join(' · ') || 'No permissions'}
                     </small>
                   </div>
+                  {error && errorKey === apiKey.id && (
+                    <p className="form-error" role="alert">
+                      {error}
+                    </p>
+                  )}
                   <div className="settings-inline-actions">
                     {apiKey.enabled ? (
                       <>
                         <button
                           className="secondary-button"
                           type="button"
-                          disabled={pending}
+                          disabled={pending || Boolean(revealedSecret)}
                           aria-busy={
                             pendingAction?.type === 'rotate' && pendingAction.apiKeyId === apiKey.id
                           }
@@ -438,8 +502,8 @@ export function ApiKeyManager({
                             <ShieldOff size={15} aria-hidden="true" />
                           )}{' '}
                           {pendingAction?.type === 'revoke' && pendingAction.apiKeyId === apiKey.id
-                            ? 'Revoking…'
-                            : 'Revoke'}
+                            ? 'Disabling…'
+                            : 'Disable'}
                         </button>
                       </>
                     ) : (
@@ -458,7 +522,7 @@ export function ApiKeyManager({
                         ) : null}
                         {pendingAction?.type === 'enable' && pendingAction.apiKeyId === apiKey.id
                           ? 'Enabling…'
-                          : 'Re-enable'}
+                          : 'Enable'}
                       </button>
                     )}
                   </div>
@@ -546,6 +610,7 @@ function ApiKeyConfirmation({
       >
         <input
           ref={input}
+          disabled={pending}
           type="password"
           required
           maxLength={128}

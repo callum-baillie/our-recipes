@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const weekStart = isoDateSchema.safeParse(params.get('start'));
   const weekEnd = isoDateSchema.safeParse(params.get('end'));
-  if (!weekStart.success || !weekEnd.success)
+  if (!weekStart.success || !weekEnd.success || weekEnd.data < weekStart.data)
     return withApiRequestId(
       jsonError(400, 'invalid_week', 'Use a valid week range.'),
       access.requestId,

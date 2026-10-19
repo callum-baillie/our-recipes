@@ -1,3 +1,4 @@
+import { ServerPreferences } from '@/components/server-preferences';
 import * as React from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
@@ -385,9 +386,10 @@ export function SettingsDetailScreen({ screen }: { screen: SettingsScreenKey }) 
           </View>
         ))}
       </Group>
-      {screen === 'meal-plan' ? <PlannerExtras /> : null}
+      {screen === 'meal-plan' ? <ServerPreferences category="mealPlan" /> : null}
       {screen === 'lists' ? <ListExtras /> : null}
-      {screen === 'pantry' ? <PantryExtras /> : null}
+      {screen === 'pantry' ? <ServerPreferences category="pantry" /> : null}
+      {screen === 'recipes' ? <ServerPreferences category="recipes" /> : null}
       {screen === 'ai' ? (
         <Surface style={{ backgroundColor: tokens.color.sage }}>
           <Body>
@@ -610,10 +612,10 @@ function NutritionGoals() {
   return (
     <Surface>
       <Eyebrow>NUTRITION GOALS</Eyebrow>
-      <Body muted>
-        Personal targets remain server-owned. Pull to refresh after changing them in the connected
-        web app.
-      </Body>
+      <Button
+        label="Manage goals and targets"
+        onPress={() => router.push('/(app)/(nutrition)/workspace?tab=goals')}
+      />
     </Surface>
   );
 }
@@ -862,43 +864,40 @@ function ApiContent() {
       </Group>
       <Group title="TRUSTED INTEGRATIONS">
         <View style={{ padding: tokens.space.md }}>
-          <Body muted>
-            Provider status and credentials are read and changed only in the connected web app.
-          </Body>
+          <Body muted>Manage provider connections and credentials on your Bòrd server.</Body>
+          <Button
+            label="Open integrations"
+            tone="secondary"
+            onPress={() => {
+              if (instanceUrl) void Linking.openURL(`${instanceUrl}/settings/integrations`);
+            }}
+          />
+          <Button
+            label="Open AI provider settings"
+            tone="secondary"
+            onPress={() => {
+              if (instanceUrl) void Linking.openURL(`${instanceUrl}/settings/ai`);
+            }}
+          />
+          <Button
+            label="Open task automation"
+            tone="secondary"
+            onPress={() => {
+              if (instanceUrl) void Linking.openURL(`${instanceUrl}/settings/automation`);
+            }}
+          />
         </View>
       </Group>
     </>
   );
 }
-function PlannerExtras() {
-  return (
-    <Group title="MEALS SHOWN">
-      <View style={{ padding: tokens.space.md, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map((meal) => (
-          <StatusPill key={meal}>{meal}</StatusPill>
-        ))}
-      </View>
-    </Group>
-  );
-}
 function ListExtras() {
   return (
-    <Group title="SUPERMARKET AISLES">
-      {['Fresh produce', 'Bakery', 'Meat & seafood', 'Dairy & eggs'].map((aisle, index) => (
-        <View key={aisle}>
-          {index ? <Divider /> : null}
-          <Goal label={`${index + 1} · ${aisle}`} value="↕" />
-        </View>
-      ))}
-    </Group>
-  );
-}
-function PantryExtras() {
-  return (
-    <Group title="QUICK ADD">
-      <Goal label="Default location" value="Pantry" />
-      <Divider />
-      <Goal label="Default grouping" value="Location" />
-    </Group>
+    <Surface>
+      <Button
+        label="Manage stores, aisles & shopping preferences"
+        onPress={() => router.push('/settings/stores')}
+      />
+    </Surface>
   );
 }

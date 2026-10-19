@@ -64,6 +64,10 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
   forgetInstance: () => Promise<void>;
   request: <T>(path: string, init?: RequestInit) => Promise<T>;
+  requestDocument: (
+    path: string,
+    init?: RequestInit,
+  ) => Promise<{ bytes: ArrayBuffer; mimeType: string }>;
   requestNdjson: <T>(path: string) => Promise<T[]>;
   requestEvents: <T>(path: string, init?: RequestInit) => Promise<T[]>;
   assetSource: (path: string) => ImageSourcePropType | undefined;
@@ -237,7 +241,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       if (!headers.has('Accept')) headers.set('Accept', 'application/json');
       const cookie = [client.getCookie(), profileCookieRef.current].filter(Boolean).join('; ');
       if (cookie) headers.set('Cookie', cookie);
-      if (init.body && !headers.has('Content-Type')) {
+      if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
         headers.set('Content-Type', 'application/json');
       }
       if (init.method && init.method !== 'GET' && init.method !== 'HEAD') {
@@ -269,6 +273,17 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       const response = await authenticatedFetch(path, init);
       if (response.status === 204) return undefined as T;
       return (await response.json()) as T;
+    },
+    [authenticatedFetch],
+  );
+
+  const requestDocument = React.useCallback(
+    async (path: string, init?: RequestInit) => {
+      const response = await authenticatedFetch(path, init);
+      return {
+        bytes: await response.arrayBuffer(),
+        mimeType: response.headers.get('content-type')?.split(';')[0] ?? 'application/octet-stream',
+      };
     },
     [authenticatedFetch],
   );
@@ -331,6 +346,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       signOut,
       forgetInstance,
       request,
+      requestDocument,
       requestNdjson,
       requestEvents,
       assetSource,
@@ -347,6 +363,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       signOut,
       forgetInstance,
       request,
+      requestDocument,
       requestNdjson,
       requestEvents,
       assetSource,

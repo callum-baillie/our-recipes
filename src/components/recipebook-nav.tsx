@@ -1,11 +1,11 @@
-import { BookOpen, Braces, Library, Tags } from 'lucide-react';
+import { BookOpen, Import, Library, Tags } from 'lucide-react';
 import Link from 'next/link';
 
 const destinations = [
   { id: 'library', href: '/recipes', label: 'Library', icon: Library },
   { id: 'collections', href: '/collections', label: 'Collections', icon: BookOpen },
   { id: 'tags', href: '/tags', label: 'Tags', icon: Tags },
-  { id: 'import', href: '/import', label: 'Import', icon: Braces },
+  { id: 'import', href: '/import', label: 'Import', icon: Import },
 ] as const;
 
 export function RecipebookNav({ current }: { current: (typeof destinations)[number]['id'] }) {

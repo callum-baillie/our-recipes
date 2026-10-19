@@ -145,10 +145,11 @@
 }
 
 .caveats summary {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
   gap: 0.3rem;
-  min-height: 2rem;
+  min-height: 44px;
   cursor: pointer;
   list-style: none;
 }
@@ -160,18 +161,6 @@
 .caveats ul {
   margin: 0.2rem 0 0;
   padding-left: 1.1rem;
-}
-
-.openIcon {
-  display: none;
-}
-
-.caveats[open] .closedIcon {
-  display: none;
-}
-
-.caveats[open] .openIcon {
-  display: block;
 }
 
 .section footer {
@@ -209,4 +198,26 @@
   display: grid;
   gap: 0.8rem;
   min-height: 5.5rem;
+}
+
+.header small {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.caveats summary span {
+  flex: 1;
+}
+.caveats summary::after {
+  display: none;
+}
+
+.metrics dd {
+  flex-wrap: wrap;
+}
+.metrics dd small {
+  flex-basis: 100%;
+  font-weight: 400;
 }

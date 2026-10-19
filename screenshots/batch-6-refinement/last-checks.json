@@ -1,0 +1,17 @@
+{
+  "results": [
+    {
+      "name": "independent AI saves and named summary outcomes",
+      "passed": true
+    },
+    {
+      "name": "long backup review remains scrollable in a short viewport",
+      "passed": true
+    },
+    {
+      "name": "kitchen icon keyboard and filtered selection identity",
+      "passed": true
+    }
+  ],
+  "blocked": []
+}

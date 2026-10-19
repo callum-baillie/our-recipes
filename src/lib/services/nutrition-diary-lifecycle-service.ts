@@ -269,12 +269,20 @@ export function executeNutritionDiaryCommand(
           targetProfileId!,
           actor,
           source,
-          moveNutritionLocalTimeToDate(
-            source.occurredAt,
-            command.targetDate,
-            sourceProfile.dailyResetTimezone,
-            targetProfile!.dailyResetTimezone,
-          ),
+          (() => {
+            try {
+              return moveNutritionLocalTimeToDate(
+                source.occurredAt,
+                command.targetDate,
+                sourceProfile.dailyResetTimezone,
+                targetProfile!.dailyResetTimezone,
+              );
+            } catch (error) {
+              if (error instanceof RangeError)
+                throw new NutritionDiaryLifecycleIntegrityError(error.message);
+              throw error;
+            }
+          })(),
           source.mealSlot,
         ),
       );

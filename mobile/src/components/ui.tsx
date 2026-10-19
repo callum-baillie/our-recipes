@@ -169,6 +169,35 @@ export function Body({
     </Text>
   );
 }
+export function SyncNotice() {
+  const { error, refreshing, refresh, lastSyncedAt } = useSync();
+  if (!error) return null;
+  return (
+    <View
+      accessibilityRole="alert"
+      style={{
+        padding: 14,
+        gap: 8,
+        borderRadius: tokens.radius.control,
+        backgroundColor: tokens.color.secondarySurface,
+        borderWidth: 1,
+        borderColor: tokens.color.separator,
+      }}
+    >
+      <Body>Couldn’t refresh your household</Body>
+      <Body muted>
+        {lastSyncedAt ? 'Showing saved data. Reconnect before making changes.' : error}
+      </Body>
+      <Button
+        label={refreshing ? 'Retrying…' : 'Try again'}
+        tone="secondary"
+        disabled={refreshing}
+        onPress={() => void refresh()}
+      />
+    </View>
+  );
+}
+
 export function Screen({
   children,
   scroll = true,
@@ -190,6 +219,7 @@ export function Screen({
     return (
       <View style={[{ flex: 1, backgroundColor: tokens.color.paper }, style]}>
         {fixedHeader}
+        <SyncNotice />
         {content}
       </View>
     );
@@ -215,6 +245,7 @@ export function Screen({
         ]}
         style={{ flex: 1, backgroundColor: tokens.color.paper }}
       >
+        <SyncNotice />
         {content}
       </ScrollView>
     </View>
@@ -630,6 +661,7 @@ export function Button({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       onPress={() => {
         if (isIOS) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -638,6 +670,7 @@ export function Button({
         {
           minHeight: tokens.layout.touch,
           paddingHorizontal: tokens.space.md,
+          paddingVertical: tokens.space.sm,
           borderRadius: tokens.radius.control,
           alignItems: 'center',
           justifyContent: 'center',
@@ -650,7 +683,12 @@ export function Button({
       ]}
     >
       {icon ? <Icon name={icon} fallback="+" color={palette.color} size={17} /> : null}
-      <Text style={[tokens.type.footnote, { fontWeight: '700', color: palette.color }]}>
+      <Text
+        style={[
+          tokens.type.callout,
+          { flexShrink: 1, textAlign: 'center', fontWeight: '600', color: palette.color },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -692,6 +730,7 @@ export function FormField({
   textContentType?: React.ComponentProps<typeof TextInput>['textContentType'];
   editable?: boolean;
 }) {
+  const [focused, setFocused] = React.useState(false);
   return (
     <View style={{ gap: 6 }}>
       <Text style={[tokens.type.caption, { color: tokens.color.ink, fontWeight: '700' }]}>
@@ -699,6 +738,8 @@ export function FormField({
       </Text>
       <TextInput
         accessibilityLabel={label}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
@@ -714,12 +755,13 @@ export function FormField({
           tokens.type.callout,
           {
             borderWidth: 1,
-            borderColor: tokens.color.separator,
-            backgroundColor: tokens.color.paperRaised,
+            borderColor: focused ? tokens.color.olive : tokens.color.separator,
+            backgroundColor: focused ? tokens.color.surface : tokens.color.paperRaised,
             color: tokens.color.ink,
             borderRadius: tokens.radius.small,
             paddingHorizontal: tokens.space.sm,
-            minHeight: multiline ? 136 : 46,
+            paddingVertical: tokens.space.sm,
+            minHeight: multiline ? 136 : 48,
             textAlignVertical: multiline ? 'top' : 'center',
           },
         ]}

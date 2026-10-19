@@ -1,17 +1,17 @@
 'use client';
 
-import { FileImage, FileText, Link2, Plus, Sparkles, X } from 'lucide-react';
+import { ClipboardPaste, FileImage, FileText, Link2, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, type RefObject } from 'react';
 
 import { useModalSurface } from '@/components/use-modal-surface';
 
 const options = [
+  { href: '/recipes/new', label: 'Write a recipe', icon: FileText },
+  { href: '/capture?mode=text', label: 'Paste or describe', icon: ClipboardPaste },
+  { href: '/capture?mode=url', label: 'Import a link', icon: Link2 },
+  { href: '/import', label: 'Photos or PDF', icon: FileImage },
   { href: '/capture/bulk', label: 'Bulk add recipes', icon: Plus },
-  { href: '/recipes/new', label: 'From scratch', icon: FileText },
-  { href: '/capture?mode=text', label: 'Paste/AI Recipe', icon: Sparkles },
-  { href: '/capture?mode=url', label: 'From URL', icon: Link2 },
-  { href: '/import', label: 'From Image', icon: FileImage },
 ] as const;
 
 export function AddRecipeTrigger({ open }: { open: boolean }) {
@@ -107,7 +107,7 @@ export function AddRecipeDialog({ open, onClose, returnFocusRef }: AddRecipeDial
           </Link>
         )}
         <div className="add-recipe-dialog-heading">
-          <h2 id="add-recipe-title">How would you like to add it?</h2>
+          <h2 id="add-recipe-title">Add a recipe</h2>
           <p id="add-recipe-description">
             Choose a starting point. You’ll review everything before it joins your cookbook.
           </p>
