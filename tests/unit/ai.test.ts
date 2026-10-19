@@ -253,7 +253,16 @@ describe('AI readiness boundary', () => {
       }),
     ).resolves.toMatchObject({ altText: 'AI-generated serving image for Tomato soup' });
 
-    expect(reviewRequests).toHaveLength(4);
+    await expect(
+      provider.improveRecipe({ recipe: fakeCandidate.recipe, mode: 'enhance' }),
+    ).resolves.toEqual(fakeCandidate);
+    expect(reviewRequests[4]).toMatchObject({
+      instructions: expect.stringContaining('Normalize ingredient spelling, quantities, units'),
+    });
+    expect(String((reviewRequests[4] as { instructions: string }).instructions)).not.toContain(
+      'Keep the same ingredient items, quantities, and units',
+    );
+    expect(reviewRequests).toHaveLength(5);
     expect(reviewRequests[0]).toMatchObject({ model: 'gpt-6-luna', text: { format: {} } });
     expect(reviewRequests[0]).toMatchObject({
       instructions: expect.stringContaining('infer a practical numeric serving yield'),

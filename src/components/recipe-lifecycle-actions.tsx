@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, Copy, Heart, Star, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, Copy, Star, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -11,7 +11,6 @@ type RecipeLifecycleActionsProps = {
   status: 'active' | 'archived' | 'trash';
   currentRevision: number;
   personalPreference: { rating: number | null; note: string } | null;
-  initialFavorite: boolean | null;
 };
 
 export function RecipeLifecycleActions({
@@ -19,18 +18,16 @@ export function RecipeLifecycleActions({
   status,
   currentRevision,
   personalPreference,
-  initialFavorite,
 }: RecipeLifecycleActionsProps) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<
-    'duplicate' | 'archive' | 'restore' | 'trash' | 'favorite' | 'preference' | null
+    'duplicate' | 'archive' | 'restore' | 'trash' | 'preference' | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [rating, setRating] = useState<number | null>(personalPreference?.rating ?? null);
   const [note, setNote] = useState(personalPreference?.note ?? '');
   const [preferenceSaved, setPreferenceSaved] = useState(false);
-  const [favorite, setFavorite] = useState(initialFavorite);
 
   async function duplicate() {
     setPendingAction('duplicate');
@@ -105,32 +102,6 @@ export function RecipeLifecycleActions({
     }
   }
 
-  async function toggleFavorite() {
-    if (favorite === null) return;
-    const nextFavorite = !favorite;
-    setPendingAction('favorite');
-    setError(null);
-    try {
-      const response = await fetch(`/api/v1/recipes/${recipeId}/favorite`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ favorite: nextFavorite }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        favorite?: boolean;
-        error?: { message?: string };
-      } | null;
-      if (!response.ok || typeof body?.favorite !== 'boolean') {
-        setError(body?.error?.message ?? 'We could not update your favorite.');
-        return;
-      }
-      setFavorite(body.favorite);
-      router.refresh();
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
   return (
     <div className="recipe-lifecycle-actions">
       <div className="recipe-maintenance-actions" aria-label="Recipe maintenance actions">
@@ -144,23 +115,6 @@ export function RecipeLifecycleActions({
           {pendingAction === 'duplicate' ? <ButtonSpinner /> : <Copy size={15} />}{' '}
           {pendingAction === 'duplicate' ? 'Duplicating…' : 'Duplicate'}
         </button>
-        {favorite !== null && (
-          <button
-            className="text-button"
-            type="button"
-            disabled={pendingAction !== null}
-            aria-busy={pendingAction === 'favorite'}
-            onClick={toggleFavorite}
-            aria-pressed={favorite}
-          >
-            {pendingAction === 'favorite' ? (
-              <ButtonSpinner />
-            ) : (
-              <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />
-            )}{' '}
-            {pendingAction === 'favorite' ? 'Saving…' : favorite ? 'Favorite' : 'Save favorite'}
-          </button>
-        )}
         {status === 'active' ? (
           <button
             className="text-button"

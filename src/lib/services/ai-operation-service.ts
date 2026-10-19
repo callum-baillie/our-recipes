@@ -290,6 +290,7 @@ export async function improveAiRecipe(input: {
   recipeId: string;
   expectedRevision: number;
   recipe: RecipePayload;
+  mode?: 'enhance' | 'improve';
 }): Promise<{ candidate: AiRecipeCandidate; audit: AiOperationAudit }> {
   ensureDatabase();
   const savedRecipe = getRecipe(input.recipeId, input.actorProfileId);
@@ -314,7 +315,10 @@ export async function improveAiRecipe(input: {
     reasoningEffort: setting.reasoningEffort,
   });
   try {
-    const candidate = await provider.improveRecipe({ recipe: input.recipe }, setting);
+    const candidate = await provider.improveRecipe(
+      { recipe: input.recipe, ...(input.mode === 'enhance' ? { mode: 'enhance' as const } : {}) },
+      setting,
+    );
     return {
       candidate: {
         ...candidate,
@@ -325,9 +329,12 @@ export async function improveAiRecipe(input: {
           sourceUrl: input.recipe.sourceUrl,
           originalAuthor: input.recipe.originalAuthor,
           sharedNotes: input.recipe.sharedNotes,
-          // AI Improve may clarify every other part of the recipe, but the
-          // ingredient contract is deliberately immutable.
-          ingredientGroups: input.recipe.ingredientGroups,
+          // The editor's existing Improve action preserves ingredients. The
+          // explicit Enhance mode may normalize them in a review-only draft.
+          ingredientGroups:
+            input.mode === 'enhance'
+              ? candidate.recipe.ingredientGroups
+              : input.recipe.ingredientGroups,
         },
       },
       audit: completeAudit(audit.id),

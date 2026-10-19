@@ -357,4 +357,43 @@ describe('review-first AI operation service', () => {
       recipeId: recipe.id,
     });
   });
+  it('returns an explicit full enhancement draft without saving or losing source information', async () => {
+    const profile = createProfile();
+    const recipe = createRecipe(
+      {
+        ...candidate.recipe,
+        title: 'Original soup',
+        sourceName: 'Family book',
+        sharedNotes: 'Keep this note.',
+        ingredientGroups: [
+          { name: '', ingredients: [{ quantity: 2, unit: 'cup', item: 'tomatoes', note: '' }] },
+        ],
+      },
+      profile.id,
+    );
+    const submitted = recipePayloadFromDetail(recipe);
+    const result = await improveAiRecipe({
+      actorProfileId: profile.id,
+      recipeId: recipe.id,
+      expectedRevision: recipe.currentRevision,
+      recipe: submitted,
+      mode: 'enhance',
+    });
+    expect(provider.improvementInputs).toEqual([{ recipe: submitted, mode: 'enhance' }]);
+    expect(result.candidate.recipe.ingredientGroups).toEqual(candidate.recipe.ingredientGroups);
+    expect(result.candidate.recipe.sourceName).toBe('Family book');
+    expect(result.candidate.recipe.sharedNotes).toBe('Keep this note.');
+    expect(getRecipe(recipe.id)?.currentRevision).toBe(1);
+    expect(getRecipe(recipe.id)?.ingredientGroups[0].ingredients[0].quantity).toBe(2);
+    await expect(
+      improveAiRecipe({
+        actorProfileId: profile.id,
+        recipeId: recipe.id,
+        expectedRevision: 99,
+        recipe: submitted,
+        mode: 'enhance',
+      }),
+    ).rejects.toBeInstanceOf(RecipeConflictError);
+    expect(provider.improvementInputs).toHaveLength(1);
+  });
 });

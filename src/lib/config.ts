@@ -182,7 +182,7 @@ export function getRuntimeConfig(): RuntimeConfig {
         apiVersion: process.env.OPEN_FOOD_FACTS_API_VERSION ?? 'v3.6',
         userAgent:
           process.env.OPEN_FOOD_FACTS_USER_AGENT ??
-          'Bord/1.0.0-rc.16 (https://github.com/callum-baillie/bord)',
+          'Bord/1.0.0-rc.17 (https://github.com/callum-baillie/bord)',
         timeoutMs: Number(process.env.OPEN_FOOD_FACTS_TIMEOUT_MS ?? '5000'),
         requestsPerMinute: Number(process.env.OPEN_FOOD_FACTS_PRODUCT_RPM ?? '12'),
       },

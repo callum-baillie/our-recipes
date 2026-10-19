@@ -1130,7 +1130,7 @@ paths:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
       x-api-permissions: ['recipes:update']
       operationId: improveRecipe
-      summary: Ask OpenAI for a review-only recipe improvement while preserving ingredients
+      summary: Ask OpenAI for a review-only recipe improvement or full enhancement
       requestBody:
         required: true
         content:
@@ -3721,6 +3721,7 @@ components:
         confirm: { type: boolean, const: true }
         expectedRevision: { type: integer, minimum: 1 }
     AiRecipeImprovementInput:
+      description: Default improve mode preserves submitted ingredients. Explicit enhance mode may normalize ingredients; both return drafts without saving.
       type: object
       additionalProperties: false
       required: [confirm, expectedRevision, recipe]
@@ -3728,6 +3729,7 @@ components:
         confirm: { type: boolean, const: true }
         expectedRevision: { type: integer, minimum: 1 }
         recipe: { $ref: '#/components/schemas/RecipeInput' }
+        mode: { type: string, enum: [improve, enhance], default: improve }
     RecipeStatusInput:
       type: object
       required: [status, expectedRevision]

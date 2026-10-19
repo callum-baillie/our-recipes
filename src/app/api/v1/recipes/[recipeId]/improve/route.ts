@@ -43,6 +43,7 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
       recipeId,
       expectedRevision: parsed.data.expectedRevision,
       recipe: parsed.data.recipe,
+      mode: parsed.data.mode,
     });
     return withApiRequestId(
       NextResponse.json(

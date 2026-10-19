@@ -188,6 +188,7 @@ export const aiRecipeImprovementRequestSchema = z
     confirm: z.literal(true),
     expectedRevision: z.coerce.number().int().positive(),
     recipe: recipeInputSchema,
+    mode: z.enum(['improve', 'enhance']).optional(),
   })
   .strict();
 

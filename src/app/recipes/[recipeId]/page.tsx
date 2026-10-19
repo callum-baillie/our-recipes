@@ -18,7 +18,7 @@ import { getRecipeImportProvenance } from '@/lib/services/import-service';
 import { getRecipePantryAvailability } from '@/lib/services/pantry-availability-service';
 import { listPantryProducts } from '@/lib/services/pantry-service';
 import { getRecipeNutritionPresentation } from '@/lib/services/nutrition-recipe-calculation-service';
-import { getRecipe, listTags } from '@/lib/services/recipe-service';
+import { getRecipe, listTags, recipePayloadFromDetail } from '@/lib/services/recipe-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +59,15 @@ export default async function RecipeDetailPage({
           title={recipe.title}
           eyebrow={recipe.status === 'active' ? 'HOUSE RECIPE' : recipe.status.toUpperCase()}
           description={recipe.summary}
-          toolbarLeft={<RecipeDetailToolbar recipeId={recipe.id} title={recipe.title} />}
+          toolbarLeft={
+            <RecipeDetailToolbar
+              key={`${recipe.id}:${actor.profileId}`}
+              recipeId={recipe.id}
+              recipe={recipePayloadFromDetail(recipe)}
+              revision={recipe.currentRevision}
+              initialFavorite={favorite}
+            />
+          }
         />
         <RecipeImageGallery
           recipeId={recipe.id}
@@ -142,7 +150,6 @@ export default async function RecipeDetailPage({
                   status={recipe.status}
                   currentRevision={recipe.currentRevision}
                   personalPreference={recipe.personalPreference}
-                  initialFavorite={favorite}
                 />
                 <RecipeRevisionHistory
                   recipeId={recipe.id}

@@ -33,6 +33,7 @@ export type AiVisionReviewInput = AiReviewRequest & {
 
 export type AiRecipeImprovementInput = {
   recipe: RecipePayload;
+  mode?: 'enhance';
 };
 
 export type AiImageGenerationInput = {
@@ -157,6 +158,15 @@ const improvementInstructions = [
   'Fix spelling and grammar, rewrite vague steps into clear kitchen-readable instructions, and add reasonable missing preparation or cooking steps implied by the existing ingredients and method.',
   'Infer missing servings, prep time, cook time, rest time, difficulty, category, cuisine, cooking method, equipment, and helpful tags when the recipe supports a responsible estimate.',
   'Do not add unsupported claims, allergens, dietary labels, temperatures, or food-safety guarantees.',
+].join(' ');
+
+const enhancementInstructions = [
+  'Enhance this existing recipe for review, keeping its identity and ingredient choices.',
+  'Normalize ingredient spelling, quantities, units, preparation notes, and shopping categories. Preserve all purchasing qualifiers and allergens; never substitute, add, or remove foods.',
+  'Do not invent missing ingredient amounts. Flag uncertain amounts for human review.',
+  'Calculate a practical serving yield and nutrition per serving from the complete ingredient list. Clearly flag inferred servings and estimated nutrition in warnings.',
+  'Improve vague steps and estimate prep, cook, and rest times responsibly. Improve categories, cuisines, equipment, and tags when supported by the recipe.',
+  'Do not add unsupported dietary claims, temperatures, or food-safety guarantees.',
 ].join(' ');
 
 function reviewPrompt(improve: boolean): string {
@@ -363,7 +373,7 @@ export class OpenAiProvider implements AiProvider {
         store: false,
         instructions: [
           reviewInstructions,
-          improvementInstructions,
+          input.mode === 'enhance' ? enhancementInstructions : improvementInstructions,
           'Return the complete improved recipe as a review candidate. A person must save it as a new revision.',
         ].join(' '),
         input: [
