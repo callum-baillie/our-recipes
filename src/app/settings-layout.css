@@ -743,6 +743,14 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   }
 }
 @container (max-width: 660px) {
+  .settings-content .settings-pane-header,
+  .settings-content .settings-pane > .settings-pane-body {
+    padding-inline: 16px;
+  }
+  .settings-content .settings-row-control > :is(.primary-button, .secondary-button),
+  .settings-content .settings-field-control > :is(.primary-button, .secondary-button) {
+    padding-inline: 12px;
+  }
   .settings-content .settings-overview {
     grid-template-columns: minmax(0, 1fr);
   }

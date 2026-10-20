@@ -126,13 +126,27 @@ test('runtime overlap has keyboard choices, responsive review and a merged next 
     await summaryAction.scrollIntoViewIfNeeded();
     if (family.startsWith('DejaVu')) await capture(page, 'summary-action-320-enlarged-fallback');
     await expectNoHorizontalOverflow(page);
-    const actionBounds = await summaryAction.evaluate((button) => ({
-      right: button.getBoundingClientRect().right,
-      containerRight: button.parentElement!.getBoundingClientRect().right,
-      height: button.getBoundingClientRect().height,
-    }));
+    const actionBounds = await summaryAction.evaluate((button) => {
+      const bounds = button.getBoundingClientRect();
+      const style = getComputedStyle(button);
+      const context = document.createElement('canvas').getContext('2d')!;
+      context.font = style.font;
+      return {
+        right: bounds.right,
+        containerRight: button.parentElement!.getBoundingClientRect().right,
+        height: bounds.height,
+        textWidth:
+          bounds.width -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight) -
+          parseFloat(style.borderLeftWidth) -
+          parseFloat(style.borderRightWidth),
+        summaryWordWidth: context.measureText('summaries').width,
+      };
+    });
     expect(actionBounds.right).toBeLessThanOrEqual(actionBounds.containerRight);
     expect(actionBounds.height).toBeGreaterThanOrEqual(44);
+    expect(actionBounds.textWidth).toBeGreaterThanOrEqual(actionBounds.summaryWordWidth);
   }
   await page.evaluate(() => {
     document.body.style.removeProperty('font-family');
