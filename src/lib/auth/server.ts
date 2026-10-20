@@ -16,6 +16,16 @@ ensureDatabase();
 
 const config = getRuntimeConfig();
 const authUrl = new URL(config.auth.baseUrl);
+// Backup restoration closes/reopens SQLite. Resolve root Drizzle methods at
+// operation time so the auth adapter never retains a closed database handle.
+// A transaction still uses the concrete transaction object provided by Drizzle.
+const authDatabase = new Proxy({} as ReturnType<typeof getDatabase>, {
+  get(_target, property) {
+    const database = getDatabase();
+    const value = Reflect.get(database, property, database);
+    return typeof value === 'function' ? value.bind(database) : value;
+  },
+});
 
 export const auth = betterAuth({
   appName: 'Bòrd',
@@ -27,7 +37,7 @@ export const auth = betterAuth({
     ...(config.appOrigin ? [config.appOrigin] : []),
     ...config.trustedOrigins,
   ],
-  database: drizzleAdapter(getDatabase(), {
+  database: drizzleAdapter(authDatabase, {
     provider: 'sqlite',
     schema,
     transaction: true,
