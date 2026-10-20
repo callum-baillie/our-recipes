@@ -78,8 +78,16 @@ test('virtual passkey enrollment, sign-in, removal and session revocation use re
       .getByLabel('Email', { exact: true })
       .fill('workflow-refinement-fixture-maya@example.test');
     await page.getByLabel('Passphrase', { exact: true }).fill(TEST_PASSPHRASE);
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await page.waitForURL((url) => url.pathname !== '/sign-in');
+    const [fallbackResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === '/api/auth/sign-in/email' &&
+          response.request().method() === 'POST',
+      ),
+      page.getByRole('button', { name: 'Sign in', exact: true }).click(),
+    ]);
+    expect(fallbackResponse.status()).toBe(200);
+    await page.waitForURL((url) => url.pathname !== '/sign-in', { timeout: 15_000 });
     expect((await (await page.request.get('/api/auth/get-session')).json())?.user?.email).toBe(
       'workflow-refinement-fixture-maya@example.test',
     );
@@ -98,7 +106,10 @@ test('virtual passkey enrollment, sign-in, removal and session revocation use re
       ),
     );
   } finally {
-    await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
-    await cdp.detach();
+    // Browser teardown owns the virtual device if the primary assertion timed out.
+    if (!page.isClosed()) {
+      await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+      await cdp.detach();
+    }
   }
 });

@@ -32,7 +32,11 @@ run(
   { V1_RELEASE_ORACLE: 'true' },
 );
 // WebAuthn RP IDs must be domains, not the primary oracle's raw IPv4 host.
-// Use the real supported localhost exception without changing origin checks.
+// Use a fresh synthetic database so the independent sign-in scenario does not
+// inherit the main suite's real authentication rate-limit counters.
+// Origin and throttling checks stay enabled.
+run([tsx, 'scripts/prepare-e2e.ts']);
+run(['--conditions=react-server', '--import', 'tsx', 'tests/fixtures/seed-post-review.ts']);
 run([playwright, 'test', 'tests/e2e/post-review-auth.spec.ts', '--workers=1', '--retries=0'], {
   V1_RELEASE_ORACLE: 'true',
   BORD_E2E_ORIGIN: 'http://localhost:3100',
