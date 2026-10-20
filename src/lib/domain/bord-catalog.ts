@@ -148,14 +148,7 @@ export const catalogGuidanceSchema = catalogRecordSchema.extend({
   license: z.string().max(500).default(''),
   precise_expiry: z.boolean().default(false),
 });
-export type CatalogMeasure = {
-  label: string;
-  amount: number | null;
-  unit: string | null;
-  gramWeight: number | null;
-  form: string | null;
-  basis: string | null;
-};
+export type { CatalogMeasure } from '../../../shared/mobile-domain/catalog-measures';
 
 export const catalogChainSchema = catalogRecordSchema.extend({
   name: z.string().max(300),

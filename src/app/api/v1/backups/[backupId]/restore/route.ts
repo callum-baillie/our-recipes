@@ -9,7 +9,6 @@ import {
   BackupValidationError,
   restoreBackup,
 } from '@/lib/services/backup-service';
-import { invalidateAuthenticationAfterRestore } from '@/lib/services/auth-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +30,6 @@ export async function POST(request: Request, context: { params: Promise<{ backup
   }
   try {
     const result = await restoreBackup((await context.params).backupId);
-    invalidateAuthenticationAfterRestore();
     return NextResponse.json({ restored: true, safetyBackup: result.safetyBackup });
   } catch (error) {
     if (error instanceof BackupNotFoundError)

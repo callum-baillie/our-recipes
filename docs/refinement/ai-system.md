@@ -1,6 +1,6 @@
 # AI execution, policy and recovery
 
-This document describes the delivered contracts on `refinement/full-project-completion`, based on `a278f81`. Tests use synthetic households and deterministic providers. They establish application behavior, not live model quality, latency or billing.
+This document describes the delivered contracts, updated for `refinement/post-review-completion` from `160441d`. Tests use synthetic households and deterministic providers. They establish application behavior, not live model quality, latency or billing. Current commands and per-finding evidence are in [post-review-ai.md](post-review-ai.md).
 
 ## Ownership and effective configuration
 
@@ -9,6 +9,8 @@ Installation administrators manage workload enablement, supported/custom model I
 **My AI preferences** saves personal processing/model defaults and bounded response-style/planning instructions independently of privacy/summary policy. A global disable or override restriction wins. Personal instructions cannot grant sharing, authority, paid consent or change output schemas. Reset-to-inherited/recommended choices are drafts until the named Save action. A conflict retains the draft; load current, compare, then deliberately retain/rebase or discard it. Summary refresh saves only its own policy group and always names the linked account recipient.
 
 Configured models are not silently upgraded or substituted. Unsupported capability/parameter combinations are rejected by the existing capability validation. Unknown custom models have no invented price estimate. Decisions uses the officially supported `gpt-6-luna` contract independently of the selected chat model; this does not authorize fallback or additional spending.
+
+Every paid boundary uses the central effective execution resolver, including nested recipe tools, maps, classifications, queued/batch jobs and scheduled generation. Current account/workload rights and administrator caps are checked again at execution. Approved model/prompt settings remain identifiable; stricter current output/deadline limits win. Durable execution traces contain configuration, outcome and parent job/turn links without private input text. The rate allowance counts provider requests (batch items count individually); it does not claim to be a currency budget. Decisions uses bounded-choice output and sends no unsupported token-limit field.
 
 ## Versioned task guidance
 
@@ -24,6 +26,8 @@ The OpenAI Responses streaming callback, HTTP stream and web/native consumers al
 
 First-party message requests may carry one UUID `operationId`, bound to the account, profile, thread and normalized message/attachments/tool consent. Migration `0069_ai_chat_turn_recovery` stores running/completed/failed/cancelled receipts. Completed exact retry returns the stored result before provider access. Changed intent conflicts. Running or interrupted work must be reconciled from the conversation; it is never automatically rerun as a new paid operation. A later typed draft stays separate from the submitted snapshot.
 
+Migration `0072_ai_execution_recovery` adds renewable leases and deadlines. An expired receipt becomes outcome unknown, with saved proposals/jobs retained. Starting a turn and committing its canonical response are transactional; delayed output cannot restore lost ownership. Exact receipt lookup and explicit recovery acknowledgement support process restart. If an acknowledged operation has no receipt, a tombstone prevents its original late arrival from executing. None of these paths resubmits provider work.
+
 **Stop generating** aborts supported network/provider work; it does not undo a queued job or committed operation or guarantee that billing stopped. Closing chat, stopping a turn, cancelling a job and reversing saved changes remain different operations. Reopening reads server-owned turns/proposals/jobs. A running or unknown turn blocks a new submission until reviewed. Browser chat retains drafts/attachments and scroll position per thread while its surface remains mounted; native drafts are account/instance/thread-scoped memory and are cleared on logout. Process loss is not a promise of persisted private drafts.
 
 ## Curated tools and reviewed changes
@@ -35,6 +39,8 @@ Sharing is checked for the resource actually used. A simple shopping task can op
 Proposals expose scope, values and per-step outcomes. Simple fields are editable in the review card; a revision creates a fresh proposal with fresh source snapshots and supersedes the old Apply control. Record snapshots remain checked when a dependency appears only in the body; newly created path targets use a server-bound earlier result. Supported bindings return `list.id`, `recipe.id`, `collection.id`, `product.id` or `meal.id` into explicitly allowed fields. Forward/invalid bindings fail before writes. The model cannot guess newly created IDs.
 
 Groups are sequential, not a blanket transaction. A durable boundary is written before each mutation, followed by its acknowledged result. Failed/unknown steps stop later steps. Results distinguish completed, failed, not attempted and outcome unknown and link to affected records. Repeating an acknowledged Apply returns stored results. A lost mutation response requires inspecting current records; it is not safe to submit the same scope as a fresh operation. Six synchronous create APIs additionally support atomic data/response receipts with an `Idempotency-Key`; catalog, Nutrition and purchase operations retain their own domain-specific replay contracts.
+
+Text recipe/plan drafting and approval do not authorize image generation. Each paid image operation has its own review, owner and source revision/digest. Generated images remain private candidates until explicit acceptance. Old confirm-only direct-image requests receive `409 image_review_required`; old queued images without a reviewed revision require a new review. An uncertain Batch submission cannot be retried automatically because the provider may already have accepted it.
 
 Credentials, privileged recovery, binary exports and actions requiring reauthentication use protected UI handoffs. Administrative configuration does not authorize reading other people's private chat or diary.
 

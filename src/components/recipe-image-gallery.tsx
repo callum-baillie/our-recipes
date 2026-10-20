@@ -21,6 +21,7 @@ type RecipeImageGalleryProps = {
   profileId: string;
   accountId: string;
   imagePolicy: ImageGenerationPolicy;
+  initialCandidateId?: string;
   images: Array<{ id: string; altText: string; width: number; height: number }>;
 };
 
@@ -32,6 +33,7 @@ export function RecipeImageGallery({
   profileId,
   accountId,
   imagePolicy,
+  initialCandidateId,
 }: RecipeImageGalleryProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -40,7 +42,7 @@ export function RecipeImageGallery({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [editingPhotos, setEditingPhotos] = useState(false);
+  const [editingPhotos, setEditingPhotos] = useState(Boolean(initialCandidateId));
   const showEditor = editingPhotos;
   const editorRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -149,7 +151,7 @@ export function RecipeImageGallery({
   }
 
   return (
-    <section className="recipe-media" aria-labelledby="recipe-photos-heading">
+    <section id="recipe-photos" className="recipe-media" aria-labelledby="recipe-photos-heading">
       <div className="recipe-media-heading">
         <div>
           <p className="eyebrow">RECIPE PHOTOS</p>
@@ -253,7 +255,8 @@ export function RecipeImageGallery({
           {converting ? 'Preparing local conversion' : 'Upload photo'}
         </button>
         <RecipeImageGenerator
-          key={`${recipeId}:${accountId}:${profileId}`}
+          initialCandidateId={initialCandidateId}
+          key={`${recipeId}:${accountId}:${profileId}:${initialCandidateId ?? ''}`}
           recipeId={recipeId}
           revision={revision}
           profileId={profileId}

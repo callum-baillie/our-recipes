@@ -1,0 +1,260 @@
+[
+  {
+    "id": "soup",
+    "recipeTitle": "Roasted tomato soup",
+    "recipeSummary": "Smooth soup with a small cream swirl.",
+    "servings": "4",
+    "ingredientNames": ["tomatoes", "onion", "olive oil", "vegetable stock", "cream"],
+    "ingredients": [
+      {
+        "quantity": 800,
+        "unit": "g",
+        "item": "tomatoes",
+        "note": ""
+      },
+      {
+        "quantity": 1,
+        "unit": "each",
+        "item": "onion",
+        "note": ""
+      },
+      {
+        "quantity": 1,
+        "unit": "tbsp",
+        "item": "olive oil",
+        "note": ""
+      },
+      {
+        "quantity": 400,
+        "unit": "ml",
+        "item": "vegetable stock",
+        "note": ""
+      },
+      {
+        "quantity": 40,
+        "unit": "ml",
+        "item": "cream",
+        "note": ""
+      }
+    ],
+    "instructionSteps": [
+      "Roast tomatoes and onion with oil until softened and lightly browned.",
+      "Add stock, simmer and blend until smooth and pourable.",
+      "Serve in a bowl with a small swirl of cream."
+    ]
+  },
+  {
+    "id": "stew",
+    "recipeTitle": "Butter bean and carrot stew",
+    "recipeSummary": "Tender beans and carrot in a thick tomato sauce.",
+    "servings": "4",
+    "ingredientNames": ["butter beans", "carrots", "chopped tomatoes", "onion"],
+    "ingredients": [
+      {
+        "quantity": 480,
+        "unit": "g",
+        "item": "cooked butter beans",
+        "note": ""
+      },
+      {
+        "quantity": 300,
+        "unit": "g",
+        "item": "carrots",
+        "note": ""
+      },
+      {
+        "quantity": 400,
+        "unit": "g",
+        "item": "chopped tomatoes",
+        "note": ""
+      },
+      {
+        "quantity": 1,
+        "unit": "each",
+        "item": "onion",
+        "note": ""
+      }
+    ],
+    "instructionSteps": [
+      "Soften chopped onion and carrot.",
+      "Add tomatoes and beans and simmer until the carrots are tender and sauce is thick.",
+      "Serve as a spoonable stew with intact beans."
+    ]
+  },
+  {
+    "id": "casserole",
+    "recipeTitle": "Potato and leek bake",
+    "recipeSummary": "Layered potato with softened leek and a browned cheese top.",
+    "servings": "4",
+    "ingredientNames": ["potatoes", "leeks", "milk", "cheddar"],
+    "ingredients": [
+      {
+        "quantity": 800,
+        "unit": "g",
+        "item": "potatoes",
+        "note": ""
+      },
+      {
+        "quantity": 250,
+        "unit": "g",
+        "item": "leeks",
+        "note": ""
+      },
+      {
+        "quantity": 300,
+        "unit": "ml",
+        "item": "milk",
+        "note": ""
+      },
+      {
+        "quantity": 100,
+        "unit": "g",
+        "item": "cheddar",
+        "note": ""
+      }
+    ],
+    "instructionSteps": [
+      "Thinly slice potatoes and soften sliced leeks.",
+      "Layer in a baking dish with milk and top with grated cheddar.",
+      "Bake until potatoes are tender and the top is golden; rest before serving a scoop."
+    ]
+  },
+  {
+    "id": "bread",
+    "recipeTitle": "Seeded wholemeal loaf",
+    "recipeSummary": "A sliced loaf with a set, slightly coarse crumb.",
+    "servings": "1 loaf",
+    "ingredientNames": ["wholemeal flour", "water", "yeast", "salt", "sunflower seeds"],
+    "ingredients": [
+      {
+        "quantity": 500,
+        "unit": "g",
+        "item": "wholemeal flour",
+        "note": ""
+      },
+      {
+        "quantity": 360,
+        "unit": "ml",
+        "item": "water",
+        "note": ""
+      },
+      {
+        "quantity": 7,
+        "unit": "g",
+        "item": "yeast",
+        "note": ""
+      },
+      {
+        "quantity": 8,
+        "unit": "g",
+        "item": "salt",
+        "note": ""
+      },
+      {
+        "quantity": 50,
+        "unit": "g",
+        "item": "sunflower seeds",
+        "note": ""
+      }
+    ],
+    "instructionSteps": [
+      "Mix and knead the dough with half the seeds, then prove.",
+      "Shape in a loaf tin, add remaining seeds and prove again.",
+      "Bake until the crumb is set; cool fully before slicing."
+    ]
+  },
+  {
+    "id": "salad",
+    "recipeTitle": "Cucumber and chickpea salad",
+    "recipeSummary": "Fresh cucumber and chickpeas with a light lemon dressing.",
+    "servings": "4",
+    "ingredientNames": ["cucumber", "chickpeas", "lemon juice", "olive oil", "parsley"],
+    "ingredients": [
+      {
+        "quantity": 1,
+        "unit": "each",
+        "item": "cucumber",
+        "note": ""
+      },
+      {
+        "quantity": 240,
+        "unit": "g",
+        "item": "cooked chickpeas",
+        "note": ""
+      },
+      {
+        "quantity": 2,
+        "unit": "tbsp",
+        "item": "lemon juice",
+        "note": ""
+      },
+      {
+        "quantity": 1,
+        "unit": "tbsp",
+        "item": "olive oil",
+        "note": ""
+      },
+      {
+        "quantity": 10,
+        "unit": "g",
+        "item": "parsley",
+        "note": ""
+      }
+    ],
+    "instructionSteps": [
+      "Dice cucumber and drain chickpeas.",
+      "Toss with lemon juice, oil and chopped parsley.",
+      "Serve chilled with a light coating of dressing, not a pool of sauce."
+    ]
+  },
+  {
+    "id": "dessert",
+    "recipeTitle": "Steamed chocolate pudding",
+    "recipeSummary": "A soft chocolate sponge, served without garnish.",
+    "servings": "6",
+    "ingredientNames": ["flour", "cocoa", "butter", "sugar", "eggs", "milk"],
+    "ingredients": [
+      {
+        "quantity": 150,
+        "unit": "g",
+        "item": "self-raising flour",
+        "note": ""
+      },
+      {
+        "quantity": 30,
+        "unit": "g",
+        "item": "cocoa",
+        "note": ""
+      },
+      {
+        "quantity": 100,
+        "unit": "g",
+        "item": "butter",
+        "note": ""
+      },
+      {
+        "quantity": 100,
+        "unit": "g",
+        "item": "sugar",
+        "note": ""
+      },
+      {
+        "quantity": 2,
+        "unit": "each",
+        "item": "eggs",
+        "note": ""
+      },
+      {
+        "quantity": 60,
+        "unit": "ml",
+        "item": "milk",
+        "note": ""
+      }
+    ],
+    "instructionSteps": [
+      "Cream butter and sugar, beat in eggs, then fold in flour, cocoa and milk.",
+      "Steam in a covered pudding basin until set with a soft, moist crumb.",
+      "Unmould and serve a wedge without sauce or garnish."
+    ]
+  }
+]

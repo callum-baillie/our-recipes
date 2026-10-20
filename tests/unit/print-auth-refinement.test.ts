@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   email: vi.fn(),
   passkey: vi.fn(),
   request: vi.fn(),
+  verification: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -13,6 +14,7 @@ vi.mock('@/lib/auth/client', () => ({
   authClient: {
     signIn: { email: mocks.email, passkey: mocks.passkey },
     requestPasswordReset: mocks.request,
+    sendVerificationEmail: mocks.verification,
   },
 }));
 vi.mock('next/navigation', () => ({
@@ -20,6 +22,7 @@ vi.mock('next/navigation', () => ({
 }));
 import { PrintWorkspace } from '@/components/print-workspace';
 import {
+  VerificationLinkForm,
   ForgotPasswordForm,
   ResetPasswordForm,
   SignInForm,
@@ -307,6 +310,7 @@ describe('printed record meaning', () => {
       checked: false,
       shoppingState: 'in_cart',
       cartQuantity: 0,
+      cartUnit: 'cup',
       cartLabel: 'Alternative flour',
       note: 'User note',
     };
@@ -315,6 +319,12 @@ describe('printed record meaning', () => {
       state: 'in_cart',
       detail: 'Cart: Alternative flour · 0 cup',
     });
+    expect(
+      printedShoppingItem({ ...row, cartQuantity: 500, cartUnit: 'g', unit: 'each' }).detail,
+    ).toContain('500 g');
+    expect(printedShoppingItem({ ...row, cartUnit: null }).detail).toContain(
+      'Purchase unit needs review',
+    );
     expect(printedShoppingItem({ ...row, quantity: null, checked: true })).toMatchObject({
       quantity: 'To buy: not recorded (cup)',
       state: 'sourced',
@@ -360,4 +370,20 @@ describe('printed record meaning', () => {
       mealPlanPdfExportSchema.safeParse({ start: '2026-02-30', end: '2026-03-01' }).success,
     ).toBe(false);
   });
+});
+
+it('requests a new verification link without claiming delivery and clears accepted state on edit', async () => {
+  mocks.verification.mockResolvedValue({ data: { status: true }, error: null });
+  render(createElement(VerificationLinkForm, { invalid: true }));
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'synthetic@example.test' } });
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Request verification link' }).closest('form')!,
+  );
+  await screen.findByText(/Request received for synthetic@example.test/);
+  expect(mocks.verification).toHaveBeenCalledWith({
+    email: 'synthetic@example.test',
+    callbackURL: '/sign-in?verified=1',
+  });
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'other@example.test' } });
+  expect(screen.queryByText(/Request received for/)).toBeNull();
 });

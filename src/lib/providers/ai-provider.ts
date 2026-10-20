@@ -85,7 +85,7 @@ function withGuidance(instructions: string, options?: AiProviderOptions): string
 function requestOptions(options?: AiProviderOptions) {
   return {
     signal: options?.signal,
-    timeout: Math.min(600, Math.max(10, options?.requestTimeoutSeconds ?? 180)) * 1000,
+    timeout: Math.min(600, Math.max(0.001, options?.requestTimeoutSeconds ?? 180)) * 1000,
     maxRetries: 0,
   };
 }

@@ -292,6 +292,21 @@ describe('read-only document exports', () => {
       );
     addShoppingListItem(
       list.id,
+      {
+        item: 'Independent purchase dimension',
+        quantity: 2,
+        unit: 'each',
+        note: '',
+        checked: false,
+        shoppingState: 'in_cart',
+        cartQuantity: 500,
+        cartUnit: 'g',
+        cartLabel: 'Reviewed food',
+      },
+      actor,
+    );
+    addShoppingListItem(
+      list.id,
       { item: 'Unknown quantity', quantity: '', unit: 'g', note: '', checked: false },
       actor,
     );
@@ -307,6 +322,8 @@ describe('read-only document exports', () => {
       expect(output).toContain('Substitute flour');
       expect(output).toContain('to buy');
       expect(output).toContain('To buy: not recorded (g)');
+      expect(output).toContain('500 g');
+      expect(output).not.toContain('500 each');
       evidence(`shopping-${paper.toLowerCase()}.pdf`, result.bytes);
     }
     const incomplete = await exportShoppingListPdf(

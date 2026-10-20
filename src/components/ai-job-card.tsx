@@ -20,6 +20,7 @@ export type AiJob = {
     label: string;
     status: string;
     errorCode: string | null;
+    candidateId?: string | null;
   }[];
 };
 export function isActiveJob(job: AiJob) {
@@ -63,7 +64,9 @@ export function AiJobCard({
           ? ` ${job.executionMode === 'batch' ? 'OpenAI Batch may take up to 24 hours. ' : ''}Work continues when you close the browser.`
           : failed
             ? ` ${unfinished} unfinished. ${errors[job.errorCode ?? ''] ?? 'Open details to review the results.'}`
-            : 'All changes are saved.'}
+            : job.kind === 'recipe_images'
+              ? 'Image previews are ready for review. No photo has been added to a recipe.'
+              : 'Draft results are ready to review.'}
       </InlineAlert>
       {!!job.items?.length && (
         <details>
@@ -73,14 +76,20 @@ export function AiJobCard({
               <li key={item.id}>
                 <strong>
                   {item.recipeId ? (
-                    <a href={`/recipes/${item.recipeId}`}>{item.label}</a>
+                    <a
+                      href={`/recipes/${item.recipeId}${item.candidateId ? `?imageCandidate=${item.candidateId}#recipe-photos` : ''}`}
+                    >
+                      {item.label}
+                    </a>
                   ) : (
                     item.label
                   )}
                 </strong>
                 <span>
                   {item.status === 'succeeded'
-                    ? 'Saved'
+                    ? item.candidateId
+                      ? 'Review image preview'
+                      : 'Draft ready'
                     : item.status === 'failed'
                       ? (errors[item.errorCode ?? ''] ?? 'Could not complete this item.')
                       : active

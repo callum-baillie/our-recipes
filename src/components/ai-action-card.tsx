@@ -15,6 +15,7 @@ export type AiDrawerAction = {
   preview: unknown;
   status: string;
   result?: unknown;
+  sourceDigest?: string | null;
 };
 
 function object(value: unknown): Record<string, unknown> | null {
@@ -57,7 +58,42 @@ function RecipeProposalCard({
 }) {
   const preview = object(action.preview) ?? {};
   const recipe = object(action.kind === 'recipe_update' ? preview.after : preview.recipe);
-  const image = object(preview.image);
+  const [localAction, setLocalAction] = useState<AiDrawerAction | null>(null);
+  const [imagePending, setImagePending] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [imageOperation, setImageOperation] = useState<string | null>(null);
+  const image = object(object(localAction?.preview)?.image ?? preview.image);
+  async function requestImage(fresh = false) {
+    if (!action.sourceDigest || imagePending) return;
+    const operationId = fresh
+      ? crypto.randomUUID()
+      : (imageOperation ?? text(image?.operationId)) || crypto.randomUUID();
+    setImageOperation(operationId);
+    setImagePending(true);
+    setImageError('');
+    try {
+      const response = await fetch(`/api/v1/ai/actions/${action.id}/image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirm: true,
+          operationId,
+          expectedSourceDigest: action.sourceDigest,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(
+          body.error?.message ??
+            'The image request did not finish. Check this request before trying a new one.',
+        );
+      setLocalAction(body.action);
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'Unable to check this image request.');
+    } finally {
+      setImagePending(false);
+    }
+  }
   const [imageFailed, setImageFailed] = useState(false);
   if (!recipe) return null;
 
@@ -76,10 +112,13 @@ function RecipeProposalCard({
   const result = object(action.result);
   const recipeId = text(result?.recipeId);
   const savedImageId = text(result?.imageId);
+  const candidateId = text(result?.candidateId);
   const imageSource =
-    action.status === 'confirmed' && recipeId && savedImageId
-      ? `/api/v1/recipes/${recipeId}/images/${savedImageId}`
-      : `/api/v1/ai/actions/${action.id}/image`;
+    action.status === 'confirmed' && recipeId && candidateId
+      ? `/api/v1/recipes/${recipeId}/image-candidates/${candidateId}/file`
+      : action.status === 'confirmed' && recipeId && savedImageId
+        ? `/api/v1/recipes/${recipeId}/images/${savedImageId}`
+        : `/api/v1/ai/actions/${action.id}/image`;
 
   return (
     <article className={styles.recipeCard} aria-label={`Recipe proposal: ${text(recipe.title)}`}>
@@ -95,15 +134,17 @@ function RecipeProposalCard({
           />
         ) : (
           <div className={styles.imageFallback}>
-            {text(image?.status) === 'generating' ? (
+            {imagePending || ['requested', 'generating'].includes(text(image?.status)) ? (
               <AsyncSkeleton label="Generating preview image" variant="image" />
             ) : (
               <ImageOff />
             )}
             <span>
-              {text(image?.status) === 'generating'
-                ? 'Creating a serving image…'
-                : 'Image preview unavailable'}
+              {imagePending
+                ? 'Preparing an image preview…'
+                : text(image?.status) === 'requested'
+                  ? 'Image request awaiting its recorded result'
+                  : 'Recipe draft · no image selected'}
             </span>
           </div>
         )}
@@ -179,13 +220,53 @@ function RecipeProposalCard({
           })}
         </section>
 
+        {action.kind === 'recipe_create' &&
+        action.status === 'pending' &&
+        action.sourceDigest &&
+        !imageReady ? (
+          <section>
+            <p>
+              Optional image: a separate paid request sends this reviewed recipe to the image
+              provider. Saving the recipe does not select an image.
+            </p>
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              disabled={busy || imagePending}
+              onClick={() => void requestImage()}
+            >
+              {imagePending
+                ? 'Preparing image…'
+                : imageOperation || text(image?.operationId)
+                  ? 'Check this image request'
+                  : 'Generate an image preview (paid)'}
+            </button>
+            {imageError ? <p role="alert">{imageError}</p> : null}
+            {['failed', 'cancelled'].includes(text(image?.status)) ? (
+              <>
+                <p>
+                  The previous request ended without an available preview. A new request may incur
+                  another charge.
+                </p>
+                <button
+                  type="button"
+                  className={styles.secondaryAction}
+                  disabled={busy || imagePending}
+                  onClick={() => void requestImage(true)}
+                >
+                  Start a new paid image request
+                </button>
+              </>
+            ) : null}
+          </section>
+        ) : null}
         {action.status === 'pending' ? (
           <div className={styles.actions}>
             <button
               type="button"
               className={styles.primaryAction}
               onClick={() => onDecide(action.id, 'confirm')}
-              disabled={busy}
+              disabled={busy || imagePending}
             >
               {pendingDecision === 'confirm' ? (
                 <LoadingIndicator label="Saving changes" />
@@ -204,7 +285,7 @@ function RecipeProposalCard({
               type="button"
               className={styles.secondaryAction}
               onClick={() => onDecide(action.id, 'cancel')}
-              disabled={busy}
+              disabled={busy || imagePending}
             >
               {pendingDecision === 'cancel' ? (
                 <>
@@ -220,7 +301,17 @@ function RecipeProposalCard({
             {action.status === 'confirmed' ? (
               <>
                 <Check aria-hidden="true" /> Added to My Recipes
-                {recipeId ? <a href={`/recipes/${recipeId}`}>View recipe</a> : null}
+                {recipeId ? (
+                  <a
+                    href={
+                      candidateId
+                        ? `/recipes/${recipeId}?imageCandidate=${candidateId}#recipe-photos`
+                        : `/recipes/${recipeId}`
+                    }
+                  >
+                    {candidateId ? 'Review image before selecting' : 'View recipe'}
+                  </a>
+                ) : null}
               </>
             ) : (
               <span>

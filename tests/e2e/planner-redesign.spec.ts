@@ -129,10 +129,10 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await generator.getByText('Cost details', { exact: true }).click();
   await expect(generator.getByLabel('Estimated AI API cost')).toContainText('Input');
   await expect(generator.getByLabel('Estimated AI API cost')).toContainText('Output');
-  const imageGeneration = generator.getByRole('switch', { name: /Generate recipe images/u });
-  await expect(imageGeneration).not.toBeChecked();
-  await imageGeneration.check();
-  await expect(generator.getByLabel('Estimated AI API cost')).toContainText('images');
+  await expect(generator.getByRole('switch', { name: /Generate recipe images/u })).toHaveCount(0);
+  await expect(
+    generator.getByText(/Recipe images are a separate optional paid request/),
+  ).toBeVisible();
   expect(
     await generator.evaluate((element) => element.scrollWidth <= element.clientWidth),
     'mobile generator should not horizontally overflow',

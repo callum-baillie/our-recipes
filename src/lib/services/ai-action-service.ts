@@ -1,3 +1,4 @@
+import { currentAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
 import {
   recipeImageInput,
   type AiImageGenerationInput,
@@ -16,7 +17,7 @@ import {
   mealPlanEntries,
   mealPlanLeftoverLinks,
   nutritionMealAllocationVersions,
-  recipeImages,
+  recipeImageCandidates,
 } from '@/lib/db/schema';
 import {
   aiActionKindSchema,
@@ -123,6 +124,10 @@ function publicAction(row: typeof aiActionProposals.$inferSelect) {
     profileId: row.profileId,
     kind: aiActionKindSchema.parse(row.kind),
     status: row.status,
+    sourceDigest:
+      row.kind === 'recipe_create'
+        ? digest(recipeInputSchema.parse(JSON.parse(row.payload).recipe))
+        : null,
     preview: JSON.parse(row.preview) as unknown,
     result: row.result ? (JSON.parse(row.result) as unknown) : null,
     expiresAt: row.expiresAt,
@@ -138,10 +143,12 @@ export function createAiActionProposal(input: {
   payload: unknown;
   preview: unknown;
 }) {
+  assertAiExecutionActive();
   ensureDatabase();
   const now = new Date();
   const row: typeof aiActionProposals.$inferInsert = {
     id: randomUUID(),
+    turnId: currentAiExecutionContext()?.turnId ?? null,
     threadId: input.threadId ?? null,
     profileId: input.profileId,
     kind: input.kind,
@@ -442,33 +449,49 @@ function execute(
           .from(aiActionPreviewImages)
           .where(eq(aiActionPreviewImages.actionId, row.id))
           .get();
-        if (previewImage) {
-          imageId = previewImage.imageId;
-          transaction
-            .insert(recipeImages)
-            .values({
-              id: previewImage.imageId,
-              recipeId,
-              storageKey: previewImage.storageKey,
-              altText: previewImage.altText,
-              width: previewImage.width,
-              height: previewImage.height,
-              createdByProfileId: row.profileId,
-              createdAt: previewImage.createdAt,
-            })
-            .run();
-          transaction
-            .delete(aiActionPreviewImages)
-            .where(eq(aiActionPreviewImages.actionId, row.id))
-            .run();
-          transaction
-            .update(aiOperationAudits)
-            .set({ recipeId, generatedImageId: previewImage.imageId })
-            .where(eq(aiOperationAudits.actionId, row.id))
-            .run();
+        // A reviewed draft image remains private until explicitly accepted for the saved recipe.
+        if (previewImage?.sourceDigest === digest(parsed.recipe) && previewImage.ownerUserId) {
+          const imageReview = JSON.parse(row.preview).image;
+          if (
+            imageReview?.status === 'ready' &&
+            imageReview.ownerUserId === previewImage.ownerUserId
+          ) {
+            imageId = previewImage.imageId;
+            transaction
+              .insert(recipeImageCandidates)
+              .values({
+                id: previewImage.imageId,
+                recipeId,
+                sourceRevision: 1,
+                ownerUserId: previewImage.ownerUserId,
+                profileId: row.profileId,
+                intentHash: digest({ actionId: row.id, sourceDigest: previewImage.sourceDigest }),
+                status: 'ready',
+                storageKey: previewImage.storageKey,
+                altText: previewImage.altText,
+                width: previewImage.width,
+                height: previewImage.height,
+                model: previewImage.model,
+                quality: imageReview.quality,
+                size: imageReview.size,
+                promptVersion: imageReview.promptVersion,
+                auditId: imageReview.auditId,
+                createdAt: previewImage.createdAt,
+              })
+              .run();
+            transaction
+              .delete(aiActionPreviewImages)
+              .where(eq(aiActionPreviewImages.actionId, row.id))
+              .run();
+            transaction
+              .update(aiOperationAudits)
+              .set({ recipeId })
+              .where(eq(aiOperationAudits.actionId, row.id))
+              .run();
+          }
         }
       });
-      return { recipeId, imageId };
+      return { recipeId, candidateId: imageId };
     }
     case 'recipe_batch_create': {
       const parsed = recipeBatchCreatePayloadSchema.parse(payload);
@@ -644,54 +667,14 @@ export async function decideAiAction(
           })
         : execute(row, conflictResolutions);
     let storedResult = result;
-    if (row.kind === 'meal_plan_generate') {
-      const payload = generatedPlanPayloadSchema.parse(JSON.parse(row.payload));
-      const planResult = result as {
-        recipeIds: string[];
-        mealIds: string[];
-        leftoverLinkIds: string[];
-        imageInputs: Array<AiImageGenerationInput & { recipeId: string }>;
+    if (row.kind === 'meal_plan_generate' || row.kind === 'recipe_batch_create') {
+      const { imageInputs: _images, ...saved } = result as {
+        imageInputs?: unknown;
+        [key: string]: unknown;
       };
-      const { imageInputs, ...persistedPlanResult } = planResult;
-      let imageJobId: string | null = null;
-      if (payload.generateRecipeImages && imageInputs.length) {
-        try {
-          const { enqueueRecipeImageJob } = await import('@/lib/services/ai-job-service');
-          imageJobId =
-            enqueueRecipeImageJob({
-              profileId: row.profileId,
-              threadId: row.threadId,
-              actionId: row.id,
-              images: imageInputs,
-            })?.id ?? null;
-        } catch {
-          // The reviewed plan is already committed. A later retry can regenerate images.
-        }
-      }
-      storedResult = { ...persistedPlanResult, imageJobId };
-    }
-    if (row.kind === 'recipe_batch_create') {
-      const batchResult = result as {
-        recipeIds: string[];
-        imageInputs: Array<AiImageGenerationInput & { recipeId: string }>;
-      };
-      const { imageInputs, ...persistedBatchResult } = batchResult;
-      let imageJobId: string | null = null;
-      if (imageInputs.length) {
-        try {
-          const { enqueueRecipeImageJob } = await import('@/lib/services/ai-job-service');
-          imageJobId =
-            enqueueRecipeImageJob({
-              profileId: row.profileId,
-              threadId: row.threadId,
-              actionId: row.id,
-              images: imageInputs,
-            })?.id ?? null;
-        } catch {
-          // Recipes remain saved even if creating the optional image task fails.
-        }
-      }
-      storedResult = { ...persistedBatchResult, imageJobId };
+      void _images;
+      // Text approval never grants permission for a second paid image operation.
+      storedResult = { ...saved, imageJobId: null, imageGeneration: 'requires_separate_review' };
     }
     const updated = getDatabase()
       .update(aiActionProposals)

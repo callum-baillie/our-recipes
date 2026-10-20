@@ -126,6 +126,13 @@ describe('Nutrition direct session and subject boundary', () => {
       { params: Promise.resolve({ profileId: adminId }) },
     );
     expect(response.status).toBe(403);
+    expect(
+      (
+        await routes.GET(request(`/profiles/${adminId}?scope=settings`, cookie), {
+          params: Promise.resolve({ profileId: adminId }),
+        })
+      ).status,
+    ).toBe(403);
   });
   it('a child viewing an adult keeps child authority and only sees their own Nutrition profile', async () => {
     const cookie = await viewed(childCookie, adminId);
@@ -161,6 +168,15 @@ describe('Nutrition direct session and subject boundary', () => {
     const cookie = await viewed(parentCookie, childId);
     const resolved = await shared.requireNutritionPrincipal(request('/session', cookie));
     const profile = nutrition.getPrivateNutritionProfile(childId, resolved.principal!.id);
+    const settingsRead = await routes.GET(request(`/profiles/${childId}?scope=settings`, cookie), {
+      params: Promise.resolve({ profileId: childId }),
+    });
+    expect(settingsRead.status).toBe(200);
+    expect((await settingsRead.json()).profile).toMatchObject({
+      id: childId,
+      version: profile.version,
+      estimatedTargetConsent: profile.estimatedTargetConsent,
+    });
     const { proxy } = await import('@/proxy');
     const allowed = await proxy(
       new NextRequest(`${origin}/api/v1/nutrition/profiles/${childId}`, {

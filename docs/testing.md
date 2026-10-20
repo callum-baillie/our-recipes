@@ -42,3 +42,9 @@ pnpm diff:check
 ```
 
 The focused Pantry recipe/planner suite covers serving scale, required-first compatible-unit allocation, filters and compact/detail rendering, durable planned/skipped/cancelled status, derived cooked exclusion, chronological exhaustion, recorded expiry-before-meal context, and non-mutation. Its isolated Playwright flow uses disposable data, 390/768/1280 viewports, keyboard interaction, axe checks, persisted reload, responsive containment, screenshots, and captured browser-error assertions.
+
+### Post-review release acceptance
+
+After `pnpm build:release`, run `pnpm test:post-review:browser`. CI executes it after the standard release oracle. It resets only synthetic `.test-data`, seeds a named fixture through the real enrollment/setup services, then exercises the specialized workflow, progressive chat, constrained footer/restart review, settings reconciliation, raw catalog context, private image candidates and explicit offline-update suites against the production standalone server. Do not run it concurrently with SQLite integration fixtures. Deterministic request interception is labelled separately from real service/provider tests; no paid calls or email are sent.
+
+The standard release oracle still exercises real initial onboarding separately. Specialized fixtures no longer depend on another optional spec having created their account. This improves reproducibility without treating a mock stream as live model quality or a viewport as physical native-device approval.

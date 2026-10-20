@@ -80,9 +80,8 @@ describe('AI settings reconciliation and action feedback', () => {
       (screen.getByRole('button', { name: 'Save my AI defaults' }) as HTMLButtonElement).disabled,
     ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Load current settings' }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Keep my draft against this version' }),
-    );
+    fireEvent.click(await screen.findByRole('radio', { name: 'Keep my edit: My retained draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use reviewed draft' }));
     expect(
       (screen.getByLabelText(/Response style and planning preferences/) as HTMLTextAreaElement)
         .value,
@@ -123,12 +122,14 @@ describe('AI settings reconciliation and action feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save privacy and summary settings' }));
     await screen.findByText('Privacy changed');
     fireEvent.click(screen.getByRole('button', { name: 'Load current settings' }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Keep my draft against this version' }),
-    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Use reviewed draft' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save privacy and summary settings' }));
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
-    expect(sent(fetcher, 2).dataPolicy).toMatchObject({ version: 2, sharePantry: true });
+    expect(sent(fetcher, 2).dataPolicy).toMatchObject({
+      version: 2,
+      sharePantry: true,
+      shareMealPlans: true,
+    });
   });
   it('distinguishes no permission, permitted but empty, ready, and disabled outputs', () => {
     expect(

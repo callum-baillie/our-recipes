@@ -332,7 +332,7 @@ export function ImportReviewForm({
                     <FoodCatalogPicker
                       context="recipe"
                       defaultQuery={ingredient.item}
-                      onImported={(product) =>
+                      onImported={(product, options) =>
                         updateGroup(groupIndex, {
                           ...group,
                           ingredients: group.ingredients.map((current, currentIndex) =>
@@ -341,6 +341,12 @@ export function ImportReviewForm({
                                   ...current,
                                   item: product.displayName,
                                   pantryProductId: product.id,
+                                  ...(options?.reviewedMeasure
+                                    ? {
+                                        quantity: options.reviewedMeasure.quantity,
+                                        unit: options.reviewedMeasure.unit,
+                                      }
+                                    : {}),
                                 }
                               : current,
                           ),

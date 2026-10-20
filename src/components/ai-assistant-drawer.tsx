@@ -18,7 +18,13 @@ import { useModalSurface } from '@/components/use-modal-surface';
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
 import styles from './ai-assistant-drawer.module.css';
 
-type TurnState = { id: string; status: 'running' | 'completed' | 'failed' | 'cancelled' };
+type TurnState = {
+  id: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'outcome_unknown';
+  reviewed?: boolean;
+};
+const blocksTurn = (turn: TurnState) =>
+  turn.status === 'running' || (turn.status === 'outcome_unknown' && !turn.reviewed);
 
 type Attachment = { kind: 'image'; name: string; mimeType: string; dataBase64: string };
 
@@ -84,6 +90,7 @@ export function AiAssistantDrawer({
     allowPaidTools: boolean;
   } | null>(null);
   const [recoveryRequired, setRecoveryRequired] = useState(false);
+  const [unreviewedTurns, setUnreviewedTurns] = useState<TurnState[]>([]);
   const [newResponse, setNewResponse] = useState(false);
   const [conversationList, setConversationList] = useState<Array<{ id: string; title: string }>>(
     [],
@@ -183,6 +190,7 @@ export function AiAssistantDrawer({
       stickToBottom.current = true;
       setThreadId(body.thread.id);
       setRecoveryRequired(false);
+      setUnreviewedTurns([]);
       submittedTurn.current = null;
       setConversationList((current) => [
         { id: body.thread.id, title: 'New conversation' },
@@ -256,14 +264,19 @@ export function AiAssistantDrawer({
           jobs?: AiJob[];
           turns?: TurnState[];
         };
-        setRecoveryRequired(Boolean(historyBody.turns?.some((turn) => turn.status === 'running')));
+        setRecoveryRequired(Boolean(historyBody.turns?.some(blocksTurn)));
+        setUnreviewedTurns(
+          (historyBody.turns ?? []).filter(
+            (turn) => turn.status === 'outcome_unknown' && !turn.reviewed,
+          ),
+        );
         setMessages(historyBody.messages);
         setDraft(historyBody.messages.length ? '' : (initialDraft ?? ''));
         setThreadId(body.threads[0].id);
         setActions(historyBody.actions ?? []);
         setJobs(historyBody.jobs ?? []);
         setStatus(
-          historyBody.turns?.some((turn) => turn.status === 'running')
+          historyBody.turns?.some(blocksTurn)
             ? 'A previous request is running or its outcome is uncertain. Review the conversation before starting separate work.'
             : '',
         );
@@ -311,11 +324,21 @@ export function AiAssistantDrawer({
           messages: Message[];
           actions: AiDrawerAction[];
           jobs: AiJob[];
+          turns?: TurnState[];
         };
         if (disposed || turnInFlight.current) return;
         setMessages(body.messages);
         setActions(body.actions);
         setJobs(body.jobs ?? []);
+        if (body.turns?.some(blocksTurn)) {
+          setRecoveryRequired(true);
+          setUnreviewedTurns(
+            body.turns.filter((turn) => turn.status === 'outcome_unknown' && !turn.reviewed),
+          );
+          setStatus(
+            'A previous request needs review. Saved changes and tasks are shown above; an interrupted response does not mean they were undone.',
+          );
+        }
         const proposals = await fetch(
           `/api/v1/ai/app-actions?threadId=${encodeURIComponent(threadId)}`,
           { cache: 'no-store' },
@@ -431,7 +454,10 @@ export function AiAssistantDrawer({
       setJobs(body.jobs ?? []);
       setDraft(saved?.text ?? '');
       setAttachments(saved?.attachments ?? []);
-      const running = body.turns?.some((turn) => turn.status === 'running') ?? false;
+      const running = body.turns?.some(blocksTurn) ?? false;
+      setUnreviewedTurns(
+        (body.turns ?? []).filter((turn) => turn.status === 'outcome_unknown' && !turn.reviewed),
+      );
       setRecoveryRequired(running);
       if (!running) submittedTurn.current = null;
       setStatus(
@@ -446,6 +472,29 @@ export function AiAssistantDrawer({
     } catch (error) {
       setStatusError(true);
       setStatus(error instanceof Error ? error.message : 'Could not reload this conversation.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function acknowledgeRecovery(operationId: string) {
+    if (!threadId || busy) return;
+    setBusy(true);
+    setStatusError(false);
+    try {
+      const response = await fetch(`/api/v1/ai/chat/threads/${threadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'acknowledge_recovery', operationId }),
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      await loadConversation(threadId);
+      setStatus(
+        'Review acknowledged. The interrupted request was not rerun or undone. You can now send a separate request.',
+      );
+    } catch (error) {
+      setStatusError(true);
+      setStatus(error instanceof Error ? error.message : 'Could not acknowledge this review.');
     } finally {
       setBusy(false);
     }
@@ -756,6 +805,7 @@ export function AiAssistantDrawer({
               stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 72;
             }}
             className={styles.messages}
+            data-chat-messages
             role="log"
             aria-label="Conversation"
             tabIndex={0}
@@ -911,24 +961,6 @@ export function AiAssistantDrawer({
                   onCommand={(jobId, command) => void commandJob(jobId, command)}
                 />
               ))}
-              {busy && !openingConversation ? (
-                <div>
-                  <AsyncSkeleton
-                    className={`${styles.message} ${styles.assistant} ${styles.typing}`}
-                    label={status || 'Working on your request'}
-                    variant="message"
-                  />
-                  <p className={styles.workExplanation}>
-                    <strong>{status || 'Working on your request'}</strong>
-                    <br />
-                    {status.includes('conversation')
-                      ? 'Your saved messages and plans will appear here.'
-                      : pendingDecision
-                        ? 'Saving your confirmed changes.'
-                        : 'Your request is running. Larger recipe and image requests can take a few minutes.'}
-                  </p>
-                </div>
-              ) : null}
               <div ref={bottomRef} />
             </div>
           </div>
@@ -1024,7 +1056,7 @@ export function AiAssistantDrawer({
             <form onSubmit={sendMessage} aria-label="AI assistant message composer">
               <button
                 type="button"
-                className={styles.attachButton}
+                className={`${styles.attachButton} ${styles.iconButton}`}
                 aria-label="Attach images"
                 title="Attach images"
                 disabled={busy || attaching || attachments.length >= 20}
@@ -1053,6 +1085,7 @@ export function AiAssistantDrawer({
               />
               <button
                 type="submit"
+                className={styles.iconButton}
                 aria-label="Send message"
                 title="Send message"
                 disabled={
@@ -1074,7 +1107,22 @@ export function AiAssistantDrawer({
               ) : null}
               {recoveryRequired ? (
                 <div className={styles.recoveryActions}>
-                  {submittedTurn.current && (
+                  {unreviewedTurns.map((turn) => (
+                    <div key={turn.id}>
+                      <p>
+                        The response was interrupted. Review the saved messages, changes and tasks
+                        above before continuing. No uncertain operation will be repeated.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void acknowledgeRecovery(turn.id)}
+                      >
+                        I reviewed the saved outcomes
+                      </button>
+                    </div>
+                  ))}
+                  {submittedTurn.current && !unreviewedTurns.length && (
                     <button type="button" disabled={busy} onClick={() => void sendTurn(true)}>
                       Check the same request
                     </button>
@@ -1100,8 +1148,14 @@ export function AiAssistantDrawer({
                   Jump to latest response
                 </button>
               ) : null}
-              {status ? (
-                <InlineAlert tone={statusError ? 'error' : 'info'}>{status}</InlineAlert>
+              {status && !unreviewedTurns.length ? (
+                statusError ? (
+                  <InlineAlert tone="error">{status}</InlineAlert>
+                ) : (
+                  <p className={styles.turnStatus} role="status">
+                    {status}
+                  </p>
+                )
               ) : null}
               <p className={`${styles.keyboardHint} ${styles.desktopHint}`}>
                 Enter to send · Shift + Enter for a new line

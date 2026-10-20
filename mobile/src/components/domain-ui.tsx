@@ -1,8 +1,9 @@
+import { shoppingAmountSummary } from '../../../shared/mobile-domain/shopping-amounts';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { MealPlanItem, PantryItem, ShoppingItem, ShoppingList } from '@/data/types';
-import { Icon, StatusPill, Surface } from '@/components/ui';
+import { Body, Icon, StatusPill, Surface } from '@/components/ui';
 import { tokens, editorial } from '@/theme/tokens';
 import { useBord } from '@/state/bord-store';
 import { useServerActions } from '@/data/server-actions';
@@ -425,6 +426,12 @@ export function ShoppingRow({ item, listId }: { item: ShoppingItem; listId: stri
           {item.amount}
         </Text>
       </Pressable>
+      {inCart ? (
+        <Body muted>
+          In cart: {shoppingAmountSummary(item).cart}. Requested:{' '}
+          {shoppingAmountSummary(item).requested}.
+        </Body>
+      ) : null}
       {item.policyBreakdown ? (
         <View
           accessibilityLabel={`Shopping policy breakdown for ${item.name}`}

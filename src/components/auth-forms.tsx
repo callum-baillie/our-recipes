@@ -174,6 +174,7 @@ export function SignInForm({
       {pending === 'passkey' && <Feedback message="Complete the passkey prompt on this device." />}
       <div className="auth-card-links">
         <Link href="/forgot-password">Forgot your passphrase?</Link>
+        <Link href="/verify-email">Request an email verification link</Link>
       </div>
     </form>
   );
@@ -460,6 +461,80 @@ export function ResetPasswordForm({
       <div className="auth-card-links">
         <Link href="/forgot-password">Request an email reset link</Link>
         {token && <Link href="/reset-password">Use a saved recovery code</Link>}
+        <Link href="/sign-in">Back to sign in</Link>
+      </div>
+    </form>
+  );
+}
+
+export function VerificationLinkForm({ invalid = false }: { invalid?: boolean }) {
+  const [email, setEmail] = useState('');
+  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const lock = useRef(false);
+  async function request(event: React.FormEvent) {
+    event.preventDefault();
+    if (lock.current) return;
+    lock.current = true;
+    setPending(true);
+    setError(null);
+    setSubmitted(null);
+    const address = email.trim();
+    try {
+      const response = await authClient.sendVerificationEmail({
+        email: address,
+        callbackURL: '/sign-in?verified=1',
+      });
+      if (response.error)
+        throw new Error(response.error.message ?? 'Could not request a verification link.');
+      setSubmitted(address);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Unable to reach the sign-in service. Try again.',
+      );
+    } finally {
+      lock.current = false;
+      setPending(false);
+    }
+  }
+  return (
+    <form className="auth-card" onSubmit={(event) => void request(event)}>
+      <Heading icon={<Mail />} eyebrow="ACCOUNT VERIFICATION" title="Request a verification link">
+        Use the email linked to your account. Existing verified accounts can sign in directly.
+      </Heading>
+      {invalid && !submitted && (
+        <Feedback message="That verification link is no longer valid. Request a new link below." />
+      )}
+      <fieldset className="auth-fields" disabled={pending}>
+        <label>
+          Email
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            disabled={pending}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setSubmitted(null);
+              setError(null);
+            }}
+          />
+        </label>
+      </fieldset>
+      <Feedback message={error} error />
+      <Feedback
+        message={
+          submitted
+            ? `Request received for ${submitted}. If this account needs verification, check its inbox and spam folder for a new link.`
+            : null
+        }
+      />
+      <button className="primary-button" type="submit" disabled={pending}>
+        {pending ? 'Requesting link…' : submitted ? 'Request again' : 'Request verification link'}
+      </button>
+      <div className="auth-card-links">
         <Link href="/sign-in">Back to sign in</Link>
       </div>
     </form>

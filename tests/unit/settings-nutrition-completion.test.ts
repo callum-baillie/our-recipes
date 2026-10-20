@@ -243,6 +243,7 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
   it('keeps saved kitchen answers separate from an interrupted questionnaire draft', async () => {
     render(createElement(KitchenInterview, { profile: member }));
     fireEvent.click(screen.getByRole('button', { name: 'Edit guided questionnaire' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit taste' }));
     fireEvent.change(screen.getByLabelText(/Do you lean sweet/), {
       target: { value: 'Unsaved sweet preference' },
     });
@@ -264,17 +265,17 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
     vi.stubGlobal('fetch', fetcher);
     render(createElement(KitchenInterview, { profile: member }));
     fireEvent.click(screen.getByRole('button', { name: 'Edit guided questionnaire' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit taste' }));
     fireEvent.change(screen.getByLabelText(/Do you lean sweet/), {
       target: { value: 'My retained draft' },
     });
     for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save context' }));
-    await screen.findByRole('region', { name: 'Review changed kitchen context' });
+    await screen.findByRole('region', { name: 'Compare concurrent changes' });
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Saved: Newly saved taste')).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Keep my draft after reviewing current context' }),
-    );
+    expect(screen.getByText('Use current saved value: Newly saved taste')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Keep my edit: My retained draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use reviewed draft' }));
     fetcher.mockImplementation((_url, init) =>
       json(init?.method === 'PATCH' ? {} : { interview: current, revision: 'latest' }),
     );
@@ -282,7 +283,7 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
     expect(JSON.parse(fetcher.mock.calls[2]![1].body)).toMatchObject({
       expectedRevision: 'latest',
-      interview: { taste: 'My retained draft' },
+      interviewPatch: { taste: 'My retained draft' },
     });
   });
 

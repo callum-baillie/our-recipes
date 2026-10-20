@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import { SettingsConflictReview } from './settings-conflict-review';
+import { SettingsMergeReview, settingsFieldLabel } from './settings-merge-review';
 import type { AiRuntimeSettings, AiUserPreferences } from '@/lib/domain/ai-runtime-settings';
 import { SettingsPane, SettingsField, SettingsActionBar } from './settings-primitives';
 import {
@@ -30,14 +30,49 @@ type CurrentRuntime = {
   workloads: Workload[];
   users?: Account[];
   version?: number;
-  account?: { preferences: AiUserPreferences; version: number };
+  account?: { preferences: AiUserPreferences; version: number; enabled?: boolean };
 };
+function draftValues(
+  settings: AiRuntimeSettings,
+  workloads: Workload[],
+  personal: AiUserPreferences | undefined,
+  accounts: Account[],
+) {
+  return personal
+    ? {
+        personal: {
+          ...personal,
+          workloads: Object.fromEntries(
+            personal.workloads.map(({ workload, model, reasoningEffort, enabled }) => [
+              workload,
+              { model, reasoningEffort, enabled },
+            ]),
+          ),
+        },
+        settings: undefined,
+        workloads: undefined,
+        accounts: undefined,
+      }
+    : {
+        personal: undefined,
+        settings,
+        workloads: Object.fromEntries(
+          workloads.map(({ workload, model, reasoningEffort, enabled }) => [
+            workload,
+            { model, reasoningEffort, enabled },
+          ]),
+        ),
+        accounts: Object.fromEntries(accounts.map(({ id, enabled }) => [id, { enabled }])),
+      };
+}
+type RuntimeDraft = ReturnType<typeof draftValues>;
 export function AiRuntimeSettingsForm(props: Props) {
   const shared = !props.personal;
   const [settings, setSettings] = useState(props.global);
   const [workloads, setWorkloads] = useState(props.workloads);
   const [personal, setPersonal] = useState(props.personal);
   const [accounts, setAccounts] = useState(props.accounts ?? []);
+  const [accountEnabled, setAccountEnabled] = useState(props.enabled);
   const [global, setGlobal] = useState(props.global);
   const [conflict, setConflict] = useState(false);
   const [current, setCurrent] = useState<CurrentRuntime | null>(null);
@@ -47,6 +82,9 @@ export function AiRuntimeSettingsForm(props: Props) {
   const [status, setStatus] = useState('');
   const [saved, setSaved] = useState(
     JSON.stringify([props.global, props.workloads, props.personal, props.accounts ?? []]),
+  );
+  const [baseline, setBaseline] = useState(() =>
+    draftValues(props.global, props.workloads, props.personal, props.accounts ?? []),
   );
   const dirty = JSON.stringify([settings, workloads, personal, accounts]) !== saved;
   const processing = shared ? settings : (personal?.processing ?? global);
@@ -95,10 +133,12 @@ export function AiRuntimeSettingsForm(props: Props) {
         setWorkloads(body.workloads);
         setAccounts(body.users);
         setVersion(body.version);
+        setBaseline(draftValues(body.settings, body.workloads, undefined, body.users));
         setSaved(JSON.stringify([body.settings, body.workloads, personal, body.users]));
       } else {
         setPersonal(body.account.preferences);
         setVersion(body.account.version);
+        setBaseline(draftValues(settings, workloads, body.account.preferences, accounts));
         setSaved(JSON.stringify([settings, workloads, body.account.preferences, accounts]));
       }
       setStatus('AI settings saved. New requests will use these choices.');
@@ -113,6 +153,8 @@ export function AiRuntimeSettingsForm(props: Props) {
     if (lock.current) return;
     lock.current = true;
     setPending(true);
+    setCurrent(null);
+    setStatus('Loading current settings…');
     try {
       const response = await fetch(`/api/v1/ai/settings${shared ? '?scope=global' : ''}`, {
         cache: 'no-store',
@@ -129,48 +171,61 @@ export function AiRuntimeSettingsForm(props: Props) {
       setPending(false);
     }
   }
-  function reconcile(keep: boolean) {
+  function currentDraft() {
+    return current
+      ? draftValues(
+          current.settings ?? current.global!,
+          current.workloads,
+          shared ? undefined : current.account!.preferences,
+          current.users ?? [],
+        )
+      : baseline;
+  }
+  function reconcile(reviewed: RuntimeDraft) {
     if (!current) return;
+    const latest = currentDraft();
+    setBaseline(latest);
     if (shared) {
-      const savedSettings = current.settings!;
-      const savedAccounts = current.users ?? [];
       setVersion(current.version!);
-      setSaved(JSON.stringify([savedSettings, current.workloads, personal, savedAccounts]));
-      setSettings(keep ? settings : savedSettings);
+      setSaved(
+        JSON.stringify([current.settings, current.workloads, personal, current.users ?? []]),
+      );
+      setSettings(reviewed.settings!);
       setWorkloads(
-        keep
-          ? current.workloads.map((item) => ({
-              ...item,
-              ...workloads.find((draft) => draft.workload === item.workload),
-              version: item.version,
-            }))
-          : current.workloads,
+        current.workloads.map((item) => ({ ...item, ...reviewed.workloads?.[item.workload] })),
       );
       setAccounts(
-        keep
-          ? savedAccounts.map((item) => ({
-              ...item,
-              enabled: accounts.find((draft) => draft.id === item.id)?.enabled ?? item.enabled,
-            }))
-          : savedAccounts,
+        (current.users ?? []).map((item) => ({ ...item, ...reviewed.accounts?.[item.id] })),
       );
     } else {
       setVersion(current.account!.version);
       setGlobal(current.global!);
+      setAccountEnabled(current.account!.enabled ?? accountEnabled);
       setSettings(current.global!);
       setWorkloads(current.workloads);
       setSaved(
         JSON.stringify([current.global, current.workloads, current.account!.preferences, accounts]),
       );
-      if (!keep) setPersonal(current.account!.preferences);
+      setPersonal(
+        reviewed.personal
+          ? {
+              ...reviewed.personal,
+              workloads: Object.entries(reviewed.personal.workloads).map(([workload, values]) => ({
+                workload: workload as AiWorkload,
+                ...values,
+                version:
+                  current.account!.preferences.workloads.find((item) => item.workload === workload)
+                    ?.version ??
+                  current.workloads.find((item) => item.workload === workload)?.version ??
+                  1,
+              })),
+            }
+          : undefined,
+      );
     }
     setConflict(false);
     setCurrent(null);
-    setStatus(
-      keep
-        ? 'Draft retained against the reviewed version. Save explicitly to apply it.'
-        : 'Current saved settings loaded.',
-    );
+    setStatus('Reviewed changes are ready. Save explicitly to apply them.');
   }
   return (
     <div
@@ -184,7 +239,7 @@ export function AiRuntimeSettingsForm(props: Props) {
         description={
           shared
             ? 'Shared defaults apply unless an account chooses an override. Disabling AI prevents new requests; already submitted batches can still finish.'
-            : `AI access is ${props.enabled && global.enabled ? 'enabled' : 'disabled by an administrator'}. Your choices apply to your signed-in account.`
+            : `AI access is ${accountEnabled && global.enabled ? 'enabled' : 'disabled by an administrator'}. Your choices apply to your signed-in account.`
         }
       >
         {shared && (
@@ -197,7 +252,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                 type="checkbox"
                 role="switch"
                 checked={settings.enabled}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setSettings((current) => ({ ...current, enabled: event.target.checked }))
                 }
@@ -211,7 +266,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                 type="checkbox"
                 role="switch"
                 checked={settings.allowPersonalModelOverrides ?? true}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setSettings((value) => ({
                     ...value,
@@ -237,7 +292,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   min={min}
                   max={max}
                   value={settings[key]}
-                  disabled={pending}
+                  disabled={pending || conflict}
                   onChange={(event) =>
                     setSettings((value) => ({ ...value, [key]: Number(event.target.value) }))
                   }
@@ -250,7 +305,7 @@ export function AiRuntimeSettingsForm(props: Props) {
             >
               <select
                 value={settings.imageQuality}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setSettings((value) => ({
                     ...value,
@@ -269,7 +324,7 @@ export function AiRuntimeSettingsForm(props: Props) {
             >
               <select
                 value={settings.imageSize}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setSettings((value) => ({
                     ...value,
@@ -289,7 +344,7 @@ export function AiRuntimeSettingsForm(props: Props) {
               <input
                 type="checkbox"
                 checked={settings.allowPersonalImageOverrides}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setSettings((value) => ({
                     ...value,
@@ -308,7 +363,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                 min={1}
                 max={100}
                 value={settings.generationsPerTenMinutes}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
@@ -324,7 +379,7 @@ export function AiRuntimeSettingsForm(props: Props) {
             <input
               type="checkbox"
               checked={!personal?.processing}
-              disabled={pending}
+              disabled={pending || conflict}
               onChange={(event) =>
                 setPersonal((current) => ({
                   ...current!,
@@ -346,7 +401,7 @@ export function AiRuntimeSettingsForm(props: Props) {
           <select
             aria-label="Processing"
             value={processing.executionMode}
-            disabled={pending || (!shared && !personal?.processing)}
+            disabled={pending || conflict || (!shared && !personal?.processing)}
             onChange={(event) =>
               changeProcessing({
                 executionMode: event.target.value as AiRuntimeSettings['executionMode'],
@@ -369,7 +424,10 @@ export function AiRuntimeSettingsForm(props: Props) {
             max={50}
             value={processing.batchMinItems}
             disabled={
-              pending || processing.executionMode !== 'auto' || (!shared && !personal?.processing)
+              pending ||
+              conflict ||
+              processing.executionMode !== 'auto' ||
+              (!shared && !personal?.processing)
             }
             onChange={(event) => changeProcessing({ batchMinItems: Number(event.target.value) })}
           />
@@ -387,7 +445,7 @@ export function AiRuntimeSettingsForm(props: Props) {
             <textarea
               rows={4}
               maxLength={2000}
-              disabled={pending}
+              disabled={pending || conflict}
               value={personal?.instructions ?? ''}
               onChange={(event) =>
                 setPersonal((value) => ({ ...value!, instructions: event.target.value }))
@@ -397,7 +455,7 @@ export function AiRuntimeSettingsForm(props: Props) {
           <button
             type="button"
             className="text-button"
-            disabled={pending || !personal?.instructions}
+            disabled={pending || conflict || !personal?.instructions}
             onClick={() => setPersonal((value) => ({ ...value!, instructions: '' }))}
           >
             Reset instructions to default
@@ -469,7 +527,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   <input
                     type="checkbox"
                     checked={!override}
-                    disabled={pending || global.allowPersonalModelOverrides === false}
+                    disabled={pending || conflict || global.allowPersonalModelOverrides === false}
                     onChange={(event) =>
                       event.target.checked
                         ? setPersonal((current) => ({
@@ -489,6 +547,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   value={item.model}
                   disabled={
                     pending ||
+                    conflict ||
                     (!shared && (!override || global.allowPersonalModelOverrides === false))
                   }
                   onChange={(event) =>
@@ -519,6 +578,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                     value={item.model}
                     disabled={
                       pending ||
+                      conflict ||
                       (!shared && (!override || global.allowPersonalModelOverrides === false))
                     }
                     onChange={(event) => update({ model: event.target.value })}
@@ -530,6 +590,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   value={item.reasoningEffort ?? ''}
                   disabled={
                     pending ||
+                    conflict ||
                     (!shared && (!override || global.allowPersonalModelOverrides === false))
                   }
                   onChange={(event) =>
@@ -553,6 +614,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   checked={item.enabled}
                   disabled={
                     pending ||
+                    conflict ||
                     (!shared && (!override || global.allowPersonalModelOverrides === false))
                   }
                   onChange={(event) => update({ enabled: event.target.checked })}
@@ -574,7 +636,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                 type="checkbox"
                 role="switch"
                 checked={account.enabled}
-                disabled={pending}
+                disabled={pending || conflict}
                 onChange={(event) =>
                   setAccounts((current) =>
                     current.map((row) =>
@@ -588,23 +650,47 @@ export function AiRuntimeSettingsForm(props: Props) {
         </SettingsPane>
       )}
       {conflict && (
-        <SettingsConflictReview
-          pending={pending}
-          loaded={Boolean(current)}
-          onLoad={() => void loadCurrent()}
-          onKeepDraft={() => reconcile(true)}
-          onUseSaved={() => reconcile(false)}
-        >
-          <details open>
-            <summary>
-              Current saved AI defaults · version{' '}
-              {shared ? current?.version : current?.account?.version}
-            </summary>
-            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-              {JSON.stringify(shared ? current?.settings : current?.account?.preferences, null, 2)}
-            </pre>
-          </details>
-        </SettingsConflictReview>
+        <section aria-label="Review changed settings">
+          <p role="status">These settings changed elsewhere. Your edits are retained.</p>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={pending}
+            onClick={() => void loadCurrent()}
+          >
+            {pending ? 'Loading current settings…' : 'Load current settings'}
+          </button>
+          {current && (
+            <SettingsMergeReview
+              key={JSON.stringify(current)}
+              baseline={baseline}
+              draft={draftValues(settings, workloads, personal, accounts)}
+              current={currentDraft()}
+              pending={pending}
+              onResolve={reconcile}
+              onDiscard={() => reconcile(currentDraft())}
+              label={(path) =>
+                path
+                  .filter(
+                    (part) => !['personal', 'settings', 'workloads', 'accounts'].includes(part),
+                  )
+                  .map(
+                    (part) =>
+                      [...(current.users ?? []), ...accounts].find((item) => item.id === part)
+                        ?.name ??
+                      (
+                        {
+                          instructions: 'Response style and planning preferences',
+                          processing: 'Background processing',
+                        } as Record<string, string>
+                      )[part] ??
+                      settingsFieldLabel([part]),
+                  )
+                  .join(' · ')
+              }
+            />
+          )}
+        </section>
       )}
       <SettingsActionBar
         status={status || (dirty ? 'Unsaved AI defaults' : 'No unsaved AI defaults')}
@@ -615,7 +701,11 @@ export function AiRuntimeSettingsForm(props: Props) {
           disabled={pending || !dirty || conflict}
           onClick={() => void save()}
         >
-          {pending ? 'Saving…' : shared ? 'Save global AI settings' : 'Save my AI defaults'}
+          {pending && !conflict
+            ? 'Saving…'
+            : shared
+              ? 'Save global AI settings'
+              : 'Save my AI defaults'}
         </button>
       </SettingsActionBar>
     </div>

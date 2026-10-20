@@ -8,7 +8,9 @@ Each candidate records the recipe revision, a normalized intent digest, effectiv
 
 The browser retains only the operation ID and submitted revision/quality/framing in session storage, scoped to account, profile and recipe. After interruption, **Check this request** is a read. **Stop waiting** aborts the client/provider request where supported; it does not claim that provider execution or billing stopped. Requested/failed operations never automatically regenerate. **Discard this preview** prevents late results from being attached and removes available preview media. Starting another preview is a separate explicit paid action. Candidate tombstones remain for replay; there is no automatic retry or background image request.
 
-The previous `{ "confirm": true }` direct-save API remains compatible for existing integrations. New web and native review use `{ "confirm": true, "preview": true, "operationId": "…", "expectedRevision": 3 }`. This compatibility path does not inherit candidate replay protection. New integrations should use the reviewed path. Candidate routes, ownership, errors and permissions are documented in OpenAPI.
+The former `{ "confirm": true }` direct-save path now returns `409 image_review_required`. Integrations must use `{ "confirm": true, "preview": true, "operationId": "…", "expectedRevision": 3 }` and then explicitly accept the owned candidate. This deliberate compatibility break prevents legacy callers from silently selecting a generated image. Queued and batch outputs also remain private candidates, bound to the actual approved recipe revision. Legacy queued images without a known revision require a fresh review.
+
+Text drafting and text approval never authorize optional images. A recipe draft has its own explicit paid image action bound to the normalized draft digest and account. An exact retry returns its receipt; closing or changing the draft prevents a late result from becoming available. Saving the recipe transfers its valid private preview to a saved-recipe candidate, which still needs explicit image acceptance.
 
 Administrator image defaults are low quality and 1024 × 1024 unless explicitly changed. Medium/high and 1536 × 1024 / 1024 × 1536 choices require the administrator's image-override policy. Neither preview nor retry changes the configured model. OpenAI requests have bounded timeouts and SDK retries disabled. Queued image jobs snapshot their approved settings; policy revocation is still checked at execution.
 
@@ -27,9 +29,19 @@ For an explicitly authorized live evaluation, generate one preview for each fixt
 
 Record individual scores and image paths; reject a candidate with any zero. Compare the same fixtures/settings across prompt changes. A mock, prompt inspection or successful provider request is not a visual-quality pass. Live evaluation remains blocked by the absence of explicit paid-call permission; no live image call was made.
 
-Parameter reference checked against [OpenAI image generation documentation](https://developers.openai.com/api/docs/guides/image-generation) on 2026-10-19. No price is displayed for an unverified/custom configured model, and no total cost guarantee is inferred from output-only image pricing.
+Parameter reference rechecked against [OpenAI image generation documentation](https://developers.openai.com/api/docs/guides/image-generation) on 2026-10-20. No price is displayed for an unverified/custom configured model, and no total cost guarantee is inferred from output-only image pricing.
+
+The executable set is `tests/fixtures/ai/image-realism.json`. A free manifest-only run is:
+
+```sh
+pnpm exec tsx scripts/evaluate-recipe-images.ts --dry-run --model gpt-image-2 --output /tmp/bord-image-evaluation --max-images 6
+```
+
+Use a new output directory. The manifest records source/prompt digests, actual options, prompt version and empty rubric scores. After separate explicit paid authorization, replace `--dry-run` with `--paid` and provide server-side `OPENAI_API_KEY` plus `BORD_PAID_IMAGE_EVAL_AUTHORIZED=yes`. The runner generates at most six images sequentially, disables retries and stops on an uncertain failure. It never creates recipes, accepts candidates or selects photos. Copy actual output paths and human scores into the report; never fill scores from a deterministic mock. This command documents the gate and does not grant permission to run it.
 
 ## Executed evidence
+
+The original checks below are historical full-refinement evidence. Current post-review results, private queued/draft behavior and new captures are in [post-review-ai.md](post-review-ai.md).
 
 - `tests/unit/recipe-image-prompt.test.ts`: 8 deterministic cases, including six dish types, untrusted recipe text and bounded provider parameters.
 - `tests/unit/recipe-image-generator.test.ts`: 3 mounted cases for pending freeze, explicit acceptance, exact retry after interruption/remount, and recoverable validation rejection.

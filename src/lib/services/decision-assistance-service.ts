@@ -1,3 +1,5 @@
+import { executeAiWorkload } from './ai-execution-service';
+import { withAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
 import 'server-only';
 import { z } from 'zod';
 import { getDatabase } from '@/lib/db/client';
@@ -99,27 +101,37 @@ export async function runDecisionAssistance(p: RequestPrincipal, input: Decision
         nextOffset,
       };
     if (missing.length) {
+      assertAiExecutionActive();
       enforceDecisionBudget(p);
       // Model-generated confidence is displayed, never used as authorization to mutate data.
-      const answers = await requestDecisions({
-        allowPaidCall: input.allowPaidCall,
-        model: DECISIONS_MODEL,
-        requestTimeoutSeconds: setting.requestTimeoutSeconds,
-        safetyIdentifier: aiSafetyIdentifier(p.profileId),
-        evidence: missing.map(({ job }, index) => ({
-          name: `item_${index}`,
-          title: job.title,
-          evidence: job.evidence,
-        })),
-        questions: missing.map(({ job }, index) => ({
-          name: `item_${index}`,
-          instructions: `${AI_GROUNDING_INSTRUCTIONS} ${setting.promptGuidance ?? ''} Evaluate only evidence for item_${index}. ${job.instructions} Return unknown when evidence is insufficient.`,
-          choices: job.options.map((o) => ({
-            value: o.value,
-            description: `${o.label}: ${o.description}`,
-          })),
-        })),
-      });
+      const answers = await withAiExecutionContext({ providerEndpoint: 'decisions' }, () =>
+        executeAiWorkload(
+          p.profileId,
+          'chat',
+          (options) =>
+            requestDecisions({
+              signal: options.signal,
+              requestTimeoutSeconds: options.requestTimeoutSeconds,
+              allowPaidCall: input.allowPaidCall,
+              model: DECISIONS_MODEL,
+              safetyIdentifier: aiSafetyIdentifier(p.profileId),
+              evidence: missing.map(({ job }, index) => ({
+                name: `item_${index}`,
+                title: job.title,
+                evidence: job.evidence,
+              })),
+              questions: missing.map(({ job }, index) => ({
+                name: `item_${index}`,
+                instructions: `${AI_GROUNDING_INSTRUCTIONS} ${options.promptGuidance ?? ''} Evaluate only evidence for item_${index}. ${job.instructions} Return unknown when evidence is insufficient.`,
+                choices: job.options.map((o) => ({
+                  value: o.value,
+                  description: `${o.label}: ${o.description}`,
+                })),
+              })),
+            }),
+          { model: DECISIONS_MODEL, reasoningEffort: null },
+        ),
+      );
       answers.forEach((answer, index) => {
         const { job, hash } = missing[index]!;
         const valid =

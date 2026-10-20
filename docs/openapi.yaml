@@ -375,7 +375,28 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/CatalogMeasuresInput' }
       responses:
-        '200': { description: 'Revision-bound source measures; no density is inferred' }
+        '200':
+          description: Revision-bound source portions. gramWeight applies to the complete stated amount/unit/modifier, not an assumed one unit; no density is inferred.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  measures:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [label, amount, unit, modifier, description, gramWeight, form, basis]
+                      properties:
+                        label: { type: string }
+                        amount: { type: [number, 'null'] }
+                        unit: { type: [string, 'null'] }
+                        modifier: { type: [string, 'null'] }
+                        description: { type: [string, 'null'] }
+                        gramWeight: { type: [number, 'null'] }
+                        form: { type: [string, 'null'] }
+                        basis: { type: [string, 'null'] }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Exact source revision expired; review again }
@@ -719,6 +740,28 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Household already exists }
+  /auth/context:
+    get:
+      operationId: readSessionActorContext
+      summary: Read minimal current account and viewing actor for reviewed native recovery
+      description: Session-only, independent of Nutrition permission. Native scanner confirmations send X-Bord-Expected-Profile-Id; the reviewed Pantry and catalog shopping POST routes reject a changed actor with 409 before writing. This header never grants permission or bypasses trusted-origin checks.
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: Current session actor; private no-store, no credentials or profile preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [actor]
+                properties:
+                  actor:
+                    type: object
+                    required: [userId, profileId]
+                    properties:
+                      userId: { type: string }
+                      profileId: { type: string, format: uuid }
+        '401': { description: Sign in required }
   /auth/enroll:
     post:
       security: []
@@ -1565,14 +1608,14 @@ paths:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
       x-api-permissions: ['recipes:update']
       operationId: generateRecipeImage
-      summary: Generate a reviewed image preview or use the legacy direct-save contract
+      summary: Generate an owned revision-bound image preview for separate acceptance
+      description: The former confirm-only direct-save body is rejected with image_review_required. Generation never attaches or selects an image. Reuse the exact operationId and reviewed intent after uncertain delivery; check the candidate receipt before starting another paid operation.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               oneOf:
-                - { $ref: '#/components/schemas/AiImageGenerationRequest' }
                 - type: object
                   additionalProperties: false
                   required: [confirm, preview, operationId, expectedRevision]
@@ -1600,11 +1643,13 @@ paths:
           {
             description: Prior request still pending; check existing candidate without regenerating,
           }
-        '201': { description: Legacy direct-save image ID and content-free audit summary }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Recipe not found }
-        '409': { description: Active profile selection required }
+        '409':
+          {
+            description: 'Image review required, changed operation intent, stale recipe revision or active profile selection required',
+          }
         '422': { description: Generated result could not be stored safely }
         '429': { description: Per-profile AI rate limit exceeded }
         '503': { description: OpenAI is not configured on this server }
@@ -3653,6 +3698,12 @@ paths:
       - { in: path, name: threadId, required: true, schema: { type: string, format: uuid } }
     get:
       operationId: readMyAiConversation
+      parameters:
+        - in: query
+          name: operationId
+          required: false
+          schema: { type: string, format: uuid }
+          description: Exact owned request lookup, including a receipt older than the latest thirty turns.
       summary: Reconcile saved messages, previews, jobs and request outcomes
       description: Session only; only the linked account's own thread. Turn receipts expose id, status, createdAt and updatedAt, never intent hashes or stored result payloads. A running receipt may require outcome reconciliation; it does not establish failure.
       responses:
@@ -3684,7 +3735,14 @@ paths:
                                         status:
                                           {
                                             type: string,
-                                            enum: [running, completed, failed, cancelled],
+                                            enum:
+                                              [
+                                                running,
+                                                completed,
+                                                failed,
+                                                cancelled,
+                                                outcome_unknown,
+                                              ],
                                           },
                                         createdAt: { type: string, format: date-time },
                                         updatedAt: { type: string, format: date-time },
@@ -3699,6 +3757,27 @@ paths:
         '401': { description: Signed out }
         '403': { description: Account does not own this private workspace }
         '404': { description: Conversation not found }
+    patch:
+      operationId: acknowledgeMyAiRecovery
+      summary: Acknowledge review of an interrupted private request
+      description: Session and trusted origin required. Reconciles an expired lease and marks its outputs reviewed, without replaying provider work. If the exact operation has no receipt, writes a reviewed tombstone so a delayed original request cannot start. An active request must finish or expire first.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action, operationId]
+              properties:
+                action: { type: string, const: acknowledge_recovery }
+                operationId: { type: string, format: uuid }
+      responses:
+        '200': { description: Recovery reviewed; no writes or paid calls repeated }
+        '400': { description: Invalid recovery command or request still active }
+        '401': { description: Signed out }
+        '403': { description: Account or trusted origin denied }
+        '404': { description: Conversation or operation is not owned by this account }
     delete:
       operationId: deleteMyAiConversation
       summary: Delete an account-owned conversation
@@ -3714,7 +3793,7 @@ paths:
       operationId: streamMyAiConversationTurn
       summary: Stream a bounded provider turn with a durable exact request identity
       description: >-
-        Session and trusted origin required. Send one operationId for the normalized message, attachments and tool consent; reuse that same intent after a lost response. A completed operation replays its saved result before contacting the provider. Running, failed or cancelled attempts require conversation reconciliation and never automatically repeat provider work.
+        Session and trusted origin required. Send one operationId for the normalized message, attachments and tool consent; reuse that same intent after a lost response. A completed operation replays its saved result before contacting the provider. Running, failed, cancelled or outcome-unknown attempts require conversation reconciliation and never automatically repeat provider work.
         Events have increasing sequence numbers and types status, text_reset, text, action, job, suggestion, app_action, error and done. Text deltas arrive while the provider is working; done contains canonical saved content. A stream ending without done is incomplete. Closing or stopping never undoes an acknowledged job or proposal.
       requestBody:
         required: true
@@ -3739,6 +3818,48 @@ paths:
         '403': { description: 'Session, account, sharing or AI policy denied' }
         '404': { description: Conversation not found }
         '429': { description: Account request budget reached }
+  /ai/actions/{actionId}/image:
+    parameters:
+      - { in: path, name: actionId, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: readMyDraftImage
+      summary: Read a private image tied to the current owned recipe draft
+      responses:
+        '200':
+          description: Private image; never cache publicly
+          content:
+            image/webp:
+              schema: { type: string, format: binary }
+        '401': { description: Signed out }
+        '403': { description: Account does not own the private draft }
+        '404': { description: 'Image absent, legacy provenance missing, or draft changed' }
+    post:
+      operationId: prepareMyDraftImage
+      summary: Explicitly authorize a separate paid image for a reviewed draft
+      description: Session and trusted origin required. Text drafting does not invoke this operation. Exact operation/draft/owner replay returns the saved receipt before provider access. Saving the recipe transfers a ready private image to a revision-bound candidate; a separate accept action selects it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm, operationId, expectedSourceDigest]
+              properties:
+                confirm: { type: boolean, const: true }
+                operationId: { type: string, format: uuid }
+                expectedSourceDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+      responses:
+        '200': { description: Current owned action and image-request status }
+        '400': { description: Missing explicit authorization or invalid reviewed intent }
+        '401': { description: Signed out }
+        '403': { description: 'Owner, workload, sharing or trusted origin denied' }
+        '404': { description: Draft is unavailable }
+        '409': { description: 'Draft changed, closed, or has an unresolved image request' }
+        '503':
+          {
+            description: Generation did not finish; reconcile the exact request before a new paid request,
+          }
   /ai/app-actions:
     get:
       operationId: listMyReviewedAiActions
@@ -3934,14 +4055,27 @@ components:
             dietaryTags:
               { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 } }
     CatalogShoppingInput:
+      description: An explicit cart amount and unit, independent of recipe demand. Existing row confirmations replace its cart amount; new entries remain separate. Exact replay is actor-bound and works without the provider.
       allOf:
-        - { $ref: '#/components/schemas/CatalogImportInput' }
+        - oneOf:
+            - { $ref: '#/components/schemas/CatalogImportInput' }
+            - type: object
+              required: [operationId, localProductId]
+              properties:
+                operationId: { type: string, format: uuid }
+                localProductId: { type: string, format: uuid }
         - type: object
           required: [cartQuantity, cartUnit]
           properties:
             itemId: { type: string, format: uuid }
-            expectedUpdatedAt: { type: string, format: date-time }
-            cartQuantity: { type: number, exclusiveMinimum: 0, maximum: 10000 }
+            expectedUpdatedAt:
+              {
+                type: string,
+                format: date-time,
+                description: Required with itemId; changed targets require a fresh review.,
+              }
+            cartIntent: { type: string, enum: [separate_entry, replace_existing] }
+            cartQuantity: { type: number, minimum: 0, maximum: 10000 }
             cartUnit: { type: string, minLength: 1, maxLength: 30 }
     CatalogReference:
       type: object
@@ -4275,11 +4409,6 @@ components:
             kind: { type: string, const: vision-extraction }
             importId: { type: string, format: uuid }
             improve: { type: boolean, default: false }
-    AiImageGenerationRequest:
-      type: object
-      required: [confirm]
-      properties:
-        confirm: { type: boolean, const: true }
     JsonLdDraftRequest:
       type: object
       required: [source]
@@ -4580,6 +4709,12 @@ components:
         shoppingState:
           { type: string, enum: [to_buy, in_cart, cant_find, sourced], default: to_buy }
         cartQuantity: { type: number, minimum: 0, maximum: 10000 }
+        cartUnit:
+          {
+            type: [string, 'null'],
+            maxLength: 30,
+            description: Purchase dimension independent of demand unit. Null legacy values require review before unpacking.,
+          }
         cartLabel:
           { type: string, maxLength: 160, description: Scanned brand or chosen substitute label. }
         aisleId: { type: string }

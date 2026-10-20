@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { scaleBindingHash, verifiedScaleReading } from './nutrition-scale-service';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
@@ -24,6 +24,8 @@ import {
   householdSettingsSchema,
   profileInputSchema,
   profileIdentityUpdateSchema,
+  personalProfileValues,
+  personalProfileUpdateSchema,
   type ProfileIdentityUpdate,
   setupSchema,
   type HouseholdSettingsInput,
@@ -504,6 +506,48 @@ export function updateProfile(
     synchronizeHouseholdNutritionProfile(transaction, updated);
   });
   return db.select().from(profiles).where(eq(profiles.id, profileId)).get()!;
+}
+
+export function personalProfileRevision(profile: ProfileRecord): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ profileId: profile.id, settings: personalProfileValues(profile) }))
+    .digest('hex');
+}
+
+export function readPersonalProfile(profileId: string) {
+  const profile = getProfile(profileId);
+  if (!profile) throw new NotFoundError('Your profile is no longer available.');
+  return { profile, revision: personalProfileRevision(profile) };
+}
+
+export function updatePersonalProfile(profileId: string, raw: unknown) {
+  const input = personalProfileUpdateSchema.parse(raw);
+  ensureDatabase();
+  return getDatabase().transaction((transaction) => {
+    const current = transaction
+      .select()
+      .from(profiles)
+      .where(and(eq(profiles.id, profileId), isNull(profiles.archivedAt)))
+      .get();
+    if (!current) throw new NotFoundError('Your profile is no longer available.');
+    if (personalProfileRevision(current) !== input.expectedRevision)
+      throw new ConflictError(
+        'Your profile changed elsewhere. Load current values and review your edits.',
+      );
+    transaction
+      .update(profiles)
+      .set({
+        ...input.settings,
+        avatarUrl: input.settings.avatarUrl || null,
+        goalContext: { ...current.goalContext, ...input.settings.goalContext },
+        updatedAt: new Date(),
+      })
+      .where(eq(profiles.id, profileId))
+      .run();
+    const updated = transaction.select().from(profiles).where(eq(profiles.id, profileId)).get()!;
+    synchronizeHouseholdNutritionProfile(transaction, updated);
+    return { profile: updated, revision: personalProfileRevision(updated) };
+  });
 }
 
 export function setProfileArchived(profileId: string, archived: boolean): ProfileRecord {

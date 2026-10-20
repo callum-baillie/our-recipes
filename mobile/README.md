@@ -54,7 +54,7 @@ The Explore & export screen adds advanced server filters and multi-recipe PDF/ZI
 
 ## Reviewed catalog and assistant execution
 
-The scanner retains the reviewed source identity/revision, nutrition basis and chosen physical amount when adding stock or matching a shopping item. Source measures and attributed storage guidance are optional reads; only explicit confirmation writes. Native callers use the same server validation and operation receipts as web. Preserve an uncertain command and retry its original operation ID; a failed refresh after acknowledgement does not mean the write failed.
+The scanner reviews both remote source records and saved local barcode matches. It retains the reviewed source identity/revision or local product ID, nutrition basis and chosen physical amount when adding stock or matching a shopping item. Source measures and attributed storage guidance are optional reads; only explicit confirmation writes. Native callers use the same server validation and operation receipts as web. Preserve an uncertain command and retry its original operation ID; a failed refresh after acknowledgement does not mean the write failed.
 
 Assistant responses use SDK54 `expo/fetch` streams. Text is shown on received events; no timer imitates streaming. UTF-8 fragments and the final line are decoded by a shared bounded parser. Sequence gaps, network loss and Stop require saved-outcome review; closing is not an undo. The next-message draft stays separate from the submitted message. In-memory drafts and attachments are scoped to instance, account and conversation and cleared on logout. They are not persisted after an app process kill. Reopening reads server-owned turns/proposals/jobs without resubmission; running turns remain blocked until reconciled. Generic proposals show their reviewed version and individual outcomes, with explicit consent for paid image requests.
 
@@ -63,3 +63,9 @@ Profile switching uses the destination profile password. It changes the viewing 
 Pure cross-platform contracts live in `../shared/mobile-domain`; mobile re-exports them and Metro watches that directory. Root parity tests therefore do not require Expo installation. The independent native CI job uses `npm ci`, formatting, lint, type checks, native unit tests and both platform exports.
 
 Current implementation/evidence and remaining device/dependency limitations: [refinement register](../docs/refinement/catalog-native.md).
+
+### Restart-safe reviewed operations
+
+Before scanner confirmation, SecureStore retains the exact command, operation ID, instance, account and original profile. Reopening only offers review and exact retry; it does not automatically write. The server also rejects a changed expected profile. Local barcode matches reuse their saved product ID without a provider import. Source portions show the full stated amount/unit/modifier and copy only a supported gram weight. Cart purchase units remain separate from requested/recipe units through Pantry intake; unknown units require review.
+
+Assistant requests retain only an authorized thread/operation reference in SecureStore; message text and attachments remain ephemeral. Restart loads the exact owned operation and its saved results. Review and continue acknowledges an unknown/missing receipt without resending it; the server prevents delayed execution of an acknowledged missing operation. Secure recovery references survive logout under the original account/instance key so a possible committed operation remains reconcilable. They contain no credential or attachment data. See [current correction evidence](../docs/refinement/post-review-catalog.md) for tested contracts and device limits.

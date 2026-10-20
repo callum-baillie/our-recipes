@@ -1,3 +1,4 @@
+import { withAiExecutionContext } from '@/lib/services/ai-execution-context';
 import { decisionRequestSchema, decisionFeedbackSchema } from '@/lib/domain/decision-assistance';
 import {
   decisionPrincipal,
@@ -24,9 +25,14 @@ export async function POST(request: Request) {
   try {
     const p = await decisionPrincipal(request);
     const input = decisionRequestSchema.parse(await boundedDecisionJson(request));
-    return Response.json(await runDecisionAssistance(p, input), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    return Response.json(
+      await withAiExecutionContext({ signal: request.signal }, () =>
+        runDecisionAssistance(p, input),
+      ),
+      {
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
   } catch (error) {
     return decisionErrorResponse(error);
   }

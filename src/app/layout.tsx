@@ -119,6 +119,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const pathname = requestHeaders.get('x-bord-pathname') ?? '';
   const isSecuritySurface = [
     '/sign-in',
+    '/verify-email',
     '/forgot-password',
     '/reset-password',
     '/security-upgrade',

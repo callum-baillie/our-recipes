@@ -1,3 +1,5 @@
+import { executeAiWorkload } from './ai-execution-service';
+import { withAiExecutionContext } from './ai-execution-context';
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
@@ -199,10 +201,19 @@ export async function prepareRecipeImageCandidate(
   });
   let storageKey: string | null = null;
   try {
-    const generated = await getAiProvider().generateRecipeImage(
-      recipeImageInput(recipePayloadFromDetail(recipe)),
-      { ...setting, imageQuality: quality, imageSize: size, signal },
+    const generated = await withAiExecutionContext({ signal }, () =>
+      executeAiWorkload(
+        owner.profileId,
+        'image_generation',
+        (options) =>
+          getAiProvider().generateRecipeImage(
+            recipeImageInput(recipePayloadFromDetail(recipe)),
+            options,
+          ),
+        { ...setting, imageQuality: quality, imageSize: size },
+      ),
     );
+    signal?.throwIfAborted();
     const stored = await storeRecipeImage(input.operationId, generated.bytes);
     storageKey = stored.storageKey;
     getDatabase().transaction((transaction) => {

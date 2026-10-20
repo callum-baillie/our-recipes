@@ -197,6 +197,7 @@ export const shoppingListItemSchema = z.object({
   shoppingState: shoppingListItemStateSchema.default('to_buy'),
   cartQuantity: z.coerce.number().min(0).max(10_000).optional(),
   cartLabel: z.string().trim().max(160).optional(),
+  cartUnit: z.string().trim().max(30).nullable().optional(),
   productId: z.string().uuid().optional(),
   recipeId: z.string().uuid().optional(),
   recommendationKey: z.string().trim().max(240).optional(),
@@ -247,11 +248,12 @@ export type MealPlanEntryInput = Omit<
 };
 export type ShoppingListItemInput = Omit<
   z.output<typeof shoppingListItemSchema>,
-  'shoppingState' | 'cartQuantity' | 'cartLabel'
+  'shoppingState' | 'cartQuantity' | 'cartLabel' | 'cartUnit'
 > & {
   shoppingState?: z.output<typeof shoppingListItemStateSchema>;
   cartQuantity?: number;
   cartLabel?: string;
+  cartUnit?: string | null;
 };
 export type DuplicateWeekInput = z.output<typeof duplicateWeekSchema>;
 export type MealPlanBatchInput = z.output<typeof mealPlanBatchSchema>;

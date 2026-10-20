@@ -54,12 +54,14 @@ export function reduceChatStream(
 
 /** Server-owned running turns survive app restarts; age is never evidence of completion. */
 export function reviewedTurnOutcome(
-  turns: { id: string; status: string }[] | undefined,
+  turns: { id: string; status: string; reviewed?: boolean }[] | undefined,
   operationId?: string,
 ) {
   const known = operationId ? turns?.find((turn) => turn.id === operationId) : undefined;
   const terminal =
     known && ['completed', 'failed', 'cancelled'].includes(known.status) ? known.status : null;
-  const running = !!turns?.some((turn) => turn.status === 'running');
+  const running = !!turns?.some(
+    (turn) => turn.status === 'running' || (turn.status === 'outcome_unknown' && !turn.reviewed),
+  );
   return { terminal, blocked: running || (!!operationId && !terminal) };
 }

@@ -15,8 +15,10 @@ import {
   foodProviderSnapshots,
   pantryBatches,
   shoppingLists,
+  shoppingListItems,
 } from '@/lib/db/schema';
 import { foodCatalogImportInputSchema } from '@/lib/domain/food-data';
+import { getNutritionDataWorkspace } from '@/lib/services/nutrition-recipe-calculation-service';
 import { BordCatalogClient } from '@/lib/providers/bord-catalog-client';
 import { getRuntimeConfig } from '@/lib/config';
 import { completeSetup } from '@/lib/services/household-service';
@@ -47,12 +49,21 @@ import {
   setShoppingListSupermarket,
   updateSupermarketProfile,
 } from '@/lib/services/list-settings-service';
-import { createManualShoppingList, getShoppingList } from '@/lib/services/planning-service';
+import {
+  addShoppingListItem,
+  createManualShoppingList,
+  getShoppingList,
+} from '@/lib/services/planning-service';
 import {
   readCatalogMeasures,
   searchStorageGuidance,
   enrichCatalogProducts,
 } from '@/lib/services/catalog-food-context-service';
+import { intakePurchasedShoppingItem } from '@/lib/services/pantry-grocery-cooking-service';
+import { createPantryLocation } from '@/lib/services/pantry-service';
+import { pantryPurchaseIntakeSchema } from '@/lib/domain/pantry-grocery-cooking';
+import { pantryLocationInputSchema } from '@/lib/domain/pantry';
+import { shoppingPurchaseDraft } from '@/lib/domain/shopping-cart';
 import { startCatalogFixture, syntheticUsda } from '../fixtures/bord-catalog-server';
 
 describe('native Bòrd catalog companion (synthetic loopback only)', () => {
@@ -205,6 +216,11 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     });
     expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
     const snapshot = getDatabase().select().from(foodProviderSnapshots).get()!;
+    expect(
+      getNutritionDataWorkspace().products.find(
+        (product) => product.displayName === 'Reviewed household oats',
+      )?.record?.catalogRef,
+    ).toEqual(record.catalogRef);
     expect(snapshot).toMatchObject({
       transportId: 'bord_food_api',
       sourceRevision: 'revision_1',
@@ -217,6 +233,11 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
       getFoodDetails(record.provider, record.providerRecordId, 'en', record.catalogRef),
     ).rejects.toMatchObject({ code: 'REVISION_EXPIRED' });
     expect(getDatabase().select().from(foodProviderSnapshots).get()).toEqual(snapshot);
+    expect(
+      getNutritionDataWorkspace().products.find(
+        (product) => product.displayName === 'Reviewed household oats',
+      )?.record?.catalogRef,
+    ).toEqual(record.catalogRef);
     fixture.state.missingFood = true;
     await expect(
       getFoodDetails(record.provider, record.providerRecordId, 'en', record.catalogRef),
@@ -238,8 +259,26 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     const { record } = await getFoodDetails('usda_fdc', '123', 'en');
     const result = await readCatalogMeasures({ reference: record.catalogRef });
     expect(result.measures).toEqual([
-      { label: 'chopped', amount: 1, unit: 'cup', gramWeight: 120, form: 'raw', basis: null },
-      { label: '1 piece', amount: 1, unit: 'piece', gramWeight: null, form: null, basis: null },
+      {
+        label: '1 cup · chopped',
+        amount: 1,
+        unit: 'cup',
+        modifier: 'chopped',
+        description: null,
+        gramWeight: 120,
+        form: 'raw',
+        basis: null,
+      },
+      {
+        label: '1 piece',
+        amount: 1,
+        unit: 'piece',
+        modifier: null,
+        description: null,
+        gramWeight: null,
+        form: null,
+        basis: null,
+      },
     ]);
     const guidance = await searchStorageGuidance({ query: 'oats' });
     expect(guidance.guidance[0]).toMatchObject({
@@ -350,6 +389,154 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     await expect(
       confirmCatalogShoppingItem({ ...args, actorUserId: 'another-account' }),
     ).rejects.toThrow(/different/u);
+  });
+  it('keeps purchase units through persisted cart review and Pantry intake without changing demand', async () => {
+    const list = createManualShoppingList('Dimension review', actor);
+    const { record } = await getFoodDetails('usda_fdc', '123', 'en');
+    const imported = importFoodCatalogRecord({
+      input: foodCatalogImportInputSchema.parse({
+        operationId: randomUUID(),
+        selection: {
+          provider: record.provider,
+          recordId: record.providerRecordId,
+          catalogRef: record.catalogRef,
+        },
+        product: { displayName: 'Reviewed food' },
+      }),
+      record,
+      actorProfileId: actor,
+      actorUserId: 'account-a',
+      destination: 'catalog',
+    });
+    const demand = addShoppingListItem(
+      list.id,
+      {
+        item: 'Food demand',
+        quantity: 2,
+        unit: 'each',
+        note: '',
+        checked: false,
+        productId: imported.productId,
+      },
+      actor,
+    );
+    const input = {
+      operationId: randomUUID(),
+      localProductId: imported.productId,
+      itemId: demand.id,
+      expectedUpdatedAt: demand.updatedAt.toISOString(),
+      cartIntent: 'replace_existing',
+      cartQuantity: 500,
+      cartUnit: 'g',
+    };
+    const args = { input, listId: list.id, actorProfileId: actor, actorUserId: 'account-a' };
+    const saved = await confirmCatalogShoppingItem(args);
+    const item = getShoppingList(list.id)!.items.find((row) => row.id === demand.id)!;
+    expect(item).toMatchObject({
+      quantity: 2,
+      unit: 'each',
+      cartQuantity: 500,
+      cartUnit: 'g',
+      shoppingState: 'in_cart',
+    });
+    const draft = shoppingPurchaseDraft(item);
+    expect(draft).toEqual({ quantity: '500', unit: 'g' });
+    const location = createPantryLocation(
+      pantryLocationInputSchema.parse({ name: 'Fixture cupboard', storageType: 'pantry' }),
+      actor,
+    );
+    const intake = pantryPurchaseIntakeSchema.parse({
+      operationKey: 'dimension-intake-1',
+      productId: imported.productId,
+      locationId: location.id,
+      quantity: Number(draft.quantity),
+      unit: draft.unit,
+      intakeMode: 'partial' as const,
+    });
+    const received = intakePurchasedShoppingItem(list.id, demand.id, intake, actor);
+    expect(
+      getDatabase()
+        .select()
+        .from(pantryBatches)
+        .where(eq(pantryBatches.id, received.batchId))
+        .get(),
+    ).toMatchObject({ quantityRemaining: 500, unit: 'g' });
+    expect(intakePurchasedShoppingItem(list.id, demand.id, intake, actor)).toMatchObject({
+      batchId: received.batchId,
+      replayed: true,
+    });
+    fixture.state.unavailable = true;
+    expect(await confirmCatalogShoppingItem(args)).toMatchObject({ ...saved, replayed: true });
+    expect(getShoppingList(list.id)!.items).toHaveLength(1);
+    // A new confirmation has separate-entry intent and must not deduplicate into
+    // the original demand row or increment its existing cart quantity.
+    const separate = await confirmCatalogShoppingItem({
+      ...args,
+      input: {
+        operationId: randomUUID(),
+        localProductId: imported.productId,
+        cartIntent: 'separate_entry',
+        cartQuantity: 0,
+        cartUnit: 'kg',
+      },
+    });
+    expect(separate.itemId).not.toBe(demand.id);
+    expect(getShoppingList(list.id)!.items).toHaveLength(2);
+    expect(getShoppingList(list.id)!.items.find((row) => row.id === separate.itemId)).toMatchObject(
+      { cartQuantity: 0, cartUnit: 'kg', shoppingState: 'in_cart' },
+    );
+    getDatabase()
+      .update(shoppingListItems)
+      .set({ updatedAt: new Date(Date.now() + 5000) })
+      .where(eq(shoppingListItems.id, demand.id))
+      .run();
+    await expect(
+      confirmCatalogShoppingItem({
+        ...args,
+        input: { ...input, operationId: randomUUID(), cartQuantity: 600 },
+      }),
+    ).rejects.toThrow(/changed/);
+    expect(getShoppingList(list.id)!.items.find((row) => row.id === demand.id)).toMatchObject({
+      cartQuantity: 500,
+      cartUnit: 'g',
+      quantity: 2,
+      unit: 'each',
+    });
+  });
+  it('returns the saved local identity on repeat scans with the provider both available and unavailable', async () => {
+    const lookup = await lookupFoodByBarcode('04006381333931', 'en');
+    const record = lookup.preferred!;
+    const input = foodCatalogImportInputSchema.parse({
+      operationId: randomUUID(),
+      selection: {
+        provider: record.provider,
+        recordId: record.providerRecordId,
+        expectedCanonicalGtin: record.canonicalGtin,
+        catalogRef: record.catalogRef,
+      },
+      product: { displayName: 'Repeated barcode product', defaultInventoryUnit: 'g' },
+    });
+    const imported = importFoodCatalogRecord({
+      input,
+      record,
+      actorProfileId: actor,
+      destination: 'catalog',
+    });
+    const before = fixture.calls.length;
+    for (const unavailable of [false, true]) {
+      fixture.state.unavailable = unavailable;
+      const repeated = await lookupFoodByBarcode('04006381333931', 'en');
+      expect(repeated).toMatchObject({
+        preferred: null,
+        alternatives: [],
+        localProduct: { id: imported.productId, displayName: 'Repeated barcode product' },
+      });
+      expect(fixture.calls).toHaveLength(before);
+    }
+    expect(getSqliteDatabase().prepare('SELECT count(*) AS n FROM pantry_products').get()).toEqual({
+      n: 1,
+    });
+    expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
   });
   it('forwards bounded store filters and rejects incomplete coordinates', async () => {
     await searchCatalogStores({

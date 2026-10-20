@@ -143,3 +143,90 @@ test('generated image preview preserves saved photos and recovers a stale accept
   await expect(page.getByRole('button', { name: 'Generate another paid preview' })).toBeEnabled();
   expect(generationCalls).toBe(1);
 });
+
+test('a candidate handoff opens the real recipe server page without changing its saved photo', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await signInWorkflowFixture(page);
+  const title = `Candidate handoff fixture ${Date.now()}`;
+  const created = await page.request.post('/api/v1/recipes', {
+    headers: { Origin: 'http://127.0.0.1:3100' },
+    data: {
+      ...emptyRecipeInput,
+      title,
+      servings: '2',
+      ingredientGroups: [
+        { name: '', ingredients: [{ quantity: '500', unit: 'g', item: 'tomatoes', note: '' }] },
+      ],
+      instructionSections: [{ title: '', steps: ['Simmer, then blend.'] }],
+    },
+  });
+  expect(created.ok()).toBe(true);
+  const { recipe } = await created.json();
+  const bytes = await sharp({
+    create: { width: 160, height: 120, channels: 3, background: '#8e5541' },
+  })
+    .webp()
+    .toBuffer();
+  const uploaded = await page.request.post(`/api/v1/recipes/${recipe.id}/images`, {
+    headers: { Origin: 'http://127.0.0.1:3100' },
+    multipart: {
+      image: { name: 'saved.webp', mimeType: 'image/webp', buffer: bytes },
+      altText: 'Saved photo remains selected',
+    },
+  });
+  expect(uploaded.ok()).toBe(true);
+  const candidateId = '00000000-0000-4000-8000-000000000897';
+  let generated = 0;
+  let reads = 0;
+  await page.route(`**/api/v1/recipes/${recipe.id}/images/generate`, (route) => {
+    generated++;
+    return route.abort();
+  });
+  await page.route(`**/api/v1/recipes/${recipe.id}/image-candidates/${candidateId}`, (route) => {
+    expect(route.request().method()).toBe('GET');
+    reads++;
+    return route.fulfill({
+      json: {
+        candidate: {
+          id: candidateId,
+          recipeId: recipe.id,
+          sourceRevision: 1,
+          status: 'ready',
+          altText: 'Private candidate handoff',
+          width: 160,
+          height: 120,
+          model: 'gpt-image-2',
+          quality: 'low',
+          size: '1024x1024',
+          promptVersion: 'synthetic',
+          imageId: null,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    });
+  });
+  await page.route(`**/api/v1/recipes/${recipe.id}/image-candidates/${candidateId}/file`, (route) =>
+    route.fulfill({ contentType: 'image/webp', body: bytes }),
+  );
+  await page.goto(`/recipes/${recipe.id}?imageCandidate=${candidateId}#recipe-photos`);
+  await expect(page).toHaveTitle(new RegExp(title));
+  await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recipe management' })).toBeAttached();
+  await expect(page.getByRole('img', { name: 'Saved photo remains selected' })).toBeVisible();
+  const check = page.getByRole('button', { name: 'Check this request' });
+  await expect(check).toBeVisible();
+  expect(generated).toBe(0);
+  expect(reads).toBe(0);
+  await check.click();
+  await expect(page.getByRole('img', { name: 'Private candidate handoff' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add reviewed photo' })).toBeEnabled();
+  await expect(page.getByRole('img', { name: 'Saved photo remains selected' })).toBeVisible();
+  expect(reads).toBe(1);
+  expect(generated).toBe(0);
+  await page.screenshot({
+    path: testInfo.outputPath('real-recipe-page-candidate-handoff.png'),
+    fullPage: true,
+  });
+});

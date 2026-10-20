@@ -1,3 +1,7 @@
+import {
+  shoppingAmountSummary,
+  type ShoppingAmounts,
+} from '../../../shared/mobile-domain/shopping-amounts';
 import * as React from 'react';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@/auth/auth-context';
@@ -12,11 +16,13 @@ export function PantryPurchaseForm({
   listId,
   itemId,
   itemName,
+  reviewedItem,
   onDone,
 }: {
   listId: string;
   itemId: string;
   itemName: string;
+  reviewedItem?: ShoppingAmounts & { pantry?: { productId?: string | null } | null };
   onDone: () => void;
 }) {
   const { request } = useAuth();
@@ -28,14 +34,16 @@ export function PantryPurchaseForm({
   const locations = useResource<{ locations: { id: string; name: string }[] }>(
     '/api/v1/pantry/locations',
   );
-  const [productId, setProductId] = React.useState('');
+  const [productId, setProductId] = React.useState(reviewedItem?.pantry?.productId ?? '');
   const [locationId, setLocationId] = React.useState('');
-  const [quantity, setQuantity] = React.useState('1');
-  const [unit, setUnit] = React.useState('each');
+  const amounts = shoppingAmountSummary(reviewedItem ?? {});
+  const [quantity, setQuantity] = React.useState(amounts.purchaseQuantity);
+  const [unit, setUnit] = React.useState(amounts.purchaseUnit);
   const [mode, setMode] = React.useState('complete');
   const key = React.useRef(randomUUID());
   const save = () =>
     task.run(async () => {
+      if (!unit.trim()) throw new Error('Enter the physical purchase unit.');
       if (!productId || !locationId)
         throw new Error('Choose the Pantry product and storage location.');
       await request(`/api/v1/shopping-lists/${listId}/items/${itemId}/pantry-intake`, {
@@ -60,10 +68,18 @@ export function PantryPurchaseForm({
         Record the quantity you actually bought. Partial intake keeps the remaining amount on your
         list.
       </Body>
+      <Body>
+        Requested: {amounts.requested}. Reviewed cart amount: {amounts.cart}.
+      </Body>
+      <Body muted>
+        Confirm the actual physical quantity and unit below. An unknown cart unit is never copied
+        from recipe demand.
+      </Body>
       <TaskError error={task.error} />
       <ResourceState resource={products} />
       <ResourceState resource={locations} />
       <ChoiceField
+        disabled={task.busy}
         label="Pantry product"
         value={productId}
         onChange={setProductId}
@@ -74,6 +90,7 @@ export function PantryPurchaseForm({
         }))}
       />
       <ChoiceField
+        disabled={task.busy}
         label="Storage location"
         value={locationId}
         onChange={setLocationId}
@@ -83,13 +100,15 @@ export function PantryPurchaseForm({
         }))}
       />
       <FormField
+        editable={!task.busy}
         label="Quantity purchased"
         value={quantity}
         onChangeText={setQuantity}
         keyboardType="decimal-pad"
       />
-      <FormField label="Stock unit" value={unit} onChangeText={setUnit} />
+      <FormField editable={!task.busy} label="Stock unit" value={unit} onChangeText={setUnit} />
       <ChoiceField
+        disabled={task.busy}
         label="Purchase"
         value={mode}
         onChange={setMode}
@@ -99,7 +118,7 @@ export function PantryPurchaseForm({
         ]}
       />
       <Button label="Record purchase" disabled={task.busy} onPress={() => void save()} />
-      <Button label="Cancel" tone="secondary" onPress={onDone} />
+      <Button label="Cancel" disabled={task.busy} tone="secondary" onPress={onDone} />
     </Surface>
   );
 }

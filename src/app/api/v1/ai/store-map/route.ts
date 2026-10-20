@@ -1,3 +1,4 @@
+import { withAiExecutionContext } from '@/lib/services/ai-execution-context';
 import { storeMapRequestSchema, storeMapCorrectionSchema } from '@/lib/domain/store-map';
 import {
   decisionPrincipal,
@@ -11,9 +12,12 @@ export async function POST(request: Request) {
   try {
     const p = await decisionPrincipal(request);
     const input = storeMapRequestSchema.parse(await boundedDecisionJson(request, 8_410_000));
-    return Response.json(await suggestStoreMap(p, input), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    return Response.json(
+      await withAiExecutionContext({ signal: request.signal }, () => suggestStoreMap(p, input)),
+      {
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
   } catch (error) {
     return decisionErrorResponse(error);
   }

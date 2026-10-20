@@ -4,6 +4,8 @@
 import { Archive, Plus, RotateCcw, Save, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Fragment, useState } from 'react';
+import { SettingsMergeReview } from './settings-merge-review';
+import { personalProfileValues, type PersonalProfileSettings } from '@/lib/domain/setup';
 import { AppDialog } from './app-dialog';
 
 import { RegionalChoice } from './regional-choice';
@@ -431,15 +433,19 @@ export function ProfileEditor({
   onRoleChange,
   personal = false,
   lastActiveMember = false,
+  onLoadCurrent,
 }: {
   profile: Profile;
   personal?: boolean;
   lastActiveMember?: boolean;
+  onLoadCurrent?: () => Promise<Profile>;
   active: boolean;
   onSave: (profile: Profile, values: ProfileValues) => Promise<Profile | void>;
   onArchive: (profile: Profile, archived: boolean) => Promise<void>;
   onRoleChange: (profile: Profile, role: AppRole) => Promise<boolean>;
 }) {
+  const [conflict, setConflict] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
   const [actionError, setActionError] = useState('');
   const [action, setAction] = useState<'save' | 'role' | 'archive' | null>(null);
   const [lastAction, setLastAction] = useState<'save' | 'role' | 'archive' | null>(null);
@@ -465,6 +471,21 @@ export function ProfileEditor({
     setActionError('');
     await run(task);
     setAction(null);
+  }
+  function reconcilePersonal(reviewed: PersonalProfileSettings) {
+    if (!currentProfile) return;
+    setSaved({ ...personalProfileValues(currentProfile), goalContext: currentProfile.goalContext });
+    setValues({
+      ...reviewed,
+      goalContext: {
+        ...reviewed.goalContext,
+        kitchenInterview: currentProfile.goalContext.kitchenInterview,
+      },
+    });
+    setConflict(false);
+    setCurrentProfile(null);
+    setActionError('');
+    setSavedMessage('Reviewed changes are ready. Save profile to apply them.');
   }
   const archived = Boolean(profile.archivedAt);
   const [roleDraft, setRoleDraft] = useState<{ confirmed: AppRole; value: AppRole } | null>(null);
@@ -556,17 +577,19 @@ export function ProfileEditor({
         }}
         onSubmit={(event) => {
           event.preventDefault();
+          if (conflict) return;
           void perform('save', async () => {
-            const submitted = personal
-              ? {
-                  ...values,
-                  goalContext: {
-                    ...values.goalContext,
-                    kitchenInterview: profile.goalContext.kitchenInterview,
-                  },
-                }
-              : values;
-            const acknowledged = await onSave(profile, submitted);
+            const submitted = values;
+            let acknowledged: Profile | void;
+            try {
+              acknowledged = await onSave(profile, submitted);
+            } catch (error) {
+              if (error instanceof Error && error.name === 'SettingsVersionConflict') {
+                setConflict(true);
+                setCurrentProfile(null);
+              }
+              throw error;
+            }
             const next = acknowledged
               ? ({
                   ...values,
@@ -584,7 +607,7 @@ export function ProfileEditor({
           });
         }}
       >
-        <fieldset className="settings-form-fields" disabled={pending || archived}>
+        <fieldset className="settings-form-fields" disabled={pending || archived || conflict}>
           <div className="settings-identity-preview">
             {values.avatarUrl && avatarFailed !== values.avatarUrl ? (
               <img
@@ -864,6 +887,35 @@ export function ProfileEditor({
           <p>The last active household member cannot be archived.</p>
         )}
         {actionError && lastAction !== 'role' ? <p role="alert">{actionError}</p> : null}
+        {conflict && onLoadCurrent && (
+          <section aria-label="Review changed profile">
+            <p role="status">Your profile changed elsewhere. Your edits are retained.</p>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={pending}
+              onClick={() =>
+                void run(async () => {
+                  setCurrentProfile(null);
+                  setCurrentProfile(await onLoadCurrent());
+                })
+              }
+            >
+              {pending ? 'Loading current profile…' : 'Load current profile'}
+            </button>
+            {currentProfile && (
+              <SettingsMergeReview
+                key={JSON.stringify(currentProfile)}
+                baseline={personalProfileValues(saved)}
+                draft={personalProfileValues(values)}
+                current={personalProfileValues(currentProfile)}
+                pending={pending}
+                onResolve={reconcilePersonal}
+                onDiscard={() => reconcilePersonal(personalProfileValues(currentProfile))}
+              />
+            )}
+          </section>
+        )}
         <SettingsActionBar
           status={
             action
@@ -881,7 +933,7 @@ export function ProfileEditor({
           <button
             className="primary-button compact"
             type="submit"
-            disabled={pending || archived || !dirty || !values.displayName.trim()}
+            disabled={pending || archived || conflict || !dirty || !values.displayName.trim()}
             aria-busy={pending}
           >
             {action === 'save' ? <ButtonSpinner /> : <Save size={16} />}{' '}

@@ -6,7 +6,7 @@ import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
 import { ensureDatabase, getSqliteDatabase } from '@/lib/db/client';
 
 export const APPLICATION_VERSION = '1.0.0-rc.18';
-export const SCHEMA_VERSION = '0071_ai_prompt_versions';
+export const SCHEMA_VERSION = '0073_shopping_cart_units';
 export const EXPECTED_MIGRATION_COUNT = 73;
 
 export type ReleaseStatus = {

@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { SettingsMergeReview } from './settings-merge-review';
 import {
   AI_PROMPT_DEFINITIONS,
   promptTemplateIssue,
@@ -14,6 +15,9 @@ function PromptEditor({ initial }: { initial: Prompt }) {
   const [draft, setDraft] = useState(initial.template);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState('');
+  const [conflict, setConflict] = useState(false);
+  const lock = useRef(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [current, setCurrent] = useState<Prompt | null>(null);
@@ -21,24 +25,35 @@ function PromptEditor({ initial }: { initial: Prompt }) {
   const dirty = draft !== saved.template;
   const issue = promptTemplateIssue(draft);
   async function compareCurrent() {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
+    setOperation('Loading current guidance…');
+    setCurrent(null);
     setError('');
     try {
       const response = await fetch('/api/v1/ai/prompts', { cache: 'no-store' });
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error?.message ?? 'Current guidance could not be loaded.');
-      setCurrent(data.prompts.find((item: Prompt) => item.workload === initial.workload));
+      const loaded = data.prompts.find((item: Prompt) => item.workload === initial.workload);
+      if (!loaded)
+        throw new Error('This task guidance is no longer available. Your draft is retained.');
+      setConflict(true);
+      setCurrent(loaded);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load current guidance.');
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
   async function olderVersions() {
     const before = saved.history.at(-1)?.version;
-    if (!before || busy) return;
+    if (!before || lock.current) return;
+    lock.current = true;
     setBusy(true);
+    setOperation('Loading earlier guidance…');
     setError('');
     try {
       const response = await fetch(
@@ -53,13 +68,16 @@ function PromptEditor({ initial }: { initial: Prompt }) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Older versions could not be loaded.');
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !dirty) return;
+    if (lock.current || conflict || !dirty) return;
+    lock.current = true;
     setBusy(true);
+    setOperation('Saving guidance…');
     setError('');
     setMessage('');
     try {
@@ -74,7 +92,13 @@ function PromptEditor({ initial }: { initial: Prompt }) {
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message ?? 'Guidance could not be saved.');
+      if (!response.ok) {
+        if (response.status === 409) {
+          setConflict(true);
+          setCurrent(null);
+        }
+        throw new Error(data.error?.message ?? 'Guidance could not be saved.');
+      }
       setSaved({ ...data.prompt, history: [data.prompt, ...saved.history] });
       setDraft(data.prompt.template);
       setNote('');
@@ -83,6 +107,7 @@ function PromptEditor({ initial }: { initial: Prompt }) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to save guidance.');
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
@@ -99,7 +124,7 @@ function PromptEditor({ initial }: { initial: Prompt }) {
           <br />
           <strong>Output contract:</strong> {definition.output}
         </p>
-        <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
+        <fieldset disabled={busy || conflict} style={{ border: 0, padding: 0, margin: 0 }}>
           <SettingsField
             title="Task guidance"
             description="Installation-wide. {{task}} is the only supported variable. Permissions, sharing, required review and structured output validation remain enforced by the server."
@@ -195,46 +220,39 @@ function PromptEditor({ initial }: { initial: Prompt }) {
           </div>
         )}
         {current && (
-          <section aria-label="Current saved guidance">
-            <h4>Current version {current.version}</h4>
-            <pre style={{ whiteSpace: 'pre-wrap' }}>{current.template}</pre>
-            <button
-              type="button"
-              onClick={() => {
-                setSaved(current);
-                setCurrent(null);
-                setError('');
-                setMessage(
-                  'Current version loaded. Your draft is retained; review it before saving.',
-                );
-              }}
-            >
-              Keep my draft against this version
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSaved(current);
-                setDraft(current.template);
-                setCurrent(null);
-                setError('');
-                setNote('');
-              }}
-            >
-              Discard my draft and use current
-            </button>
-          </section>
+          <SettingsMergeReview
+            key={JSON.stringify(current)}
+            baseline={{ template: saved.template }}
+            draft={{ template: draft }}
+            current={{ template: current.template }}
+            pending={busy}
+            label={() => 'Task guidance'}
+            onResolve={(reviewed) => {
+              setSaved(current);
+              setDraft(reviewed.template);
+              setCurrent(null);
+              setConflict(false);
+              setError('');
+              setMessage('Reviewed guidance is ready. Save explicitly to activate a new version.');
+            }}
+            onDiscard={() => {
+              setSaved(current);
+              setDraft(current.template);
+              setCurrent(null);
+              setConflict(false);
+              setError('');
+              setNote('');
+            }}
+          />
         )}
         <SettingsActionBar
           status={
-            busy
-              ? 'Saving guidance…'
-              : message || (dirty ? 'Unsaved task guidance' : 'Saved guidance')
+            busy ? operation : message || (dirty ? 'Unsaved task guidance' : 'Saved guidance')
           }
         >
           <button
             className="button-primary"
-            disabled={busy || !dirty || Boolean(issue) || note.trim().length < 3}
+            disabled={busy || conflict || !dirty || Boolean(issue) || note.trim().length < 3}
           >
             Save {definition.title} guidance
           </button>

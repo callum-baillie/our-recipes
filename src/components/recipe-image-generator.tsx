@@ -38,18 +38,29 @@ export function RecipeImageGenerator({
   profileId,
   accountId = 'current-account',
   policy,
+  initialCandidateId,
 }: {
   recipeId: string;
   revision: number;
   profileId: string;
   accountId?: string;
   policy: ImageGenerationPolicy;
+  initialCandidateId?: string;
 }) {
   const router = useRouter();
   const [quality, setQuality] = useState(policy.quality);
   const [size, setSize] = useState(policy.size);
   const [candidate, setCandidate] = useState<RecipeImageCandidate | null>(null);
-  const [memoryRequest, setMemoryRequest] = useState<RecipeImagePreviewRequest | null>(null);
+  const [memoryRequest, setMemoryRequest] = useState<RecipeImagePreviewRequest | null>(
+    initialCandidateId
+      ? {
+          confirm: true,
+          preview: true,
+          operationId: initialCandidateId,
+          expectedRevision: revision,
+        }
+      : null,
+  );
   const [pending, setPending] = useState<
     'generate' | 'retry' | 'check' | 'accept' | 'discard' | null
   >(null);
@@ -271,7 +282,7 @@ export function RecipeImageGenerator({
             {pending === 'check' ? 'Checking request…' : 'Check this request'}
           </button>
         )}
-        {unresolved && !candidate && error && requestDraft && (
+        {unresolved && !initialCandidateId && !candidate && error && requestDraft && (
           <button
             type="button"
             className="secondary-button"

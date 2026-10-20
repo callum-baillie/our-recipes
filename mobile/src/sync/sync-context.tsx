@@ -1,3 +1,4 @@
+import { amountLabel } from '../../../shared/mobile-domain/shopping-amounts';
 import { localDate } from '@/data/planner';
 import * as React from 'react';
 import { AppState } from 'react-native';
@@ -118,6 +119,8 @@ type ShoppingDetail = ShoppingSummary & {
     aisleId: string | null;
     checked: boolean;
     shoppingState: string;
+    cartQuantity?: number | null;
+    cartUnit?: string | null;
     sourceRecipeIds: string;
     policyBreakdown?: ShoppingPolicyBreakdown | null;
   }[];
@@ -437,12 +440,14 @@ export function SyncProvider({ children }: React.PropsWithChildren) {
           items: list.items.map((item) => ({
             id: item.id,
             name: item.item,
-            amount: [item.quantity, item.unit].filter(Boolean).join(' ') || item.note,
+            amount: amountLabel(item.quantity, item.unit),
             aisle: list.aisles.find((aisle) => aisle.id === item.aisleId)?.name ?? 'Other',
             done:
               item.shoppingState === 'in_cart' || item.shoppingState === 'sourced' || item.checked,
             source: shoppingSourceLabel(item.sourceRecipeIds, item.note, mappedRecipes),
             quantity: item.quantity,
+            cartQuantity: item.cartQuantity ?? null,
+            cartUnit: item.cartUnit ?? null,
             unit: item.unit,
             note: item.note,
             aisleId: item.aisleId,

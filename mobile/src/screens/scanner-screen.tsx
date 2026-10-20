@@ -6,7 +6,27 @@ import { randomUUID } from 'expo-crypto';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/auth/auth-context';
 import { useSync } from '@/sync/sync-context';
-import { catalogConfirmation, catalogQuantity, type ReviewedCatalogFood } from '@/data/catalog';
+import { useBord } from '@/state/bord-store';
+import {
+  barcodeReviewChoices,
+  catalogConfirmation,
+  catalogQuantity,
+  type ReviewedCatalogFood,
+  type ReviewedLocalProduct,
+  type BarcodeReviewResult,
+} from '@/data/catalog';
+import {
+  nativeScannerRecovery,
+  sameScannerActor,
+  type ScannerActor,
+  type ScannerOperation,
+} from '@/data/scanner-recovery';
+import {
+  catalogContextKey,
+  sourcePortionAmount,
+  createRequestGeneration,
+  type CatalogMeasure,
+} from '../../../shared/mobile-domain/catalog-measures';
 import {
   AppHeader,
   Body,
@@ -24,22 +44,42 @@ type List = {
   name: string;
   items: { id: string; item: string; checked: boolean; updatedAt: string }[];
 };
-type Attempt = { path: string; body: unknown; description: string };
+type Guidance = {
+  id: string;
+  name: string;
+  storageState: string | null;
+  form: string | null;
+  details: Record<string, string | number | boolean | null>;
+  attribution: string;
+  license: string;
+};
+type Journal = Awaited<ReturnType<typeof nativeScannerRecovery>>;
 
 export function BarcodeScannerScreen() {
-  const { target = 'pantry', listId } = useLocalSearchParams<{
+  const { instanceUrl, user } = useAuth();
+  return <ScannerReview key={`${instanceUrl}:${user?.id}`} />;
+}
+function ScannerReview() {
+  const { target: requestedTarget, listId } = useLocalSearchParams<{
     target?: 'pantry' | 'shopping';
     listId?: string;
   }>();
+  const target = requestedTarget === 'shopping' ? 'shopping' : 'pantry';
   const [permission, requestPermission] = useCameraPermissions();
-  const { request } = useAuth();
+  const { request, instanceUrl, user } = useAuth();
   const { refresh } = useSync();
+  const { state } = useBord();
   const [barcode, setBarcode] = React.useState('');
   const [records, setRecords] = React.useState<ReviewedCatalogFood[]>([]);
+  const [localProduct, setLocalProduct] = React.useState<ReviewedLocalProduct | null>(null);
   const [selected, setSelected] = React.useState(0);
-  const record = records[selected] ?? null;
-  const [message, setMessage] = React.useState('');
+  const record = localProduct ? null : (records[selected] ?? null);
+  const reviewName = localProduct?.displayName ?? record?.displayName;
+  const [message, setMessage] = React.useState('Checking saved confirmations…');
   const [busy, setBusy] = React.useState(false);
+  const [ready, setReady] = React.useState(false);
+  const [recoveryCheck, setRecoveryCheck] = React.useState(0);
+  const [actor, setActor] = React.useState<ScannerActor | null>(null);
   const [cameraState, setCameraState] = React.useState<'starting' | 'ready' | 'error'>('starting');
   const [cameraKey, setCameraKey] = React.useState(0);
   const [quantity, setQuantity] = React.useState('1');
@@ -49,85 +89,77 @@ export function BarcodeScannerScreen() {
   );
   const [locationId, setLocationId] = React.useState('');
   const [list, setList] = React.useState<List | null>(null);
-  const [attempt, setAttempt] = React.useState<Attempt | null>(null);
+  const [attempt, setAttempt] = React.useState<ScannerOperation | null>(null);
   const [saved, setSaved] = React.useState(false);
+  const [completedDestination, setCompletedDestination] = React.useState<'pantry' | 'shopping'>(
+    target,
+  );
   const [contextBusy, setContextBusy] = React.useState<'measures' | 'storage-guidance' | null>(
     null,
   );
-  const [measures, setMeasures] = React.useState<
-    { label: string; gramWeight: number | null; form: string | null; basis: string | null }[] | null
-  >(null);
-  const [guidance, setGuidance] = React.useState<
-    | {
-        id: string;
-        name: string;
-        storageState: string | null;
-        form: string | null;
-        details: Record<string, string | number | boolean | null>;
-        attribution: string;
-        license: string;
-      }[]
-    | null
-  >(null);
-  const readContext = async (kind: 'measures' | 'storage-guidance') => {
-    if (!record?.catalogRef || contextBusy || busy || attempt) return;
-    const reviewed = record;
-    setContextBusy(kind);
-    try {
-      const response = await request<{
-        measures?: NonNullable<typeof measures>;
-        guidance?: NonNullable<typeof guidance>;
-      }>(`/api/v1/food-data/catalog/${kind}`, {
-        method: 'POST',
-        body: JSON.stringify(
-          kind === 'measures'
-            ? { reference: reviewed.catalogRef }
-            : { query: reviewed.displayName.slice(0, 200) },
-        ),
-      });
-      if (kind === 'measures') setMeasures(response.measures ?? []);
-      else setGuidance(response.guidance ?? []);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Source context is unavailable. Manual amounts remain usable.',
-      );
-    } finally {
-      setContextBusy(null);
-    }
-  };
-  usePreventRemove(!!attempt, () =>
-    setMessage(
-      busy
-        ? 'This confirmation is still saving. Closing cannot cancel a server operation; wait for its result.'
-        : 'This confirmation has no acknowledged result. Retry the same confirmation before leaving so its outcome can be reconciled.',
-    ),
-  );
-  const reloadList = async () => {
-    if (!listId || busy || attempt) return;
-    setBusy(true);
-    try {
-      const result = await request<{ list: List }>(
-        `/api/v1/shopping-lists/${encodeURIComponent(listId)}`,
-      );
-      setList(result.list);
-      setMessage('Current list loaded. Review the matching item before confirming.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'The list could not be refreshed.');
-    } finally {
-      setBusy(false);
-    }
-  };
+  const [measures, setMeasures] = React.useState<CatalogMeasure[] | null>(null);
+  const [guidance, setGuidance] = React.useState<Guidance[] | null>(null);
+  const journal = React.useRef<Journal | null>(null);
   const lock = React.useRef(false);
   const scanLock = React.useRef(false);
+  const generation = React.useRef(createRequestGeneration());
+  const controller = React.useRef<AbortController | null>(null);
   const alive = React.useRef(true);
+  const sourceKey = record?.catalogRef
+    ? catalogContextKey(record.catalogRef, record.displayName)
+    : (localProduct?.id ?? '');
+  const currentKey = React.useRef(sourceKey);
+  currentKey.current = sourceKey;
+  const clearContext = () => {
+    generation.current.next();
+    controller.current?.abort();
+    setContextBusy(null);
+    setMeasures(null);
+    setGuidance(null);
+    setQuantity('1');
+    setUnit('each');
+  };
   React.useEffect(() => {
+    const requests = generation.current;
     alive.current = true;
     return () => {
       alive.current = false;
+      requests.next();
+      controller.current?.abort();
     };
   }, []);
+  React.useEffect(() => {
+    let current = true;
+    void (async () => {
+      if (!instanceUrl || !user) return;
+      const stored = await nativeScannerRecovery(instanceUrl, user.id);
+      const pending = await stored.read();
+      if (!current) return;
+      journal.current = stored;
+      setAttempt(pending);
+      const context = await request<{ actor: ScannerActor }>('/api/v1/auth/context');
+      if (!current) return;
+      if (context.actor.userId !== user.id)
+        throw new Error('The signed-in account changed. Reopen the scanner.');
+      setActor(context.actor);
+      setReady(true);
+      setMessage(
+        pending
+          ? 'A previous confirmation needs review. Nothing is retried automatically.'
+          : 'Scan a barcode or enter it below.',
+      );
+    })().catch((error) => {
+      if (current)
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Saved confirmation recovery is unavailable. No write can start.',
+        );
+    });
+    return () => {
+      current = false;
+    };
+  }, [instanceUrl, request, user, recoveryCheck]);
   React.useEffect(() => {
     let current = true;
     if (target === 'shopping' && listId) {
@@ -156,37 +188,92 @@ export function BarcodeScannerScreen() {
       current = false;
     };
   }, [target, listId, request]);
+  usePreventRemove(busy && !!attempt, () =>
+    setMessage(
+      'The confirmation may already be running on the server. Its recovery record is saved; wait for this response before leaving.',
+    ),
+  );
+
+  const readContext = async (kind: 'measures' | 'storage-guidance') => {
+    if (!record?.catalogRef || contextBusy || busy || attempt) return;
+    const token = generation.current.next();
+    const key = sourceKey;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    const current = () =>
+      alive.current &&
+      generation.current.isCurrent(token) &&
+      currentKey.current === key &&
+      !abort.signal.aborted;
+    setContextBusy(kind);
+    setMessage('');
+    try {
+      const result = await request<{ measures?: CatalogMeasure[]; guidance?: Guidance[] }>(
+        `/api/v1/food-data/catalog/${kind}`,
+        {
+          method: 'POST',
+          signal: abort.signal,
+          body: JSON.stringify(
+            kind === 'measures'
+              ? { reference: record.catalogRef }
+              : { query: record.displayName.slice(0, 200) },
+          ),
+        },
+      );
+      if (!current()) return;
+      if (kind === 'measures') setMeasures(result.measures ?? []);
+      else setGuidance(result.guidance ?? []);
+    } catch (error) {
+      if (current())
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Source context is unavailable. Manual amounts remain usable.',
+        );
+    } finally {
+      if (current()) setContextBusy(null);
+    }
+  };
   const lookup = async (raw: string) => {
-    if (lock.current || attempt) return;
+    if (!ready || lock.current || attempt) return;
+    clearContext();
+    const token = generation.current.next();
+    const abort = new AbortController();
+    controller.current = abort;
     lock.current = true;
     scanLock.current = true;
     setBusy(true);
     setMessage('Looking up this barcode…');
     try {
-      const result = await request<{
-        preferred?: ReviewedCatalogFood | null;
-        alternatives?: ReviewedCatalogFood[];
-      }>('/api/v1/food-data/barcode-lookups', {
+      const result = await request<BarcodeReviewResult>('/api/v1/food-data/barcode-lookups', {
         method: 'POST',
+        signal: abort.signal,
         body: JSON.stringify({ barcode: raw, language: 'en', compareUsda: true }),
       });
-      if (!alive.current) return;
-      const choices = [result.preferred, ...(result.alternatives ?? [])].filter(
-        (item): item is ReviewedCatalogFood => Boolean(item),
-      );
-      if (!choices.length)
+      if (!alive.current || !generation.current.isCurrent(token)) return;
+      const choices = barcodeReviewChoices(result);
+      if (!choices.localProduct && !choices.records.length)
         throw new Error(
-          'No source match was found. Keep the barcode and try again, or add the product manually.',
+          'No source or saved product match was found. Try again or add the product manually.',
         );
-      setRecords(choices);
+      setRecords(choices.records);
+      setLocalProduct(choices.localProduct);
       setSelected(0);
-      setMessage('Review the source and amount before confirming. Lookup has changed nothing.');
+      setUnit(choices.localProduct?.defaultInventoryUnit || 'each');
+      setMessage(
+        choices.localProduct
+          ? 'This verified barcode matches a saved household product. Review the amount and destination; no duplicate import is needed.'
+          : 'Review the source and amount before confirming. Lookup has changed nothing.',
+      );
     } catch (error) {
-      if (alive.current) setMessage(error instanceof Error ? error.message : 'Lookup failed.');
-      scanLock.current = false;
+      if (alive.current && generation.current.isCurrent(token)) {
+        setMessage(error instanceof Error ? error.message : 'Lookup failed.');
+        scanLock.current = false;
+      }
     } finally {
       lock.current = false;
-      if (alive.current) setBusy(false);
+      if (alive.current && generation.current.isCurrent(token)) setBusy(false);
     }
   };
   const onScanned = (result: BarcodeScanningResult) => {
@@ -195,16 +282,40 @@ export function BarcodeScannerScreen() {
       void lookup(result.data);
     }
   };
-  const send = async (command: Attempt) => {
-    if (lock.current) return;
+  const send = async (command: ScannerOperation) => {
+    if (lock.current || !journal.current || !instanceUrl) return;
     lock.current = true;
     setBusy(true);
-    setAttempt(command);
-    setMessage('Saving the reviewed selection…');
+    setMessage('Checking the original account and profile…');
+    let sent = false;
+    let acknowledged = false;
+    let existing: ScannerOperation | null = null;
     try {
-      await request(command.path, { method: 'POST', body: JSON.stringify(command.body) });
+      const context = await request<{ actor: ScannerActor }>('/api/v1/auth/context');
+      if (!sameScannerActor(command, instanceUrl, context.actor))
+        throw new Error(
+          'Return to the original account and viewing profile before retrying this confirmation. It has not been retargeted.',
+        );
+      existing = await journal.current.read();
+      await journal.current.write(command);
+      if (!alive.current) return;
+      setAttempt(command);
+      setMessage('Saving the reviewed selection…');
+      sent = true;
+      await request(command.path, {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': command.operationId,
+          'X-Bord-Expected-Profile-Id': command.actor.profileId,
+        },
+        body: JSON.stringify(command.body),
+      });
+      acknowledged = true;
+      // Acknowledgement remains durable even when workspace refresh fails.
+      await journal.current.acknowledge(command.operationId);
       if (!alive.current) return;
       setAttempt(null);
+      setCompletedDestination(command.destination);
       setSaved(true);
       setMessage(command.description);
       try {
@@ -212,18 +323,28 @@ export function BarcodeScannerScreen() {
       } catch {
         if (alive.current)
           setMessage(
-            `${command.description} The workspace refresh failed; pull to refresh when connected.`,
+            `${command.description} Workspace refresh failed; refresh the saved destination when connected.`,
           );
       }
     } catch (error) {
       if (!alive.current) return;
       const knownRejected =
+        sent &&
         error instanceof Error &&
         'status' in error &&
         [400, 401, 403, 404, 409, 422].includes(Number(error.status));
-      if (knownRejected) setAttempt(null);
+      if (knownRejected && !existing) {
+        try {
+          await journal.current.acknowledge(command.operationId);
+          setAttempt(null);
+        } catch {
+          /* Keep the durable recovery record if local cleanup fails. */
+        }
+      }
+      // A previously uncertain request may have committed before a later authority/version rejection.
+      // Keep its original journal until an acknowledged replay; never treat a rejected retry as proof of no write.
       setMessage(
-        `${error instanceof Error ? error.message : 'The response was lost.'}${knownRejected ? ' Review the fields before trying again.' : ' The outcome is unknown. Retry the same confirmation to reconcile it safely.'}`,
+        `${error instanceof Error ? error.message : 'The response was lost.'} ${acknowledged ? 'The server confirmed this operation. Local recovery cleanup failed; retry the same saved operation to retrieve its result.' : sent ? (knownRejected ? (existing ? 'Review the original confirmation and current saved records; its earlier outcome is not erased by this rejection.' : 'This submission was rejected. Correct the reviewed fields before confirming again.') : 'The outcome is unknown. Retry this exact saved confirmation.') : 'No new request was sent.'}`,
       );
     } finally {
       lock.current = false;
@@ -231,52 +352,137 @@ export function BarcodeScannerScreen() {
     }
   };
   const confirm = (item?: List['items'][number]) => {
-    if (!record || attempt || busy || contextBusy) return;
+    if ((!record && !localProduct) || attempt || busy || contextBusy || !actor || !instanceUrl)
+      return;
     try {
       const amount = catalogQuantity(quantity, unit);
-      const base = catalogConfirmation(record, randomUUID(), amount.unit);
+      const operationId = randomUUID();
+      const base = localProduct
+        ? { operationId, localProductId: localProduct.id }
+        : catalogConfirmation(record!, operationId, amount.unit);
+      let path: string;
+      let body: Record<string, unknown>;
+      let description: string;
       if (target === 'shopping') {
         if (!list) throw new Error('Reload the selected shopping list before confirming.');
-        void send({
-          path: `/api/v1/shopping-lists/${list.id}/catalog-items`,
-          body: {
-            ...base,
-            ...(item ? { itemId: item.id, expectedUpdatedAt: item.updatedAt } : {}),
-            cartQuantity: amount.quantity,
-            cartUnit: amount.unit,
-          },
-          description: `${record.displayName} was matched to ${list.name} and marked in cart. No purchase or Pantry intake was recorded.`,
-        });
+        path = `/api/v1/shopping-lists/${list.id}/catalog-items`;
+        body = {
+          ...base,
+          cartIntent: item ? 'replace_existing' : 'separate_entry',
+          ...(item ? { itemId: item.id, expectedUpdatedAt: item.updatedAt } : {}),
+          cartQuantity: amount.quantity,
+          cartUnit: amount.unit,
+        };
+        description = `${amount.quantity} ${amount.unit} of ${reviewName} recorded in ${list.name}'s cart. No purchase or Pantry intake was recorded.`;
       } else {
         if (!locationId) throw new Error('Choose a storage location.');
-        void send({
-          path: '/api/v1/pantry/catalog-imports',
-          body: {
-            ...base,
-            batches: [
-              {
-                quantityRemaining: amount.quantity,
-                originalQuantity: amount.quantity,
-                unit: amount.unit,
-                locationId,
-                status: 'unopened',
-                expiryPrecision: 'unknown',
-                source: 'Reviewed barcode',
-                notes: '',
-              },
-            ],
-          },
-          description: `${amount.quantity} ${amount.unit} of ${record.displayName} added to Pantry with the reviewed source snapshot.`,
-        });
+        const batch = {
+          quantityRemaining: amount.quantity,
+          originalQuantity: amount.quantity,
+          unit: amount.unit,
+          locationId,
+          status: 'unopened',
+          expiryPrecision: 'unknown',
+          source: 'Reviewed barcode',
+          notes: '',
+        };
+        path = localProduct ? '/api/v1/pantry/batches' : '/api/v1/pantry/catalog-imports';
+        body = localProduct
+          ? { ...batch, productId: localProduct.id }
+          : { ...base, batches: [batch] };
+        description = `${amount.quantity} ${amount.unit} of ${reviewName} added to Pantry${localProduct ? ' using the saved product' : ' with the reviewed source snapshot'}.`;
       }
+      void send({
+        version: 1,
+        operationId,
+        actor,
+        instanceUrl,
+        createdAt: new Date().toISOString(),
+        path,
+        body,
+        description,
+        destination: target,
+      });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Check the fields.');
     }
   };
+  const reloadList = async () => {
+    if (!listId || busy || attempt) return;
+    setBusy(true);
+    try {
+      const result = await request<{ list: List }>(
+        `/api/v1/shopping-lists/${encodeURIComponent(listId)}`,
+      );
+      setList(result.list);
+      setMessage('Current list loaded. Review the amount and matching item.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Refresh failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const originalPerson = attempt
+    ? (state.profiles.find((profile) => profile.id === attempt.actor.profileId)?.displayName ??
+      'the original viewing profile')
+    : actor
+      ? (state.profiles.find((profile) => profile.id === actor.profileId)?.displayName ??
+        'the active viewing profile')
+      : '';
   return (
     <Screen>
       <AppHeader back assistant={false} title="Scan and review food" />
-      {!record ? (
+      {!ready ? (
+        <Button
+          label="Retry recovery check"
+          tone="secondary"
+          disabled={busy}
+          onPress={() => setRecoveryCheck((value) => value + 1)}
+        />
+      ) : null}
+      {attempt ? (
+        <Surface elevated>
+          <StatusPill>Confirmation needs reconciliation</StatusPill>
+          <Body>{attempt.description.replace(/ added to | recorded in /g, ' reviewed for ')}</Body>
+          <Body muted>
+            Original person: {originalPerson}. Prepared{' '}
+            {new Date(attempt.createdAt).toLocaleString()}. This saved command may already have
+            committed; opening this screen does not retry it.
+          </Body>
+          <Button
+            label={busy ? 'Checking confirmation…' : 'Retry original confirmation'}
+            disabled={busy || !ready}
+            onPress={() => void send(attempt)}
+          />
+          <Button
+            label="Review saved destination"
+            tone="secondary"
+            disabled={busy}
+            onPress={() =>
+              router.push(attempt.destination === 'shopping' ? '/(app)/(lists)' : '/(app)/(pantry)')
+            }
+          />
+          <Button
+            label="Switch viewing profile"
+            tone="quiet"
+            disabled={busy}
+            onPress={() => router.push('/settings/profiles')}
+          />
+        </Surface>
+      ) : saved ? (
+        <Surface>
+          <StatusPill>Saved</StatusPill>
+          <Body>{message}</Body>
+          <Button
+            label="View saved destination"
+            onPress={() =>
+              router.push(
+                completedDestination === 'shopping' ? '/(app)/(lists)' : '/(app)/(pantry)',
+              )
+            }
+          />
+        </Surface>
+      ) : !reviewName ? (
         <>
           {permission?.granted ? (
             <View
@@ -294,19 +500,17 @@ export function BarcodeScannerScreen() {
                 onCameraReady={() => setCameraState('ready')}
                 onMountError={() => {
                   setCameraState('error');
-                  setMessage(
-                    'The camera could not start. Enter the barcode or retry camera access.',
-                  );
+                  setMessage('Camera unavailable. Enter a barcode or retry.');
                 }}
                 barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a'] }}
-                onBarcodeScanned={busy || cameraState !== 'ready' ? undefined : onScanned}
+                onBarcodeScanned={busy || !ready || cameraState !== 'ready' ? undefined : onScanned}
               />
             </View>
           ) : (
             <Surface>
               <Body>
                 {permission
-                  ? 'Allow camera access to scan. Manual barcode entry works without camera permission.'
+                  ? 'Allow camera access to scan, or enter a barcode manually.'
                   : 'Checking camera permission…'}
               </Body>
               <Button
@@ -314,16 +518,16 @@ export function BarcodeScannerScreen() {
                 disabled={busy}
                 onPress={() => void requestPermission()}
               />
-              {permission && !permission.canAskAgain && (
+              {permission && !permission.canAskAgain ? (
                 <Button
                   label="Open system settings"
                   tone="secondary"
                   onPress={() => void Linking.openSettings()}
                 />
-              )}
+              ) : null}
             </Surface>
           )}
-          {permission?.granted && (
+          {permission?.granted ? (
             <Body muted>
               {cameraState === 'starting'
                 ? 'Starting camera…'
@@ -331,8 +535,8 @@ export function BarcodeScannerScreen() {
                   ? 'Camera ready. Aim at an EAN or UPC-A barcode.'
                   : 'Camera unavailable.'}
             </Body>
-          )}
-          {cameraState === 'error' && (
+          ) : null}
+          {cameraState === 'error' ? (
             <Button
               label="Retry camera"
               tone="secondary"
@@ -341,165 +545,211 @@ export function BarcodeScannerScreen() {
                 setCameraKey((key) => key + 1);
               }}
             />
-          )}
+          ) : null}
           <Surface>
             <FormField
               label="Barcode"
               value={barcode}
               onChangeText={setBarcode}
               keyboardType="number-pad"
-              editable={!busy}
+              editable={!busy && ready}
             />
             <Button
               label={busy ? 'Looking up…' : 'Look up barcode'}
-              disabled={busy || !barcode.trim()}
+              disabled={busy || !ready || !barcode.trim()}
               onPress={() => void lookup(barcode)}
             />
           </Surface>
         </>
       ) : (
         <Surface elevated>
-          <StatusPill>Review source food</StatusPill>
-          <EditorialText variant="title">{record.displayName}</EditorialText>
+          <StatusPill>{localProduct ? 'Review saved product' : 'Review source food'}</StatusPill>
+          <EditorialText variant="title">{reviewName}</EditorialText>
           <Body muted>
-            {[record.brand, record.quantity, record.canonicalGtin].filter(Boolean).join(' · ')}
+            {localProduct
+              ? [
+                  localProduct.brand,
+                  localProduct.defaultPackageAmount == null
+                    ? ''
+                    : `${localProduct.defaultPackageAmount} ${localProduct.defaultPackageUnit ?? ''} package`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : [record?.brand, record?.quantity, record?.canonicalGtin]
+                  .filter(Boolean)
+                  .join(' · ')}
           </Body>
-          <Body>
-            {record.provider === 'usda_fdc' ? 'USDA FoodData Central' : 'Open Food Facts'} ·{' '}
-            {record.catalogRef
-              ? `revision ${record.catalogRef.source_revision.slice(0, 12)}`
-              : 'Direct provider record'}
-          </Body>
-          <Body muted>
-            {record.citation} {record.license}
-          </Body>
-          <Body>
-            Nutrition basis: {record.nutrientBasis?.replaceAll('_', ' ') ?? 'Not recorded'}
-            {record.servingSize ? ` · ${record.servingSize}` : ''}. Missing nutrients and allergen
-            evidence remain unknown.
-          </Body>
-          {record.nutrients.slice(0, 6).map((nutrient) => (
-            <Body key={nutrient.nutrientCode}>
-              {nutrient.nutrientCode.replaceAll('_', ' ')}: {nutrient.amount} {nutrient.unit}
+          {localProduct ? (
+            <Body>
+              This verified barcode belongs to the saved household product. Its identity and source
+              history remain attached; confirmation adds the reviewed amount without importing
+              another product.
             </Body>
-          ))}
-          {records.length > 1 &&
-            records.map((choice, index) => (
-              <Button
-                key={`${choice.provider}:${choice.providerRecordId}`}
-                label={`${index === selected ? 'Selected: ' : ''}${choice.provider.replaceAll('_', ' ')} · ${choice.displayName}`}
-                disabled={busy || !!contextBusy || !!attempt || saved}
-                tone="secondary"
-                onPress={() => {
-                  setSelected(index);
-                  setMeasures(null);
-                  setGuidance(null);
-                }}
-              />
-            ))}
-          {record.catalogRef && (
+          ) : record ? (
             <>
-              <Button
-                label={contextBusy === 'measures' ? 'Loading measures…' : 'Show source measures'}
-                tone="secondary"
-                disabled={busy || !!contextBusy || !!attempt}
-                onPress={() => void readContext('measures')}
-              />
-              {measures &&
-                (measures.length ? (
-                  measures.map((measure, index) => (
-                    <View key={index}>
+              <Body>
+                {record.provider === 'usda_fdc' ? 'USDA FoodData Central' : 'Open Food Facts'} ·{' '}
+                {record.catalogRef
+                  ? `revision ${record.catalogRef.source_revision.slice(0, 12)}`
+                  : 'Direct provider record'}
+              </Body>
+              <Body muted>
+                {record.citation} {record.license}
+              </Body>
+              <Body>
+                Nutrition basis: {record.nutrientBasis?.replaceAll('_', ' ') ?? 'Not recorded'}
+                {record.servingSize ? ` · ${record.servingSize}` : ''}. Missing nutrient/allergen
+                evidence stays unknown.
+              </Body>
+              {record.nutrients.slice(0, 6).map((nutrient) => (
+                <Body key={nutrient.nutrientCode}>
+                  {nutrient.nutrientCode.replaceAll('_', ' ')}: {nutrient.amount} {nutrient.unit}
+                </Body>
+              ))}
+              {records.length > 1
+                ? records.map((choice, index) => (
+                    <Button
+                      key={`${choice.provider}:${choice.providerRecordId}`}
+                      label={`${index === selected ? 'Selected: ' : ''}${choice.provider.replaceAll('_', ' ')} · ${choice.displayName}`}
+                      disabled={busy || saved}
+                      tone="secondary"
+                      onPress={() => {
+                        clearContext();
+                        setSelected(index);
+                      }}
+                    />
+                  ))
+                : null}
+              {record.catalogRef ? (
+                <>
+                  <Button
+                    label={
+                      contextBusy === 'measures' ? 'Loading measures…' : 'Show source measures'
+                    }
+                    tone="secondary"
+                    disabled={busy || !!contextBusy || saved}
+                    onPress={() => void readContext('measures')}
+                  />
+                  {measures ? (
+                    measures.length ? (
+                      measures.map((measure, index) => (
+                        <View key={index}>
+                          <Body>
+                            {measure.label}
+                            {measure.gramWeight !== null ? ` · ${measure.gramWeight} g` : ''}
+                            {measure.form ? ` · ${measure.form}` : ''}
+                            {measure.basis ? ` · ${measure.basis}` : ''}
+                          </Body>
+                          {measure.description && measure.description !== measure.modifier ? (
+                            <Body muted>{measure.description}</Body>
+                          ) : null}
+                          {sourcePortionAmount(measure) && !saved ? (
+                            <Button
+                              label={`Use source portion (${measure.label}) · ${measure.gramWeight} g`}
+                              tone="quiet"
+                              disabled={busy}
+                              onPress={() => {
+                                const amount = sourcePortionAmount(measure)!;
+                                setQuantity(String(amount.quantity));
+                                setUnit(amount.unit);
+                                setMessage(
+                                  'The complete stated source portion was copied. Review before confirming.',
+                                );
+                              }}
+                            />
+                          ) : null}
+                        </View>
+                      ))
+                    ) : (
                       <Body>
-                        {measure.label}
-                        {measure.gramWeight !== null ? ` · ${measure.gramWeight} g` : ''}
-                        {measure.form ? ` · ${measure.form}` : ''}
-                        {measure.basis ? ` · ${measure.basis}` : ''}
+                        No supported measures exist for this revision. Enter a measured amount.
                       </Body>
-                      {measure.gramWeight !== null && !saved && (
-                        <Button
-                          label={`Use one ${measure.label} as ${measure.gramWeight} g`}
-                          tone="quiet"
-                          disabled={busy || !!attempt}
-                          onPress={() => {
-                            setQuantity(String(measure.gramWeight));
-                            setUnit('g');
+                    )
+                  ) : null}
+                  {instanceUrl ? (
+                    <>
+                      <Button
+                        label="Find official stores in web settings"
+                        tone="quiet"
+                        onPress={() =>
+                          void Linking.openURL(`${instanceUrl}/settings/lists`).catch(() =>
                             setMessage(
-                              'Source measure copied to the amount. Review it before confirming.',
-                            );
-                          }}
-                        />
-                      )}
-                    </View>
-                  ))
-                ) : (
-                  <Body>
-                    No supported measures exist for this revision. Enter a measured amount.
-                  </Body>
-                ))}
-              <Button
-                label={
-                  contextBusy === 'storage-guidance'
-                    ? 'Loading storage guidance…'
-                    : 'Find storage guidance'
-                }
-                tone="secondary"
-                disabled={busy || !!contextBusy || !!attempt}
-                onPress={() => void readContext('storage-guidance')}
-              />
-              {guidance &&
-                (guidance.length ? (
-                  guidance.map((entry) => (
-                    <View key={entry.id}>
-                      <Body>
-                        {[entry.name, entry.form, entry.storageState].filter(Boolean).join(' · ')}
-                      </Body>
-                      {Object.entries(entry.details).map(([key, value]) => (
-                        <Body muted key={key}>
-                          {key.replaceAll('_', ' ')}:{' '}
-                          {value === null ? 'Not recorded' : String(value)}
-                        </Body>
-                      ))}
+                              'The web settings could not be opened. Your reviewed food is retained.',
+                            ),
+                          )
+                        }
+                      />
                       <Body muted>
-                        {entry.attribution} · {entry.license}. Source guidance does not set a batch
-                        expiry date.
+                        Sign in to the same kitchen if requested. Store chain, area and location
+                        filters are available there; your reviewed food remains here.
                       </Body>
-                    </View>
-                  ))
-                ) : (
-                  <Body>No matching guidance is available in this source pack.</Body>
-                ))}
+                    </>
+                  ) : null}
+                  <Button
+                    label={
+                      contextBusy === 'storage-guidance'
+                        ? 'Loading guidance…'
+                        : 'Find storage guidance'
+                    }
+                    tone="secondary"
+                    disabled={busy || !!contextBusy || saved}
+                    onPress={() => void readContext('storage-guidance')}
+                  />
+                  {guidance ? (
+                    guidance.length ? (
+                      guidance.map((entry) => (
+                        <View key={entry.id}>
+                          <Body>
+                            {[entry.name, entry.form, entry.storageState]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Body>
+                          {Object.entries(entry.details).map(([key, value]) => (
+                            <Body muted key={key}>
+                              {key.replaceAll('_', ' ')}:{' '}
+                              {value === null ? 'Not recorded' : String(value)}
+                            </Body>
+                          ))}
+                          <Body muted>
+                            {entry.attribution} · {entry.license}. Guidance does not set a batch
+                            expiry date.
+                          </Body>
+                        </View>
+                      ))
+                    ) : (
+                      <Body>No matching guidance is available in this source pack.</Body>
+                    )
+                  ) : null}
+                </>
+              ) : null}
             </>
-          )}
-          {!saved && (
+          ) : null}
+          {!saved ? (
             <>
+              <Body>For {originalPerson}</Body>
               <FormField
                 label={target === 'shopping' ? 'Amount in cart' : 'Amount added to Pantry'}
                 value={quantity}
                 onChangeText={setQuantity}
                 keyboardType="decimal-pad"
-                editable={!busy && !attempt}
+                editable={!busy}
               />
-              <FormField
-                label="Unit"
-                value={unit}
-                onChangeText={setUnit}
-                editable={!busy && !attempt}
-              />
+              <FormField label="Unit" value={unit} onChangeText={setUnit} editable={!busy} />
               <Body muted>
-                Package size and nutrition basis are separate. Enter the physical amount; no density
-                or serving conversion is assumed.
+                Enter the physical amount. Package size, recipe demand and nutrition basis remain
+                separate; no density conversion is assumed.
               </Body>
               {target === 'shopping' ? (
                 <>
                   <Body>
                     {list
-                      ? `Confirm the matching item in ${list.name}.`
-                      : 'Loading the selected shopping list…'}
+                      ? `Review the item in ${list.name}. Replacing a cart amount does not add to its previous amount.`
+                      : 'Loading the selected list…'}
                   </Body>
                   <Button
                     label="Refresh current list"
                     tone="quiet"
-                    disabled={busy || !!attempt}
+                    disabled={busy}
                     onPress={() => void reloadList()}
                   />
                   {list?.items
@@ -507,15 +757,15 @@ export function BarcodeScannerScreen() {
                     .map((item) => (
                       <Button
                         key={item.id}
-                        label={`Match ${item.item} and mark in cart`}
+                        label={`Replace ${item.item}'s cart amount`}
                         tone="secondary"
-                        disabled={busy || !!attempt}
+                        disabled={busy || !!contextBusy}
                         onPress={() => confirm(item)}
                       />
                     ))}
                   <Button
-                    label="Add as new in-cart item"
-                    disabled={busy || !!attempt || !list}
+                    label="Add separate in-cart entry"
+                    disabled={busy || !!contextBusy || !list}
                     onPress={() => confirm()}
                   />
                 </>
@@ -527,23 +777,19 @@ export function BarcodeScannerScreen() {
                       key={location.id}
                       label={`${location.id === locationId ? 'Selected: ' : ''}${location.path ?? location.name}`}
                       tone="secondary"
-                      disabled={busy || !!attempt}
+                      disabled={busy}
                       onPress={() => setLocationId(location.id)}
                     />
                   ))}
                   <Button
                     label={busy ? 'Saving…' : 'Confirm Pantry intake'}
-                    disabled={busy || !!attempt || !locationId}
+                    disabled={busy || !!contextBusy || !locationId}
                     onPress={() => confirm()}
                   />
                 </>
               )}
             </>
-          )}
-          {attempt && !busy && (
-            <Button label="Retry the same confirmation" onPress={() => void send(attempt)} />
-          )}
-          {saved && (
+          ) : (
             <Button
               label={target === 'shopping' ? 'Open shopping list' : 'Open Pantry'}
               onPress={() =>
@@ -556,11 +802,11 @@ export function BarcodeScannerScreen() {
           <Button
             label="Scan another"
             tone="quiet"
-            disabled={busy || !!attempt}
+            disabled={busy}
             onPress={() => {
+              clearContext();
               setRecords([]);
-              setMeasures(null);
-              setGuidance(null);
+              setLocalProduct(null);
               setBarcode('');
               setSaved(false);
               setMessage('');
@@ -570,11 +816,14 @@ export function BarcodeScannerScreen() {
           />
         </Surface>
       )}
-      {message && (
-        <Text accessibilityRole="alert" style={[tokens.type.footnote, { color: tokens.color.ink }]}>
+      {message ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={[tokens.type.footnote, { color: tokens.color.ink }]}
+        >
           {message}
         </Text>
-      )}
+      ) : null}
     </Screen>
   );
 }

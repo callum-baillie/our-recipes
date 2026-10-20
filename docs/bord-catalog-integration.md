@@ -39,7 +39,7 @@ Native search cache keys include endpoint/key/config fingerprint, generation, no
 
 ## Application contracts and native review
 
-The native scanner uses the same source review and confirmed imports as the web picker. A scan retains the full source reference and basis, offers distinct alternatives, and asks for quantity/unit and destination. Pantry confirmation creates the reviewed source product and stock batch together; shopping confirmation matches or creates the intended item and records the reviewed cart amount. Neither route is a retailer purchase or Nutrition intake. Saved provider identity is structured data, not a note or display-name match.
+The native scanner uses the same source review and confirmed imports as the web picker. A scan retains the full source reference and basis, offers distinct alternatives, and asks for quantity/unit and destination. Pantry confirmation creates the reviewed source product and stock batch together; shopping confirmation either explicitly replaces a reviewed existing row’s cart amount or creates a separate in-cart entry. It stores cart amount/unit independently from requested quantity/unit. A saved local barcode match reuses its product ID without a provider import. Neither route is a retailer purchase or Nutrition intake. Saved provider identity is structured data, not a note or display-name match.
 
 Supported read contracts are:
 
@@ -99,3 +99,21 @@ The migration test upgrades a synthetic database from the prior schema, retains 
 ## Current refinement evidence
 
 See [catalog and native register](refinement/catalog-native.md) for current behavioral checks, capability/ownership matrices, synthetic screenshots, native build evidence and remaining device/dependency limits. The historical results above are retained as historical evidence, not reused as current acceptance.
+
+## Reviewed cart amounts and restart recovery
+
+`POST /api/v1/shopping-lists/{listId}/catalog-items` accepts an exact reviewed remote selection or a saved `localProductId`. Lookup never imports or changes stock. Confirmation requires its original operation UUID and explicit `cartQuantity`/`cartUnit`, independent of recipe demand. With no item ID it creates a separate cart row; with `itemId` and `expectedUpdatedAt` it replaces that reviewed row's cart amount. `cartIntent` can name `separate_entry` or `replace_existing`; incompatible combinations fail validation. It never implicitly adds to a prior cart amount.
+
+The result and local mutation commit together. Keep the same operation and original account/profile context after an uncertain response. Completed replay works during catalog outages. A changed intent uses a new operation only after the old outcome is resolved. New remote writes re-fetch the reviewed revision; expired revisions require renewed review. Existing local products need no provider request.
+
+Migration0073 preserves legacy cart numbers but leaves their purchase unit unreviewed (`cartUnit:null`). Review it before unpacking; demand units or free-text labels are not authoritative evidence.500g purchased against2each demand stays500g and does not claim demand coverage. Compatible g/kg coverage uses existing inventory conversion; mass/volume/count are never converted without evidence.
+
+System → Food providers → Effective food-data configuration shows current mode, effective remote fallback, provider/catalog deadlines, quotas and freshness/stale/cache limits without credentials. These installation settings come from named environment variables or defaults and require restart/recreation. Configured quotas are not live remaining allowance, and pack readiness is separate from code capability.
+
+## Reviewed source portions and restart recovery
+
+Measures retain `amount`, `unit`, `modifier`, `description`, `gramWeight`, `form` and `basis`. For example, `2 cup · chopped` with `gramWeight: 240` means the entire two-cup source portion weighs 240 g; it is not one cup at 240 g. Missing quantities remain null. Web Pantry, recipe/import editors and supported saved-food intake forms can copy the full supplied gram weight into an editable amount; only their explicit Save/Log action writes. Saved-food measures use the exact snapshot belonging to the selected nutrition record, not a newer linked revision.
+
+The source-review enrichment action accepts identified canonical product IDs. Free-text enrichment is not advertised. Missing source evidence, unavailable packs and failed requests remain distinct. Native store discovery uses a deliberate handoff to the same kitchen’s existing settings editor and its chain/area/proximity/pagination controls.
+
+Native scanner confirmations use an encrypted write-ahead journal bound to instance/account/original profile. Assistant recovery stores only owned server operation references. Neither reconnect nor restart resubmits work automatically. `/auth/context` provides minimal session actor binding and reviewed scanner write routes enforce the optional `X-Bord-Expected-Profile-Id` header. Exact receipts remain usable during provider outage after current authorization. See [post-review evidence](refinement/post-review-catalog.md).

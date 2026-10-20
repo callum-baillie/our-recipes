@@ -40,7 +40,8 @@
     "openapi:client-smoke": "redocly bundle docs/openapi.yaml --output .test-data/openapi.json && node scripts/smoke-openapi-client.mjs .test-data/openapi.json",
     "openapi:validate": "redocly lint docs/openapi.yaml && pnpm openapi:coverage && pnpm openapi:client-smoke",
     "diff:check": "node scripts/check-diff.mjs",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm openapi:validate && pnpm build:release && pnpm diff:check"
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm openapi:validate && pnpm build:release && pnpm diff:check",
+    "test:post-review:browser": "node scripts/run-post-review-browser.mjs"
   },
   "dependencies": {
     "@better-auth/api-key": "1.6.25",

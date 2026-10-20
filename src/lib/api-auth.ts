@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { canAccountUseAi } from '@/lib/services/ai-access-service';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
@@ -29,6 +30,44 @@ export async function authorizeApi(
   const requestId = incoming && incoming.length <= 128 ? incoming : randomUUID();
   try {
     const principal = await authenticateApiRequest(request, resource, action);
+    const expectedProfile = request.headers.get('x-bord-expected-profile-id');
+    if (
+      expectedProfile !== null &&
+      request.method === 'POST' &&
+      /^\/api\/v1\/(?:pantry\/(?:batches|catalog-imports)|shopping-lists\/[^/]+\/catalog-items)$/.test(
+        new URL(request.url).pathname,
+      )
+    ) {
+      const originError = requireTrustedSessionMutation(request, principal, requestId);
+      if (originError) return { principal: null, requestId, response: originError };
+      if (!z.string().uuid().safeParse(expectedProfile).success)
+        return {
+          principal: null,
+          requestId,
+          response: withApiRequestId(
+            jsonError(
+              400,
+              'invalid_expected_profile',
+              'Review the original profile before confirming.',
+            ),
+            requestId,
+          ),
+        };
+      if (expectedProfile !== principal.profileId)
+        return {
+          principal: null,
+          requestId,
+          response: withApiRequestId(
+            jsonError(
+              409,
+              'reviewed_actor_changed',
+              'The active profile changed. Return to the original profile to reconcile this reviewed operation.',
+            ),
+            requestId,
+          ),
+        };
+    }
+
     const aiMutation =
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       /(?:\/ai\/|\/images\/generate$|\/nutrition\/estimate$|\/improve$)/u.test(

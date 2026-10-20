@@ -6,6 +6,7 @@ import {
   shoppingWorkflowState,
   moveShoppingItem,
 } from '@/lib/domain/shopping-workflow';
+import { cartDemandCoverage, shoppingPurchaseDraft } from '@/lib/domain/shopping-cart';
 import { formatShoppingQuantity } from '@/lib/domain/shopping-quantity';
 import { ShoppingListNotes } from './shopping-list-notes';
 import { ShoppingListShortcuts } from './shopping-list-shortcuts';
@@ -112,8 +113,7 @@ function emptyIntakeDraft(item: Item, locationId = ''): IntakeDraft {
   return {
     productId: item.pantry?.productId ?? '',
     locationId,
-    quantity: String(item.cartQuantity > 0 ? item.cartQuantity : (item.quantity ?? '')),
-    unit: item.unit,
+    ...shoppingPurchaseDraft(item),
     intakeMode: 'partial',
     packageCount: '',
     amountPerPackage: '',
@@ -492,6 +492,7 @@ export function ShoppingListEditor({
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [cartQuantityItem, setCartQuantityItem] = useState<Item | null>(null);
   const [cartQuantityDraft, setCartQuantityDraft] = useState('');
+  const [cartUnitDraft, setCartUnitDraft] = useState('');
   const [editingItem, setEditingItem] = useState<{
     id: string;
     name: string;
@@ -706,6 +707,7 @@ export function ShoppingListEditor({
           checked: item.checked,
           shoppingState: item.shoppingState,
           cartQuantity: item.cartQuantity,
+          cartUnit: item.cartUnit,
           cartLabel: item.cartLabel,
         }),
       });
@@ -741,6 +743,15 @@ export function ShoppingListEditor({
     cartLabel = item.cartLabel,
   ) => {
     if (pendingStateChanges.current.has(item.id)) return;
+    if (
+      state === 'in_cart' &&
+      cartQuantity === undefined &&
+      item.cartUnit == null &&
+      (item.cartQuantity > 0 || item.quantity === null)
+    ) {
+      editCartQuantity(item);
+      return;
+    }
     pendingStateChanges.current.add(item.id);
     setPendingItems((current) => [...current, item.id]);
     const previous = { ...item };
@@ -749,9 +760,15 @@ export function ShoppingListEditor({
       cartQuantity:
         cartQuantity ??
         (state === 'in_cart'
-          ? (item.quantity ?? Math.max(1, item.cartQuantity))
+          ? item.cartUnit == null
+            ? (item.quantity ?? 0)
+            : item.cartQuantity
           : item.cartQuantity),
       cartLabel,
+      cartUnit:
+        state === 'in_cart' && (cartQuantity !== undefined || item.cartUnit == null)
+          ? item.unit
+          : item.cartUnit,
       shoppingState: state,
       checked: state === 'sourced',
     };
@@ -807,33 +824,43 @@ export function ShoppingListEditor({
   };
 
   const editCartQuantity = (item: Item) => {
-    setCartQuantityDraft(String(item.cartQuantity || item.quantity || 1));
+    setCartQuantityDraft(
+      item.cartUnit == null && item.cartQuantity === 0 ? '' : String(item.cartQuantity),
+    );
+    setCartUnitDraft(item.cartUnit ?? '');
     setCartQuantityItem(item);
   };
 
   const saveCartQuantity = async (event: FormEvent) => {
     event.preventDefault();
-    if (!cartQuantityItem) return;
+    if (!cartQuantityItem || busy === 'cart-quantity') return;
+    if (!cartUnitDraft.trim()) {
+      showToast('Review the purchase unit before saving.', 'error');
+      return;
+    }
     const amount = Number(cartQuantityDraft);
-    if (!Number.isFinite(amount) || amount < 0 || amount > 10_000) {
+    if (!cartQuantityDraft.trim() || !Number.isFinite(amount) || amount < 0 || amount > 10_000) {
       showToast('Enter a quantity from 0 to 10,000.', 'error');
       return;
     }
     const previous = { ...cartQuantityItem };
-    const complete = amount > 0 && (previous.quantity === null || amount >= previous.quantity);
+    const cartUnit = cartUnitDraft.trim();
+    const complete = cartDemandCoverage({ ...previous, cartQuantity: amount, cartUnit }).complete;
     const changed = {
       ...previous,
       cartQuantity: amount,
+      cartUnit,
       cartLabel: amount ? previous.cartLabel : '',
-      shoppingState: (complete ? 'in_cart' : 'to_buy') as ShoppingState,
+      shoppingState: (amount > 0 ? 'in_cart' : 'to_buy') as ShoppingState,
       checked: false,
     };
     updateLocal(previous.id, changed);
+    setBusy('cart-quantity');
     if (await save(changed)) {
       setLastChecked({ item: changed, previous });
       showToast(
         amount && !complete
-          ? `${formatQuantity(amount, previous.unit)} recorded; the remaining amount stays on your list.`
+          ? `${formatQuantity(amount, cartUnit)} recorded; the remaining amount stays on your list.`
           : amount
             ? `${previous.item} marked in cart.`
             : `${previous.item} remains on your list.`,
@@ -843,6 +870,7 @@ export function ShoppingListEditor({
     } else {
       setItems((current) => current.map((row) => (row.id === previous.id ? previous : row)));
     }
+    setBusy('');
   };
 
   const lookupBarcode = async (value: string) => {
@@ -899,6 +927,7 @@ export function ShoppingListEditor({
       note: scanNote,
       cartLabel: scanRecord.displayName,
       cartQuantity,
+      cartUnit: item.unit,
       shoppingState: (unpackMode && complete
         ? 'sourced'
         : complete
@@ -958,6 +987,7 @@ export function ShoppingListEditor({
           checked: unpackMode,
           shoppingState: unpackMode ? 'sourced' : 'in_cart',
           cartQuantity: quantity,
+          cartUnit: 'each',
           cartLabel: scanRecord.displayName,
         }),
       });
@@ -1035,6 +1065,7 @@ export function ShoppingListEditor({
       note,
       cartLabel: record.displayName,
       cartQuantity: original.quantity ?? Math.max(1, original.cartQuantity),
+      cartUnit: original.unit,
       shoppingState: 'in_cart' as const,
       checked: false,
     };
@@ -1070,6 +1101,7 @@ export function ShoppingListEditor({
           checked: false,
           shoppingState: 'to_buy',
           cartQuantity: 0,
+          cartUnit: null,
           cartLabel: '',
         }),
       });
@@ -1514,11 +1546,15 @@ export function ShoppingListEditor({
             }`}
           >
             <span className={styles.buyAmount}>{quantitySummary.primary}</span>
-            {item.cartQuantity > 0 ? (
+            {item.cartQuantity > 0 || item.cartUnit != null ? (
               <span className={styles.cartAmount}>
-                {formatQuantity(item.cartQuantity, item.unit)} in cart
-                {item.quantity !== null && item.cartQuantity < item.quantity
-                  ? ` · ${formatQuantity(item.quantity - item.cartQuantity, item.unit)} still needed`
+                {item.cartUnit == null
+                  ? 'Purchase unit needs review'
+                  : formatQuantity(item.cartQuantity, item.cartUnit)}{' '}
+                {state === 'in_cart' ? ' in cart' : ' recorded'}
+                {cartDemandCoverage(item).remaining !== null &&
+                cartDemandCoverage(item).remaining! > 0
+                  ? ` · ${formatQuantity(cartDemandCoverage(item).remaining!, item.unit)} still needed`
                   : ''}
               </span>
             ) : null}
@@ -1561,7 +1597,7 @@ export function ShoppingListEditor({
               className={`${styles.stateButton} ${styles.foundButton}`}
               type="button"
               disabled={pendingItems.includes(item.id)}
-              onClick={() => void setItemState(item, 'in_cart', item.quantity ?? 1)}
+              onClick={() => void setItemState(item, 'in_cart')}
             >
               <CheckCircle2 size={19} /> <span>Found it!</span>
             </button>
@@ -2732,17 +2768,34 @@ export function ShoppingListEditor({
           onSubmit={(event) => void saveCartQuantity(event)}
         >
           <label>
-            Quantity bought ({cartQuantityItem?.unit || 'units'})
+            Quantity bought
             <input
               type="number"
               min="0"
               max="10000"
               step="any"
               inputMode="decimal"
+              disabled={busy === 'cart-quantity'}
               value={cartQuantityDraft}
               onChange={(event) => setCartQuantityDraft(event.target.value)}
             />
           </label>
+          <label>
+            Purchase unit
+            <input
+              value={cartUnitDraft}
+              maxLength={30}
+              required
+              disabled={busy === 'cart-quantity'}
+              onChange={(event) => setCartUnitDraft(event.target.value)}
+            />
+          </label>
+          {cartQuantityItem?.cartUnit == null ? (
+            <p>
+              The earlier purchase unit was not recorded. Confirm it before unpacking; recipe demand
+              is separate.
+            </p>
+          ) : null}
           <p>
             {cartQuantityItem?.quantity !== null && cartQuantityItem?.quantity !== undefined
               ? `Needed: ${formatQuantity(cartQuantityItem.quantity, cartQuantityItem.unit)}. Any amount left stays on the shopping list.`
@@ -2752,7 +2805,9 @@ export function ShoppingListEditor({
             <button type="button" onClick={() => setCartQuantityItem(null)}>
               Cancel
             </button>
-            <button type="submit">Save quantity</button>
+            <button type="submit" disabled={busy === 'cart-quantity'}>
+              {busy === 'cart-quantity' ? 'Saving quantity…' : 'Save quantity'}
+            </button>
           </footer>
         </form>
       </dialog>

@@ -1,7 +1,4 @@
-import {
-  recipeImageInput,
-  RECIPE_IMAGE_PROMPT_VERSION,
-} from '@/lib/domain/recipe-image-generation';
+import { executeAiWorkload } from './ai-execution-service';
 import 'server-only';
 import { getEffectiveAiPolicy, aiUserIdForProfile } from './ai-access-service';
 
@@ -19,12 +16,10 @@ import type {
 import type { RecipePayload } from '@/lib/domain/recipe';
 import { AiProviderRequestError, AiProviderUnavailableError } from '@/lib/providers/ai-provider';
 import { getAiProvider, getAiReadiness } from '@/lib/services/ai-readiness-service';
-import { getAiWorkloadSetting, getAiDataPolicy } from '@/lib/services/ai-settings-service';
+import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { getImportArtifact, getImportOperation } from '@/lib/services/import-service';
-import { createRecipeImage } from '@/lib/services/recipe-image-service';
 import {
   getRecipe,
-  recipePayloadFromDetail,
   RecipeConflictError,
   RecipeNotFoundError,
   updateRecipeNutritionEstimateWithIntegrations,
@@ -205,15 +200,17 @@ export async function createAiReviewCandidate(input: {
       promptVersion: setting.promptVersion,
     });
     try {
-      const candidate = await provider.createTextReviewCandidate(
-        {
-          kind: 'text-normalization',
-          sourceDigest: audit.sourceDigest,
-          sourceLabel,
-          sourceText,
-          improve: input.action.improve,
-        },
-        setting,
+      const candidate = await executeAiWorkload(input.actorProfileId, 'recipe_review', (options) =>
+        provider.createTextReviewCandidate(
+          {
+            kind: 'text-normalization',
+            sourceDigest: audit.sourceDigest,
+            sourceLabel,
+            sourceText,
+            improve: input.action.improve,
+          },
+          options,
+        ),
       );
       return { candidate: publicCandidate(candidate, sourceLabel), audit: completeAudit(audit.id) };
     } catch (error) {
@@ -272,17 +269,19 @@ export async function createAiReviewCandidate(input: {
     promptVersion: setting.promptVersion,
   });
   try {
-    const candidate = await provider.createVisionReviewCandidate(
-      {
-        kind: 'vision-extraction',
-        sourceDigest,
-        sourceLabel: loaded.operation.sourceName,
-        imageDataUrls: files.map(
-          (entry) => `data:${entry.file.mediaType};base64,${entry.file.bytes.toString('base64')}`,
-        ),
-        improve: input.action.improve,
-      },
-      setting,
+    const candidate = await executeAiWorkload(input.actorProfileId, 'recipe_review', (options) =>
+      provider.createVisionReviewCandidate(
+        {
+          kind: 'vision-extraction',
+          sourceDigest,
+          sourceLabel: loaded.operation.sourceName,
+          imageDataUrls: files.map(
+            (entry) => `data:${entry.file.mediaType};base64,${entry.file.bytes.toString('base64')}`,
+          ),
+          improve: input.action.improve,
+        },
+        options,
+      ),
     );
     return {
       candidate: publicCandidate(candidate, loaded.operation.sourceName),
@@ -330,9 +329,11 @@ export async function improveAiRecipe(input: {
     promptVersion: setting.promptVersion,
   });
   try {
-    const candidate = await provider.improveRecipe(
-      { recipe: input.recipe, ...(input.mode === 'enhance' ? { mode: 'enhance' as const } : {}) },
-      setting,
+    const candidate = await executeAiWorkload(input.actorProfileId, 'recipe_review', (options) =>
+      provider.improveRecipe(
+        { recipe: input.recipe, ...(input.mode === 'enhance' ? { mode: 'enhance' as const } : {}) },
+        options,
+      ),
     );
     return {
       candidate: {
@@ -368,62 +369,16 @@ export async function improveAiRecipe(input: {
   }
 }
 
-export async function generateAiRecipeImage(input: {
+/** @deprecated Use the owned candidate service and explicit acceptance. */
+export async function generateAiRecipeImage(_input: {
   actorProfileId: string;
   recipeId: string;
 }): Promise<{ imageId: string; audit: AiOperationAudit }> {
-  ensureDatabase();
-  assertAiRateLimit(input.actorProfileId);
-  const recipe = getRecipe(input.recipeId, input.actorProfileId);
-  if (!recipe) throw new RecipeNotFoundError('That recipe no longer exists.');
-  const setting = getAiWorkloadSetting(input.actorProfileId, 'image_generation');
-  if (!setting.enabled) {
-    throw new AiOperationError(
-      'ai_request_failed',
-      'AI recipe image generation is disabled in household settings.',
-    );
-  }
-  if (!getAiDataPolicy(input.actorProfileId).shareSharedRecipes)
-    throw new AiOperationError(
-      'ai_sharing_disabled',
-      'Allow shared recipes in your AI privacy settings before sending this recipe to OpenAI.',
-    );
-  const provider = configuredProvider();
-  const audit = beginAudit({
-    kind: 'image-generation',
-    sourceDigest: digest(
-      `${recipe.id}:${recipe.currentRevision}:${recipe.updatedAt.toISOString()}`,
-    ),
-    sourceLabel: recipe.title.slice(0, 160),
-    profileId: input.actorProfileId,
-    recipeId: recipe.id,
-    model: setting.model,
-    promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
-  });
-  try {
-    const generated = await provider.generateRecipeImage(
-      recipeImageInput(recipePayloadFromDetail(recipe)),
-      setting,
-    );
-    const image = await createRecipeImage(
-      recipe.id,
-      input.actorProfileId,
-      generated.bytes,
-      generated.altText,
-    );
-    return { imageId: image.id, audit: completeAudit(audit.id, image.id) };
-  } catch (error) {
-    failAudit(audit.id);
-    if (error instanceof AiProviderUnavailableError)
-      throw new AiOperationError('ai_not_configured', 'OpenAI is not configured for this server.');
-    if (error instanceof RecipeNotFoundError) throw error;
-    if (error instanceof AiProviderRequestError)
-      throw new AiOperationError('ai_request_failed', 'OpenAI could not generate a recipe image.');
-    throw new AiOperationError(
-      'ai_request_failed',
-      'The generated image could not be stored safely. Nothing was added to the recipe.',
-    );
-  }
+  void _input; // Compatibility entry point intentionally refuses direct attachment.
+  throw new AiOperationError(
+    'ai_request_failed',
+    'Direct image attachment is no longer supported. Prepare and accept a reviewed image candidate.',
+  );
 }
 
 export async function estimateAiRecipeNutrition(input: {
@@ -462,25 +417,30 @@ export async function estimateAiRecipeNutrition(input: {
     promptVersion: setting.promptVersion,
   });
   try {
-    const estimate = await provider.estimateRecipeNutrition(
-      {
-        recipeTitle: recipe.title,
-        recipeSummary: recipe.summary,
-        servings: recipe.servings,
-        ingredientGroups: recipe.ingredientGroups.map((group) => ({
-          name: group.name,
-          ingredients: group.ingredients.map(({ quantity, unit, item, note }) => ({
-            quantity,
-            unit,
-            item,
-            note,
-          })),
-        })),
-        instructionSteps: recipe.instructionSections.flatMap((section) =>
-          section.steps.map((step) => step.body),
+    const estimate = await executeAiWorkload(
+      input.actorProfileId,
+      'nutrition_estimation',
+      (options) =>
+        provider.estimateRecipeNutrition(
+          {
+            recipeTitle: recipe.title,
+            recipeSummary: recipe.summary,
+            servings: recipe.servings,
+            ingredientGroups: recipe.ingredientGroups.map((group) => ({
+              name: group.name,
+              ingredients: group.ingredients.map(({ quantity, unit, item, note }) => ({
+                quantity,
+                unit,
+                item,
+                note,
+              })),
+            })),
+            instructionSteps: recipe.instructionSections.flatMap((section) =>
+              section.steps.map((step) => step.body),
+            ),
+          },
+          options,
         ),
-      },
-      setting,
     );
     const updated = updateRecipeNutritionEstimateWithIntegrations(
       recipe.id,

@@ -60,7 +60,7 @@ export const AI_MODEL_CATALOG = [
     id: 'gpt-5.4-mini',
     label: 'GPT-5.4 Mini',
     workloads: aiWorkloadSchema.options.filter((item) => item !== 'image_generation'),
-    reasoning: [],
+    reasoning: ['none', 'low', 'medium', 'high', 'xhigh'],
   },
   {
     id: 'gpt-4o',

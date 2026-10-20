@@ -1,5 +1,7 @@
 # Full project refinement
 
+**Current follow-up:** [post-review completion register](post-review.md) starts from160441d and supersedes broad completion claims below for the F/G execution paths. The entries below describe the previous release and its bounded historical evidence. New fixes and acceptance must be read in the follow-up register.
+
 Started 2026-10-19 from clean `main` at `a278f81a272472b9ee2da6ff7c55788285c6fb4c`. Implementation branch: `refinement/full-project-completion`. Local implementation, GitHub publication and deployment are separate outcomes; the final receipt is in [release-evidence.md](release-evidence.md).
 
 The named `BORD-UI-IMPLEMENTATION-VERIFICATION.md` and seven batch Markdown files were absent from both local repositories. The self-contained Appendix A supplied the required backlog. Historical screenshots are baseline evidence only.

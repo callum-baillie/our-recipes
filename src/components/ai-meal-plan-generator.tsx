@@ -280,21 +280,13 @@ function ModeOptions({
           onChange={(value) => set('planLeftovers', value)}
         />
         {!recipebook ? (
-          <>
-            <Toggle
-              label="Generate recipe images"
-              description="This increases API costs significantly."
-              checked={imageGenerationEnabled && options.generateRecipeImages}
-              disabled={!imageGenerationEnabled}
-              onChange={(value) => set('generateRecipeImages', value)}
-            />
-            {!imageGenerationEnabled ? (
-              <p className={styles.imageSettingNote}>
-                Image generation is disabled for the household.{' '}
-                <Link href="/account/ai">Enable it in AI settings</Link>.
-              </p>
-            ) : null}
-          </>
+          <p className={styles.imageSettingNote}>
+            Recipe images are a separate optional paid request. After saving, open a recipe to
+            review an image request and accept a candidate.
+            {!imageGenerationEnabled
+              ? ' Image generation is currently disabled by household policy.'
+              : ''}
+          </p>
         ) : null}
       </fieldset>
       <button
@@ -397,8 +389,7 @@ export function AiMealPlanGenerator({
             : aiOptions.allowRepeatingMeals,
         planLeftovers:
           activeMode === 'recipebook' ? recipebookOptions.planLeftovers : aiOptions.planLeftovers,
-        generateRecipeImages:
-          activeMode === 'ai' && imageGenerationEnabled && aiOptions.generateRecipeImages,
+        generateRecipeImages: false,
       }),
     [
       aiModel,
@@ -409,7 +400,6 @@ export function AiMealPlanGenerator({
       aiOptions,
       recipebookOptions,
       activeMode,
-      imageGenerationEnabled,
     ],
   );
 
@@ -450,8 +440,7 @@ export function AiMealPlanGenerator({
           options: {
             ...options,
             followNutrition: nutritionReady && options.followNutrition,
-            generateRecipeImages:
-              mode === 'ai' && imageGenerationEnabled && options.generateRecipeImages,
+            generateRecipeImages: false,
           },
           fixedMeals: [],
           instructions: '',
@@ -904,9 +893,7 @@ export function AiMealPlanGenerator({
                     {insertedKeys.size} new/replaced calendar entries · {acceptedRecipeKeys.size}{' '}
                     new recipes · {leftovers.size} new leftover links · {removedConflicts.length}{' '}
                     existing meals replaced.{' '}
-                    {proposal.preview.request.options?.generateRecipeImages
-                      ? `${acceptedRecipeKeys.size} images requested after saving.`
-                      : ''}{' '}
+                    {'Images require a separate reviewed request after saving.'}{' '}
                     {insertedKeys.size === 0 && removedConflicts.length === 0
                       ? 'Keeping everything creates no calendar entries, recipes or new portions.'
                       : insertedKeys.size === 0

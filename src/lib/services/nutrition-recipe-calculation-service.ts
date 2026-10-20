@@ -1,4 +1,5 @@
 import 'server-only';
+import { catalogReferenceSchema, type CatalogReference } from '@/lib/domain/food-data';
 
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
@@ -7,6 +8,8 @@ import { z } from 'zod';
 import { ensureDatabase, getDatabase, getSqliteDatabase } from '@/lib/db/client';
 import {
   foodNutritionRecords,
+  foodProviderSnapshots,
+  pantryProductProviderLinks,
   nutritionCalculationVersions,
   nutritionDataSources,
   pantryProducts,
@@ -665,6 +668,39 @@ export function buildConfirmedRecipeConsumptionInput(
 
 export function getNutritionDataWorkspace() {
   const database = db();
+  // Match the selected nutrition record to its frozen provider snapshot, not a newer product link.
+  const catalogReferences = new Map<string, CatalogReference>();
+  for (const row of database
+    .select({
+      productId: pantryProductProviderLinks.productId,
+      provider: foodProviderSnapshots.provider,
+      providerRecordId: foodProviderSnapshots.providerRecordId,
+      contentHash: foodProviderSnapshots.contentHash,
+      transportId: foodProviderSnapshots.transportId,
+      sourceRevision: foodProviderSnapshots.sourceRevision,
+      catalogGeneration: foodProviderSnapshots.catalogGeneration,
+      canonicalProductId: foodProviderSnapshots.canonicalProductId,
+    })
+    .from(pantryProductProviderLinks)
+    .innerJoin(
+      foodProviderSnapshots,
+      eq(pantryProductProviderLinks.snapshotId, foodProviderSnapshots.id),
+    )
+    .all()) {
+    const ref = catalogReferenceSchema.safeParse({
+      transport_id: row.transportId,
+      source_id: row.provider,
+      source_record_id: row.providerRecordId,
+      source_revision: row.sourceRevision,
+      catalog_generation: row.catalogGeneration,
+      canonical_product_id: row.canonicalProductId,
+    });
+    if (ref.success)
+      catalogReferences.set(
+        `${row.productId}:${row.providerRecordId}:${row.contentHash}`,
+        ref.data,
+      );
+  }
   const products = database
     .select({ id: pantryProducts.id, displayName: pantryProducts.displayName })
     .from(pantryProducts)
@@ -688,6 +724,7 @@ export function getNutritionDataWorkspace() {
               completeness: record.completeness,
               sourceName: record.source.name,
               sourceRecordKey: record.sourceRecordKey,
+              catalogRef: catalogReferences.get(`${product.id}:${record.sourceRecordKey}`) ?? null,
               notes: record.notes,
               values: record.values.map((value) => ({
                 nutrientCode: value.nutrientCode,

@@ -240,8 +240,21 @@ function IngredientGroupEditor({
             context="recipe"
             launchLabel="Find food data"
             defaultQuery={rows?.[ingredientIndex]?.item ?? ''}
-            onImported={(product) => {
+            onImported={(product, options) => {
               acknowledgeLink(product.id, product.displayName);
+              if (options?.reviewedMeasure) {
+                form.setValue(
+                  `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.quantity` as const,
+                  options.reviewedMeasure.quantity,
+                  { shouldDirty: true },
+                );
+                form.setValue(
+                  `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.unit` as const,
+                  options.reviewedMeasure.unit,
+                  { shouldDirty: true },
+                );
+              }
+
               setLinkedNames((names) => ({ ...names, [product.id]: product.displayName }));
               form.setValue(
                 `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,

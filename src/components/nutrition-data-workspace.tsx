@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
+import type { CatalogReference } from '@/lib/domain/food-data';
 import { FoodCatalogPicker } from './food-catalog-picker';
 import { NutritionFeedback } from './nutrition-form-fields';
 import { useNutritionDraft } from './use-nutrition-draft';
@@ -54,6 +55,7 @@ export type NutritionDataWorkspaceData = {
       completeness: number;
       sourceName: string;
       sourceRecordKey?: string;
+      catalogRef?: CatalogReference | null;
       notes?: string;
       values: Array<{ nutrientCode: string; amount: number }>;
     };

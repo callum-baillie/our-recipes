@@ -40,10 +40,20 @@ export async function generateMetadata({
 
 export default async function RecipeDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ recipeId: string }>;
+  searchParams: Promise<{ imageCandidate?: string | string[] }>;
 }) {
   const { recipeId } = await params;
+  const requestedCandidate = (await searchParams).imageCandidate;
+  const imageCandidate =
+    typeof requestedCandidate === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      requestedCandidate,
+    )
+      ? requestedCandidate
+      : undefined;
   const principal = await getAuthenticatedSessionPrincipal(
     new Request('http://localhost/recipes', { headers: await headers() }),
   );
@@ -91,12 +101,13 @@ export default async function RecipeDetailPage({
           Jump to ingredients and method ↓
         </a>
         <RecipeImageGallery
-          key={`${principal?.userId}:${actor.profileId}:${recipe.id}`}
+          key={`${principal?.userId}:${actor.profileId}:${recipe.id}:${imageCandidate ?? ''}`}
           recipeId={recipe.id}
           recipeTitle={recipe.title}
           revision={recipe.currentRevision}
           profileId={actor.profileId ?? 'none'}
           accountId={principal?.userId ?? 'signed-out'}
+          initialCandidateId={imageCandidate}
           imagePolicy={{
             enabled: imagePolicy.enabled,
             model: imagePolicy.model,

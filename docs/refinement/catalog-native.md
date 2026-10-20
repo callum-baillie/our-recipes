@@ -1,5 +1,7 @@
 # Catalog and native refinement register
 
+> Historical full-project evidence. Native restart recovery and portion/cart semantics are superseded by [post-review corrections](post-review-catalog.md). The original limitations below describe the earlier revision.
+
 ## Starting point and boundaries
 
 - Application baseline: `a278f81a272472b9ee2da6ff7c55788285c6fb4c`, shared branch `refinement/full-project-completion`. Evidence below is from this baseline plus the uncommitted refinement changes; the final handoff supplies the integrated commit.

@@ -9,6 +9,7 @@ import {
   SettingsEmpty,
 } from './settings-primitives';
 import { useEffect, useRef, useState } from 'react';
+import { SettingsMergeReview } from './settings-merge-review';
 import { scheduledDraftExample } from '@/lib/domain/task-settings';
 import { RegionalChoice } from './regional-choice';
 import { SettingsPageHeader } from './settings-page-header';
@@ -28,6 +29,12 @@ type Job = {
   threadId: string | null;
   actionId: string | null;
 };
+function scheduleValues(settings: Preferences) {
+  const { executionMode: _mode, batchMinItems: _threshold, ...schedule } = settings;
+  void _mode;
+  void _threshold;
+  return schedule;
+}
 export function TaskSettings({
   initial,
   profileId,
@@ -41,9 +48,11 @@ export function TaskSettings({
 }) {
   const [settings, setSettings] = useState(initial.settings);
   const [version, setVersion] = useState(initial.version);
+  const [lastScheduledDate, setLastScheduledDate] = useState(initial.lastScheduledDate);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [pendingJobAction, setPendingJobAction] = useState<{
@@ -59,6 +68,9 @@ export function TaskSettings({
   const reviewSurface = useRef<HTMLDivElement>(null);
   const lock = useRef(false);
   const [saved, setSaved] = useState(JSON.stringify(initial.settings));
+  const [baselineSettings, setBaselineSettings] = useState(initial.settings);
+  const [conflict, setConflict] = useState(false);
+  const [currentSettings, setCurrentSettings] = useState<typeof initial | null>(null);
   const [errorJobId, setErrorJobId] = useState<string | null>(null);
   const [pollError, setPollError] = useState('');
   const [jobError, setJobError] = useState('');
@@ -93,7 +105,7 @@ export function TaskSettings({
     };
   }, []);
   async function save() {
-    if (lock.current) return;
+    if (lock.current || conflict) return;
     lock.current = true;
     setBusy(true);
     setSavingSettings(true);
@@ -112,10 +124,18 @@ export function TaskSettings({
         }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error?.message ?? 'Settings could not be saved.');
+      if (!response.ok) {
+        if (response.status === 409) {
+          setConflict(true);
+          setCurrentSettings(null);
+        }
+        throw new Error(body.error?.message ?? 'Settings could not be saved.');
+      }
       setVersion(body.version);
+      setLastScheduledDate(body.lastScheduledDate ?? null);
       setSettings(body.settings);
       setSaved(JSON.stringify(body.settings));
+      setBaselineSettings(body.settings);
       setStatus('Automation preferences saved.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to save.');
@@ -124,6 +144,38 @@ export function TaskSettings({
       setBusy(false);
       setSavingSettings(false);
     }
+  }
+  async function loadCurrentSettings() {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setLoadingSettings(true);
+    setCurrentSettings(null);
+    setStatus('Loading current schedule…');
+    try {
+      const response = await fetch('/api/v1/account/automation', { cache: 'no-store' });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error?.message ?? 'Could not load current schedule.');
+      setCurrentSettings(body);
+      setStatus('Current schedule loaded. Review concurrent changes.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not load current schedule.');
+    } finally {
+      lock.current = false;
+      setBusy(false);
+      setLoadingSettings(false);
+    }
+  }
+  function reconcileSchedule(reviewed: ReturnType<typeof scheduleValues>) {
+    if (!currentSettings) return;
+    setVersion(currentSettings.version);
+    setLastScheduledDate(currentSettings.lastScheduledDate);
+    setBaselineSettings(currentSettings.settings);
+    setSaved(JSON.stringify(currentSettings.settings));
+    setSettings({ ...currentSettings.settings, ...reviewed });
+    setConflict(false);
+    setCurrentSettings(null);
+    setStatus('Reviewed schedule is ready. Save schedule to apply it.');
   }
   async function command(job: Job, command: 'retry' | 'cancel') {
     if (lock.current) return;
@@ -211,7 +263,7 @@ export function TaskSettings({
       setPendingDecision(null);
     }
   }
-  const schedule = scheduledDraftExample(settings, new Date(), initial.lastScheduledDate);
+  const schedule = scheduledDraftExample(settings, new Date(), lastScheduledDate);
   return (
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
@@ -236,7 +288,7 @@ export function TaskSettings({
         </SettingsPane>
         <SettingsGroup
           title={<>Weekly meal-plan draft</>}
-          disabled={busy || !canEdit}
+          disabled={busy || !canEdit || conflict}
           className={styles.panel}
         >
           <SettingsField
@@ -454,9 +506,33 @@ export function TaskSettings({
           <p>
             Scheduled runs create a draft below. Existing meals are kept; review and confirm the
             draft before it changes your planner. The app must be running on the scheduled day. Last
-            scheduled: {initial.lastScheduledDate ?? 'Never'}.
+            scheduled: {lastScheduledDate ?? 'Never'}.
           </p>
         </SettingsGroup>
+        {conflict && (
+          <section aria-label="Review changed schedule">
+            <p role="status">The schedule changed elsewhere. Your edits are retained.</p>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void loadCurrentSettings()}
+            >
+              {loadingSettings ? 'Loading current schedule…' : 'Load current schedule'}
+            </button>
+            {currentSettings && (
+              <SettingsMergeReview
+                key={JSON.stringify(currentSettings)}
+                baseline={scheduleValues(baselineSettings)}
+                draft={scheduleValues(settings)}
+                current={scheduleValues(currentSettings.settings)}
+                pending={busy}
+                onResolve={reconcileSchedule}
+                onDiscard={() => reconcileSchedule(scheduleValues(currentSettings.settings))}
+              />
+            )}
+          </section>
+        )}
         <SettingsActionBar
           status={
             status ||
@@ -465,7 +541,11 @@ export function TaskSettings({
               : 'No unsaved schedule changes')
           }
         >
-          <button className="primary-button" disabled={busy || !canEdit} aria-busy={savingSettings}>
+          <button
+            className="primary-button"
+            disabled={busy || !canEdit || conflict}
+            aria-busy={savingSettings}
+          >
             {savingSettings ? <ButtonSpinner /> : null}
             {savingSettings ? 'Saving…' : 'Save schedule'}
           </button>

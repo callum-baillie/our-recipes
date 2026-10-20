@@ -152,7 +152,7 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   await expect(page.getByRole('button', { name: 'Remove from cart', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Change quantity', exact: true }).click();
   await page.screenshot({ path: '/tmp/bord-mobile-cart-quantity.png', fullPage: true });
-  await page.getByLabel('Quantity bought (each)').fill('6');
+  await page.getByLabel('Quantity bought', { exact: true }).fill('6');
   await page.getByRole('button', { name: 'Save quantity', exact: true }).click();
   await expect(page.getByText(/6 each in cart/)).toBeVisible();
   const savedList = await page.request.get(`/api/v1/shopping-lists/${list.id}`);

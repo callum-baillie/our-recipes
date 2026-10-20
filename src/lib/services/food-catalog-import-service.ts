@@ -445,7 +445,15 @@ export async function confirmCatalogShoppingItem(args: {
   actorUserId: string;
 }) {
   const input = foodCatalogShoppingInputSchema.parse(args.input);
-  const { itemId, expectedUpdatedAt, cartQuantity, cartUnit, ...catalogInput } = input;
+  const {
+    itemId,
+    expectedUpdatedAt,
+    cartQuantity,
+    cartUnit,
+    cartIntent: _cartIntent,
+    ...catalogInput
+  } = input;
+  void _cartIntent;
   ensureDatabase();
   const database = getDatabase();
   const requestDigest = digest({
@@ -484,19 +492,25 @@ export async function confirmCatalogShoppingItem(args: {
   if (
     isNativeCatalogEnabled() &&
     !directFoodFallbackAllowed() &&
+    'selection' in catalogInput &&
     !catalogInput.selection.catalogRef
   )
     throw new FoodDataError(
       'REVISION_EXPIRED',
       'Review this food through the catalog before saving.',
     );
-  const { record } = await getFoodDetails(
-    catalogInput.selection.provider,
-    catalogInput.selection.recordId,
-    'en',
-    catalogInput.selection.catalogRef,
-    true,
-  );
+  const record =
+    'selection' in catalogInput
+      ? (
+          await getFoodDetails(
+            catalogInput.selection.provider,
+            catalogInput.selection.recordId,
+            'en',
+            catalogInput.selection.catalogRef,
+            true,
+          )
+        ).record
+      : null;
   return database.transaction(() => {
     const currentReplay = replay();
     if (currentReplay) return { ...currentReplay, replayed: true };
@@ -514,13 +528,28 @@ export async function confirmCatalogShoppingItem(args: {
       throw new PantryConflictError(
         'The shopping item changed. Refresh and review the match again.',
       );
-    const imported = importFoodCatalogRecord({
-      input: catalogInput,
-      record,
-      actorProfileId: args.actorProfileId,
-      actorUserId: args.actorUserId,
-      destination: 'catalog',
-    });
+    const localProduct =
+      'localProductId' in catalogInput
+        ? database
+            .select()
+            .from(pantryProducts)
+            .where(eq(pantryProducts.id, catalogInput.localProductId))
+            .get()
+        : null;
+    if ('localProductId' in catalogInput && (!localProduct || localProduct.archivedAt))
+      throw new PantryConflictError(
+        'That saved product changed or is unavailable. Review it again.',
+      );
+    const imported = localProduct
+      ? { productId: localProduct.id, reusedProduct: true }
+      : importFoodCatalogRecord({
+          input: catalogInput as FoodCatalogImportInput,
+          record: record!,
+          actorProfileId: args.actorProfileId,
+          actorUserId: args.actorUserId,
+          destination: 'catalog',
+        });
+    const displayName = localProduct?.displayName ?? record!.displayName;
     let savedItemId: string;
     if (existing) {
       savedItemId = existing.id;
@@ -542,7 +571,8 @@ export async function confirmCatalogShoppingItem(args: {
           checked: false,
           shoppingState: 'in_cart',
           cartQuantity,
-          cartLabel: `${cartQuantity} ${cartUnit} · ${record.displayName}`.slice(0, 160),
+          cartUnit,
+          cartLabel: displayName.slice(0, 160),
         },
         args.actorProfileId,
       );
@@ -550,17 +580,19 @@ export async function confirmCatalogShoppingItem(args: {
       savedItemId = addShoppingListItem(
         args.listId,
         {
-          item: catalogInput.product.displayName,
+          item: displayName,
           quantity: '',
           unit: '',
           note: '',
           checked: false,
           shoppingState: 'in_cart',
           cartQuantity,
-          cartLabel: `${cartQuantity} ${cartUnit} · ${record.displayName}`.slice(0, 160),
+          cartUnit,
+          cartLabel: displayName.slice(0, 160),
           productId: imported.productId,
         },
         args.actorProfileId,
+        { separateEntry: true },
       ).id;
     }
     const result = {
@@ -569,7 +601,25 @@ export async function confirmCatalogShoppingItem(args: {
       reusedProduct: imported.reusedProduct,
       itemId: savedItemId,
       listId: args.listId,
+      cart: {
+        quantity: cartQuantity,
+        unit: cartUnit,
+        intent: existing ? 'replace_existing' : 'separate_entry',
+      },
     };
+    if (localProduct)
+      database
+        .insert(foodCatalogImportOperations)
+        .values({
+          id: input.operationId,
+          actorProfileId: args.actorProfileId,
+          destination: 'catalog',
+          productId: imported.productId,
+          requestDigest,
+          result: JSON.stringify(result),
+          createdAt: new Date(),
+        })
+        .run();
     database
       .update(foodCatalogImportOperations)
       .set({ requestDigest, result: JSON.stringify(result) })

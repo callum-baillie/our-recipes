@@ -36,6 +36,7 @@ export async function requestDecisions(input: {
   allowPaidCall: boolean;
   model?: typeof DECISIONS_MODEL;
   requestTimeoutSeconds?: number;
+  signal?: AbortSignal;
 }) {
   if (!input.allowPaidCall)
     throw new DecisionError('Confirm the paid AI request before continuing.', 403);
@@ -46,12 +47,20 @@ export async function requestDecisions(input: {
     );
   const key = getOpenAiApiKey();
   if (!key) throw new DecisionError('Configure an OpenAI API key in the server environment.', 503);
+  input.signal?.throwIfAborted();
   let response: Response;
   try {
     response = await fetch('https://api.openai.com/v1/decisions', {
       method: 'POST',
       redirect: 'error',
-      signal: AbortSignal.timeout((input.requestTimeoutSeconds ?? 60) * 1000),
+      signal: input.signal
+        ? AbortSignal.any([
+            input.signal,
+            AbortSignal.timeout(
+              Math.max(1, Math.floor((input.requestTimeoutSeconds ?? 60) * 1000)),
+            ),
+          ])
+        : AbortSignal.timeout(Math.max(1, Math.floor((input.requestTimeoutSeconds ?? 60) * 1000))),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: DECISIONS_MODEL,
@@ -61,8 +70,10 @@ export async function requestDecisions(input: {
       }),
     });
   } catch {
+    input.signal?.throwIfAborted();
     throw new DecisionError('OpenAI could not be reached. Your records have not changed.', 503);
   }
+  input.signal?.throwIfAborted();
   if (!response.ok)
     throw new DecisionError(
       response.status === 429

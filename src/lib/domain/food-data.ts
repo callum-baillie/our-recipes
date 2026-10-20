@@ -219,17 +219,41 @@ export const foodCatalogImportInputSchema = z
   })
   .strict();
 
-export const foodCatalogShoppingInputSchema = foodCatalogImportInputSchema
-  .extend({
-    itemId: z.string().uuid().optional(),
-    expectedUpdatedAt: z.string().datetime().optional(),
-    cartQuantity: z.number().positive().max(10000),
-    cartUnit: z.string().trim().min(1).max(30),
-  })
-  .strict()
-  .refine((input) => Boolean(input.itemId) === Boolean(input.expectedUpdatedAt), {
-    message: 'Review the current item version before matching.',
-    path: ['expectedUpdatedAt'],
+const shoppingConfirmationFields = {
+  itemId: z.string().uuid().optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
+  cartQuantity: z.number().min(0).max(10000),
+  cartUnit: z.string().trim().min(1).max(30),
+  // Replaces the reviewed row amount; separate entries never deduplicate demand rows.
+  cartIntent: z.enum(['separate_entry', 'replace_existing']).optional(),
+};
+export const foodCatalogShoppingInputSchema = z
+  .union([
+    foodCatalogImportInputSchema.extend(shoppingConfirmationFields).strict(),
+    z
+      .object({
+        operationId: z.string().uuid(),
+        localProductId: z.string().uuid(),
+        ...shoppingConfirmationFields,
+      })
+      .strict(),
+  ])
+  .superRefine((input, context) => {
+    if (Boolean(input.itemId) !== Boolean(input.expectedUpdatedAt))
+      context.addIssue({
+        code: 'custom',
+        message: 'Review the current item version before matching.',
+        path: ['expectedUpdatedAt'],
+      });
+    if (
+      (input.cartIntent === 'separate_entry' && input.itemId) ||
+      (input.cartIntent === 'replace_existing' && !input.itemId)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Choose a separate entry or review the existing row to replace its cart amount.',
+        path: ['cartIntent'],
+      });
   });
 
 export type FoodCatalogImportInput = z.infer<typeof foodCatalogImportInputSchema>;

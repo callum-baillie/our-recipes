@@ -422,3 +422,38 @@ describe('session and API create replay remains authorized and atomic', () => {
     expect((await POST(createRequest(body, 'revoked-create-1', key.secret))).status).toBe(401);
   });
 });
+
+describe('reviewed native actor context', () => {
+  it('returns only authenticated account and active actor, rejecting signed-out access', async () => {
+    const { GET } = await import('@/app/api/v1/auth/context/route');
+    expect((await GET(request('/auth/context'))).status).toBe(401);
+    const response = await GET(request('/auth/context', { cookie }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ actor: { userId, profileId } });
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+  it('rejects malformed or switched original actor before a reviewed confirmation can execute', async () => {
+    const { authorizeApi } = await import('@/lib/api-auth');
+    const reviewed = (expected: string) => {
+      const value = request('/pantry/batches', { cookie, method: 'POST', origin, body: {} });
+      value.headers.set('X-Bord-Expected-Profile-Id', expected);
+      return value;
+    };
+    const wrong = await authorizeApi(
+      reviewed('00000000-0000-4000-8000-000000000099'),
+      'pantry',
+      'create',
+    );
+    expect(wrong.response?.status).toBe(409);
+    expect(await wrong.response?.json()).toMatchObject({
+      error: { code: 'reviewed_actor_changed' },
+    });
+    expect(
+      (await authorizeApi(reviewed('not-a-profile'), 'pantry', 'create')).response?.status,
+    ).toBe(400);
+    expect((await authorizeApi(reviewed(profileId), 'pantry', 'create')).response).toBeNull();
+    const untrusted = reviewed(profileId);
+    untrusted.headers.set('origin', 'https://untrusted.example');
+    expect((await authorizeApi(untrusted, 'pantry', 'create')).response?.status).toBe(403);
+  });
+});

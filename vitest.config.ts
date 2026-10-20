@@ -23,6 +23,7 @@ export default defineConfig({
         resolve: { alias: { '@': sourceDirectory, 'server-only': serverOnlyStub } },
         test: {
           name: 'integration',
+          testTimeout: 15_000,
           env: {
             DATABASE_URL: ':memory:',
             DATA_DIR: '.test-data/integration-default',

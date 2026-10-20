@@ -1,5 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { mergeSettings } from '@/lib/domain/settings-merge';
+import { SettingsMergeReview } from './settings-merge-review';
 import dynamic from 'next/dynamic';
 const InterviewChat = dynamic(
   () => import('./ai-assistant-drawer').then((module) => module.AiAssistantDrawer),
@@ -42,7 +44,7 @@ export const kitchenInterviewQuestions: Array<{ key: keyof Answers; title: strin
     {
       key: 'routine',
       title: 'Which meals do you share with your household?',
-      help: 'Perhaps everyone shares dinner but has their own breakfast or lunch. Include cooking time and budget preferences.',
+      help: 'Perhaps everyone shares dinner but has their own breakfast or lunch. Include cooking time, equipment, budget and routine preferences.',
     },
     {
       key: 'favorites',
@@ -73,6 +75,15 @@ export function KitchenInterview({
   );
   const [changedContext, setChangedContext] = useState<{ interview: Answers | null } | null>(null);
   const [step, setStep] = useState<number | null>(null);
+  const resumeStep = useRef(0);
+  const answerRef = useRef<HTMLTextAreaElement>(null);
+  const reviewRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (step === null) return;
+    resumeStep.current = step;
+    if (step < kitchenInterviewQuestions.length) answerRef.current?.focus();
+    else reviewRef.current?.focus();
+  }, [step]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState(false);
@@ -85,20 +96,39 @@ export function KitchenInterview({
       const current = await fetch('/api/v1/account/kitchen-context', { cache: 'no-store' });
       if (!current.ok) throw new Error('Could not load your latest kitchen context.');
       const context = await current.json();
-      if (JSON.stringify(context.interview ?? null) !== JSON.stringify(savedAnswers)) {
-        setChangedContext({ interview: context.interview ?? null });
+      const latest = { ...emptyKitchenInterview, ...context.interview };
+      const reconciled = mergeSettings(savedAnswers ?? emptyKitchenInterview, answers, latest);
+      if (reconciled.conflicts.length) {
+        setChangedContext({ interview: latest });
         throw new Error(
-          'Your saved kitchen context changed elsewhere. Review its current values before saving; your draft has been retained.',
+          'Your saved kitchen context changed elsewhere. Resolve overlapping answers before saving; your draft has been retained.',
         );
+      }
+      const interviewPatch = Object.fromEntries(
+        Object.entries(reconciled.value).filter(
+          ([key, value]) => value !== latest[key as keyof Answers] && value !== '',
+        ),
+      );
+      const clearFields = Object.entries(reconciled.value)
+        .filter(([key, value]) => value === '' && latest[key as keyof Answers] !== '')
+        .map(([key]) => key);
+      if (!Object.keys(interviewPatch).length && !clearFields.length) {
+        setSavedAnswers(latest);
+        setAnswers(latest);
+        setStep(null);
+        setMessage('Your saved answers are current. There are no changes to save.');
+        return;
       }
       const response = await fetch('/api/v1/account/kitchen-context', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interview: answers, expectedRevision: context.revision }),
+        body: JSON.stringify({ interviewPatch, clearFields, expectedRevision: context.revision }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? 'Could not save your interview.');
-      setSavedAnswers({ ...answers });
+      const acknowledged = { ...emptyKitchenInterview, ...body.interview };
+      setSavedAnswers(acknowledged);
+      setAnswers(acknowledged);
       setMessage(
         'Your kitchen context is saved. The assistant can use it when dietary preference sharing is enabled.',
       );
@@ -150,44 +180,30 @@ export function KitchenInterview({
       )}
       {message && <InlineAlert tone={error ? 'error' : 'success'}>{message}</InlineAlert>}
       {changedContext && (
-        <section aria-label="Review changed kitchen context">
-          <dl>
-            {kitchenInterviewQuestions.map((q) => (
-              <div key={q.key}>
-                <dt>{q.title}</dt>
-                <dd>Saved: {changedContext.interview?.[q.key] || 'Not answered'}</dd>
-                <dd>Your draft: {answers[q.key] || 'Not answered'}</dd>
-              </div>
-            ))}
-          </dl>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setSavedAnswers(changedContext.interview);
-              setChangedContext(null);
-              setError(false);
-              setMessage(
-                'Current context reviewed. Your draft is retained; Save context explicitly to apply it.',
-              );
-            }}
-          >
-            Keep my draft after reviewing current context
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setSavedAnswers(changedContext.interview);
-              setAnswers(changedContext.interview ?? emptyKitchenInterview);
-              setChangedContext(null);
-              setMessage('Current saved context loaded.');
-              setError(false);
-            }}
-          >
-            Use current saved answers
-          </button>
-        </section>
+        <SettingsMergeReview
+          key={JSON.stringify(changedContext)}
+          baseline={savedAnswers ?? emptyKitchenInterview}
+          draft={answers}
+          current={changedContext.interview ?? emptyKitchenInterview}
+          pending={busy}
+          label={(path) =>
+            kitchenInterviewQuestions.find((q) => q.key === path[0])?.title ?? path.join(' ')
+          }
+          onResolve={(merged) => {
+            setSavedAnswers(changedContext.interview);
+            setAnswers(merged);
+            setChangedContext(null);
+            setError(false);
+            setMessage('Reviewed answers retained as a draft. Save context to apply them.');
+          }}
+          onDiscard={() => {
+            setSavedAnswers(changedContext.interview);
+            setAnswers(changedContext.interview ?? emptyKitchenInterview);
+            setChangedContext(null);
+            setError(false);
+            setMessage('Current saved answers loaded.');
+          }}
+        />
       )}
 
       {step === null ? (
@@ -195,7 +211,16 @@ export function KitchenInterview({
           <button
             className="secondary-button"
             onClick={() => {
-              setStep(0);
+              const dirty =
+                JSON.stringify(answers) !== JSON.stringify(savedAnswers ?? emptyKitchenInterview);
+              const unanswered = kitchenInterviewQuestions.findIndex((q) => !answers[q.key].trim());
+              setStep(
+                dirty
+                  ? resumeStep.current
+                  : savedAnswers || unanswered < 0
+                    ? kitchenInterviewQuestions.length
+                    : unanswered,
+              );
               setMessage('');
             }}
           >
@@ -230,7 +255,32 @@ export function KitchenInterview({
           {question ? (
             <>
               <p>
-                Question {step + 1} of {kitchenInterviewQuestions.length}
+                For {profile.displayName} ·{' '}
+                {kitchenInterviewQuestions.filter((q) => answers[q.key].trim()).length} topics have
+                answers. Every topic is optional.
+              </p>
+              <p>
+                {kitchenInterviewQuestions.map((q, index) => (
+                  <button
+                    type="button"
+                    className="text-button"
+                    key={q.key}
+                    aria-current={index === step ? 'step' : undefined}
+                    onClick={() => setStep(index)}
+                  >
+                    {
+                      {
+                        taste: 'Taste',
+                        snacks: 'Snacks',
+                        desserts: 'Desserts',
+                        routine: 'Routine',
+                        favorites: 'Favorites',
+                        avoid: 'Practical needs',
+                      }[q.key]
+                    }
+                    {answers[q.key].trim() ? ' ✓' : ''}
+                  </button>
+                ))}
               </p>
               <label htmlFor="interview-answer">
                 <strong>{question.title}</strong>
@@ -242,7 +292,35 @@ export function KitchenInterview({
                   like them suggested?
                 </p>
               )}
+              <div className="button-row" aria-label="Optional answer suggestions">
+                {{
+                  taste: ['Mostly savory', 'A little of both', 'Sweet flavors'],
+                  snacks: ['Fruit or yogurt', 'Savory snacks', 'I rarely snack'],
+                  desserts: ['Occasionally', 'Most evenings', 'I usually skip dessert'],
+                  routine: ['Shared dinners', 'Quick weekday meals', 'Flexible routines'],
+                  favorites: ['Comfort food', 'Simple seasonal meals', 'Trying new cuisines'],
+                  avoid: ['Short cooking time', 'A modest budget', 'Texture preferences'],
+                }[question.key].map((suggestion) => (
+                  <button
+                    type="button"
+                    className="secondary-button compact"
+                    key={suggestion}
+                    onClick={() => {
+                      setAnswers((current) => ({
+                        ...current,
+                        [question.key]: current[question.key].trim()
+                          ? `${current[question.key]}; ${suggestion}`
+                          : suggestion,
+                      }));
+                      answerRef.current?.focus();
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
               <textarea
+                ref={answerRef}
                 id="interview-answer"
                 aria-describedby="interview-help"
                 rows={4}
@@ -254,12 +332,27 @@ export function KitchenInterview({
             </>
           ) : (
             <>
-              <h3>Review your kitchen context</h3>
+              <h3 ref={reviewRef} tabIndex={-1}>
+                Review kitchen context for {profile.displayName}
+              </h3>
+              <p>
+                These stated preferences will be saved to your linked account profile. They do not
+                change allergies or Nutrition consent.
+              </p>
               <dl>
                 {kitchenInterviewQuestions.map((q) => (
                   <div key={q.key}>
                     <dt>{q.title}</dt>
-                    <dd>{answers[q.key] || 'Not answered'}</dd>
+                    <dd>
+                      {answers[q.key] || 'Not answered'}{' '}
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => setStep(kitchenInterviewQuestions.indexOf(q))}
+                      >
+                        Edit {q.key}
+                      </button>
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -280,6 +373,11 @@ export function KitchenInterview({
             ) : (
               <button className="primary-button" type="button" onClick={() => void save()}>
                 {busy && <ButtonSpinner />}Save context
+              </button>
+            )}
+            {question && (
+              <button className="text-button" type="button" onClick={() => setStep(step + 1)}>
+                Skip this topic
               </button>
             )}
             <button className="text-button" type="button" onClick={() => setStep(null)}>

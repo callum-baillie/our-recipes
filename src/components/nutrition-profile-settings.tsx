@@ -2,6 +2,7 @@
 
 import { validTimeZone } from '@/lib/domain/regional';
 import type { BodyMetrics } from '@/lib/domain/body-metrics';
+import { SettingsMergeReview, settingsFieldLabel } from './settings-merge-review';
 import { ButtonSpinner } from './skeleton';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -52,6 +53,61 @@ export type NutritionProfileSettingsValue = {
   showMealPlanNutrition: boolean;
 };
 
+type NutritionSettingsDraft = Omit<
+  NutritionProfileSettingsValue,
+  'id' | 'version' | 'currentWeightKilograms' | 'advancedMetrics'
+>;
+const nutritionSettingsFields = [
+  'dateOfBirth',
+  'heightCentimeters',
+  'measurementSystem',
+  'referenceSexCategory',
+  'activityLevel',
+  'nutritionGoalType',
+  'targetWeightKilograms',
+  'targetDate',
+  'explicitlyEnteredLifeStage',
+  'dietaryPreferences',
+  'foodAllergies',
+  'dietaryExclusions',
+  'estimatedTargetsEnabled',
+  'estimatedTargetConsent',
+  'weightTrackingEnabled',
+  'preferredEnergyUnit',
+  'dailyResetTimezone',
+  'weekStartsOn',
+  'referenceJurisdiction',
+  'visibleNutrientCodes',
+  'trendRangeDays',
+  'showPlannedNutrition',
+  'showRecipeCardNutrition',
+  'recipeCardNutrientCodes',
+  'showMealPlanNutrition',
+] as const;
+function settingsValues(value: NutritionProfileSettingsValue): NutritionSettingsDraft {
+  return Object.fromEntries(
+    nutritionSettingsFields.map((key) => [key, value[key]]),
+  ) as NutritionSettingsDraft;
+}
+function settingsResponse(raw: NutritionProfileSettingsValue): NutritionProfileSettingsValue {
+  const value = { ...raw };
+  for (const key of [
+    'dietaryPreferences',
+    'foodAllergies',
+    'dietaryExclusions',
+    'visibleNutrientCodes',
+    'recipeCardNutrientCodes',
+  ] as const) {
+    const stored: unknown = value[key];
+    const parsed: unknown = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string'))
+      throw new Error('Current preferences could not be read. Your draft is retained.');
+    value[key] = parsed;
+    if (!Array.isArray(value[key]) || value[key].some((item) => typeof item !== 'string'))
+      throw new Error('Current preferences could not be read. Your draft is retained.');
+  }
+  return value;
+}
 type EnergyEstimateResponse = {
   action: 'previewed' | 'applied';
   estimate: {
@@ -216,6 +272,10 @@ export function NutritionProfileSettings({
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedProfile, setSavedProfile] = useState(profile);
+  const [renderProfile, setRenderProfile] = useState(profile);
+  const [formGeneration, setFormGeneration] = useState(0);
+  const [conflictDraft, setConflictDraft] = useState<NutritionSettingsDraft | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<NutritionProfileSettingsValue | null>(null);
   const [measurementSystem, setMeasurementSystem] = useState(profile.measurementSystem);
   const height = useRef(profile.heightCentimeters);
   const targetWeight = useRef(profile.targetWeightKilograms);
@@ -300,7 +360,7 @@ export function NutritionProfileSettings({
           : (Number(next.feet) * 12 + Number(next.inches)) * 2.54;
   }
   async function requestEnergyEstimate(action: 'preview' | 'apply', form: HTMLFormElement) {
-    if (lock.current || dirty) {
+    if (lock.current || dirty || conflictDraft) {
       setEstimateStatus(
         'Save the intended preferences and consent before previewing their saved snapshot.',
       );
@@ -367,7 +427,7 @@ export function NutritionProfileSettings({
   }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (lock.current) return;
+    if (lock.current || conflictDraft) return;
     const form = event.currentTarget;
     const request = settingsSnapshot(new FormData(form));
     for (const [name, limit] of [
@@ -401,7 +461,13 @@ export function NutritionProfileSettings({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(request),
       });
-      if (!response.ok) throw new Error(await responseMessage(response, form));
+      if (!response.ok) {
+        if (response.status === 409) {
+          setConflictDraft(request.settings as NutritionSettingsDraft);
+          setCurrentProfile(null);
+        }
+        throw new Error(await responseMessage(response, form));
+      }
       const body = await response.json();
       const acknowledged = body.profile as Partial<NutritionProfileSettingsValue> &
         Record<string, unknown>;
@@ -427,20 +493,19 @@ export function NutritionProfileSettings({
         }
         return request.settings[key];
       };
-      setSavedProfile(
-        (current) =>
-          ({
-            ...current,
-            ...request.settings,
-            ...acknowledged,
-            dietaryPreferences: acknowledgedList('dietaryPreferences'),
-            foodAllergies: acknowledgedList('foodAllergies'),
-            dietaryExclusions: acknowledgedList('dietaryExclusions'),
-            visibleNutrientCodes: acknowledgedList('visibleNutrientCodes'),
-            recipeCardNutrientCodes: acknowledgedList('recipeCardNutrientCodes'),
-          }) as NutritionProfileSettingsValue,
-      );
-      baseline.current = JSON.stringify(request.settings);
+      const next = {
+        ...savedProfile,
+        ...request.settings,
+        ...acknowledged,
+        dietaryPreferences: acknowledgedList('dietaryPreferences'),
+        foodAllergies: acknowledgedList('foodAllergies'),
+        dietaryExclusions: acknowledgedList('dietaryExclusions'),
+        visibleNutrientCodes: acknowledgedList('visibleNutrientCodes'),
+        recipeCardNutrientCodes: acknowledgedList('recipeCardNutrientCodes'),
+      } as NutritionProfileSettingsValue;
+      setSavedProfile(next);
+      updateFormProfile(next);
+      baseline.current = JSON.stringify(settingsValues(next));
       setDirty(false);
       setStatus(`${personName}'s Nutrition preferences saved.`);
       router.refresh();
@@ -454,6 +519,62 @@ export function NutritionProfileSettings({
     }
   }
 
+  async function loadCurrentProfile() {
+    if (lock.current) return;
+    lock.current = true;
+    setSaving(true);
+    setCurrentProfile(null);
+    setStatus('Loading current preferences…');
+    try {
+      const response = await fetch(`/api/v1/nutrition/profiles/${profile.id}?scope=settings`, {
+        cache: 'no-store',
+      });
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(body.error?.message ?? 'Could not load current preferences.');
+      const current = settingsResponse(body.profile);
+      if (current.id !== profile.id)
+        throw new Error('The response belongs to another person. Your draft is retained.');
+      setCurrentProfile(current);
+      setStatus('Current preferences loaded. Review concurrent changes.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not load current preferences.');
+    } finally {
+      lock.current = false;
+      setSaving(false);
+    }
+  }
+  function updateFormProfile(next: NutritionProfileSettingsValue) {
+    setRenderProfile(next);
+    height.current = next.heightCentimeters;
+    targetWeight.current = next.targetWeightKilograms;
+    setMeasurementSystem(next.measurementSystem);
+    setHeightInput(heightDisplay(next.heightCentimeters));
+    setWeightInput(
+      next.targetWeightKilograms === null
+        ? ''
+        : String(
+            Number(
+              (
+                next.targetWeightKilograms /
+                (next.measurementSystem === 'imperial' ? KILOGRAMS_PER_POUND : 1)
+              ).toFixed(1),
+            ),
+          ),
+    );
+    setFormGeneration((value) => value + 1);
+  }
+  function reconcileProfile(reviewed: NutritionSettingsDraft) {
+    if (!currentProfile) return;
+    setSavedProfile(currentProfile);
+    baseline.current = JSON.stringify(settingsValues(currentProfile));
+    updateFormProfile({ ...currentProfile, ...reviewed });
+    setConflictDraft(null);
+    setCurrentProfile(null);
+    invalidateEstimate();
+    setDirty(JSON.stringify(reviewed) !== baseline.current);
+    setStatus('Reviewed preferences are ready. Save explicitly before another estimate preview.');
+  }
   const estimatePrerequisites = [
     !validTimeZone(savedProfile.dailyResetTimezone) && 'Correct and save the Nutrition time zone.',
     !savedProfile.estimatedTargetsEnabled && 'Enable optional estimates and save preferences.',
@@ -537,14 +658,18 @@ export function NutritionProfileSettings({
             </a>
           ))}
         </nav>
-        <fieldset disabled={saving || estimatePending !== null} className="settings-form-fields">
+        <fieldset
+          key={formGeneration}
+          disabled={saving || estimatePending !== null || Boolean(conflictDraft)}
+          className="settings-form-fields"
+        >
           <SettingsGroup title={<>Goals and tracking choices</>} id="nutrition-goals">
             <div className={`settings-fields ${styles.grid}`}>
               <SettingsField
                 description="Describe your goal; this does not calculate or replace a calorie target."
                 title="Nutrition goal type"
               >
-                <select name="nutritionGoalType" defaultValue={profile.nutritionGoalType}>
+                <select name="nutritionGoalType" defaultValue={renderProfile.nutritionGoalType}>
                   <option value="none">No body-weight goal</option>
                   <option value="maintain">Maintain</option>
                   <option value="gain">Gain</option>
@@ -576,13 +701,17 @@ export function NutritionProfileSettings({
                 description="An optional date to review progress toward your goal."
                 title="Target date (optional)"
               >
-                <input name="targetDate" type="date" defaultValue={profile.targetDate ?? ''} />
+                <input
+                  name="targetDate"
+                  type="date"
+                  defaultValue={renderProfile.targetDate ?? ''}
+                />
               </SettingsField>
               <SettingsField
                 description="Display food energy as kilocalories or kilojoules."
                 title="Preferred energy unit"
               >
-                <select name="preferredEnergyUnit" defaultValue={profile.preferredEnergyUnit}>
+                <select name="preferredEnergyUnit" defaultValue={renderProfile.preferredEnergyUnit}>
                   <option value="kcal">Kilocalories (kcal)</option>
                   <option value="kJ">Kilojoules (kJ)</option>
                 </select>
@@ -597,7 +726,7 @@ export function NutritionProfileSettings({
                 role="switch"
                 name="weightTrackingEnabled"
                 type="checkbox"
-                defaultChecked={profile.weightTrackingEnabled}
+                defaultChecked={renderProfile.weightTrackingEnabled}
               />
             </SettingsField>
             <p className={styles.notice}>
@@ -620,14 +749,17 @@ export function NutritionProfileSettings({
               >
                 <textarea
                   name="dietaryPreferences"
-                  defaultValue={profile.dietaryPreferences.join('\n')}
+                  defaultValue={renderProfile.dietaryPreferences.join('\n')}
                 />
               </SettingsField>
               <SettingsField
                 description="Enter only allergies you have explicitly identified, one per line."
                 title="Food allergies (optional)"
               >
-                <textarea name="foodAllergies" defaultValue={profile.foodAllergies.join('\n')} />
+                <textarea
+                  name="foodAllergies"
+                  defaultValue={renderProfile.foodAllergies.join('\n')}
+                />
               </SettingsField>
               <SettingsField
                 description="List foods or ingredients you want excluded from suggestions."
@@ -635,7 +767,7 @@ export function NutritionProfileSettings({
               >
                 <textarea
                   name="dietaryExclusions"
-                  defaultValue={profile.dietaryExclusions.join('\n')}
+                  defaultValue={renderProfile.dietaryExclusions.join('\n')}
                 />
               </SettingsField>
             </div>
@@ -663,7 +795,7 @@ export function NutritionProfileSettings({
               <NutrientPicker
                 name="visibleNutrientCodes"
                 title="Nutrients shown in coverage"
-                initial={profile.visibleNutrientCodes}
+                initial={renderProfile.visibleNutrientCodes}
                 definitions={nutrientDefinitions}
                 maximum={12}
                 onChange={() => {
@@ -676,7 +808,7 @@ export function NutritionProfileSettings({
                 description="The initial time span shown in your nutrition trends."
                 title="Trend range"
               >
-                <select name="trendRangeDays" defaultValue={profile.trendRangeDays}>
+                <select name="trendRangeDays" defaultValue={renderProfile.trendRangeDays}>
                   <option value="7">7 days</option>
                   <option value="14">14 days</option>
                   <option value="30">30 days</option>
@@ -691,7 +823,7 @@ export function NutritionProfileSettings({
                 role="switch"
                 name="showPlannedNutrition"
                 type="checkbox"
-                defaultChecked={profile.showPlannedNutrition}
+                defaultChecked={renderProfile.showPlannedNutrition}
               />
             </SettingsField>
             <SettingsField
@@ -702,7 +834,7 @@ export function NutritionProfileSettings({
                 role="switch"
                 name="showRecipeCardNutrition"
                 type="checkbox"
-                defaultChecked={profile.showRecipeCardNutrition}
+                defaultChecked={renderProfile.showRecipeCardNutrition}
               />
             </SettingsField>
             <details className="settings-disclosure">
@@ -710,7 +842,7 @@ export function NutritionProfileSettings({
               <NutrientPicker
                 name="recipeCardNutrientCodes"
                 title="Compact recipe-card nutrients"
-                initial={profile.recipeCardNutrientCodes}
+                initial={renderProfile.recipeCardNutrientCodes}
                 maximum={5}
                 definitions={nutrientDefinitions.filter((item) =>
                   [
@@ -737,7 +869,7 @@ export function NutritionProfileSettings({
                 role="switch"
                 name="showMealPlanNutrition"
                 type="checkbox"
-                defaultChecked={profile.showMealPlanNutrition}
+                defaultChecked={renderProfile.showMealPlanNutrition}
               />
             </SettingsField>
           </SettingsGroup>
@@ -769,7 +901,11 @@ export function NutritionProfileSettings({
                   description="Used only when you choose an age-based nutrition estimate."
                   title="Date of birth (optional)"
                 >
-                  <input name="dateOfBirth" type="date" defaultValue={profile.dateOfBirth ?? ''} />
+                  <input
+                    name="dateOfBirth"
+                    type="date"
+                    defaultValue={renderProfile.dateOfBirth ?? ''}
+                  />
                 </SettingsField>
                 {measurementSystem === 'imperial' ? (
                   <fieldset className={styles.heightGroup}>
@@ -819,7 +955,7 @@ export function NutritionProfileSettings({
                 >
                   <select
                     name="referenceSexCategory"
-                    defaultValue={profile.referenceSexCategory ?? ''}
+                    defaultValue={renderProfile.referenceSexCategory ?? ''}
                   >
                     <option value="">Not provided</option>
                     <option value="female">Female (reference category)</option>
@@ -830,7 +966,7 @@ export function NutritionProfileSettings({
                   description="Record your usual activity level for nutrition personalization."
                   title="Activity level (optional)"
                 >
-                  <select name="activityLevel" defaultValue={profile.activityLevel ?? ''}>
+                  <select name="activityLevel" defaultValue={renderProfile.activityLevel ?? ''}>
                     <option value="">Not provided</option>
                     <option value="sedentary">Sedentary</option>
                     <option value="light">Light</option>
@@ -845,7 +981,7 @@ export function NutritionProfileSettings({
                 >
                   <select
                     name="explicitlyEnteredLifeStage"
-                    defaultValue={profile.explicitlyEnteredLifeStage ?? ''}
+                    defaultValue={renderProfile.explicitlyEnteredLifeStage ?? ''}
                   >
                     <option value="">Not provided</option>
                     <option value="pregnant">Pregnancy explicitly entered</option>
@@ -862,7 +998,7 @@ export function NutritionProfileSettings({
                     role="switch"
                     name="estimatedTargetsEnabled"
                     type="checkbox"
-                    defaultChecked={profile.estimatedTargetsEnabled}
+                    defaultChecked={renderProfile.estimatedTargetsEnabled}
                   />
                 </SettingsField>
                 <SettingsField
@@ -872,7 +1008,7 @@ export function NutritionProfileSettings({
                   <input
                     name="estimatedTargetConsent"
                     type="checkbox"
-                    defaultChecked={profile.estimatedTargetConsent}
+                    defaultChecked={renderProfile.estimatedTargetConsent}
                   />
                 </SettingsField>
               </div>
@@ -1050,7 +1186,7 @@ export function NutritionProfileSettings({
                   <RegionalChoice
                     kind="timezone"
                     name="dailyResetTimezone"
-                    defaultValue={profile.dailyResetTimezone}
+                    defaultValue={renderProfile.dailyResetTimezone}
                     required
                     maxLength={100}
                   />
@@ -1059,7 +1195,7 @@ export function NutritionProfileSettings({
                   description="The first day used for weekly nutrition summaries."
                   title="Week starts on"
                 >
-                  <select name="weekStartsOn" defaultValue={profile.weekStartsOn}>
+                  <select name="weekStartsOn" defaultValue={renderProfile.weekStartsOn}>
                     <option value="0">Sunday</option>
                     <option value="1">Monday</option>
                     <option value="2">Tuesday</option>
@@ -1076,7 +1212,7 @@ export function NutritionProfileSettings({
                   <input
                     list="reference-jurisdictions"
                     name="referenceJurisdiction"
-                    defaultValue={profile.referenceJurisdiction}
+                    defaultValue={renderProfile.referenceJurisdiction}
                     required
                     minLength={2}
                     maxLength={20}
@@ -1089,6 +1225,43 @@ export function NutritionProfileSettings({
             </SettingsGroup>
           </details>
         </fieldset>
+        {conflictDraft && (
+          <section aria-label="Review changed Nutrition preferences">
+            <p role="status">
+              Preferences changed elsewhere. Your edits are retained for {personName}.
+            </p>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={saving}
+              onClick={() => void loadCurrentProfile()}
+            >
+              {saving ? 'Loading current preferences…' : 'Load current preferences'}
+            </button>
+            {currentProfile && (
+              <SettingsMergeReview
+                key={JSON.stringify(currentProfile)}
+                baseline={settingsValues(savedProfile)}
+                draft={conflictDraft}
+                label={(path) =>
+                  (
+                    ({
+                      heightCentimeters: 'Height (cm)',
+                      targetWeightKilograms: 'Target weight (kg)',
+                      estimatedTargetConsent: 'Estimate consent',
+                      estimatedTargetsEnabled: 'Allow optional estimates',
+                      dailyResetTimezone: 'Nutrition time zone',
+                    }) as Record<string, string>
+                  )[path[0]] ?? settingsFieldLabel(path)
+                }
+                current={settingsValues(currentProfile)}
+                pending={saving}
+                onResolve={reconcileProfile}
+                onDiscard={() => reconcileProfile(settingsValues(currentProfile))}
+              />
+            )}
+          </section>
+        )}
         <div id="nutrition-save">
           <span id="nutrition-save-status" role="status">
             {status}
@@ -1097,11 +1270,11 @@ export function NutritionProfileSettings({
             <button
               className="primary-button compact"
               type="submit"
-              disabled={saving || estimatePending !== null || !dirty}
+              disabled={saving || estimatePending !== null || !dirty || Boolean(conflictDraft)}
               aria-busy={saving}
             >
               {saving ? <ButtonSpinner /> : null}
-              {saving ? 'Saving…' : `Save ${personName}'s preferences`}
+              {saving && !conflictDraft ? 'Saving…' : `Save ${personName}'s preferences`}
             </button>
           </SettingsActionBar>
         </div>

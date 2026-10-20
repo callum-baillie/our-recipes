@@ -1,3 +1,8 @@
+import {
+  aiDependencySchema as dependencySchema,
+  aiProducedIds as producedIds,
+  aiDependencyTargets as expectedTarget,
+} from '@/lib/domain/ai-app-dependencies';
 import 'server-only';
 import { recipeImageInput } from '@/lib/domain/recipe-image-generation';
 import { and, eq, desc } from 'drizzle-orm';
@@ -24,37 +29,6 @@ import { getAiReadiness } from './ai-readiness-service';
 import { getAiWorkloadSetting } from './ai-settings-service';
 import { appRoleCan } from '@/lib/domain/permissions';
 
-const dependencySchema = z
-  .object({
-    fromStep: z.number().int().min(0).max(19),
-    result: z.enum(['list.id', 'recipe.id', 'collection.id', 'product.id', 'meal.id']),
-    target: z.enum([
-      'parameters.listId',
-      'parameters.recipeId',
-      'parameters.collectionId',
-      'parameters.productId',
-      'parameters.entryId',
-      'body.recipeId',
-      'body.productId',
-      'body.pantryProductId',
-      'body.collectionId',
-    ]),
-  })
-  .strict();
-const producedIds: Record<string, string> = {
-  createOrGenerateShoppingList: 'list.id',
-  createRecipe: 'recipe.id',
-  createCollection: 'collection.id',
-  createPantryProduct: 'product.id',
-  addMealPlanEntry: 'meal.id',
-};
-const expectedTarget = {
-  'list.id': ['parameters.listId'],
-  'recipe.id': ['parameters.recipeId', 'body.recipeId'],
-  'collection.id': ['parameters.collectionId', 'body.collectionId'],
-  'product.id': ['parameters.productId', 'body.productId', 'body.pantryProductId'],
-  'meal.id': ['parameters.entryId'],
-};
 const actionSchema = z
   .object({
     operationId: z.string().max(100),
@@ -628,7 +602,13 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
     snapshots?: Snapshot[];
     threadId: string;
   };
-  value.actions = value.actions.map((action) => actionSchema.parse(action));
+  const compatible = z.array(actionSchema).safeParse(value.actions);
+  if (!compatible.success)
+    throw new DecisionError(
+      'This saved proposal uses an unsupported dependency contract. Prepare a new review; no changes were applied.',
+      409,
+    );
+  value.actions = compatible.data;
   if (decision === 'apply')
     for (const saved of value.snapshots ?? []) {
       const op = operation(p, saved.operationId);

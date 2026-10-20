@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { acceptRecipeImageCandidate } from '@/lib/services/recipe-image-candidate-service';
 import { effectivePlanEntries } from '@/lib/domain/planner-workflow';
 import { prepareAppActions, confirmAppActions } from '@/lib/services/ai-app-action-service';
 import type { RequestPrincipal } from '@/lib/services/auth-service';
@@ -17,6 +19,8 @@ import {
   aiSummaryJobs,
   mealPlanLeftoverLinks,
   recipeImages,
+  recipeImageCandidates,
+  aiRuntimeSettings,
 } from '@/lib/db/schema';
 import {
   aiActionDecisionSchema,
@@ -34,6 +38,7 @@ import { createAiActionProposal, decideAiAction } from '@/lib/services/ai-action
 import {
   generateAiActionPreviewImage,
   getAiActionPreviewImageFile,
+  recipeDraftImageDigest,
 } from '@/lib/services/ai-action-preview-image-service';
 import {
   conciseProposalResponse,
@@ -948,7 +953,7 @@ describe('AI assistant services', () => {
     expect(listRecipes().filter((item) => item.title === recipe.title)).toHaveLength(1);
   });
 
-  it('promotes a deterministic generated preview image when the recipe is confirmed', async () => {
+  it('keeps the explicitly requested draft image private after recipe creation until image acceptance', async () => {
     const profile = setupProfile();
     const thread = createAiChatThread(profile.id);
     const imageBytes = await sharp({
@@ -982,6 +987,9 @@ describe('AI assistant services', () => {
       actionId: proposal.id,
       profileId: profile.id,
       recipe,
+      confirm: true,
+      operationId: randomUUID(),
+      expectedSourceDigest: recipeDraftImageDigest(recipe),
     });
     expect(preview.preview).toMatchObject({ image: { status: 'ready' } });
     expect(
@@ -995,12 +1003,20 @@ describe('AI assistant services', () => {
       result: { recipeId: expect.any(String) },
     });
     expect(getDatabase().select().from(aiActionPreviewImages).all()).toHaveLength(0);
+    expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
+    const imageResult = confirmed.result as { recipeId: string; candidateId: string };
+    const accepted = acceptRecipeImageCandidate(
+      { userId: `profile:${profile.id}`, profileId: profile.id, linkedProfileId: profile.id },
+      imageResult.recipeId,
+      imageResult.candidateId,
+    );
+    expect(accepted.status).toBe('accepted');
     expect(getDatabase().select().from(recipeImages).all()).toMatchObject([
       { altText: 'A deterministic bowl preview', createdByProfileId: profile.id },
     ]);
   });
 
-  it('saves a reviewed meal plan before its requested recipe images run', async () => {
+  it('saves a reviewed text meal plan without authorizing optional image work', async () => {
     const profile = setupProfile();
     const imageBytes = await sharp({
       create: { width: 48, height: 48, channels: 3, background: '#8aa06b' },
@@ -1050,16 +1066,11 @@ describe('AI assistant services', () => {
     const confirmed = await decideAiAction(generated.proposal.id, profile.id, 'confirm');
     expect(confirmed).toMatchObject({
       status: 'confirmed',
-      result: { imageJobId: expect.any(String) },
+      result: { imageJobId: null, imageGeneration: 'requires_separate_review' },
     });
-    expect(getDatabase().select().from(aiJobs).all()).toMatchObject([
-      { kind: 'recipe_images', status: 'queued', executionMode: 'direct' },
-    ]);
-    expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
+    expect(getDatabase().select().from(aiJobs).all()).toHaveLength(0);
     await runDueAiJobs();
-    expect(getDatabase().select().from(recipeImages).all()).toMatchObject([
-      { altText: 'A deterministic meal-plan image', createdByProfileId: profile.id },
-    ]);
+    expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
   });
 
   it.each([10, 4])(
@@ -1067,6 +1078,14 @@ describe('AI assistant services', () => {
     async (successfulCount) => {
       const profile = setupProfile();
       const thread = createAiChatThread(profile.id);
+      getDatabase()
+        .insert(aiRuntimeSettings)
+        .values({
+          id: 'global',
+          settings: JSON.stringify({ generationsPerTenMinutes: 100 }),
+          version: 1,
+        })
+        .run();
       updateAiSettings(profile.id, {
         dataPolicy: { ...getAiDataPolicy(profile.id), shareSharedRecipes: true },
       });
@@ -1176,15 +1195,26 @@ describe('AI assistant services', () => {
         .run();
       await runDueAiJobs();
 
-      expect(getDatabase().select().from(recipeImages).all()).toHaveLength(successfulCount);
+      expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
+      expect(
+        getDatabase()
+          .select()
+          .from(recipeImageCandidates)
+          .all()
+          .filter((item) => item.status === 'ready'),
+      ).toHaveLength(successfulCount);
       expect(getDatabase().select().from(aiJobs).all()[0]?.status).toBe(
         successfulCount === 10 ? 'completed' : 'failed',
       );
       expect(
         getDatabase()
-          .select({ recipeId: recipeImages.recipeId })
-          .from(recipeImages)
+          .select({
+            recipeId: recipeImageCandidates.recipeId,
+            status: recipeImageCandidates.status,
+          })
+          .from(recipeImageCandidates)
           .all()
+          .filter((image) => image.status === 'ready')
           .map((image) => image.recipeId)
           .sort(),
       ).toEqual([...recipeIds].reverse().slice(0, successfulCount).sort());
@@ -1194,19 +1224,19 @@ describe('AI assistant services', () => {
           .from(aiChatMessages)
           .all()
           .some((message) =>
-            message.content.includes(`${successfulCount} of 10 recipe images saved`),
+            message.content.includes(`${successfulCount} of 10 image previews prepared`),
           ),
       ).toBe(true);
       if (successfulCount === 4) {
         const jobId = getDatabase().select().from(aiJobs).all()[0]!.id;
         const retry = retryAiJob(jobId, profile.id);
-        expect(retry.completedItems).toBe(4);
+        expect(retry.completedItems).toBe(0);
         expect(
-          getAiJob(jobId, profile.id).items.filter((item) => item.status === 'pending'),
+          getAiJob(retry.id, profile.id).items.filter((item) => item.status === 'pending'),
         ).toHaveLength(6);
         await runDueAiJobs();
         expect(submittedLines.split('\n')).toHaveLength(6);
-        expect(getDatabase().select().from(recipeImages).all()).toHaveLength(4);
+        expect(getDatabase().select().from(recipeImages).all()).toHaveLength(0);
       }
     },
   );

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import {
   getSharedNutritionProfile,
+  getPrivateNutritionProfile,
   updateNutritionProfileSettings,
 } from '@/lib/services/nutrition-profile-service';
 import {
@@ -26,9 +27,15 @@ export async function GET(request: Request, context: Context) {
   if (auth.response) return auth.response;
   try {
     const profileId = parseNutritionProfileId((await context.params).profileId);
-    return NextResponse.json({
-      profile: getSharedNutritionProfile(profileId, auth.principal.id),
-    });
+    return NextResponse.json(
+      {
+        profile:
+          new URL(request.url).searchParams.get('scope') === 'settings'
+            ? getPrivateNutritionProfile(profileId, auth.principal.id)
+            : getSharedNutritionProfile(profileId, auth.principal.id),
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    );
   } catch (error) {
     return nutritionApiError(error);
   }

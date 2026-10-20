@@ -26,11 +26,6 @@
   },
   {
     "method": "GET",
-    "path": "/ai/actions/{actionId}/image",
-    "reason": "Ephemeral first-party assistant preview asset."
-  },
-  {
-    "method": "GET",
     "path": "/ai/settings",
     "reason": "First-party settings UI query; external callers use the documented readiness endpoint."
   },
@@ -303,6 +298,11 @@
     "method": "PATCH",
     "path": "/ai/store-map",
     "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
+  },
+  {
+    "method": "GET",
+    "path": "/account/profile",
+    "reason": "Linked-account personal preferences and revision for scoped conflict reconciliation; excludes credentials."
   },
   {
     "method": "PATCH",

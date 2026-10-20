@@ -1,7 +1,7 @@
 'use client';
 
 import { AiSummaryCards, type AiSummaryCardData } from './ai-summary-cards';
-import { SettingsConflictReview } from './settings-conflict-review';
+import { SettingsMergeReview } from './settings-merge-review';
 import {
   summaryInputCategories,
   type SummaryAvailability,
@@ -111,6 +111,7 @@ export function AiSettingsForm({
   const [statusSource, setStatusSource] = useState<'save' | 'refresh'>('save');
   const lock = useRef(false);
   const [savedPolicy, setSavedPolicy] = useState(JSON.stringify(initialSettings.dataPolicy));
+  const [baselinePolicy, setBaselinePolicy] = useState(initialSettings.dataPolicy);
   const dirty = JSON.stringify(settings.dataPolicy) !== savedPolicy;
   const imageGeneration = settings.workloads.find((item) => item.workload === 'image_generation');
 
@@ -143,6 +144,7 @@ export function AiSettingsForm({
     }
     setSettings(body);
     setSavedPolicy(JSON.stringify(body.dataPolicy));
+    setBaselinePolicy(body.dataPolicy);
     return body;
   }
 
@@ -205,6 +207,8 @@ export function AiSettingsForm({
     if (lock.current) return;
     lock.current = true;
     setSaving(true);
+    setCurrent(null);
+    setStatus('Loading current settings…');
     setStatusSource('save');
     try {
       const response = await fetch('/api/v1/ai/settings', { cache: 'no-store' });
@@ -220,23 +224,20 @@ export function AiSettingsForm({
       setSaving(false);
     }
   }
-  function reconcile(keep: boolean) {
+  function policyValues(policy: Settings['dataPolicy']) {
+    const { version: _version, ...values } = policy;
+    void _version;
+    return values;
+  }
+  function reconcile(reviewed: ReturnType<typeof policyValues>) {
     if (!current) return;
     setSavedPolicy(JSON.stringify(current.dataPolicy));
-    setSettings((draft) => ({
-      ...current,
-      dataPolicy: keep
-        ? { ...draft.dataPolicy, version: current.dataPolicy.version }
-        : current.dataPolicy,
-    }));
+    setBaselinePolicy(current.dataPolicy);
+    setSettings({ ...current, dataPolicy: { ...reviewed, version: current.dataPolicy.version } });
     setCurrent(null);
     setConflict(false);
     setStatusSource('save');
-    setStatus(
-      keep
-        ? 'Privacy draft retained against the reviewed version. Save explicitly to apply it.'
-        : 'Current saved privacy settings loaded.',
-    );
+    setStatus('Reviewed privacy changes are ready. Save explicitly to apply them.');
   }
   return (
     <div id="ai-privacy" className="settings-stack" onChange={() => setStatus('')}>
@@ -258,7 +259,7 @@ export function AiSettingsForm({
               type="checkbox"
               role="switch"
               checked={imageGeneration?.enabled ?? true}
-              disabled={saving || refreshing}
+              disabled={saving || refreshing || conflict}
               onChange={(event) =>
                 setSettings((current) => ({
                   ...current,
@@ -284,7 +285,7 @@ export function AiSettingsForm({
         >
           <select
             value={String(settings.dataPolicy.summaryFrequency)}
-            disabled={saving || refreshing}
+            disabled={saving || refreshing || conflict}
             onChange={(event) =>
               setSettings((current) => ({
                 ...current,
@@ -317,7 +318,7 @@ export function AiSettingsForm({
                 type="checkbox"
                 role="switch"
                 checked={Boolean(settings.dataPolicy[key])}
-                disabled={saving || refreshing}
+                disabled={saving || refreshing || conflict}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
@@ -364,7 +365,7 @@ export function AiSettingsForm({
             <button
               className="secondary-button"
               type="button"
-              disabled={saving || refreshing}
+              disabled={saving || refreshing || conflict}
               onClick={() =>
                 setSettings((current) => ({
                   ...current,
@@ -394,7 +395,7 @@ export function AiSettingsForm({
                   description="Select the model used for this type of request."
                 >
                   <select
-                    disabled={saving || refreshing}
+                    disabled={saving || refreshing || conflict}
                     value={known ? item.model : '__custom'}
                     onChange={(event) =>
                       updateWorkload(index, {
@@ -418,7 +419,7 @@ export function AiSettingsForm({
                     description="Enter a model available to the configured provider account."
                   >
                     <input
-                      disabled={saving || refreshing}
+                      disabled={saving || refreshing || conflict}
                       value={item.model}
                       onChange={(event) => updateWorkload(index, { model: event.target.value })}
                     />
@@ -429,7 +430,7 @@ export function AiSettingsForm({
                   description="Use the model default or choose an available effort level."
                 >
                   <select
-                    disabled={saving || refreshing}
+                    disabled={saving || refreshing || conflict}
                     value={item.reasoningEffort ?? 'none'}
                     onChange={(event) =>
                       updateWorkload(index, {
@@ -474,7 +475,7 @@ export function AiSettingsForm({
                   type="checkbox"
                   role="switch"
                   checked={Boolean(settings.dataPolicy[key])}
-                  disabled={saving || refreshing}
+                  disabled={saving || refreshing || conflict}
                   onChange={(event) =>
                     setSettings((current) => ({
                       ...current,
@@ -544,28 +545,37 @@ export function AiSettingsForm({
         </>
       )}
       {conflict && (
-        <SettingsConflictReview
-          pending={saving || refreshing}
-          loaded={Boolean(current)}
-          onLoad={() => void loadCurrent()}
-          onKeepDraft={() => reconcile(true)}
-          onUseSaved={() => reconcile(false)}
-        >
-          <details open>
-            <summary>Current saved privacy choices · version {current?.dataPolicy.version}</summary>
-            <dl>
-              {[...summaryFields, ...policyFields].map(([key, title]) => (
-                <div key={key}>
-                  <dt>{title}</dt>
-                  <dd>
-                    {current?.dataPolicy[key] ? 'On' : 'Off'} saved ·{' '}
-                    {settings.dataPolicy[key] ? 'On' : 'Off'} in your draft
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </details>
-        </SettingsConflictReview>
+        <section aria-label="Review changed settings">
+          <p role="status">Privacy settings changed elsewhere. Your edits are retained.</p>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={saving || refreshing}
+            onClick={() => void loadCurrent()}
+          >
+            {saving ? 'Loading current settings…' : 'Load current settings'}
+          </button>
+          {current && (
+            <SettingsMergeReview
+              key={JSON.stringify(current.dataPolicy)}
+              baseline={policyValues(baselinePolicy)}
+              draft={policyValues(settings.dataPolicy)}
+              current={policyValues(current.dataPolicy)}
+              pending={saving || refreshing}
+              onResolve={reconcile}
+              onDiscard={() => reconcile(policyValues(current.dataPolicy))}
+              label={(path) =>
+                path
+                  .map(
+                    (key) =>
+                      [...summaryFields, ...policyFields].find(([field]) => field === key)?.[1] ??
+                      key.replace(/([a-z])([A-Z])/g, '$1 $2'),
+                  )
+                  .join(' · ')
+              }
+            />
+          )}
+        </section>
       )}
       <div id="ai-privacy-save">
         <SettingsActionBar
@@ -582,7 +592,7 @@ export function AiSettingsForm({
             disabled={saving || refreshing || !dirty || conflict}
             onClick={() => void save()}
           >
-            {saving ? (
+            {saving && !conflict ? (
               <>
                 <LoadingIndicator label="Saving AI settings" /> Saving…
               </>

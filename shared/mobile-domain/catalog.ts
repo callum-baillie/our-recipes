@@ -65,3 +65,27 @@ export function catalogQuantity(value: string, unit: string) {
     throw new Error('Enter a positive amount up to 10,000 and its unit.');
   return { quantity, unit: unit.trim() };
 }
+
+/** Existing household product identified by a verified barcode. No remote import is needed. */
+export type ReviewedLocalProduct = {
+  id: string;
+  displayName: string;
+  brand: string;
+  defaultInventoryUnit: string;
+  defaultPackageAmount?: number | null;
+  defaultPackageUnit?: string;
+};
+export type BarcodeReviewResult = {
+  preferred?: ReviewedCatalogFood | null;
+  alternatives?: ReviewedCatalogFood[];
+  localProduct?: ReviewedLocalProduct | null;
+  providerStatuses?: { provider: string; status: string }[];
+};
+export function barcodeReviewChoices(result: BarcodeReviewResult) {
+  return {
+    localProduct: result.localProduct ?? null,
+    records: [result.preferred, ...(result.alternatives ?? [])].filter(
+      (food): food is ReviewedCatalogFood => Boolean(food),
+    ),
+  };
+}

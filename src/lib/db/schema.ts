@@ -734,7 +734,13 @@ export const aiChatTurns = sqliteTable(
       .references(() => profiles.id, { onDelete: 'cascade' }),
     ownerUserId: text('owner_user_id').notNull(),
     intentHash: text('intent_hash').notNull(),
-    status: text('status', { enum: ['running', 'completed', 'failed', 'cancelled'] }).notNull(),
+    status: text('status', {
+      enum: ['running', 'completed', 'failed', 'cancelled', 'outcome_unknown'],
+    }).notNull(),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: integer('lease_expires_at', { mode: 'timestamp' }),
+    deadlineAt: integer('deadline_at', { mode: 'timestamp' }),
+    recoveryJson: text('recovery_json'),
     resultJson: text('result_json'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
@@ -746,6 +752,7 @@ export const aiActionProposals = sqliteTable(
   'ai_action_proposals',
   {
     id: text('id').primaryKey(),
+    turnId: text('turn_id'),
     threadId: text('thread_id').references(() => aiChatThreads.id, { onDelete: 'set null' }),
     profileId: text('profile_id')
       .notNull()
@@ -775,6 +782,8 @@ export const aiActionPreviewImages = sqliteTable('ai_action_preview_images', {
   width: integer('width').notNull(),
   height: integer('height').notNull(),
   model: text('model').notNull(),
+  sourceDigest: text('source_digest'),
+  ownerUserId: text('owner_user_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
@@ -782,6 +791,7 @@ export const aiJobs = sqliteTable(
   'ai_jobs',
   {
     id: text('id').primaryKey(),
+    turnId: text('turn_id'),
     profileId: text('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -1115,6 +1125,8 @@ export const shoppingListItems = sqliteTable('shopping_list_items', {
     .notNull()
     .default('to_buy'),
   cartQuantity: real('cart_quantity').notNull().default(0),
+  // Null means legacy/unreviewed purchase dimension, never the demand unit.
+  cartUnit: text('cart_unit'),
   cartLabel: text('cart_label').notNull().default(''),
   sourceRecipeIds: text('source_recipe_ids').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -2549,6 +2561,7 @@ export const aiDecisionRecords = sqliteTable(
   'ai_decision_records',
   {
     id: text('id').primaryKey(),
+    turnId: text('turn_id'),
     ownerUserId: text('owner_user_id').notNull(),
     profileId: text('profile_id')
       .notNull()
@@ -2668,3 +2681,22 @@ export const recipeImageCandidates = sqliteTable(
   },
   (table) => [index('recipe_image_candidate_owner').on(table.ownerUserId, table.recipeId)],
 );
+
+/** Sanitized, immutable execution identity. No model inputs, private evidence or secrets. */
+export const aiExecutionTraces = sqliteTable('ai_execution_traces', {
+  id: text('id').primaryKey(),
+  parentTraceId: text('parent_trace_id'),
+  parentJobId: text('parent_job_id'),
+  turnId: text('turn_id'),
+  profileId: text('profile_id').notNull(),
+  ownerUserId: text('owner_user_id'),
+  workload: text('workload').notNull(),
+  model: text('model').notNull(),
+  promptVersion: text('prompt_version').notNull(),
+  optionsJson: text('options_json').notNull(),
+  status: text('status', {
+    enum: ['requested', 'completed', 'failed', 'cancelled', 'outcome_unknown'],
+  }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+});

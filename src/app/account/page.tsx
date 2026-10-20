@@ -4,7 +4,7 @@ import { KitchenInterview, kitchenInterviewQuestions } from '@/components/kitche
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
-import { getHouseholdState } from '@/lib/services/household-service';
+import { getHouseholdState, personalProfileRevision } from '@/lib/services/household-service';
 import { PersonalProfileSettings } from '@/components/personal-profile-settings';
 import { AppearanceSettings } from '@/components/theme-toggle';
 import { SettingsPageHeader } from '@/components/settings-page-header';
@@ -29,6 +29,7 @@ export default async function AccountPage() {
       />
       {profile && (
         <PersonalProfileSettings
+          revision={personalProfileRevision(profile)}
           profile={{ ...profile, role: principal.role, isLastAdmin: false }}
         />
       )}

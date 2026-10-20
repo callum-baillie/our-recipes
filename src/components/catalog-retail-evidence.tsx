@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AsyncSkeleton } from '@/components/skeleton';
 import type { CatalogReference } from '@/lib/domain/food-data';
 import styles from './catalog-store-link.module.css';
@@ -38,6 +38,9 @@ function observationSummary(row: Record<string, unknown>, kind: 'offer' | 'place
     .join(' · ');
 }
 export function CatalogRetailEvidence({ reference }: { reference: CatalogReference }) {
+  return <ScopedRetailEvidence key={JSON.stringify(reference)} reference={reference} />;
+}
+function ScopedRetailEvidence({ reference }: { reference: CatalogReference }) {
   const [stores, setStores] = useState<Array<{
     id: string;
     name: string;
@@ -47,6 +50,62 @@ export function CatalogRetailEvidence({ reference }: { reference: CatalogReferen
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [evidence, setEvidence] = useState<Evidence | null>(null);
+  const [identified, setIdentified] = useState('');
+  const requestVersion = useRef(0);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      controller.current?.abort();
+    },
+    [],
+  );
+  async function read(enrichment = false) {
+    const version = ++requestVersion.current;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `/api/v1/food-data/catalog/${enrichment ? 'enrichment' : 'retail-evidence'}`,
+        {
+          method: 'POST',
+          signal: abort.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            enrichment
+              ? {
+                  lines: [
+                    {
+                      lineId: 'reviewed-food',
+                      productId: reference.canonical_product_id,
+                      ...(store ? { storeId: store } : {}),
+                    },
+                  ],
+                }
+              : { productId: reference.canonical_product_id, ...(store ? { storeId: store } : {}) },
+          ),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error?.message ?? 'Evidence is unavailable.');
+      if (version !== requestVersion.current || abort.signal.aborted) return;
+      setEvidence(enrichment ? (result.lines?.[0]?.evidence ?? null) : result.evidence);
+      setIdentified(
+        enrichment
+          ? result.lines?.[0]?.product
+            ? `${result.lines[0].product.name ?? 'Identified source product'} · revision ${result.lines[0].product.revision}`
+            : 'No identified product evidence is available.'
+          : '',
+      );
+    } catch (error) {
+      if (version === requestVersion.current && !abort.signal.aborted)
+        setError(error instanceof Error ? error.message : 'Evidence is unavailable.');
+    } finally {
+      if (version === requestVersion.current && !abort.signal.aborted) setBusy(false);
+    }
+  }
   useEffect(() => {
     let alive = true;
     fetch('/api/v1/supermarket-profiles')
@@ -104,30 +163,21 @@ export function CatalogRetailEvidence({ reference }: { reference: CatalogReferen
         className="secondary-button compact"
         disabled={busy || !stores}
         aria-busy={busy}
-        onClick={async () => {
-          setBusy(true);
-          setError('');
-          try {
-            const response = await fetch('/api/v1/food-data/catalog/retail-evidence', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                productId: reference.canonical_product_id,
-                ...(store ? { storeId: store } : {}),
-              }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error?.message ?? 'Evidence is unavailable.');
-            setEvidence(result.evidence);
-          } catch (error) {
-            setError(error instanceof Error ? error.message : 'Evidence is unavailable.');
-          } finally {
-            setBusy(false);
-          }
-        }}
+        onClick={() => void read()}
       >
         {busy ? 'Checking evidence…' : 'Check public evidence'}
       </button>
+      <button
+        type="button"
+        className="secondary-button compact"
+        disabled={busy || !stores}
+        onClick={() => void read(true)}
+      >
+        Review identified product enrichment
+      </button>
+      {identified ? (
+        <p role="status">{identified}. This read has not changed the shopping list.</p>
+      ) : null}
       {evidence && (
         <div role="status" className={styles.saved}>
           <span>

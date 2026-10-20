@@ -241,27 +241,19 @@ describe('review-first AI operation service', () => {
     expect(estimated.recipe.nutritionCalories).toBe(230);
     expect(estimated.recipe.nutritionSodiumMilligrams).toBe(410);
 
-    const generated = await generateAiRecipeImage({
-      actorProfileId: profile.id,
-      recipeId: recipe.id,
-    });
-    expect(getRecipe(recipe.id)?.images.map((image) => image.id)).toContain(generated.imageId);
-    expect(provider.imageInputs[0]?.recipeTitle).toBe('Tomato soup');
+    await expect(
+      generateAiRecipeImage({ actorProfileId: profile.id, recipeId: recipe.id }),
+    ).rejects.toThrow(/review|candidate/i);
+    expect(getRecipe(recipe.id)?.images).toHaveLength(0);
+    expect(provider.imageInputs).toHaveLength(0);
 
     const audits = getDatabase().select().from(aiOperationAudits).all();
-    expect(audits).toHaveLength(4);
-    expect(audits.map((audit) => audit.status)).toEqual([
-      'succeeded',
-      'succeeded',
-      'succeeded',
-      'succeeded',
-    ]);
+    expect(audits).toHaveLength(3);
+    expect(audits.map((audit) => audit.status)).toEqual(['succeeded', 'succeeded', 'succeeded']);
     expect(audits.map((audit) => audit.sourceDigest)).toEqual(
       expect.arrayContaining([expect.stringMatching(/^[a-f0-9]{64}$/u)]),
     );
-    expect(audits.find((audit) => audit.kind === 'image-generation')?.generatedImageId).toBe(
-      generated.imageId,
-    );
+    expect(audits.some((audit) => audit.kind === 'image-generation')).toBe(false);
     expect(audits.find((audit) => audit.kind === 'nutrition-estimation')?.recipeId).toBe(recipe.id);
     expect(JSON.stringify(audits)).not.toContain(sourceText);
   });

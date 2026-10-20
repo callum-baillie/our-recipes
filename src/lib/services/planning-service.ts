@@ -1703,12 +1703,13 @@ export function addShoppingListItem(
   listId: string,
   input: ShoppingListItemInput,
   actorProfileId?: string,
+  options: { separateEntry?: boolean } = {},
 ): typeof shoppingListItems.$inferSelect {
   ensureDatabase();
   const list = getDatabase().select().from(shoppingLists).where(eq(shoppingLists.id, listId)).get();
   if (!list) throw new PlanningNotFoundError('That shopping list no longer exists.');
   const db = getDatabase();
-  if (input.productId) {
+  if (input.productId && !options.separateEntry) {
     const existing = db
       .select({ item: shoppingListItems, pantry: pantryShoppingItemDetails })
       .from(shoppingListItems)
@@ -1812,6 +1813,9 @@ export function addShoppingListItem(
     checked: input.checked,
     shoppingState: input.checked ? 'sourced' : (input.shoppingState ?? 'to_buy'),
     cartQuantity: input.cartQuantity ?? 0,
+    // Demand's unit is not evidence of the independently purchased dimension.
+    // Older clients without cartUnit leave an explicitly unreviewed amount.
+    cartUnit: input.cartUnit ?? null,
     cartLabel: input.cartLabel ?? '',
     sourceRecipeIds: JSON.stringify(input.recipeId ? [input.recipeId] : []),
     createdAt: now,
@@ -1905,12 +1909,13 @@ export function updateShoppingListItem(
             : aisleIdOrNull(input.aisleId),
         checked: input.checked,
         cartQuantity: input.cartQuantity ?? previous.cartQuantity,
+        cartUnit: input.cartUnit !== undefined ? input.cartUnit : previous.cartUnit,
         cartLabel: input.cartLabel ?? previous.cartLabel,
         shoppingState:
           input.checked || input.shoppingState === 'sourced'
             ? 'sourced'
             : (input.shoppingState ?? 'to_buy'),
-        updatedAt: new Date(),
+        updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1_000)),
       })
       .where(and(eq(shoppingListItems.id, itemId), eq(shoppingListItems.listId, listId)))
       .run();
@@ -1925,7 +1930,7 @@ export function updateShoppingListItem(
           demandState: 'uncertain',
           uncertaintyReason:
             'Food changed. Match the replacement to a pantry product before recording a purchase.',
-          updatedAt: new Date(),
+          updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1_000)),
         })
         .where(eq(pantryShoppingItemDetails.shoppingListItemId, itemId))
         .run();
@@ -1946,7 +1951,7 @@ export function updateShoppingListItem(
               ? 'active'
               : policyInstance.state,
           updatedByProfileId: actorProfileId ?? policyInstance.updatedByProfileId,
-          updatedAt: new Date(),
+          updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1_000)),
         })
         .where(eq(shoppingPolicyInstances.id, policyInstance.id))
         .run();

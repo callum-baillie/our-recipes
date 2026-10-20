@@ -15,6 +15,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { CatalogFoodContext } from './catalog-food-context';
 import { AppDialog } from './app-dialog';
 import { NutritionEventFields, NutritionFeedback } from './nutrition-form-fields';
 import { useNutritionDraft } from './use-nutrition-draft';
@@ -691,6 +692,17 @@ export function NutritionRecordForm({
                     )}
                   </div>
                 )}
+                {selectedProduct?.record?.catalogRef && units.includes('g') ? (
+                  <CatalogFoodContext
+                    key={selectedProduct.record.id}
+                    name={selectedProduct.displayName}
+                    reference={selectedProduct.record.catalogRef}
+                    onSelectMeasure={(amount) => {
+                      if (request.isPending() || draft.uncertain) return;
+                      change({ quantity: String(amount.quantity), unit: amount.unit });
+                    }}
+                  />
+                ) : null}
                 <div className={styles.formGrid}>
                   {field('quantity', 'Amount consumed', {
                     type: 'number',
@@ -835,6 +847,17 @@ export function NutritionRecordForm({
             {mode === 'manual' && (
               <>
                 {field('sourceName', 'Food or meal name', { maxLength: 300, required: true })}
+                {selectedProduct?.record?.catalogRef && units.includes('g') ? (
+                  <CatalogFoodContext
+                    key={selectedProduct.record.id}
+                    name={selectedProduct.displayName}
+                    reference={selectedProduct.record.catalogRef}
+                    onSelectMeasure={(amount) => {
+                      if (request.isPending() || draft.uncertain) return;
+                      change({ quantity: String(amount.quantity), unit: amount.unit });
+                    }}
+                  />
+                ) : null}
                 <div className={styles.formGrid}>
                   {field('quantity', 'Amount consumed', {
                     type: 'number',

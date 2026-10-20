@@ -160,7 +160,9 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         safety_identifier: input.safetyIdentifier,
         ...reasoning(input.reasoningEffort),
       };
-      const deadline = AbortSignal.timeout((input.requestTimeoutSeconds ?? 180) * 1000);
+      const deadline = AbortSignal.timeout(
+        Math.max(1, Math.floor((input.requestTimeoutSeconds ?? 180) * 1000)),
+      );
       const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
       const stream = this.responses.stream?.(request, { signal });
       let response: Awaited<ReturnType<ResponsesClient['create']>>;
@@ -218,6 +220,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
 
   async generateMealPlan(input: Parameters<AiAssistantProvider['generateMealPlan']>[0]) {
     try {
+      input.signal?.throwIfAborted();
       const response = await this.responses.parse(
         {
           model: input.model,
@@ -240,14 +243,17 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         },
         { signal: input.signal, timeout: (input.requestTimeoutSeconds ?? 180) * 1000 },
       );
+      input.signal?.throwIfAborted();
       return aiMealPlanCandidateSchema.parse(response.output_parsed);
     } catch {
+      input.signal?.throwIfAborted();
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid meal plan.');
     }
   }
 
   async generateRecipe(input: Parameters<AiAssistantProvider['generateRecipe']>[0]) {
     try {
+      input.signal?.throwIfAborted();
       const response = await this.responses.parse(
         {
           model: input.model,
@@ -270,8 +276,10 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         },
         { signal: input.signal, timeout: (input.requestTimeoutSeconds ?? 180) * 1000 },
       );
+      input.signal?.throwIfAborted();
       return recipeInputSchema.parse(response.output_parsed);
     } catch {
+      input.signal?.throwIfAborted();
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid recipe.');
     }
   }
@@ -290,6 +298,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
 
   async generateSummaryBundle(input: Parameters<AiAssistantProvider['generateSummaryBundle']>[0]) {
     try {
+      input.signal?.throwIfAborted();
       const response = await this.responses.parse(
         {
           model: input.model,
@@ -312,8 +321,10 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         },
         { signal: input.signal, timeout: (input.requestTimeoutSeconds ?? 180) * 1000 },
       );
+      input.signal?.throwIfAborted();
       return aiSummaryBundleOutputSchema.parse(response.output_parsed);
     } catch {
+      input.signal?.throwIfAborted();
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid summary.');
     }
   }

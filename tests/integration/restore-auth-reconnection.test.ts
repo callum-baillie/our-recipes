@@ -48,7 +48,6 @@ it('rejects restored/revoked sessions and permits fresh sign-in through the exis
   expect((await auth.api.getSession({ headers: new Headers({ cookie }) }))?.user.email).toBe(email);
   const backup = await backups.createBackup();
   await backups.restoreBackup(backup.id);
-  accounts.invalidateAuthenticationAfterRestore();
   expect(await auth.api.getSession({ headers: new Headers({ cookie }) })).toBeNull();
   const fresh = await signIn();
   expect((await auth.api.getSession({ headers: new Headers({ cookie: fresh }) }))?.user.email).toBe(

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { FoodRuntimeSettings } from '@/components/food-runtime-settings';
 import { AppSettingsForm } from '@/components/app-settings-form';
 import { BackupManager } from '@/components/backup-manager';
 import { FreshInstallPanel } from '@/components/fresh-install-panel';
@@ -118,6 +119,7 @@ export default async function SystemSettingsPage() {
             <output>Rights blocked · official links may still be available</output>
           </SettingsRow>
         )}
+        <FoodRuntimeSettings />
         {foodProviders.map((provider) => (
           <SettingsRow
             key={provider.provider}

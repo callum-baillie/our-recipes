@@ -213,6 +213,152 @@ describe('authorized AI operations and prompt contracts', () => {
     ).toHaveLength(1);
     expect(planning.getShoppingList(list.id)?.items).toHaveLength(2);
   });
+  it('executes recipe, collection, product and meal dependencies using actual response IDs', async () => {
+    setSharing({ shareSharedRecipes: true, shareMealPlans: true, sharePantry: true });
+    const { emptyRecipeInput } = await import('@/lib/domain/recipe');
+    const source = request('/ai/app-actions');
+    const { appAction } = await actions.prepareAppActions(principal, source, threadId, {
+      title: 'Create and connect synthetic records',
+      actions: [
+        {
+          operationId: 'createRecipe',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify({
+            ...emptyRecipeInput,
+            title: 'Dependency soup',
+            servings: '4',
+            ingredientGroups: [
+              { name: '', ingredients: [{ quantity: 1, unit: 'can', item: 'tomatoes', note: '' }] },
+            ],
+            instructionSections: [{ title: '', steps: ['Simmer.'] }],
+          }),
+        },
+        {
+          operationId: 'createCollection',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify({ name: 'Dependency collection' }),
+        },
+        {
+          operationId: 'addRecipeToCollection',
+          parametersJson: JSON.stringify({ collectionId: '' }),
+          bodyJson: JSON.stringify({ recipeId: '' }),
+          bindings: [
+            { fromStep: 0, result: 'recipe.id', target: 'body.recipeId' },
+            { fromStep: 1, result: 'collection.id', target: 'parameters.collectionId' },
+          ],
+        },
+        {
+          operationId: 'createPantryProduct',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify({ displayName: 'Dependency tomatoes' }),
+        },
+        {
+          operationId: 'updatePantryProduct',
+          parametersJson: JSON.stringify({ productId: '' }),
+          bodyJson: JSON.stringify({ displayName: 'Dependency tomatoes reviewed' }),
+          bindings: [{ fromStep: 3, result: 'product.id', target: 'parameters.productId' }],
+        },
+        {
+          operationId: 'addMealPlanEntry',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify({
+            plannedFor: '2026-11-02',
+            meal: 'dinner',
+            recipeId: '',
+            servings: 4,
+            note: '',
+          }),
+          bindings: [{ fromStep: 0, result: 'recipe.id', target: 'body.recipeId' }],
+        },
+        {
+          operationId: 'updateMealPlanEntry',
+          parametersJson: JSON.stringify({ entryId: '' }),
+          bodyJson: JSON.stringify({ status: 'skipped' }),
+          bindings: [{ fromStep: 5, result: 'meal.id', target: 'parameters.entryId' }],
+        },
+      ],
+    });
+    const result = await actions.confirmAppActions(principal, source, {
+      id: appAction.id,
+      version: appAction.version,
+      decision: 'apply',
+    });
+    expect(result.status, JSON.stringify(result.results)).toBe('applied');
+    expect(result.results).toHaveLength(7);
+    const recipeService = await import('@/lib/services/recipe-service');
+    const saved = recipeService.listRecipes('Dependency soup')[0]!;
+    const collections = await import('@/lib/services/collection-service');
+    const collection = collections
+      .listCollections()
+      .find((x) => x.name === 'Dependency collection')!;
+    expect(collections.getCollection(collection.id)?.recipes.map((x) => x.id)).toContain(saved.id);
+    const pantry = await import('@/lib/services/pantry-service');
+    expect(
+      pantry.listPantryProducts().some((x) => x.displayName === 'Dependency tomatoes reviewed'),
+    ).toBe(true);
+    const planning = await import('@/lib/services/planning-service');
+    const meal = planning
+      .listPlannedMeals('2026-11-02', '2026-11-02')
+      .find((x) => x.recipeId === saved.id)!;
+    expect(meal.status).toBe('skipped');
+    expect(meal.recipeRevision).toBe(1);
+    const replay = await actions.confirmAppActions(principal, source, {
+      id: appAction.id,
+      version: appAction.version,
+      decision: 'apply',
+    });
+    expect(replay.replayed).toBe(true);
+    expect(recipeService.listRecipes('Dependency soup')).toHaveLength(1);
+  });
+  it('requires fresh review for persisted legacy entry.id dependencies without applying a step', async () => {
+    setSharing({ shareMealPlans: true });
+    const source = request('/ai/app-actions');
+    const { appAction } = await actions.prepareAppActions(principal, source, threadId, {
+      title: 'Legacy dependency fixture',
+      actions: [
+        {
+          operationId: 'addMealPlanEntry',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify({
+            plannedFor: '2026-11-03',
+            meal: 'dinner',
+            recipeId: '',
+            title: 'Legacy meal',
+            servings: 1,
+            note: '',
+          }),
+        },
+        {
+          operationId: 'updateMealPlanEntry',
+          parametersJson: JSON.stringify({ entryId: '' }),
+          bodyJson: JSON.stringify({ status: 'skipped' }),
+          bindings: [{ fromStep: 0, result: 'meal.id', target: 'parameters.entryId' }],
+        },
+      ],
+    });
+    const row = db
+      .getDatabase()
+      .select()
+      .from(schema.aiDecisionRecords)
+      .where(eq(schema.aiDecisionRecords.id, appAction.id))
+      .get()!;
+    db.getDatabase()
+      .update(schema.aiDecisionRecords)
+      .set({ resultJson: row.resultJson.replace('meal.id', 'entry.id') })
+      .where(eq(schema.aiDecisionRecords.id, appAction.id))
+      .run();
+    await expect(
+      actions.confirmAppActions(principal, source, {
+        id: appAction.id,
+        version: appAction.version,
+        decision: 'apply',
+      }),
+    ).rejects.toThrow(/unsupported dependency contract/);
+    const planning = await import('@/lib/services/planning-service');
+    expect(
+      planning.listPlannedMeals('2026-11-03', '2026-11-03').some((x) => x.title === 'Legacy meal'),
+    ).toBe(false);
+  });
   it('rejects forward or mismatched dependencies before creating any records', async () => {
     const planning = await import('@/lib/services/planning-service');
     const before = planning.listShoppingLists().length;

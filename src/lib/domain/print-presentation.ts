@@ -20,13 +20,14 @@ export function printedShoppingItem(item: {
   checked: boolean;
   shoppingState: string;
   cartQuantity: number;
+  cartUnit?: string | null;
   cartLabel: string;
   note: string;
 }) {
   const state = item.checked ? 'sourced' : item.shoppingState;
   const cart =
     state === 'in_cart' || item.cartLabel
-      ? `Cart: ${item.cartLabel || item.item} · ${formatShoppingQuantity(item.cartQuantity, item.unit)}`
+      ? `Cart: ${item.cartLabel || item.item} · ${item.cartUnit == null ? 'Purchase unit needs review' : formatShoppingQuantity(item.cartQuantity, item.cartUnit)}`
       : '';
   return {
     label: item.item,

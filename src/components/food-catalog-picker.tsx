@@ -25,6 +25,14 @@ const BarcodeScanner = dynamic(
   },
 );
 
+const measureSelectionKey = (record: FoodRecord) =>
+  JSON.stringify([
+    record.provider,
+    record.providerRecordId,
+    record.catalogRef ?? null,
+    record.displayName,
+  ]);
+
 type LocalProduct = { id: string; displayName: string; brand: string; variant?: string };
 type PickerContext = 'pantry' | 'recipe' | 'nutrition';
 type PickerTab = 'scan' | 'barcode' | 'search';
@@ -70,7 +78,7 @@ export function FoodCatalogPicker({
   onSavingChange?: (saving: boolean) => void;
   onImported?: (
     product: { id: string; displayName: string },
-    options?: { keepOpen?: boolean },
+    options?: { keepOpen?: boolean; reviewedMeasure?: { quantity: number; unit: 'g' } },
   ) => void;
 }) {
   const titleId = useId();
@@ -85,6 +93,12 @@ export function FoodCatalogPicker({
   const [localProducts, setLocalProducts] = useState<LocalProduct[]>([]);
   const [selectedLocal, setSelectedLocal] = useState<LocalProduct | null>(null);
   const [statuses, setStatuses] = useState<ProviderStatus[]>([]);
+  const [reviewedMeasure, setReviewedMeasure] = useState<{
+    key: string;
+    quantity: number;
+    unit: 'g';
+  } | null>(null);
+  const reviewForm = useRef<HTMLFormElement>(null);
   const [selected, setSelected] = useState<FoodRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [savingImport, setSavingImport] = useState(false);
@@ -98,6 +112,7 @@ export function FoodCatalogPicker({
     payload: unknown;
     displayName: string;
     existingProductId?: string;
+    reviewedMeasure?: { quantity: number; unit: 'g' };
   } | null>(null);
   const importLock = useRef(false);
   const readController = useRef<AbortController | null>(null);
@@ -153,6 +168,7 @@ export function FoodCatalogPicker({
     setRecords([]);
     setLocalProducts([]);
     setStatuses([]);
+    setReviewedMeasure(null);
     setSelected(null);
     setSelectedLocal(null);
     setError('');
@@ -240,6 +256,7 @@ export function FoodCatalogPicker({
         Boolean,
       ) as FoodRecord[];
       setRecords(next);
+      setReviewedMeasure(null);
       if (next.length === 1 && !result.localProduct) setSelected(next[0]);
     } catch (value) {
       if (version === readVersion.current)
@@ -260,6 +277,7 @@ export function FoodCatalogPicker({
     }
     setBusy(true);
     setError('');
+    setReviewedMeasure(null);
     setSelected(null);
     setSelectedLocal(null);
     try {
@@ -300,6 +318,7 @@ export function FoodCatalogPicker({
         language: navigator.language.slice(0, 2),
       })) as { record: FoodRecord };
       if (version !== readVersion.current) return;
+      setReviewedMeasure(null);
       setSelected(result.record);
     } catch (value) {
       if (version === readVersion.current)
@@ -386,6 +405,10 @@ export function FoodCatalogPicker({
       path: pantry ? '/api/v1/pantry/catalog-imports' : '/api/v1/food-data/imports',
       payload,
       displayName: base.product.displayName,
+      reviewedMeasure:
+        reviewedMeasure?.key === measureSelectionKey(selected)
+          ? { quantity: reviewedMeasure.quantity, unit: reviewedMeasure.unit }
+          : undefined,
     };
     await retryImport();
   }
@@ -407,8 +430,9 @@ export function FoodCatalogPicker({
         displayName: attempt.displayName,
       };
       importAttempt.current = null;
-      onImported?.(product);
+      onImported?.(product, { reviewedMeasure: attempt.reviewedMeasure });
       setOpen(false);
+      setReviewedMeasure(null);
       setSelected(null);
       setSelectedLocal(null);
       setRecords([]);
@@ -835,6 +859,7 @@ export function FoodCatalogPicker({
               <button
                 className={styles.backButton}
                 type="button"
+                disabled={busy || savingImport || !!importAttempt.current}
                 onClick={() => setSelectedLocal(null)}
               >
                 ← Back to results
@@ -903,8 +928,18 @@ export function FoodCatalogPicker({
               </button>
             </form>
           ) : selected ? (
-            <form className={styles.review} onSubmit={importRecord}>
-              <button className={styles.backButton} type="button" onClick={() => setSelected(null)}>
+            <form
+              ref={reviewForm}
+              key={measureSelectionKey(selected)}
+              className={styles.review}
+              onSubmit={importRecord}
+            >
+              <button
+                className={styles.backButton}
+                type="button"
+                disabled={savingImport || !!importAttempt.current}
+                onClick={() => setSelected(null)}
+              >
                 ← Back to results
               </button>
               <div className={styles.reviewHeading}>
@@ -938,11 +973,39 @@ export function FoodCatalogPicker({
               )}
               {selected.catalogRef && (
                 <CatalogFoodContext
-                  key={`${selected.provider}:${selected.providerRecordId}:${selected.catalogRef.source_revision}`}
+                  key={measureSelectionKey(selected)}
                   name={selected.displayName}
                   reference={selected.catalogRef}
+                  onSelectMeasure={(amount) => {
+                    if (savingImport || importAttempt.current) return;
+                    setReviewedMeasure({
+                      key: measureSelectionKey(selected),
+                      ...amount,
+                    });
+                    if (context === 'pantry') {
+                      const quantity = reviewForm.current?.elements.namedItem(
+                        'quantityRemaining',
+                      ) as HTMLInputElement | null;
+                      const unit = reviewForm.current?.elements.namedItem(
+                        'unit',
+                      ) as HTMLSelectElement | null;
+                      if (quantity && unit) {
+                        quantity.value = String(amount.quantity);
+                        unit.value = amount.unit;
+                        quantity.focus();
+                      }
+                    }
+                  }}
                 />
               )}
+              {context !== 'pantry' && reviewedMeasure?.key === measureSelectionKey(selected) ? (
+                <p role="status">
+                  Selected source portion: {reviewedMeasure.quantity} g.{' '}
+                  {context === 'recipe'
+                    ? 'This amount will fill the ingredient draft after you confirm the product.'
+                    : 'Use this reviewed amount when recording food; importing alone records no intake.'}
+                </p>
+              ) : null}
               {selected.catalogRef?.canonical_product_id && (
                 <CatalogRetailEvidence
                   key={`${selected.provider}:${selected.providerRecordId}`}

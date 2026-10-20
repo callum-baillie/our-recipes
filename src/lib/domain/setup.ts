@@ -23,6 +23,39 @@ export const profileInputSchema = z.object({
 });
 
 export const profileUpdateSchema = profileInputSchema;
+/** My profile owns general preferences; questionnaire answers have their own revisioned route. */
+export const personalProfileSettingsSchema = profileInputSchema
+  .extend({
+    avatarUrl: z.union([z.literal(''), z.string().url().max(2_048)]),
+    mainGoals: z.string().trim().max(2_000),
+    goalContext: profileGoalContextSchema.omit({ kitchenInterview: true }).strict(),
+  })
+  .strict();
+export const personalProfileUpdateSchema = z
+  .object({
+    expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
+    settings: personalProfileSettingsSchema,
+  })
+  .strict();
+export type PersonalProfileSettings = z.infer<typeof personalProfileSettingsSchema>;
+export function personalProfileValues(
+  profile: ProfileInput | (Omit<ProfileInput, 'avatarUrl'> & { avatarUrl: string | null }),
+): PersonalProfileSettings {
+  const { kitchenInterview: _interview, ...goals } =
+    profile.goalContext ?? defaultProfileGoalContext;
+  void _interview;
+  return personalProfileSettingsSchema.parse({
+    displayName: profile.displayName,
+    color: profile.color,
+    avatarUrl: profile.avatarUrl ?? '',
+    units: profile.units,
+    temperatureUnit: profile.temperatureUnit,
+    locale: profile.locale,
+    timezone: profile.timezone,
+    mainGoals: profile.mainGoals ?? '',
+    goalContext: goals,
+  });
+}
 /** Household identity edits may never carry hidden personal preferences. */
 export const profileIdentityUpdateSchema = profileInputSchema
   .pick({ displayName: true, color: true, avatarUrl: true })

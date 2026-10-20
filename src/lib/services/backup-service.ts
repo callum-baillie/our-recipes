@@ -34,6 +34,8 @@ import { backupIdSchema, backupManifestSchema, type BackupManifest } from '@/lib
 import { getHouseholdState } from '@/lib/services/household-service';
 import { APPLICATION_VERSION, SCHEMA_VERSION } from '@/lib/release';
 import { BackupSwapRollbackError, swapBackupData } from '@/lib/services/backup-data-swap';
+import { withAuthenticationRestore } from '@/lib/auth/restore-fence';
+import { invalidateAuthenticationAfterRestore } from '@/lib/services/auth-service';
 
 const MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRY_BYTES = 512 * 1024 * 1024;
@@ -427,6 +429,7 @@ async function restoreValidatedBackup(id: string): Promise<{ safetyBackup: Backu
     (suffix) => `${databaseRelativePath}${suffix}`,
   );
   let preserveRecoveryDirectories = false;
+  let swapStarted = false;
   try {
     if (['uploads', 'generated', 'config'].includes(databaseRelativePath.split(sep)[0]!))
       throw new BackupError(
@@ -461,23 +464,30 @@ async function restoreValidatedBackup(id: string): Promise<{ safetyBackup: Backu
       join(validated.stagingDirectory, 'config.json'),
       join(restoredDirectory, 'config', 'backup-export.json'),
     );
-    swapBackupData({
-      dataDirectory,
-      restoredDirectory,
-      previousDirectory,
-      databaseSidecars,
-      paths: [
-        databaseRelativePath,
-        ...databaseSidecars,
-        'uploads',
-        'generated',
-        join('config', 'backup-export.json'),
-      ],
-      closeDatabase: closeDatabaseConnection,
-      verify: () => {
-        ensureDatabase();
-        databaseIntegrity(getDatabasePath());
-      },
+    await withAuthenticationRestore(() => {
+      swapStarted = true;
+      swapBackupData({
+        dataDirectory,
+        restoredDirectory,
+        previousDirectory,
+        databaseSidecars,
+        paths: [
+          databaseRelativePath,
+          ...databaseSidecars,
+          'uploads',
+          'generated',
+          join('config', 'backup-export.json'),
+        ],
+        closeDatabase: closeDatabaseConnection,
+        verify: () => {
+          ensureDatabase();
+          databaseIntegrity(getDatabasePath());
+          // Keep restored credentials inaccessible until their invalidation commits.
+          // This synchronous guarded phase rolls the replacement back on failure;
+          // asynchronous staging cleanup must never expose backup-era credentials.
+          invalidateAuthenticationAfterRestore();
+        },
+      });
     });
     return { safetyBackup };
   } catch (error) {
@@ -485,7 +495,7 @@ async function restoreValidatedBackup(id: string): Promise<{ safetyBackup: Backu
       preserveRecoveryDirectories = true;
       throw new BackupError(error.message, { cause: error });
     }
-    closeDatabaseConnection();
+    if (swapStarted) closeDatabaseConnection();
     if (!(error instanceof BackupError) && !(error instanceof BackupValidationError)) {
       throw new BackupError(
         'Restoration could not complete; the original data remains in place. Check storage permissions and free space before reviewing the backup again.',

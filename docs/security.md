@@ -25,7 +25,11 @@ Current controls:
 - Passkeys are optional for account sign-in and admin step-up convenience; email/passphrase reset
   remains available through SMTP, with one-time recovery codes as the offline fallback.
 - Database restore invalidates every session, verification, passkey, and recovery code and disables
-  all API keys in the restored database.
+  all API keys in the restored database before removing the durable recovery barrier. Authentication
+  requests drain before the synchronous swap. Failure rolls back; incomplete recovery fails closed.
+- Email-verification links use Better Auth's signer/verifier and an expiring one-use issuance ledger.
+  Restored, already-used and pre-upgrade untracked links cannot create a session. Request a new link
+  at `/verify-email`; requesting a link does not confirm account existence or email delivery.
 - Production refuses missing/short independent `COOKIE_SECRET` and `BETTER_AUTH_SECRET` values,
   and requires canonical Better Auth URL and SMTP configuration.
 - Email verification is required in production by default and can be explicitly disabled with
@@ -47,10 +51,11 @@ Current controls:
 - Portable full-recipe export is server-generated output only: an active profile is required, an explicit `Origin` must be trusted, and the gzip response is `no-store` with `nosniff`. It accepts no bytes, file names, archive paths, or restore input. Process-private staging receives only generated JSON-LD and copied regular normalized WebP files; source links/symlinks, missing media, JSON-LD/media files over 10 MB, a manifest over 16 MB, more than 10,000 recipes or 50,000 distinct images, and more than 1 GB uncompressed output are rejected. The manifest exposes only stable archive-relative paths, lengths, and SHA-256 checksums; it excludes profile identity, profile-scoped preferences, revisions, import/OCR data, storage keys, and configuration. Staging/archive files are removed after a completed, failed, or cancelled stream.
 - Rich recipe metadata and equipment are bounded shared inputs. Imported/manual legacy Nutrition values remain labelled source evidence; normalized, versioned ingredient calculations are authoritative across Recipes, Planner, and Nutrition. Optional AI estimation is an explicit configured provider action and remains unverified evidence until normalized sources exist. Per-profile ratings and notes use the validated active-profile ID and are excluded from shared revision snapshots and exports, but profiles are not a confidentiality boundary.
 - Recipe snapshots are internal bounded JSON produced by the ordinary recipe validator. A restore route requires trusted origin, a valid active profile, a positive source revision, and the caller’s expected current revision; it validates the saved snapshot again and writes a new revision rather than replacing historical data. The library projection exposes only the selected profile’s favorite/rating values, not another profile’s preference row.
-- Meal-plan writes accept only a valid local date, one of breakfast/lunch/dinner/snack, bounded servings/note, and either a current recipe ID or a bounded free-form title. Calendar export is a deterministic local `text/calendar` response with `nosniff`; it does not contact a calendar provider. Shopping rows and aisle names/order are bounded and require a trusted origin; deleting an aisle unassigns rows rather than deleting household food data.
-- The service worker caches only versioned public/static shell assets. It does not cache
-  authenticated pages, recipe/Pantry/list API payloads, or requests carrying authorization
-  headers, never replays mutations, and clears app caches on sign-out.
+- Meal-plan writes accept a validated local date and supported configured meal type, bounded servings/note, and either a current recipe ID or a bounded free-form title. Calendar export is a deterministic local `text/calendar` response with `nosniff`; it does not contact a calendar provider. Shopping rows and aisle names/order are bounded and require a trusted origin; deleting an aisle unassigns rows rather than deleting household food data.
+- The service worker caches versioned assets and eligible same-origin recipe-detail navigations,
+  not a complete recipe-library catalogue or private API payloads. It never queues/replays mutations
+  and clears application caches on sign-out. Update activation requires the explicit client lifecycle;
+  background worker activation does not navigate every open window. See the read-only PWA decision.
 - Backup export uses a SQLite snapshot plus only regular local media files and safe display metadata; it excludes environment files and secrets. Restore accepts only a currently listed server-created bundle, validates archive entry paths/types/size limits in isolated staging, checks every manifest checksum and SQLite integrity, requires exact `RESTORE` confirmation, and creates a safety backup before any data-root replacement.
 - The Docker runner is non-root and keeps mutable state only below `/data`. `COOKIE_SECRET`,
   `BETTER_AUTH_SECRET`, SMTP credentials, and trusted origins are runtime environment variables,

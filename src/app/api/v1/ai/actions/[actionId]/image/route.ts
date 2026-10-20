@@ -3,8 +3,16 @@ import { DecisionError } from '@/lib/providers/decisions-provider';
 import { decisionErrorResponse } from '@/lib/services/decision-request-service';
 
 import { jsonError } from '@/lib/http';
-import { AiActionForbiddenError, AiActionNotFoundError } from '@/lib/services/ai-action-service';
-import { getAiActionPreviewImageFile } from '@/lib/services/ai-action-preview-image-service';
+import {
+  AiActionForbiddenError,
+  AiActionNotFoundError,
+  AiActionConflictError,
+} from '@/lib/services/ai-action-service';
+import {
+  getAiActionPreviewImageFile,
+  generateAiActionPreviewImage,
+  draftImageRequestSchema,
+} from '@/lib/services/ai-action-preview-image-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,5 +37,39 @@ export async function GET(request: Request, context: { params: Promise<{ actionI
       return jsonError(403, 'action_forbidden', error.message);
     if (error instanceof DecisionError) return decisionErrorResponse(error);
     throw error;
+  }
+}
+
+export async function POST(request: Request, context: { params: Promise<{ actionId: string }> }) {
+  try {
+    const principal = await personalAiPrincipal(request);
+    const body = draftImageRequestSchema.safeParse(await request.json().catch(() => null));
+    if (!body.success)
+      return jsonError(
+        400,
+        'invalid_image_review',
+        'Review this draft and explicitly confirm a separate image request.',
+      );
+    const action = await generateAiActionPreviewImage({
+      actionId: (await context.params).actionId,
+      profileId: principal.linkedProfileId,
+      ownerUserId: principal.userId,
+      ...body.data,
+      signal: request.signal,
+    });
+    return Response.json({ action });
+  } catch (error) {
+    if (error instanceof AiActionNotFoundError)
+      return jsonError(404, 'action_not_found', error.message);
+    if (error instanceof AiActionForbiddenError)
+      return jsonError(403, 'action_forbidden', error.message);
+    if (error instanceof AiActionConflictError)
+      return jsonError(409, 'action_changed', error.message);
+    if (error instanceof DecisionError) return decisionErrorResponse(error);
+    return jsonError(
+      503,
+      'image_request_failed',
+      'The image request did not finish. Review its saved status before requesting another image.',
+    );
   }
 }

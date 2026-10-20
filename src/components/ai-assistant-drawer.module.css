@@ -309,7 +309,7 @@
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--muted) 40%, transparent) transparent;
 }
-.composer button {
+.composer .iconButton {
   display: grid;
   place-items: center;
   width: 40px;
@@ -322,12 +322,12 @@
   color: white;
   cursor: pointer;
 }
-.composer button svg {
+.composer .iconButton svg {
   display: block;
   width: 18px;
   height: 18px;
 }
-.composer button:disabled {
+.composer .iconButton:disabled {
   color: var(--muted);
   background: var(--paper-deep);
   opacity: 0.72;
@@ -380,7 +380,7 @@
   }
 
   :global(html:not([data-theme='light'])) .user,
-  :global(html:not([data-theme='light'])) .composer button {
+  :global(html:not([data-theme='light'])) .composer .iconButton {
     color: var(--on-primary);
     background: var(--leaf);
     border-color: var(--leaf);
@@ -390,7 +390,7 @@
     background: var(--paper);
   }
 
-  :global(html:not([data-theme='light'])) .composer button:disabled {
+  :global(html:not([data-theme='light'])) .composer .iconButton:disabled {
     color: var(--muted);
     background: var(--paper-deep);
     border-color: transparent;
@@ -406,7 +406,7 @@
 }
 
 :global(html[data-theme='dark']) .user,
-:global(html[data-theme='dark']) .composer button {
+:global(html[data-theme='dark']) .composer .iconButton {
   color: var(--on-primary);
   background: var(--leaf);
   border-color: var(--leaf);
@@ -416,7 +416,7 @@
   background: var(--paper);
 }
 
-:global(html[data-theme='dark']) .composer button:disabled {
+:global(html[data-theme='dark']) .composer .iconButton:disabled {
   color: var(--muted);
   background: var(--paper-deep);
   border-color: transparent;
@@ -537,7 +537,7 @@
     font-size: 16px;
     max-height: 24dvh;
   }
-  .composer button {
+  .composer .iconButton {
     min-width: 44px;
     min-height: 44px;
   }
@@ -805,4 +805,104 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* Text commands retain their labels; only attach/send use circular controls. */
+.composerMeta {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.composerMeta button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control, 8px);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.composerMeta button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.composerMeta > [role='status'],
+.composerMeta > [role='alert'] {
+  flex: 1 1 100%;
+}
+.recoveryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+@media (max-width: 540px), (max-height: 600px) {
+  .keyboardHint {
+    display: none;
+  }
+  .composer {
+    padding-top: 0.5rem;
+  }
+  .composerMeta {
+    gap: 0.35rem;
+    font-size: 0.85rem;
+  }
+  .composerMeta:has(button) {
+    max-height: 26dvh;
+    overflow-y: auto;
+    padding-bottom: 0.25rem;
+  }
+}
+@media (forced-colors: active) {
+  .composerMeta button,
+  .composer .iconButton {
+    border: 1px solid ButtonText;
+  }
+}
+
+.composerMeta:has(button) .keyboardHint {
+  display: none;
+}
+
+.turnStatus {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+@media (max-height: 600px) {
+  .composer form {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    grid-template-rows: auto;
+    gap: 0.25rem;
+    padding: 0.35rem;
+    border-radius: 1rem;
+  }
+  .composer textarea {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 44px;
+    max-height: 18dvh;
+    padding: 0.5rem 0.2rem;
+  }
+  .composer form .attachButton {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .composer form button[type='submit'] {
+    grid-column: 3;
+    grid-row: 1;
+  }
 }

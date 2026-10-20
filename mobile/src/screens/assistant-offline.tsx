@@ -1,3 +1,11 @@
+import { matchesChatOperation } from '../../../shared/mobile-domain/chat-recovery';
+import {
+  editableProposalFields,
+  fieldLabel,
+  revisedProposalBody,
+  reviewValues,
+  revisionMessage,
+} from '../../../shared/mobile-domain/proposal-review';
 import * as React from 'react';
 import { AssistantMessage } from '@/components/assistant-message';
 import {
@@ -31,11 +39,22 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Body, Button, EditorialText, Eyebrow, Icon, IconButton, Surface } from '@/components/ui';
+import {
+  Body,
+  Button,
+  EditorialText,
+  Eyebrow,
+  FormField,
+  Icon,
+  IconButton,
+  Surface,
+} from '@/components/ui';
 import { tokens } from '@/theme/tokens';
 import { useBord } from '@/state/bord-store';
 import { useSync } from '@/sync/sync-context';
 import { useAuth } from '@/auth/auth-context';
+import { nativeChatRecovery, type ChatOperationReference } from '@/data/chat-recovery';
+import type { ScannerActor } from '@/data/scanner-recovery';
 import { readAssistantDraft, retainAssistantDraft } from '@/data/assistant-drafts';
 import {
   initialChatStream,
@@ -100,6 +119,7 @@ type AppProposal = {
     changeLabel?: string;
     body: unknown;
     path?: string;
+    bindings?: { fromStep: number; result: string; target: string }[];
   }[];
   results?: { summary: string; message: string; ok: boolean; state?: string; href?: string }[];
 };
@@ -132,6 +152,11 @@ function AssistantConversation() {
   );
   const [appProposals, setAppProposals] = React.useState<AppProposal[]>([]);
   const [jobs, setJobs] = React.useState<{ id: string; status: string; title?: string }[]>([]);
+  const recoveryJournal = React.useRef<Awaited<ReturnType<typeof nativeChatRecovery>> | null>(null);
+  const durableTurn = React.useRef<ChatOperationReference | null>(null);
+  const [recoveryReady, setRecoveryReady] = React.useState(false);
+  const [recoveryCheck, setRecoveryCheck] = React.useState(0);
+  const [unknownReview, setUnknownReview] = React.useState<string | null>(null);
   const turnRef = React.useRef<ChatTurn | null>(retained.current?.turn ?? null);
   const abortRef = React.useRef<AbortController | null>(null);
   const sendLock = React.useRef(false);
@@ -156,6 +181,16 @@ function AssistantConversation() {
       ? state.settings['ai.name'].trim()
       : "Chef's Assistant";
   const messagesRef = React.useRef<ScrollView>(null);
+  const threadReadVersion = React.useRef(0);
+  const composerRef = React.useRef<TextInput>(null);
+  const askToRevise = (title: string) => {
+    setMessage((draft) => revisionMessage(draft, title));
+    setStatus(
+      'Revision request added to your draft. Review and send it deliberately; the saved proposal has not changed.',
+    );
+    snapSheet('expanded');
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
   const { compactHeight, expandedHeight } = getAssistantSheetHeights(windowHeight, insets.top);
   const compact = compactHeight < 500;
   const sheetHeight = useSharedValue(compactHeight);
@@ -235,23 +270,56 @@ function AssistantConversation() {
 
   const loadThread = React.useCallback(
     async (id: string) => {
+      const version = ++threadReadVersion.current;
+      const stored = durableTurn.current;
+      if (stored) {
+        const context = await request<{ actor: ScannerActor }>('/api/v1/auth/context');
+        if (
+          context.actor.userId !== stored.actor.userId ||
+          context.actor.profileId !== stored.actor.profileId
+        )
+          throw new Error(
+            'Return to the original account and viewing profile to review this conversation outcome.',
+          );
+      }
       const history = await request<{
         messages: ChatMessage[];
         actions: ChatAction[];
         jobs?: { id: string; status: string; title?: string }[];
-        turns?: { id: string; status: string }[];
-      }>(`/api/v1/ai/chat/threads/${encodeURIComponent(id)}`);
+        turns?: { id: string; status: string; reviewed?: boolean }[];
+      }>(
+        `/api/v1/ai/chat/threads/${encodeURIComponent(id)}${stored?.threadId === id ? `?operationId=${encodeURIComponent(stored.operationId)}` : ''}`,
+      );
       const proposals = await request<{ proposals: AppProposal[] }>(
         `/api/v1/ai/app-actions?threadId=${encodeURIComponent(id)}`,
       );
-      if (!alive.current) return;
+      if (!alive.current || version !== threadReadVersion.current) return;
       setMessages(history.messages);
       setActions(history.actions ?? []);
       setJobs(history.jobs ?? []);
       setAppProposals(proposals.proposals);
       const submitted = turnRef.current;
-      const outcome = reviewedTurnOutcome(history.turns, submitted?.operationId);
+      const operationId = stored?.operationId ?? submitted?.operationId;
+      const known = history.turns?.find((turn) => turn.id === operationId);
+      const outcome = reviewedTurnOutcome(history.turns, operationId);
+      setUnknownReview(
+        known?.status === 'outcome_unknown' && !known.reviewed
+          ? known.id
+          : !known && stored?.threadId === id
+            ? stored.operationId
+            : null,
+      );
+      if (known?.status === 'outcome_unknown' && known.reviewed) {
+        await recoveryJournal.current?.acknowledge(known.id);
+        durableTurn.current = null;
+        turnRef.current = null;
+        setRecoveryRequired(false);
+        setStatus('The unknown outcome has been reviewed. Saved effects were not repeated.');
+        return;
+      }
       if (outcome.terminal) {
+        if (operationId) await recoveryJournal.current?.acknowledge(operationId);
+        durableTurn.current = null;
         turnRef.current = null;
         setRecoveryRequired(outcome.blocked);
         setStatus(
@@ -270,6 +338,10 @@ function AssistantConversation() {
     [request],
   );
   const reset = React.useCallback(async () => {
+    if (durableTurn.current) {
+      setStatus('Review the saved operation outcome before starting another conversation.');
+      return;
+    }
     setBusy(true);
     try {
       const result = await request<{ thread: { id: string; title?: string } }>(
@@ -441,11 +513,46 @@ function AssistantConversation() {
   const initialLoad = React.useRef({ loadThread, reset });
   React.useEffect(() => {
     let cancelled = false;
-    void request<{ threads: { id: string; title?: string }[] }>('/api/v1/ai/chat/threads')
+    void (async () => {
+      if (!instanceUrl || !user) throw new Error('Sign in to open the assistant.');
+      const journal = await nativeChatRecovery(instanceUrl, user.id);
+      const pending = await journal.read();
+      if (cancelled) return { threads: [] };
+      recoveryJournal.current = journal;
+      durableTurn.current = pending;
+      setRecoveryRequired(!!pending || !!turnRef.current);
+      if (pending) {
+        const previous = retained.current;
+        if (previous?.threadId && previous.threadId !== pending.threadId)
+          retainAssistantDraft(`${scope}:${previous.threadId}`, previous);
+        const saved =
+          previous?.threadId === pending.threadId
+            ? previous
+            : readAssistantDraft<RetainedConversation>(`${scope}:${pending.threadId}`);
+        const turn =
+          saved?.turn?.operationId === pending.operationId &&
+          saved.turn.threadId === pending.threadId
+            ? saved.turn
+            : null;
+        retained.current = {
+          message: saved?.message ?? '',
+          attachments: saved?.attachments ?? [],
+          threadId: pending.threadId,
+          turn,
+        };
+        turnRef.current = turn;
+        setMessage(saved?.message ?? '');
+        setAttachments(saved?.attachments ?? []);
+        setThreadId(pending.threadId);
+      }
+      setRecoveryReady(true);
+      return request<{ threads: { id: string; title?: string }[] }>('/api/v1/ai/chat/threads');
+    })()
       .then(async ({ threads }) => {
         if (cancelled) return;
         setThreads(threads);
         if (
+          !durableTurn.current &&
           retained.current?.threadId &&
           !threads.some((thread) => thread.id === retained.current?.threadId)
         ) {
@@ -456,15 +563,16 @@ function AssistantConversation() {
           );
           return;
         }
-        if (!threads[0]) {
+        if (!threads[0] && !durableTurn.current) {
           await initialLoad.current.reset();
           return;
         }
         const id =
-          retained.current?.threadId &&
+          durableTurn.current?.threadId ??
+          (retained.current?.threadId &&
           threads.some((thread) => thread.id === retained.current?.threadId)
             ? retained.current.threadId
-            : threads[0].id;
+            : threads[0].id);
         setThreadId(id);
         await initialLoad.current.loadThread(id);
       })
@@ -474,9 +582,13 @@ function AssistantConversation() {
     return () => {
       cancelled = true;
     };
-  }, [request]);
+  }, [request, instanceUrl, user, recoveryCheck, scope]);
   const switchThread = async (id: string) => {
     if (busy || id === threadId) return;
+    if (durableTurn.current && durableTurn.current.threadId !== id) {
+      setStatus('Review the pending original conversation before switching.');
+      return;
+    }
     if (threadId)
       retainAssistantDraft(`${scope}:${threadId}`, {
         message,
@@ -506,7 +618,8 @@ function AssistantConversation() {
   };
   const performSend = React.useCallback(
     async (retry = false) => {
-      if (sendLock.current || busy || !threadId || (!retry && recoveryRequired)) return;
+      if (sendLock.current || busy || !threadId || !recoveryReady || (!retry && recoveryRequired))
+        return;
       const attempt = retry
         ? turnRef.current
         : { operationId: randomUUID(), threadId, message: message.trim(), attachments };
@@ -542,6 +655,35 @@ function AssistantConversation() {
       setStatus('Preparing a response…');
       let stream = { ...initialChatStream };
       try {
+        if (!instanceUrl || !user || !recoveryJournal.current)
+          throw new Error('Secure recovery is not ready.');
+        const context = await request<{ actor: ScannerActor }>('/api/v1/auth/context');
+        const reference = durableTurn.current ?? {
+          version: 1 as const,
+          instanceUrl,
+          actor: context.actor,
+          threadId: attempt.threadId,
+          operationId: attempt.operationId,
+          createdAt: new Date().toISOString(),
+        };
+        if (
+          context.actor.userId !== user.id ||
+          !matchesChatOperation(reference, {
+            instanceUrl,
+            actor: context.actor,
+            threadId: attempt.threadId,
+            operationId: attempt.operationId,
+          })
+        )
+          throw new Error(
+            'Return to the original account, profile and conversation operation before retrying. No new request was sent.',
+          );
+        await recoveryJournal.current.write(reference);
+        durableTurn.current = reference;
+        if (abort.signal.aborted || !alive.current)
+          throw new Error(
+            'Response was stopped before a new request was sent. Review recovery before continuing.',
+          );
         await requestEventStream<ChatEvent>(
           `/api/v1/ai/chat/threads/${encodeURIComponent(attempt.threadId)}/messages`,
           (event) => {
@@ -596,6 +738,8 @@ function AssistantConversation() {
         );
         if (!stream.completed)
           throw new Error('The connection ended before a completed response was acknowledged.');
+        await recoveryJournal.current.acknowledge(attempt.operationId);
+        durableTurn.current = null;
         turnRef.current = null;
         if (alive.current) {
           setRecoveryRequired(false);
@@ -616,7 +760,18 @@ function AssistantConversation() {
         if (alive.current) setBusy(false);
       }
     },
-    [attachments, busy, message, requestEventStream, threadId, recoveryRequired],
+    [
+      attachments,
+      busy,
+      message,
+      requestEventStream,
+      threadId,
+      recoveryRequired,
+      recoveryReady,
+      request,
+      instanceUrl,
+      user,
+    ],
   );
   const send = React.useCallback(() => {
     if (!assistantEnabled) {
@@ -860,6 +1015,13 @@ function AssistantConversation() {
                     <Eyebrow>REVIEW PROPOSAL</Eyebrow>
                     <EditorialText variant="section">{proposalTitle(action)}</EditorialText>
                     <Body muted>{proposalDetail(action)}</Body>
+                    <NativeReviewDetails value={action.preview} />
+                    <Button
+                      label="Revise in conversation"
+                      tone="secondary"
+                      disabled={busy || recoveryRequired}
+                      onPress={() => askToRevise(proposalTitle(action))}
+                    />
                     {actionErrors[action.id] ? (
                       <Text accessibilityRole="alert">{actionErrors[action.id]}</Text>
                     ) : null}
@@ -898,7 +1060,8 @@ function AssistantConversation() {
                 <NativeAppProposal
                   key={proposal.id}
                   proposal={proposal}
-                  disabled={busy}
+                  disabled={busy || recoveryRequired}
+                  onRevise={askToRevise}
                   onSaved={async () => {
                     if (threadId) await loadThread(threadId);
                     await refresh();
@@ -920,6 +1083,39 @@ function AssistantConversation() {
                   />
                 </Surface>
               ))}
+              {!recoveryReady && !busy ? (
+                <Button
+                  label="Retry secure recovery check"
+                  tone="secondary"
+                  onPress={() => setRecoveryCheck((value) => value + 1)}
+                />
+              ) : null}
+              {unknownReview && !busy ? (
+                <Surface>
+                  <Body>
+                    Review the saved messages, proposals and tasks above. The interrupted operation
+                    may have effects; acknowledgement does not repeat or undo them. The original
+                    request will not be resumed or resubmitted.
+                  </Body>
+                  <Button
+                    label="Review and continue"
+                    onPress={() => {
+                      if (!threadId) return;
+                      setBusy(true);
+                      void request(`/api/v1/ai/chat/threads/${encodeURIComponent(threadId)}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                          action: 'acknowledge_recovery',
+                          operationId: unknownReview,
+                        }),
+                      })
+                        .then(() => loadThread(threadId))
+                        .catch((error) => setStatus(error.message))
+                        .finally(() => setBusy(false));
+                    }}
+                  />
+                </Surface>
+              ) : null}
               {recoveryRequired && !busy && (
                 <Surface>
                   <Body>
@@ -935,8 +1131,8 @@ function AssistantConversation() {
                     }}
                   />
                   <Button
-                    label="Retry original request safely"
-                    disabled={!turnRef.current}
+                    label="Retry the same original request"
+                    disabled={!turnRef.current || !!unknownReview}
                     onPress={() => void performSend(true)}
                   />
                 </Surface>
@@ -1026,6 +1222,7 @@ function AssistantConversation() {
                     onPress={openAttachmentMenu}
                   />
                   <TextInput
+                    ref={composerRef}
                     accessibilityLabel="Message Chef's Assistant"
                     value={message}
                     onChangeText={setMessage}
@@ -1067,6 +1264,7 @@ function AssistantConversation() {
                       (!message.trim() && attachments.length === 0) ||
                       busy ||
                       recoveryRequired ||
+                      !recoveryReady ||
                       !threadId
                     }
                     onPress={send}
@@ -1224,20 +1422,59 @@ function MessageAttachmentPreview({
   );
 }
 
+function NativeReviewDetails({ value }: { value: unknown }) {
+  const [open, setOpen] = React.useState(false);
+  const [limit, setLimit] = React.useState(30);
+  const fields = reviewValues(value);
+  return (
+    <View style={{ gap: tokens.space.xs }}>
+      <Button
+        label={open ? 'Hide proposed values' : 'Review proposed values'}
+        tone="quiet"
+        onPress={() => setOpen(!open)}
+      />
+      {open ? (
+        <View style={{ gap: tokens.space.sm }}>
+          {fields.slice(0, limit).map((field, index) => (
+            <View key={index}>
+              <Body muted>{field.label}</Body>
+              <Text selectable style={[tokens.type.callout, { color: tokens.color.ink }]}>
+                {field.value}
+              </Text>
+            </View>
+          ))}
+          {fields.length > limit ? (
+            <Button
+              label={`Show more values (${fields.length - limit} remaining)`}
+              tone="secondary"
+              onPress={() => setLimit(limit + 30)}
+            />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function NativeAppProposal({
   proposal,
   disabled,
   onSaved,
+  onRevise,
 }: {
   proposal: AppProposal;
   disabled: boolean;
   onSaved: () => Promise<void>;
+  onRevise: (title: string) => void;
 }) {
   const { request, instanceUrl } = useAuth();
   const [current, setCurrent] = React.useState(proposal);
-  const [pending, setPending] = React.useState<'apply' | 'dismiss' | null>(null);
+  const [pending, setPending] = React.useState<'apply' | 'dismiss' | 'edit' | null>(null);
   const [error, setError] = React.useState('');
-  const [detail, setDetail] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [editBase, setEditBase] = React.useState(proposal);
+  const [drafts, setDrafts] = React.useState<Record<string, string | boolean>[]>([]);
+  const [replacement, setReplacement] = React.useState<AppProposal | null>(null);
   const [paidConsent, setPaidConsent] = React.useState(false);
   const images =
     current.actions.length > 0 &&
@@ -1270,6 +1507,61 @@ function NativeAppProposal({
       setPending(null);
     }
   };
+  const prepareEdit = async () => {
+    if (lock.current || disabled) return;
+    lock.current = true;
+    setPending('edit');
+    setError('');
+    try {
+      const bodyEdits = editBase.actions.flatMap((action, step) => {
+        const body = revisedProposalBody(action.body, drafts[step] ?? {});
+        return JSON.stringify(body) === JSON.stringify(action.body)
+          ? []
+          : [{ step, bodyJson: JSON.stringify(body) }];
+      });
+      if (!bodyEdits.length) {
+        setEditing(false);
+        return;
+      }
+      const result = await request<{ appAction: AppProposal }>('/api/v1/ai/app-actions', {
+        method: 'PUT',
+        body: JSON.stringify({
+          id: editBase.id,
+          version: editBase.version,
+          title: editBase.title,
+          bodyEdits,
+        }),
+      });
+      setReplacement(result.appAction);
+      setEditing(false);
+      try {
+        await onSaved();
+      } catch {
+        setError(
+          'The edited review is saved. Reload the conversation to reconcile its current state.',
+        );
+      }
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : 'The edited review could not be prepared. Your changes are retained.',
+      );
+    } finally {
+      lock.current = false;
+      setPending(null);
+    }
+  };
+  if (replacement)
+    return (
+      <NativeAppProposal
+        key={replacement.id}
+        proposal={replacement}
+        disabled={disabled}
+        onSaved={onSaved}
+        onRevise={onRevise}
+      />
+    );
   const reviewable = ['proposed', 'pending', 'ready'].includes(current.status);
   return (
     <Surface style={{ backgroundColor: tokens.color.sage }}>
@@ -1280,18 +1572,15 @@ function NativeAppProposal({
           <Body>{action.summary}</Body>
           {action.recordLabel ? <Body muted>{action.recordLabel}</Body> : null}
           {action.changeLabel ? <Body muted>{action.changeLabel}</Body> : null}
-          {detail ? (
-            <Text selectable style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
-              {JSON.stringify(action.body, null, 2)}
-            </Text>
-          ) : null}
+          {action.bindings?.map((binding, i) => (
+            <Body muted key={i}>
+              Uses {binding.result.split('.')[0]} created in step {binding.fromStep + 1}.
+            </Body>
+          ))}
+          <NativeReviewDetails value={action.body} />
         </View>
       ))}
-      <Button
-        label={detail ? 'Hide request details' : 'Review request details'}
-        tone="quiet"
-        onPress={() => setDetail(!detail)}
-      />
+
       {current.results?.map((result, index) => (
         <View key={index}>
           <Body>
@@ -1312,9 +1601,23 @@ function NativeAppProposal({
         </View>
       ))}
       {error ? (
-        <Text accessibilityRole="alert" style={{ color: tokens.color.ink }}>
-          {error}
-        </Text>
+        <View style={{ gap: tokens.space.xs }}>
+          <Text accessibilityRole="alert" style={{ color: tokens.color.ink }}>
+            {error}
+          </Text>
+          <Button
+            label="Reload saved proposal"
+            tone="secondary"
+            disabled={!!pending}
+            onPress={() => {
+              void onSaved().catch((failure) =>
+                setError(
+                  failure instanceof Error ? failure.message : 'Saved results could not be loaded.',
+                ),
+              );
+            }}
+          />
+        </View>
       ) : null}
       {reviewable && images ? (
         <Pressable
@@ -1330,7 +1633,99 @@ function NativeAppProposal({
           </Body>
         </Pressable>
       ) : null}
-      {reviewable ? (
+      {reviewable && !images && !editing ? (
+        <View style={{ gap: tokens.space.xs }}>
+          <Button
+            label="Edit proposed values"
+            tone="secondary"
+            disabled={disabled || !!pending}
+            onPress={() => {
+              setEditBase(current);
+              setDrafts(
+                current.actions.map((action) =>
+                  Object.fromEntries(
+                    editableProposalFields(action.body).map(([key, value]) => [
+                      key,
+                      typeof value === 'boolean' ? value : String(value),
+                    ]),
+                  ),
+                ),
+              );
+              setEditing(true);
+            }}
+          />
+          <Button
+            label="Revise in conversation"
+            tone="secondary"
+            disabled={disabled || !!pending}
+            onPress={() => onRevise(current.title)}
+          />
+        </View>
+      ) : null}
+      {editing ? (
+        <View style={{ gap: tokens.space.sm }}>
+          <Body>
+            These edits prepare a new review. Nothing is applied yet. Nested recipe or meal content
+            can be revised in conversation.
+          </Body>
+          {editBase.actions.map((action, step) => (
+            <View key={step} style={{ gap: tokens.space.xs }}>
+              <EditorialText>
+                {step + 1}. {action.summary}
+              </EditorialText>
+              {editableProposalFields(action.body).map(([key, value]) =>
+                typeof value === 'boolean' ? (
+                  <Pressable
+                    key={key}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: !!drafts[step]?.[key], disabled: !!pending }}
+                    disabled={!!pending}
+                    style={{ minHeight: 44, justifyContent: 'center' }}
+                    onPress={() =>
+                      setDrafts((previous) =>
+                        previous.map((draft, index) =>
+                          index === step ? { ...draft, [key]: !draft[key] } : draft,
+                        ),
+                      )
+                    }
+                  >
+                    <Body>
+                      {drafts[step]?.[key] ? '✓' : '○'} {fieldLabel(key)}
+                    </Body>
+                  </Pressable>
+                ) : (
+                  <FormField
+                    key={key}
+                    label={fieldLabel(key)}
+                    value={String(drafts[step]?.[key] ?? '')}
+                    editable={!pending}
+                    keyboardType={typeof value === 'number' ? 'decimal-pad' : 'default'}
+                    onChangeText={(text) =>
+                      setDrafts((previous) =>
+                        previous.map((draft, index) =>
+                          index === step ? { ...draft, [key]: text } : draft,
+                        ),
+                      )
+                    }
+                  />
+                ),
+              )}
+            </View>
+          ))}
+          <Button
+            label={pending === 'edit' ? 'Preparing edited review…' : 'Prepare edited review'}
+            disabled={disabled || !!pending}
+            onPress={() => void prepareEdit()}
+          />
+          <Button
+            label="Keep original review"
+            tone="secondary"
+            disabled={!!pending}
+            onPress={() => setEditing(false)}
+          />
+        </View>
+      ) : null}
+      {reviewable && !editing ? (
         <View style={{ gap: tokens.space.xs }}>
           <Button
             label={

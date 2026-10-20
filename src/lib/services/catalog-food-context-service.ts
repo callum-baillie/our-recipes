@@ -1,4 +1,5 @@
 import 'server-only';
+import { normalizeCatalogMeasure } from '../../../shared/mobile-domain/catalog-measures';
 
 import { BordCatalogClient } from '@/lib/providers/bord-catalog-client';
 import { FoodDataError } from '@/lib/domain/food-data';
@@ -6,7 +7,6 @@ import {
   catalogEnrichmentInputSchema,
   catalogMeasuresInputSchema,
   storageGuidanceInputSchema,
-  type CatalogMeasure,
 } from '@/lib/domain/bord-catalog';
 import { getCatalogFoodDetails, isNativeCatalogEnabled } from './bord-catalog-service';
 
@@ -20,8 +20,6 @@ function client() {
 }
 const text = (value: unknown, maximum = 300) =>
   typeof value === 'string' && value.trim() ? value.trim().slice(0, maximum) : null;
-const positive = (value: unknown) =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 
 export async function readCatalogMeasures(input: unknown) {
   const { reference, form, basis } = catalogMeasuresInputSchema.parse(input);
@@ -34,26 +32,7 @@ export async function readCatalogMeasures(input: unknown) {
     reference.source_revision,
     { ...(form ? { form } : {}), ...(basis ? { basis } : {}) },
   );
-  const measures: CatalogMeasure[] = result.data.map((row) => {
-    const measureUnit =
-      row.measureUnit && typeof row.measureUnit === 'object'
-        ? (row.measureUnit as Record<string, unknown>)
-        : {};
-    const unit = text(row.unit) ?? text(measureUnit.name);
-    const amount = positive(row.amount);
-    return {
-      label:
-        text(row.modifier) ??
-        text(row.portionDescription) ??
-        text(row.label) ??
-        ([amount, unit].filter((part) => part !== null).join(' ') || 'Source measure'),
-      amount,
-      unit,
-      gramWeight: positive(row.gramWeight) ?? positive(row.gram_weight),
-      form: text(row.form),
-      basis: text(row.basis),
-    };
-  });
+  const measures = result.data.map(normalizeCatalogMeasure);
   return {
     reference,
     measures,

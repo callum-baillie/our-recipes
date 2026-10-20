@@ -1,3 +1,4 @@
+import { currentAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { and, desc, eq, gt, isNotNull } from 'drizzle-orm';
@@ -64,9 +65,11 @@ export function storeDecision(
     ttlMs?: number;
   },
 ) {
+  assertAiExecutionActive();
   ensureDatabase();
   const row = {
     id: randomUUID(),
+    turnId: currentAiExecutionContext()?.turnId ?? null,
     ownerUserId: p.userId,
     profileId: p.profileId,
     task: input.task,

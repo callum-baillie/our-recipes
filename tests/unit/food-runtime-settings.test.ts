@@ -1,0 +1,20 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterEach, expect, it, vi } from 'vitest';
+import { FoodRuntimeSettings } from '@/components/food-runtime-settings';
+afterEach(() => vi.unstubAllEnvs());
+it('shows effective catalog-only policy and configured limits without serializing credentials', () => {
+  vi.stubEnv('FOOD_DATA_MODE', 'catalog_only');
+  vi.stubEnv('FOOD_DATA_ALLOW_REMOTE_FALLBACK', 'true');
+  vi.stubEnv('BORD_FOOD_API_KEY', 'never-render-this-fixture-secret');
+  vi.stubEnv('BORD_FOOD_API_TIMEOUT_MS', '6789');
+  vi.stubEnv('FOOD_DATA_CACHE_ROW_CAP', '1234');
+  const output = renderToStaticMarkup(createElement(FoodRuntimeSettings));
+  expect(output).toContain('catalog_only');
+  expect(output).toContain('Configured on · direct fallback blocked by current mode');
+  expect(output).toContain('6789 ms');
+  expect(output).toContain('1234');
+  expect(output).toContain('Configured · server only');
+  expect(output).not.toContain('never-render-this-fixture-secret');
+  expect(output).toContain('restart');
+});

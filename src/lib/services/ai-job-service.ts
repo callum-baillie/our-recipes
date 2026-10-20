@@ -1,3 +1,9 @@
+import { executeAiWorkload, resolveAiExecutionOptions } from './ai-execution-service';
+import { withAiExecutionContext } from './ai-execution-context';
+import { getRecipe } from './recipe-service';
+import { recipeImageInput } from '@/lib/domain/recipe-image-generation';
+import { appRoleCan } from '@/lib/domain/permissions';
+import { currentAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
 import { RECIPE_IMAGE_PROMPT_VERSION } from '@/lib/domain/recipe-image-generation';
 import 'server-only';
 import {
@@ -29,7 +35,8 @@ import {
   aiJobItems,
   aiJobs,
   aiOperationAudits,
-  recipeImages,
+  recipeImageCandidates,
+  user,
 } from '@/lib/db/schema';
 import { aiStructuredRecipeSchema } from '@/lib/domain/ai';
 import type { AiReasoningEffort } from '@/lib/domain/ai-assistant';
@@ -56,7 +63,7 @@ export const AI_BATCH_MIN_ITEMS = Math.min(
 type AiJobRow = typeof aiJobs.$inferSelect;
 type AiJobItemRow = typeof aiJobItems.$inferSelect;
 
-type RecipeImageJobInput = AiImageGenerationInput & { recipeId: string };
+type RecipeImageJobInput = AiImageGenerationInput & { recipeId: string; expectedRevision?: number };
 type RecipeGenerationJobInput = {
   promptGuidance?: string;
   promptVersion?: string;
@@ -91,6 +98,8 @@ export type AiBatchClient = {
     endpoint: '/v1/images/generations' | '/v1/responses';
     lines: string;
     metadata: Record<string, string>;
+    signal?: AbortSignal;
+    timeout?: number;
   }): Promise<{ batchId: string; inputFileId: string }>;
   retrieve(batchId: string): Promise<BatchSnapshot>;
   read(fileId: string): Promise<string>;
@@ -105,6 +114,7 @@ export class AiJobStateError extends Error {}
 const imageItemSchema = z
   .object({
     recipeId: z.string().uuid(),
+    expectedRevision: z.number().int().positive().optional(),
     recipeTitle: z.string().trim().min(1).max(160),
     recipeSummary: z.string().max(800),
     ingredientNames: z.array(z.string().max(160)).max(80),
@@ -179,6 +189,108 @@ function assertJobAiAccess(job: AiJobRow) {
   assertProfileAiEnabled(job.profileId);
 }
 
+/** Recheck the categories actually present in a saved household snapshot before transmitting it. */
+function assertQueuedRecipeContextSharing(job: AiJobRow, context: unknown) {
+  const object = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const populated = (value: unknown) => Array.isArray(value) && value.length > 0;
+  const household = object(object(context).household);
+  if (!Object.keys(household).length) return;
+  const current = getAiDataPolicy(job.profileId);
+  const shared = object(household.sharedCategories);
+  const require = (allowed: boolean) => {
+    if (!allowed)
+      throw new AiJobForbiddenError(
+        'Sharing or household access changed after this draft was queued. Prepare a new draft with current permissions.',
+      );
+  };
+  if (shared.pantry === true || populated(household.pantry)) require(current.sharePantry);
+  if (
+    shared.shoppingLists === true ||
+    populated(household.shoppingLists) ||
+    populated(household.supermarkets) ||
+    object(household.preferences).shopping != null
+  )
+    require(current.shareShoppingLists);
+  if (shared.recipes === true || populated(household.recipes)) {
+    require(current.shareSharedRecipes);
+    if (
+      Array.isArray(household.recipes) &&
+      household.recipes.some((recipe) => object(recipe).personalRating != null)
+    )
+      require(current.shareRecipePreferences);
+  }
+  if (shared.mealPlans === true || populated(household.mealPlan)) {
+    require(current.shareMealPlans);
+    if (
+      Array.isArray(household.mealPlan) &&
+      household.mealPlan.some(
+        (meal) =>
+          object(meal).recipeOverride != null ||
+          (typeof object(meal).recipeIngredientsSnapshot === 'string' &&
+            object(meal).recipeIngredientsSnapshot !== '{"baseServings":"","ingredients":[]}'),
+      )
+    )
+      require(current.shareSharedRecipes);
+  }
+  const profiles = Array.isArray(household.profiles) ? household.profiles : [];
+  const preferences = object(household.preferences).profiles;
+  const allProfileKeys = [...profiles, ...(Array.isArray(preferences) ? preferences : [])].map(
+    (profile) => object(profile).key,
+  );
+  if (allProfileKeys.some((id) => typeof id === 'string' && id !== job.profileId)) {
+    const owner = jobOwnerUserId(job);
+    const account = owner
+      ? getDatabase().select({ role: user.role }).from(user).where(eq(user.id, owner)).get()
+      : null;
+    require(Boolean(account && appRoleCan(account.role, 'shared.update')));
+  }
+  const fields = {
+    shareIdentity: ['displayName'],
+    shareProfileGoals: ['profileGoals'],
+    shareDietaryPreferences: [
+      'kitchenInterview',
+      'dietaryPreferences',
+      'foodAllergies',
+      'dietaryExclusions',
+    ],
+    sharePersonalMetrics: [
+      'activityLevel',
+      'ageYears',
+      'enteredBodyMetrics',
+      'heightCentimeters',
+      'referenceSexCategory',
+      'explicitlyEnteredLifeStage',
+    ],
+    shareWeight: ['currentWeightKilograms', 'targetWeightKilograms', 'weightTargetDate'],
+    shareNutritionGoals: ['nutritionGoalType', 'weightGoalPace', 'nutritionGoals'],
+    shareNutritionAggregates: ['nutrition'],
+    shareRawDiary: ['diary'],
+  } as const;
+  for (const raw of profiles) {
+    const profile = object(raw);
+    if (typeof profile.key !== 'string')
+      throw new AiJobForbiddenError('The queued profile context needs a fresh review.');
+    const policy = getAiDataPolicy(profile.key);
+    for (const [key, names] of Object.entries(fields))
+      if (names.some((name) => Object.hasOwn(profile, name)))
+        require(policy[key as keyof typeof fields]);
+    const measurement = object(profile.latestRecordedMeasurement);
+    if (measurement.weightKilograms != null) require(policy.shareWeight);
+    if (measurement.bodyMetrics != null) require(policy.sharePersonalMetrics);
+    if (
+      [profile.enteredBodyMetrics, measurement.bodyMetrics].some((metrics) =>
+        Object.entries(object(metrics)).some(
+          ([name, value]) => name.endsWith('Kilograms') && value != null,
+        ),
+      )
+    )
+      require(policy.shareWeight);
+  }
+}
+
 function titleFor(job: AiJobRow): string {
   return job.kind === 'meal_plan_generation'
     ? 'Scheduled meal-plan draft'
@@ -219,6 +331,10 @@ function publicJob(job: AiJobRow, items: AiJobItemRow[]) {
         label: payload.recipeTitle ?? payload.label ?? `Recipe ${item.position + 1}`,
         status: item.status,
         errorCode: item.errorCode,
+        candidateId:
+          job.kind === 'recipe_images' && item.status === 'succeeded'
+            ? ((parseJson(item.result ?? '{}') as { candidateId?: string }).candidateId ?? null)
+            : null,
       };
     }),
   };
@@ -323,6 +439,7 @@ export function enqueueRecipeImageJob(input: {
   images: RecipeImageJobInput[];
 }) {
   ensureDatabase();
+  assertAiExecutionActive();
   if (!input.images.length) return null;
   const now = new Date();
   const setting = getAiWorkloadSetting(input.profileId, 'image_generation');
@@ -330,6 +447,22 @@ export function enqueueRecipeImageJob(input: {
     throw new AiJobForbiddenError('Image generation is disabled for this account.');
   if (!getAiDataPolicy(input.profileId).shareSharedRecipes)
     throw new AiJobForbiddenError('Recipe sharing is disabled for this account.');
+  const ownerUserId =
+    aiUserIdForProfile(input.profileId) ??
+    (process.env.NODE_ENV === 'test' ? `profile:${input.profileId}` : null);
+  if (!ownerUserId) throw new AiJobForbiddenError('A signed-in account must own image requests.');
+  const images = input.images.map((image) => {
+    const saved = getRecipe(image.recipeId, input.profileId);
+    if (!saved || (image.expectedRevision && saved.currentRevision !== image.expectedRevision))
+      throw new AiJobStateError(
+        'The recipe changed. Review its current version before requesting an image.',
+      );
+    return {
+      ...recipeImageInput(saved),
+      recipeId: saved.id,
+      expectedRevision: saved.currentRevision,
+    };
+  });
   const id = randomUUID();
   const mode = taskExecutionMode(input.profileId, input.images.length);
   getDatabase().transaction(() => {
@@ -340,6 +473,7 @@ export function enqueueRecipeImageJob(input: {
         profileId: input.profileId,
         threadId: input.threadId ?? null,
         actionId: input.actionId ?? null,
+        turnId: currentAiExecutionContext()?.turnId ?? null,
         kind: 'recipe_images',
         status: 'queued',
         executionMode: mode,
@@ -350,7 +484,7 @@ export function enqueueRecipeImageJob(input: {
           promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
         }),
         result: null,
-        sourceDigest: digest(input.images),
+        sourceDigest: digest(images),
         providerBatchId: null,
         providerInputFileId: null,
         attempts: 0,
@@ -363,7 +497,8 @@ export function enqueueRecipeImageJob(input: {
         completedAt: null,
       })
       .run();
-    input.images.forEach((image, position) => {
+    images.forEach((image, position) => {
+      const itemId = randomUUID();
       const auditId = randomUUID();
       insertImageAudit({
         id: auditId,
@@ -376,9 +511,27 @@ export function enqueueRecipeImageJob(input: {
         now,
       });
       getDatabase()
+        .insert(recipeImageCandidates)
+        .values({
+          id: itemId,
+          recipeId: image.recipeId,
+          sourceRevision: image.expectedRevision,
+          ownerUserId,
+          profileId: input.profileId,
+          intentHash: digest(image),
+          status: 'requested',
+          model: setting.model,
+          quality: setting.imageQuality ?? 'low',
+          size: setting.imageSize ?? '1024x1024',
+          promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
+          auditId,
+          createdAt: now,
+        })
+        .run();
+      getDatabase()
         .insert(aiJobItems)
         .values({
-          id: randomUUID(),
+          id: itemId,
           jobId: id,
           position,
           customId: `${id}:${position}`,
@@ -408,8 +561,10 @@ export function enqueueRecipeBatchGenerationJob(input: {
 }) {
   ensureDatabase();
   assertProfileAiEnabled(input.profileId);
+  assertAiExecutionActive();
   if (!input.recipes.length || input.recipes.length > 50)
     throw new AiJobStateError('Choose 1 to 50 recipes for a background task.');
+  const setting = getAiWorkloadSetting(input.profileId, 'recipe_generation');
   const now = new Date();
   const id = randomUUID();
   getDatabase().transaction(() => {
@@ -420,12 +575,13 @@ export function enqueueRecipeBatchGenerationJob(input: {
         profileId: input.profileId,
         threadId: input.threadId,
         actionId: null,
+        turnId: currentAiExecutionContext()?.turnId ?? null,
         kind: 'recipe_batch_generation',
         status: 'queued',
         executionMode: taskExecutionMode(input.profileId, input.recipes.length),
         model: input.model,
         payload: JSON.stringify({
-          generateRecipeImages: input.generateRecipeImages,
+          generateRecipeImages: false,
           ownerUserId: aiUserIdForProfile(input.profileId),
         }),
         result: null,
@@ -442,7 +598,20 @@ export function enqueueRecipeBatchGenerationJob(input: {
         completedAt: null,
       })
       .run();
-    input.recipes.forEach((recipe, position) => {
+    input.recipes.forEach((submitted, position) => {
+      const recipe = {
+        ...submitted,
+        promptGuidance: submitted.promptGuidance ?? setting.promptGuidance,
+        promptVersion: submitted.promptVersion ?? setting.promptVersion,
+        maxOutputTokens: Math.min(
+          submitted.maxOutputTokens ?? Infinity,
+          setting.maxOutputTokens ?? 4096,
+        ),
+        requestTimeoutSeconds: Math.min(
+          submitted.requestTimeoutSeconds ?? Infinity,
+          setting.requestTimeoutSeconds ?? 180,
+        ),
+      };
       const auditId = randomUUID();
       getDatabase()
         .insert(aiOperationAudits)
@@ -455,6 +624,7 @@ export function enqueueRecipeBatchGenerationJob(input: {
           provider: 'OpenAI',
           model: input.model,
           reasoningEffort: recipe.reasoningEffort,
+          promptVersion: recipe.promptVersion,
           inputTokens: null,
           outputTokens: null,
           threadId: input.threadId,
@@ -501,18 +671,25 @@ class OpenAiBatchClient implements AiBatchClient {
   }
 
   async submit(input: Parameters<AiBatchClient['submit']>[0]) {
-    const file = await this.client.files.create({
-      file: await toFile(Buffer.from(input.lines, 'utf8'), 'bord-ai-batch.jsonl', {
-        type: 'application/jsonl',
-      }),
-      purpose: 'batch',
-    });
-    const batch = await this.client.batches.create({
-      input_file_id: file.id,
-      endpoint: input.endpoint,
-      completion_window: '24h',
-      metadata: input.metadata,
-    });
+    const file = await this.client.files.create(
+      {
+        file: await toFile(Buffer.from(input.lines, 'utf8'), 'bord-ai-batch.jsonl', {
+          type: 'application/jsonl',
+        }),
+        purpose: 'batch',
+      },
+      { signal: input.signal, timeout: input.timeout, maxRetries: 0 },
+    );
+    input.signal?.throwIfAborted();
+    const batch = await this.client.batches.create(
+      {
+        input_file_id: file.id,
+        endpoint: input.endpoint,
+        completion_window: '24h',
+        metadata: input.metadata,
+      },
+      { signal: input.signal, timeout: input.timeout, maxRetries: 0 },
+    );
     return { batchId: batch.id, inputFileId: file.id };
   }
 
@@ -591,20 +768,36 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
     .map((item) => {
       if (job.kind === 'recipe_images') {
         const image = imageItemSchema.parse(parseJson(item.payload));
+        if (
+          !image.expectedRevision ||
+          getRecipe(image.recipeId, job.profileId)?.currentRevision !== image.expectedRevision
+        )
+          throw new AiJobStateError(
+            'Review the current recipe before submitting this image request.',
+          );
+        const options = resolveAiExecutionOptions(job.profileId, 'image_generation', {
+          model: job.model,
+          ...savedImageOptions(job),
+        });
         return JSON.stringify({
           custom_id: item.customId,
           method: 'POST',
           url: '/v1/images/generations',
           body: {
             model: job.model,
-            prompt: recipeImagePrompt(image, savedImageOptions(job).promptGuidance),
-            size: savedImageOptions(job).imageSize,
-            quality: savedImageOptions(job).imageQuality,
+            prompt: recipeImagePrompt(image, options.promptGuidance),
+            size: options.imageSize,
+            quality: options.imageQuality,
             output_format: 'webp',
           },
         });
       }
       const recipe = recipeItemSchema.parse(parseJson(item.payload));
+      assertQueuedRecipeContextSharing(job, recipe.context);
+      const options = resolveAiExecutionOptions(job.profileId, 'recipe_generation', {
+        ...recipe,
+        model: job.model,
+      });
       return JSON.stringify({
         custom_id: item.customId,
         method: 'POST',
@@ -614,9 +807,9 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
           instructions: [
             AI_GROUNDING_INSTRUCTIONS,
             recipe.instructions,
-            recipe.promptGuidance ?? '',
+            options.promptGuidance ?? '',
           ].join('\n'),
-          max_output_tokens: recipe.maxOutputTokens ?? 4096,
+          max_output_tokens: options.maxOutputTokens,
           input: [
             {
               role: 'user',
@@ -626,7 +819,7 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
           text: { format: zodTextFormat(aiStructuredRecipeSchema, 'generated_recipe') },
           store: false,
           safety_identifier: recipe.safetyIdentifier,
-          ...(recipe.reasoningEffort ? { reasoning: { effort: recipe.reasoningEffort } } : {}),
+          ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
         },
       });
     })
@@ -696,40 +889,37 @@ async function attachRecipeImage(
   altText = `AI-generated serving image for ${image.recipeTitle}`.slice(0, 180),
 ) {
   if (!ownsActiveLease(job)) return;
-  const imageId = randomUUID();
-  const stored = await storeRecipeImage(imageId, bytes);
-  try {
-    if (!ownsActiveLease(job)) {
-      await removeRecipeImage(stored.storageKey);
-      return;
-    }
-    getDatabase().transaction((transaction) => {
-      transaction
-        .insert(recipeImages)
-        .values({
-          id: imageId,
-          recipeId: image.recipeId,
-          storageKey: stored.storageKey,
-          altText,
-          width: stored.width,
-          height: stored.height,
-          createdByProfileId: jobWithItems(item.jobId).job.profileId,
-          createdAt: new Date(),
-        })
-        .run();
-      if (item.auditId) {
-        transaction
-          .update(aiOperationAudits)
-          .set({ recipeId: image.recipeId, generatedImageId: imageId })
-          .where(eq(aiOperationAudits.id, item.auditId))
-          .run();
-      }
-    });
-  } catch (error) {
-    await removeRecipeImage(stored.storageKey).catch(() => undefined);
-    throw error;
+  const candidate = getDatabase()
+    .select()
+    .from(recipeImageCandidates)
+    .where(eq(recipeImageCandidates.id, item.id))
+    .get();
+  if (!candidate || !image.expectedRevision)
+    throw new AiJobStateError(
+      'Legacy image request has no reviewed revision. Request a new image review.',
+    );
+  if (candidate.status !== 'requested') return;
+  const stored = await storeRecipeImage(item.id, bytes);
+  if (!ownsActiveLease(job)) {
+    await removeRecipeImage(stored.storageKey);
+    return;
   }
-  updateItemSuccess(item, { recipeId: image.recipeId, imageId });
+  const updated = getDatabase()
+    .update(recipeImageCandidates)
+    .set({ status: 'ready', ...stored, altText })
+    .where(
+      and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
+    )
+    .run();
+  if (updated.changes !== 1) {
+    await removeRecipeImage(stored.storageKey);
+    return;
+  }
+  updateItemSuccess(item, {
+    recipeId: image.recipeId,
+    candidateId: item.id,
+    sourceRevision: image.expectedRevision,
+  });
 }
 
 async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
@@ -741,13 +931,30 @@ async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
     )
       throw new AiJobForbiddenError('AI is disabled.');
     const image = imageItemSchema.parse(parseJson(item.payload));
-    const generated = await getAiProvider().generateRecipeImage(image, {
-      model: job.model,
-      ...savedImageOptions(job),
-    });
+    if (!image.expectedRevision)
+      throw new AiJobStateError('Legacy image request needs a fresh reviewed revision.');
+    if (getRecipe(image.recipeId, job.profileId)?.currentRevision !== image.expectedRevision)
+      throw new AiJobStateError('The reviewed recipe changed before generation.');
+    const generated = await withAiExecutionContext({ parentJobId: job.id }, () =>
+      executeAiWorkload(
+        job.profileId,
+        'image_generation',
+        (options) => getAiProvider().generateRecipeImage(image, options),
+        { model: job.model, ...savedImageOptions(job) },
+      ),
+    );
     await attachRecipeImage(item, image, generated.bytes, job, generated.altText);
   } catch {
-    if (ownsActiveLease(job)) updateItemFailure(item, 'image_generation_failed');
+    if (ownsActiveLease(job)) {
+      getDatabase()
+        .update(recipeImageCandidates)
+        .set({ status: 'failed' })
+        .where(
+          and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
+        )
+        .run();
+      updateItemFailure(item, 'image_generation_failed');
+    }
   }
 }
 
@@ -757,18 +964,24 @@ async function processDirectRecipe(item: AiJobItemRow, job: AiJobRow) {
     if (!getAiWorkloadSetting(job.profileId, 'recipe_generation').enabled)
       throw new AiJobForbiddenError('AI is disabled.');
     const request = recipeItemSchema.parse(parseJson(item.payload));
+    assertQueuedRecipeContextSharing(job, request.context);
     const recipe = recipeInputSchema.parse(
-      await getAiAssistantProvider().generateRecipe({
-        model: job.model,
-        promptGuidance: request.promptGuidance,
-        maxOutputTokens: request.maxOutputTokens,
-        requestTimeoutSeconds: request.requestTimeoutSeconds,
-        reasoningEffort: request.reasoningEffort,
-        safetyIdentifier: request.safetyIdentifier,
-        instructions: [AI_GROUNDING_INSTRUCTIONS, request.instructions].join('\n'),
-        context: request.context,
-        images: request.images,
-      }),
+      await withAiExecutionContext({ parentJobId: job.id }, () =>
+        executeAiWorkload(
+          job.profileId,
+          'recipe_generation',
+          (options) =>
+            getAiAssistantProvider().generateRecipe({
+              ...request,
+              ...options,
+              safetyIdentifier: request.safetyIdentifier,
+              instructions: [AI_GROUNDING_INSTRUCTIONS, request.instructions].join('\n'),
+              context: request.context,
+              images: request.images,
+            }),
+          { ...request, model: job.model },
+        ),
+      ),
     );
     if (ownsActiveLease(job)) updateItemSuccess(item, recipe);
   } catch {
@@ -869,7 +1082,7 @@ async function finishJob(job: AiJobRow) {
         threadId: job.threadId,
         role: 'assistant',
         model: job.model,
-        content: `${counts.completedItems} of ${counts.totalItems} recipe images saved.${failedNames.length ? ` Could not generate: ${failedNames.join(', ')}. Review the task details and retry only the unfinished items; retrying may incur charges.` : ' The new images are now visible on your recipes.'}`,
+        content: `${counts.completedItems} of ${counts.totalItems} image previews prepared.${failedNames.length ? ` Could not generate: ${failedNames.join(', ')}. Review the task details and retry only the unfinished items; retrying may incur charges.` : ' Review each image before selecting it for the matching recipe.'}`,
         createdAt: now,
       })
       .run();
@@ -900,16 +1113,55 @@ async function runDirectJob(job: AiJobRow, items: AiJobItemRow[]) {
 async function submitBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
   const lines = batchLines(job, items);
   if (!lines) return finishJob(job);
-  const submitted = await getAiBatchClient().submit({
-    endpoint: endpointFor(job),
-    lines,
-    metadata: { bord_ai_job_id: job.id, bord_ai_job_kind: job.kind },
-  });
+  const submitted = await withAiExecutionContext(
+    {
+      parentJobId: job.id,
+      requestUnits: items.filter((item) => item.status === 'pending').length,
+      submittedConfigurations: lines.split('\n').map((line) => {
+        const submitted = JSON.parse(line);
+        const body = submitted.body;
+        const saved = parseJson(
+          items.find((item) => item.customId === submitted.custom_id)!.payload,
+        ) as { promptVersion?: string };
+        return {
+          model: body.model,
+          promptVersion:
+            saved.promptVersion ??
+            (job.kind === 'recipe_images' ? savedImageOptions(job).promptVersion : undefined) ??
+            'builtin',
+          maxOutputTokens: body.max_output_tokens,
+          imageQuality: body.quality,
+          imageSize: body.size,
+        };
+      }),
+    },
+    () =>
+      executeAiWorkload(
+        job.profileId,
+        job.kind === 'recipe_images' ? 'image_generation' : 'recipe_generation',
+        (options) => {
+          getDatabase()
+            .update(aiJobs)
+            .set({ errorCode: 'provider_submission_pending' })
+            .where(eq(aiJobs.id, job.id))
+            .run();
+          return getAiBatchClient().submit({
+            endpoint: endpointFor(job),
+            lines,
+            metadata: { bord_ai_job_id: job.id, bord_ai_job_kind: job.kind },
+            signal: options.signal,
+            timeout: options.requestTimeoutSeconds * 1000,
+          });
+        },
+        { model: job.model, ...(job.kind === 'recipe_images' ? savedImageOptions(job) : {}) },
+      ),
+  );
   const now = new Date();
   const submittedState = getDatabase()
     .update(aiJobs)
     .set({
       status: 'submitted',
+      errorCode: null,
       providerBatchId: submitted.batchId,
       providerInputFileId: submitted.inputFileId,
       nextAttemptAt: new Date(now.getTime() + POLL_MS),
@@ -1107,14 +1359,21 @@ async function runOneAiJob(candidate: AiJobRow) {
     }
     if (job.kind === 'meal_plan_generation') {
       const { runScheduledPlanJob } = await import('./task-scheduler-service');
-      await runScheduledPlanJob(job);
+      await withAiExecutionContext({ parentJobId: job.id }, () => runScheduledPlanJob(job));
     } else if (job.status === 'submitted') await pollBatchJob(job, items);
     else if (job.executionMode === 'batch') await submitBatchJob(job, items);
     else await runDirectJob(job, items);
   } catch (error) {
     const now = new Date();
-    const failure =
-      error instanceof AiAccessDeniedError || error instanceof AiJobForbiddenError
+    const submissionUnknown =
+      getDatabase()
+        .select({ errorCode: aiJobs.errorCode })
+        .from(aiJobs)
+        .where(eq(aiJobs.id, job.id))
+        .get()?.errorCode === 'provider_submission_pending';
+    const failure = submissionUnknown
+      ? 'provider_submission_outcome_unknown'
+      : error instanceof AiAccessDeniedError || error instanceof AiJobForbiddenError
         ? 'ai_disabled'
         : 'worker_failed';
     if (job.status !== 'submitted' && ownsActiveLease(job))
@@ -1189,6 +1448,20 @@ export async function cancelAiJob(jobId: string, profileId: string) {
     .run();
   if (!cancelled.changes)
     throw new AiJobStateError('This task finished before it could be cancelled.');
+  if (job.kind === 'recipe_images')
+    getDatabase()
+      .update(recipeImageCandidates)
+      .set({ status: 'discarded' })
+      .where(
+        and(
+          inArray(
+            recipeImageCandidates.id,
+            items.filter((item) => item.status !== 'succeeded').map((item) => item.id),
+          ),
+          eq(recipeImageCandidates.status, 'requested'),
+        ),
+      )
+      .run();
   items
     .filter((item) => item.status === 'pending')
     .forEach((item) => updateItemFailure(item, 'cancelled'));
@@ -1215,6 +1488,10 @@ function retryJobTransaction(jobId: string, profileId: string) {
   if (job.status !== 'failed' && job.status !== 'cancelled') {
     throw new AiJobStateError('Only failed or cancelled background tasks can be retried.');
   }
+  if (job.errorCode === 'provider_submission_outcome_unknown')
+    throw new AiJobStateError(
+      'The provider may have accepted this paid batch. Reconcile its provider outcome before starting another batch; this request will not be submitted again.',
+    );
   const previousResult = job.result ? (parseJson(job.result) as { retryJobId?: string }) : null;
   if (previousResult?.retryJobId) return getAiJob(previousResult.retryJobId, profileId);
   // A partially completed recipe draft may already have been accepted. Retry only
@@ -1233,6 +1510,29 @@ function retryJobTransaction(jobId: string, profileId: string) {
         .object({ generateRecipeImages: z.boolean().default(false) })
         .parse(parseJson(job.payload)).generateRecipeImages,
     });
+    getDatabase()
+      .update(aiJobs)
+      .set({ result: JSON.stringify({ ...previousResult, retryJobId: retry.id }) })
+      .where(eq(aiJobs.id, job.id))
+      .run();
+    return retry;
+  }
+  if (job.kind === 'recipe_images') {
+    const images = items
+      .filter((item) => item.status !== 'succeeded')
+      .map((item) => imageItemSchema.parse(parseJson(item.payload)));
+    if (
+      images.some(
+        (image) =>
+          !image.expectedRevision ||
+          getRecipe(image.recipeId, profileId)?.currentRevision !== image.expectedRevision,
+      )
+    )
+      throw new AiJobStateError(
+        'A recipe changed or this legacy request has no reviewed revision. Prepare a new image review.',
+      );
+    const retry = enqueueRecipeImageJob({ profileId, threadId: job.threadId, images });
+    if (!retry) throw new AiJobStateError('There is no unfinished work to retry.');
     getDatabase()
       .update(aiJobs)
       .set({ result: JSON.stringify({ ...previousResult, retryJobId: retry.id }) })

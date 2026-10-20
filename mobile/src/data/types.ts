@@ -115,6 +115,8 @@ export type ShoppingItem = {
   unit?: string;
   note?: string;
   aisleId?: string | null;
+  cartQuantity?: number | null;
+  cartUnit?: string | null;
   shoppingState?: 'to_buy' | 'in_cart' | 'cant_find' | 'sourced';
   policyBreakdown?: ShoppingPolicyBreakdown | null;
 };

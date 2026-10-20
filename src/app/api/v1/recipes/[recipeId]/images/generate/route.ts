@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 
 import { aiImageGenerationRequestSchema } from '@/lib/domain/ai';
 import { jsonError } from '@/lib/http';
-import { AiOperationError, generateAiRecipeImage } from '@/lib/services/ai-operation-service';
+import { AiOperationError } from '@/lib/services/ai-operation-service';
 import { RecipeNotFoundError } from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
@@ -55,20 +55,11 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
         access.requestId,
       );
     }
-    const created = await generateAiRecipeImage({
-      actorProfileId: actor.profileId,
-      recipeId: (await context.params).recipeId,
-    });
     return withApiRequestId(
-      NextResponse.json(
-        {
-          image: { id: created.imageId },
-          audit: { id: created.audit.id, kind: created.audit.kind, status: created.audit.status },
-        },
-        {
-          status: 201,
-          headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
-        },
+      jsonError(
+        409,
+        'image_review_required',
+        'Generate a reviewed candidate using an operationId and expectedRevision, then explicitly accept it. Direct image attachment is no longer supported.',
       ),
       access.requestId,
     );

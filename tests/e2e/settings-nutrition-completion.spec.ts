@@ -182,11 +182,9 @@ test('AI conflict review and mobile store selector preserve independent drafts',
   await instructions.fill('Prefer brief steps in this draft.');
   await page.getByRole('button', { name: 'Save my AI defaults', exact: true }).click();
   await page.getByRole('button', { name: 'Load current settings', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Keep my draft against this version' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Use reviewed draft' })).toBeVisible();
   await capture(page, 'ai-default-conflict-mobile');
-  await page.getByRole('button', { name: 'Keep my draft against this version' }).click();
+  await page.getByRole('button', { name: 'Use reviewed draft' }).click();
   await expect(instructions).toHaveValue('Prefer brief steps in this draft.');
   await expect(
     page.getByRole('button', { name: 'Save my AI defaults', exact: true }),

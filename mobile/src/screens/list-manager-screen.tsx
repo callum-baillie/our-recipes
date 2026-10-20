@@ -1,3 +1,4 @@
+import { shoppingAmountSummary } from '../../../shared/mobile-domain/shopping-amounts';
 import { PantryPurchaseForm } from '@/components/pantry-purchase-form';
 import * as React from 'react';
 import { Alert, View } from 'react-native';
@@ -27,6 +28,9 @@ type Item = {
   note: string;
   aisleId: string | null;
   shoppingState: string;
+  cartQuantity?: number | null;
+  cartUnit?: string | null;
+  pantry?: { productId?: string | null } | null;
   checked: boolean;
 };
 type List = {
@@ -152,6 +156,7 @@ export function ListManagerScreen() {
           listId={listId}
           itemId={intakeId}
           itemName={resource.data.list.items.find((item) => item.id === intakeId)!.item}
+          reviewedItem={resource.data.list.items.find((item) => item.id === intakeId)!}
           onDone={() => {
             setIntakeId('');
             resource.reload();
@@ -279,8 +284,12 @@ export function ListManagerScreen() {
                   onPress={() => setIntakeId(item.id)}
                 />
                 <Body>
-                  {item.quantity ?? ''} {item.unit} · {item.shoppingState.replaceAll('_', ' ')}
+                  Requested: {shoppingAmountSummary(item).requested} ·{' '}
+                  {item.shoppingState.replaceAll('_', ' ')}
                 </Body>
+                {item.cartQuantity != null || item.cartUnit ? (
+                  <Body>In cart: {shoppingAmountSummary(item).cart}</Body>
+                ) : null}
                 <Button label="Edit item" tone="secondary" onPress={() => edit(item)} />
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Button
