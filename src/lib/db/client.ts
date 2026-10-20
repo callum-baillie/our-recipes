@@ -21,6 +21,16 @@ let drizzleDatabase: AppDatabase | undefined;
 let openedPath: string | undefined;
 let hasMigrated = false;
 
+// Next's server/proxy bundles can instantiate this module separately while
+// sharing one application process. Recovery must close every SQLite handle
+// before replacing files, not only the caller's bundle-local handle.
+function processConnections(): Set<Database.Database> {
+  const state = globalThis as typeof globalThis & {
+    __bordSqliteConnections?: Set<Database.Database>;
+  };
+  return (state.__bordSqliteConnections ??= new Set());
+}
+
 function resolveDatabasePath(databaseUrl: string): string {
   const path = databaseUrl.startsWith('file:') ? databaseUrl.slice('file:'.length) : databaseUrl;
   return path === ':memory:' || isAbsolute(path) ? path : normalize(`${process.cwd()}/${path}`);
@@ -35,14 +45,18 @@ function openDatabase(): { sqlite: Database.Database; db: AppDatabase; path: str
     throw new BackupRecoveryRequiredError();
   const path = resolveDatabasePath(getRuntimeConfig().databaseUrl);
 
-  if (database && drizzleDatabase && openedPath === path) {
+  if (database?.open && drizzleDatabase && openedPath === path) {
     return { sqlite: database, db: drizzleDatabase, path };
   }
 
-  if (database) database.close();
+  if (database) {
+    if (database.open) database.close();
+    processConnections().delete(database);
+  }
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
 
   database = new Database(path);
+  processConnections().add(database);
   database.pragma('journal_mode = WAL');
   database.pragma('foreign_keys = ON');
   drizzleDatabase = drizzle(database, { schema });
@@ -79,7 +93,10 @@ export function resetDatabaseForTests(): void {
 }
 
 export function closeDatabaseConnection(): void {
-  database?.close();
+  for (const connection of processConnections()) {
+    if (connection.open) connection.close();
+  }
+  processConnections().clear();
   database = undefined;
   drizzleDatabase = undefined;
   openedPath = undefined;

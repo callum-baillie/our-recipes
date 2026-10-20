@@ -45,6 +45,8 @@ async function signIn() {
     .map((value) => value.split(';')[0])
     .join('; ');
   assert.ok(cookie, 'Synthetic sign-in did not return a session cookie.');
+  const session = await (await request('/api/auth/get-session')).json();
+  assert.equal(session?.user?.email, 'cook@example.invalid');
 }
 
 async function createRecipe(title) {

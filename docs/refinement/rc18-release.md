@@ -18,6 +18,8 @@ A durable restore marker blocks database use after interrupted/incomplete recove
 
 The actual container then exposed the auth adapter's captured closed SQLite handle after restore. Its Drizzle root methods now resolve the current database at operation time while preserving concrete transaction objects. A real-library synthetic-session regression checks old-session revocation and fresh sign-in through the existing auth instance after restore; the container smoke exercises that same lifecycle over HTTP.
 
+Separate Next server/proxy bundles can also retain distinct connections in the same process. Recovery now closes the process-wide registered handles before replacing files; cached bundle clients detect closed handles and reopen. A two-module-instance fixture checks this boundary, and the HTTP smoke verifies the fresh session through both authentication and protected application routes.
+
 ## Upgrade and rollback
 
 Create, download and validate a backup of the current installation before upgrading. Keep it outside the application volume and record the prior image digest. Pull the versioned image, retain the existing dedicated `/data` mount and configured secrets/origin, then require health to report version `1.0.0-rc.18`, schema `0071_ai_prompt_versions` and `migrationStatus: current` before accepting writes. The existing entrypoint takes a pre-migration SQLite safety copy. Do not point an older image at the migrated database; use a fresh data directory and the prior version's supported restore flow with the pre-upgrade backup. See [deployment](../deployment.md) and [backup recovery](../backup-and-restore.md).
