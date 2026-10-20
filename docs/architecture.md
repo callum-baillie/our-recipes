@@ -1,6 +1,6 @@
 # Architecture
 
-The read-only Open Food Facts/USDA provider layer, selected-record provenance, and camera boundary are specified in [food-data-integrations.md](food-data-integrations.md). Browser components call only Bòrd APIs; SQLite, rate state, provider configuration, and credentials remain server-only.
+The native Bòrd Food API and compatible direct Open Food Facts/USDA adapters, selected-record provenance and camera boundary are specified in [bord-catalog-integration.md](bord-catalog-integration.md) and [food-data-integrations.md](food-data-integrations.md). Browser/native components call only Bòrd APIs; SQLite, rate state, provider configuration and credentials remain server-only.
 
 Bòrd uses a Next.js App Router application with a deliberately narrow vertical-slice structure:
 
@@ -10,13 +10,13 @@ Bòrd uses a Next.js App Router application with a deliberately narrow vertical-
 - `src/lib/services`: household and profile use cases, independent of HTTP.
 - `src/lib/storage`: server-only durable media storage and image transformation boundary.
 - `src/lib/db`: Drizzle table definitions, SQLite connection lifecycle, and migrations.
-- `src/lib/actor-context.ts`: the non-auth profile selection seam used by later audit/history features.
+- `src/lib/actor-context.ts`: signed, session-bound profile attribution, subordinate to the authenticated principal and capabilities.
 
 The current runtime is Node 24, Next 16, React 19, strict TypeScript, Tailwind 4, Drizzle ORM, `better-sqlite3`, Sharp, and local PDF.js text extraction. `DATA_DIR` defaults to `./data`; new installations store SQLite at `DATA_DIR/bord.db`. Container startup renames an unambiguous legacy `our-recipes.db` and its sidecars before the app opens SQLite, while local development continues to resolve an existing legacy file safely. Recipe images are stored below `DATA_DIR/uploads`, while normalized document imports are stored below `DATA_DIR/generated/imports`; neither tree is in the application web root. The database uses WAL mode and foreign keys. `pnpm db:migrate` applies the committed Drizzle migration before a deployment, while the application also ensures current migrations before serving state.
 
 The browser never opens SQLite, filesystem paths, or an AI provider. API route handlers validate input with Zod, check an exact trusted mutation origin, call services, and return versioned JSON. No CORS headers are enabled by default.
 
-Profiles are a convenience layer, not identity or authorization. The selected profile is held in an HttpOnly, same-site, HMAC-signed cookie. `ActorContext` exposes the selected profile ID without making a security claim. A future authenticated deployment can replace that seam without changing recipe-domain services.
+Better Auth accounts establish identity and sessions. The selected household profile is held in an HttpOnly, same-site, HMAC-signed, session-bound cookie; switching it cannot elevate the account's permissions. `ActorContext` preserves attribution. Personal account forms use the linked profile, while Nutrition operations distinguish the signed-in actor from the authorized viewed person. Handlers and services recheck authority instead of treating the cookie or proxy as sufficient. See the [field ownership matrix](refinement/settings-ownership.md).
 
 Household organization is server-backed: editable profiles carry cooking preferences and may be archived only when another active profile remains; profile archival never deletes attributed recipe/history rows. Tags are a canonical local catalog with optional colors and usage counts. Their rename, merge, and delete services update recipe associations and affected FTS documents atomically; browser tag autocomplete is advisory, while the server normalizes all saved names.
 

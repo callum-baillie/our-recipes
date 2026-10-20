@@ -219,6 +219,19 @@ export const foodCatalogImportInputSchema = z
   })
   .strict();
 
+export const foodCatalogShoppingInputSchema = foodCatalogImportInputSchema
+  .extend({
+    itemId: z.string().uuid().optional(),
+    expectedUpdatedAt: z.string().datetime().optional(),
+    cartQuantity: z.number().positive().max(10000),
+    cartUnit: z.string().trim().min(1).max(30),
+  })
+  .strict()
+  .refine((input) => Boolean(input.itemId) === Boolean(input.expectedUpdatedAt), {
+    message: 'Review the current item version before matching.',
+    path: ['expectedUpdatedAt'],
+  });
+
 export type FoodCatalogImportInput = z.infer<typeof foodCatalogImportInputSchema>;
 
 export const canonicalNutrientCodeSchema = z.enum(NUTRIENT_CODES);

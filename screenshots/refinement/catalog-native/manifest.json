@@ -1,0 +1,18 @@
+{
+  "baseCommit": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
+  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md",
+  "capturedAt": "2026-10-20T15:59:57.628838+00:00",
+  "spec": "tests/e2e/catalog-native-refinement.spec.ts",
+  "scope": "Synthetic bounded source data and intercepted confirmation/replay. Browser coordinates are synthetic; no real provider or stock mutation.",
+  "captures": [
+    "food-confirm-short-568.png",
+    "food-confirm-text-200.png",
+    "food-context-1440.png",
+    "food-context-320.png",
+    "food-context-390.png",
+    "store-filters-1440.png",
+    "store-filters-320.png",
+    "store-filters-390.png",
+    "uncertain-confirmation-320.png"
+  ]
+}

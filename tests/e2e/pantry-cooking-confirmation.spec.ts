@@ -6,6 +6,8 @@ import { completeInitialOnboarding } from './helpers/onboarding';
 const ORIGIN = 'http://127.0.0.1:3100';
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
+  // A successful stock mutation refreshes the route and its streamed metadata.
+  await page.waitForLoadState('networkidle');
   await expect(page).toHaveTitle(/\S/u);
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, fullPage: true, caret: 'initial' });
@@ -113,7 +115,10 @@ test('planned cooking reviews exact FEFO stock and only deducts after literal co
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/planner?view=week&date=2027-04-01');
-  await page.locator('summary[aria-label="Actions for Cooking lentil stew"]:visible').click();
+  await page
+    .getByRole('button', { name: 'Actions for Cooking lentil stew', exact: true })
+    .filter({ visible: true })
+    .click();
   const cookLink = page.getByRole('link', {
     name: 'Make Cooking lentil stew from this planned meal',
   });

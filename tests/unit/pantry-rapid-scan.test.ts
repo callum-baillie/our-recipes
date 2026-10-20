@@ -54,7 +54,18 @@ describe('reviewed rapid Pantry intake', () => {
     expect(result.current.entries[0]).toMatchObject({
       operationId,
       saveAttempted: true,
-      error: 'Connection lost',
+      error: expect.stringContaining('Outcome unknown; retry uses the same confirmation.'),
+    });
+    await act(async () => {
+      result.current.quantity('b', 5);
+      result.current.remove('b');
+      await result.current.scan('b');
+    });
+    expect(result.current.entries[0]).toMatchObject({
+      barcode: 'b',
+      count: 1,
+      operationId,
+      saveAttempted: true,
     });
     expect(imported).toHaveBeenCalledWith(
       { id: 'a', displayName: 'Flour', brand: '' },

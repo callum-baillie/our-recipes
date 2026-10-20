@@ -4,7 +4,11 @@ import { getDatabase } from '@/lib/db/client';
 import type { DecisionCard, DecisionJob, DecisionRequest } from '@/lib/domain/decision-assistance';
 import { DECISION_TASKS, decisionFeedbackSchema } from '@/lib/domain/decision-assistance';
 import { AI_GROUNDING_INSTRUCTIONS } from '@/lib/domain/ai-grounding';
-import { DecisionError, requestDecisions } from '@/lib/providers/decisions-provider';
+import {
+  DECISIONS_MODEL,
+  DecisionError,
+  requestDecisions,
+} from '@/lib/providers/decisions-provider';
 import type { RequestPrincipal } from '@/lib/services/auth-service';
 import { aiSafetyIdentifier } from '@/lib/services/ai-context-service';
 import { getAiDataPolicy, getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
@@ -36,7 +40,13 @@ const correctionSchema = z.object({
   note: z.string(),
 });
 const hashJob = (p: RequestPrincipal, job: DecisionJob) =>
-  decisionHash({ revision: 1, model: 'gpt-6-luna', policy: getAiDataPolicy(p.profileId), job });
+  decisionHash({
+    revision: 2,
+    model: DECISIONS_MODEL,
+    promptVersion: getAiWorkloadSetting(p.profileId, 'chat').promptVersion,
+    policy: getAiDataPolicy(p.profileId),
+    job,
+  });
 function toCard(
   row: ReturnType<typeof ownedDecision>,
   job: DecisionJob,
@@ -93,6 +103,8 @@ export async function runDecisionAssistance(p: RequestPrincipal, input: Decision
       // Model-generated confidence is displayed, never used as authorization to mutate data.
       const answers = await requestDecisions({
         allowPaidCall: input.allowPaidCall,
+        model: DECISIONS_MODEL,
+        requestTimeoutSeconds: setting.requestTimeoutSeconds,
         safetyIdentifier: aiSafetyIdentifier(p.profileId),
         evidence: missing.map(({ job }, index) => ({
           name: `item_${index}`,
@@ -101,7 +113,7 @@ export async function runDecisionAssistance(p: RequestPrincipal, input: Decision
         })),
         questions: missing.map(({ job }, index) => ({
           name: `item_${index}`,
-          instructions: `${AI_GROUNDING_INSTRUCTIONS} Evaluate only evidence for item_${index}. ${job.instructions} Return unknown when evidence is insufficient.`,
+          instructions: `${AI_GROUNDING_INSTRUCTIONS} ${setting.promptGuidance ?? ''} Evaluate only evidence for item_${index}. ${job.instructions} Return unknown when evidence is insufficient.`,
           choices: job.options.map((o) => ({
             value: o.value,
             description: `${o.label}: ${o.description}`,

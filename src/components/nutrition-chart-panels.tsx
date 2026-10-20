@@ -53,6 +53,11 @@ export function NutritionChartPanels({
             Target, minimum, range, and limit rows keep their own meanings. Missing values are
             unknown, not zero.
           </p>
+          {datasets.coverage.some((row) => row.status === 'ambiguous_goal') && (
+            <a className="inline-link" href="/nutrition?goals=1">
+              Review conflicting goals
+            </a>
+          )}
           <small>
             {datasets.calorie.profileLabel} · {datasets.calorie.date}
           </small>
@@ -92,7 +97,7 @@ export function NutritionChartPanels({
                       </small>
                     </span>
                   </div>
-                  {row.amount !== null && (row.kind === 'target' || row.kind === 'minimum') ? (
+                  {row.ratio !== null && (row.kind === 'target' || row.kind === 'minimum') ? (
                     <div className={styles.track} aria-hidden="true">
                       <span
                         style={{
@@ -135,7 +140,9 @@ export function NutritionChartPanels({
                         <td>{row.status.replaceAll('_', ' ')}</td>
                         <td>
                           {row.ratio === null
-                            ? 'No data'
+                            ? row.status === 'ambiguous_goal'
+                              ? 'Comparison unavailable'
+                              : 'No data'
                             : `${(row.ratio * 100).toFixed(1)}% of ${
                                 row.kind === 'range' || row.kind === 'limit' ? 'maximum' : row.kind
                               }`}

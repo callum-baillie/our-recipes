@@ -69,6 +69,7 @@ export type PantryDashboard = {
   batches: PantryBatchView[];
   recentEvents: Array<typeof pantryInventoryEvents.$inferSelect & { productName: string }>;
   lowStockProductIds: string[];
+  productStock: Record<string, { knownQuantity: number; unit: string; uncertain: boolean }>;
 };
 
 function resolvedRestockPolicy(input: PantryProductInput) {
@@ -1888,6 +1889,29 @@ export function getPantryDashboard(
     batches,
     recentEvents,
     lowStockProductIds,
+    // Essentials describes household stock, independently of the filtered display rows.
+    productStock: Object.fromEntries(
+      products.map((product) => {
+        const unit = product.stockUnit || product.defaultInventoryUnit;
+        const eligible = allBatches.filter(
+          (batch) =>
+            batch.productId === product.id &&
+            ACTIVE_BATCH_STATUSES.has(batch.status) &&
+            !batch.excludeFromGrocery,
+        );
+        let knownQuantity = 0;
+        let uncertain = false;
+        for (const batch of eligible) {
+          if (batch.quantityRemaining === null || !areInventoryUnitsCompatible(batch.unit, unit)) {
+            uncertain = true;
+            continue;
+          }
+          knownQuantity += convertInventoryQuantity(batch.quantityRemaining, batch.unit, unit);
+          if (batch.approximateState !== null) uncertain = true;
+        }
+        return [product.id, { knownQuantity, unit, uncertain }];
+      }),
+    ),
   };
 }
 

@@ -23,6 +23,8 @@ import {
   defaultOnboardingNutrition,
   householdSettingsSchema,
   profileInputSchema,
+  profileIdentityUpdateSchema,
+  type ProfileIdentityUpdate,
   setupSchema,
   type HouseholdSettingsInput,
   type OnboardingNutritionInput,
@@ -466,7 +468,12 @@ export function getProfile(profileId: string): ProfileRecord | null {
   );
 }
 
-export function updateProfile(profileId: string, input: ProfileInput): ProfileRecord {
+export function updateProfile(
+  profileId: string,
+  input: ProfileInput | ProfileIdentityUpdate,
+): ProfileRecord {
+  const identityOnly = 'scope' in input;
+  if (identityOnly) input = profileIdentityUpdateSchema.parse(input);
   ensureDatabase();
   const db = getDatabase();
   const existing = db.select().from(profiles).where(eq(profiles.id, profileId)).get();
@@ -478,13 +485,17 @@ export function updateProfile(profileId: string, input: ProfileInput): ProfileRe
       .set({
         displayName: input.displayName,
         color: input.color,
-        avatarUrl: input.avatarUrl || null,
-        units: input.units,
-        temperatureUnit: input.temperatureUnit,
-        locale: input.locale,
-        timezone: input.timezone,
-        mainGoals: input.mainGoals ?? existing.mainGoals,
-        goalContext: input.goalContext ?? existing.goalContext,
+        ...(input.avatarUrl === undefined ? {} : { avatarUrl: input.avatarUrl || null }),
+        ...(!('scope' in input)
+          ? {
+              units: input.units,
+              temperatureUnit: input.temperatureUnit,
+              locale: input.locale,
+              timezone: input.timezone,
+              mainGoals: input.mainGoals ?? existing.mainGoals,
+              goalContext: input.goalContext ?? existing.goalContext,
+            }
+          : {}),
         updatedAt,
       })
       .where(eq(profiles.id, profileId))

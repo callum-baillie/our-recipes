@@ -1,8 +1,8 @@
-import { cookies } from 'next/headers';
+import { personalAiPrincipal } from '@/lib/services/ai-personal-request';
+import { decisionErrorResponse } from '@/lib/services/decision-request-service';
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   AiAssistantProviderResponseError,
@@ -19,12 +19,15 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   if (!hasTrustedMutationOrigin(request))
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
-  const profileId = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value).profileId;
-  if (!profileId)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  let principal;
+  try {
+    principal = await personalAiPrincipal(request);
+  } catch (error) {
+    return decisionErrorResponse(error);
+  }
   try {
     const result = await generateAiMealPlanProposal({
-      actorProfileId: profileId,
+      actorProfileId: principal.linkedProfileId,
       request: await request.json().catch(() => null),
     });
     return NextResponse.json({ proposal: result.proposal }, { status: 201 });

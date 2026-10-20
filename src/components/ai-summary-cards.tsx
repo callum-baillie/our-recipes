@@ -125,6 +125,16 @@ export function AiSummaryCards({
         </div>
       </header>
       <p className={styles.summary}>{summary.summary}</p>
+      {summary.caveats.length ? (
+        <aside className={styles.qualifications} aria-label="Summary limitations">
+          <strong>Read with these limitations</strong>
+          <ul>
+            {summary.caveats.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </aside>
+      ) : null}
       {summary.metrics.length ? (
         <dl className={styles.metrics}>
           {summary.metrics.map((metric) => {
@@ -154,11 +164,17 @@ export function AiSummaryCards({
           <summary className="recipe-disclosure-summary">
             <span>Data notes</span> <ChevronDown size={18} aria-hidden="true" />
           </summary>
-          <ul>
-            {summary.caveats.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          <p>
+            This saved summary reflects only the evidence available when it was generated. Its
+            limitations are shown above with the summary.
+          </p>
+          {summary.periodStart && summary.periodEnd ? (
+            <p>
+              Recorded scope: {summary.periodStart} to {summary.periodEnd}.
+            </p>
+          ) : (
+            <p>No dated scope was recorded for this summary.</p>
+          )}
         </details>
       ) : null}
       <footer>

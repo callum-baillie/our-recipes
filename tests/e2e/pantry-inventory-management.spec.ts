@@ -80,7 +80,7 @@ async function clickCardAction(card: ReturnType<Page['locator']>, name: string) 
       await dialog.accept();
     });
   const action = (await openCardMenu(card)).getByRole('button', { name, exact: true });
-  await action.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  await action.scrollIntoViewIfNeeded();
   await expect(action).toBeInViewport();
   await action.click();
 }
@@ -187,7 +187,7 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await add.getByLabel('Use by').fill('2027-10-02');
   await add.getByLabel('Date precision').selectOption('exact');
   await add.getByRole('button', { name: 'Add item', exact: true }).click();
-  await expectSaved(page, 'Pantry item added.');
+  await expectSaved(page, '1 Pantry batch added.');
 
   card = cards.first();
   manage = await batchManagement(card);

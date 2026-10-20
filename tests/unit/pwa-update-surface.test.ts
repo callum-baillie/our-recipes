@@ -11,6 +11,42 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+it('does not describe a first worker installation as an application update', async () => {
+  const installing = Object.assign(new EventTarget(), { state: 'installed' });
+  const registration = Object.assign(new EventTarget(), {
+    active: null,
+    waiting: { postMessage: vi.fn() },
+    installing,
+    update: vi.fn(async () => undefined),
+  });
+  const workers = Object.assign(new EventTarget(), {
+    controller: null,
+    register: vi.fn(async () => registration),
+  });
+  vi.stubEnv('NEXT_PUBLIC_ENABLE_PWA_IN_DEVELOPMENT', 'true');
+  vi.stubGlobal('isSecureContext', true);
+  vi.stubGlobal('navigator', { onLine: true, serviceWorker: workers });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ status: 'ok' })),
+  );
+  await act(async () => {
+    render(createElement(PwaRegistration));
+  });
+  await act(async () => {
+    registration.dispatchEvent(new Event('updatefound'));
+    installing.dispatchEvent(new Event('statechange'));
+    workers.dispatchEvent(new Event('controllerchange'));
+  });
+  expect(screen.queryByRole('button', { name: 'Reload when ready' })).toBeNull();
+});
 it('keeps dirty and clean pages on the update notice until one explicit activation request', async () => {
   const post = vi.fn();
   const registration = Object.assign(new EventTarget(), {

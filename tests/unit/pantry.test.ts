@@ -95,6 +95,9 @@ describe('Pantry inventory units', () => {
     expect(convertInventoryQuantity(1, 'kg', 'g')).toBe(1_000);
     expect(convertInventoryQuantity(2, 'cup', 'ml')).toBeCloseTo(473.176, 3);
     expect(convertInventoryQuantity(1, 'dozen', 'each')).toBe(12);
+    expect(convertInventoryQuantity(0.0000001, 'g', 'g')).toBe(0.0000001);
+    expect(convertInventoryQuantity(0.0000001, 'g', 'kg')).toBe(0.0000000001);
+    expect(convertInventoryQuantity(0, 'g', 'kg')).toBe(0);
   });
 
   it('never converts between incompatible dimensions', () => {

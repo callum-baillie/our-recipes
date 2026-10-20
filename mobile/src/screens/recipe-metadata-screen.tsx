@@ -17,6 +17,7 @@ import {
   Surface,
 } from '@/components/ui';
 import { ResourceState, TaskError } from '@/components/nutrition-workspace-common';
+import { RecipeImageReview } from '@/components/recipe-image-review';
 import { preserveRecipeFields, type EditableDetail } from '@/data/recipe-edit';
 
 type Detail = EditableDetail & {
@@ -66,7 +67,8 @@ export function RecipeMetadataScreen() {
   );
 }
 function MetadataEditor({ detail, reload }: { detail: Detail; reload: () => void }) {
-  const { request, assetSource } = useAuth();
+  const { request, assetSource, user, instanceUrl } = useAuth();
+  const accountSubject = `${instanceUrl}:${user?.id ?? 'signed-out'}`;
   const { refresh } = useSync();
   const task = useTask();
   const [fields, setFields] = React.useState<Record<string, string>>(
@@ -177,31 +179,14 @@ function MetadataEditor({ detail, reload }: { detail: Detail; reload: () => void
       </Surface>
       <Button label="Save recipe details" disabled={task.busy} onPress={() => void save()} />
       <EditorialText>Photos</EditorialText>
-      <Button
-        label="Generate serving photo with OpenAI"
-        tone="secondary"
-        disabled={task.busy}
-        onPress={() =>
-          Alert.alert(
-            'Generate a recipe photo?',
-            'This sends this recipe to OpenAI and uses your server’s configured paid image provider.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Confirm paid generation',
-                onPress: () =>
-                  void task.run(async () => {
-                    await request(`/api/v1/recipes/${detail.id}/images/generate`, {
-                      method: 'POST',
-                      body: JSON.stringify({ confirm: true }),
-                    });
-                    reload();
-                    await refresh();
-                  }),
-              },
-            ],
-          )
-        }
+      <RecipeImageReview
+        key={`${detail.id}:${accountSubject}`}
+        recipeId={detail.id}
+        revision={detail.currentRevision}
+        onAccepted={async () => {
+          reload();
+          await refresh();
+        }}
       />
       <FormField
         label="Description for the next photo (optional)"

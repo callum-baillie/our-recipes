@@ -95,7 +95,7 @@ describe('PWA service worker updates', () => {
     expect(workerSource).toContain("url.pathname.startsWith('/api/v1/branding/icons/v1/')");
   });
 
-  it('deletes obsolete app caches and refreshes controlled clients during an update', async () => {
+  it('retains caches and notifies clients without navigating during an update', async () => {
     const worker = loadWorker({
       cacheKeys: ['our-recipes-read-v2', `bord-read-${appVersion}`, 'another-app-cache'],
       isUpdate: true,
@@ -103,11 +103,10 @@ describe('PWA service worker updates', () => {
 
     await worker.dispatch('activate');
 
-    expect(worker.deletedCaches).toEqual(['our-recipes-read-v2']);
+    expect(worker.deletedCaches).toEqual([]);
     expect(worker.clients.claim).toHaveBeenCalledOnce();
     expect(worker.messages).toEqual([{ type: 'BORD_UPDATED', version: appVersion }]);
-    expect(worker.navigations).toHaveLength(1);
-    expect(new URL(worker.navigations[0]!).searchParams.get('__bord_updated')).toBe(appVersion);
+    expect(worker.navigations).toHaveLength(0);
   });
 
   it('claims clients without reloading them on a true first install', async () => {

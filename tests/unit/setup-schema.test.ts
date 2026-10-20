@@ -1,6 +1,14 @@
+// @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { defaultProfileGoalContext } from '@/lib/domain/profile-goals';
+import { ProfileEditor, type Profile } from '@/components/profile-settings';
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+afterEach(cleanup);
 
 import {
   defaultProfileInput,
@@ -102,16 +110,57 @@ describe('setupSchema', () => {
 
   it('uses US onboarding defaults and derives hidden regional settings from the browser', () => {
     const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
-    const settingsSource = readFileSync('src/components/profile-settings.tsx', 'utf8');
     expect(defaultProfileInput).toMatchObject({ units: 'imperial', temperatureUnit: 'F' });
     expect(source).toContain('navigator.language');
     expect(source).toContain('Intl.DateTimeFormat().resolvedOptions().timeZone');
     expect(source).not.toContain('<span>Avatar URL');
     expect(source).not.toContain('<span>Locale</span>');
     expect(source).not.toContain('<span>Time zone</span>');
-    expect(settingsSource).toContain('Avatar URL');
-    expect(settingsSource).toContain('title="Locale"');
-    expect(settingsSource).toContain('title="Time zone"');
+  });
+
+  it('preserves valid regional identifiers through personal profile editing', async () => {
+    const profile: Profile = {
+      ...defaultProfileInput,
+      mainGoals: '',
+      goalContext: defaultProfileGoalContext,
+      id: 'person-1',
+      displayName: 'Avery',
+      avatarUrl: null,
+      archivedAt: null,
+      role: 'parent',
+      isLastAdmin: false,
+      locale: 'en-NZ',
+      timezone: 'Pacific/Auckland',
+    };
+    const save = vi.fn().mockResolvedValue(undefined);
+    render(
+      createElement(ProfileEditor, {
+        profile,
+        active: true,
+        personal: true,
+        onSave: save,
+        onArchive: vi.fn(),
+        onRoleChange: vi.fn(),
+      }),
+    );
+    expect((screen.getByLabelText(/^Regional format/) as HTMLInputElement).value).toBe('en-NZ');
+    expect((screen.getByLabelText(/^Time zone/) as HTMLInputElement).value).toBe(
+      'Pacific/Auckland',
+    );
+    fireEvent.change(screen.getByLabelText(/^Display name/), {
+      target: { value: 'Avery renamed' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        profile,
+        expect.objectContaining({
+          displayName: 'Avery renamed',
+          locale: 'en-NZ',
+          timezone: 'Pacific/Auckland',
+        }),
+      ),
+    );
   });
 
   it('accepts profile-only onboarding with personal goals and optional nutrition details', () => {

@@ -1,5 +1,5 @@
 import { bodyMetricFields as webBodyFields, bodyMetricsSchema } from '@/lib/domain/body-metrics';
-import { bodyMetricFields, parseBodyMetrics } from '../../mobile/src/data/body-metrics';
+import { bodyMetricFields, parseBodyMetrics } from '../../shared/mobile-domain/body-metrics';
 import { describe, expect, it } from 'vitest';
 import { mealPlanEntrySchema, mealPlanEntryUpdateSchema } from '@/lib/domain/planning';
 import { NUTRIENT_DEFINITIONS } from '@/lib/domain/nutrition';
@@ -9,9 +9,9 @@ import {
   inventoryPdfExportSchema,
 } from '@/lib/domain/pdf-export';
 import { manualConsumptionRequestSchema } from '@/lib/domain/nutrition-food-diary';
-import { mealEntryPayload, type MealEntry } from '../../mobile/src/data/meal-entry';
-import { nutrientValues, localTimestamp } from '../../mobile/src/data/nutrition-commands';
-import { nutrientCatalog } from '../../mobile/src/data/nutrient-catalog';
+import { mealEntryPayload, type MealEntry } from '../../shared/mobile-domain/meal-entry';
+import { nutrientValues, localTimestamp } from '../../shared/mobile-domain/nutrition-commands';
+import { nutrientCatalog } from '../../shared/mobile-domain/nutrient-catalog';
 const recipeId = '49386bc5-777c-4588-a019-a032a03f6a99';
 const base = {
   kind: 'recipe' as const,

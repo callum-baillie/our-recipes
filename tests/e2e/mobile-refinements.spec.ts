@@ -33,14 +33,19 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
     await expect(settings).toBeVisible();
     await settings.getByRole('button', { name: 'Close plan settings' }).focus();
     await page.keyboard.press('Shift+Tab');
-    await expect(settings.getByRole('button', { name: 'Done', exact: true })).toBeFocused();
+    await expect(
+      settings
+        .locator('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]')
+        .filter({ visible: true })
+        .last(),
+    ).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(settings.getByRole('button', { name: 'Close plan settings' })).toBeFocused();
     const bounds = await settings.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(0);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(844);
-    await settings.getByRole('button', { name: 'Edit types', exact: true }).click();
+    await settings.getByRole('button', { name: 'Manage meal types', exact: true }).click();
     await expect(
       settings.getByRole('group', { name: 'Meal types shown in the planner' }),
     ).toBeVisible();
@@ -84,7 +89,7 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   const darkSettings = page.getByRole('dialog', { name: 'Plan settings', exact: true });
   expect((await appAxe(page).include('#planner-settings-panel').analyze()).violations).toEqual([]);
   await page.screenshot({ path: '/tmp/bord-planner-settings-dark.png' });
-  await darkSettings.getByRole('button', { name: 'Done', exact: true }).click();
+  await darkSettings.getByRole('button', { name: 'Close plan settings', exact: true }).click();
   await page
     .getByLabel('Actions for Traditional Scottish Stovies')
     .filter({ visible: true })
@@ -108,6 +113,7 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(390);
   expect(menuBox!.width).toBeGreaterThanOrEqual(44);
   await actions.click();
+  await page.getByText('Reschedule or swap', { exact: true }).click();
   await expect(
     page
       .getByLabel('Move Traditional Scottish Stovies to another day or meal')
@@ -117,9 +123,11 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   await page.getByRole('button', { name: 'Edit meal / adapt recipe', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Edit planned meal', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close meal editor', exact: true }).click();
-  await page.getByRole('button', { name: 'Close meal actions' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Actions for Traditional Scottish Stovies', exact: true }),
+  ).not.toBeVisible();
   await page
-    .getByRole('link', { name: 'Traditional Scottish Stovies', exact: true })
+    .getByRole('link', { name: 'Make Traditional Scottish Stovies', exact: true })
     .first()
     .click();
   await expect(page).toHaveURL(/\/cook\?/);
@@ -140,7 +148,7 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   await page.goto(`/lists/${list.id}`);
   await page.getByRole('button', { name: 'Shopping mode', exact: true }).click();
   await expect(page.getByRole('button', { name: /Shop with Instacart/i })).toHaveCount(0);
-  await page.getByRole('button', { name: 'In cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Add to cart', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Remove from cart', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Change quantity', exact: true }).click();
   await page.screenshot({ path: '/tmp/bord-mobile-cart-quantity.png', fullPage: true });
@@ -151,7 +159,7 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   expect((await savedList.json()).list.items[0]).toMatchObject({ quantity: 12, cartQuantity: 6 });
   await page.screenshot({ path: '/tmp/bord-mobile-shopping.png', fullPage: true });
   await page.goto('/account');
-  await page.getByRole('button', { name: 'Start my interview' }).click();
+  await page.getByRole('button', { name: 'Start guided questionnaire', exact: true }).click();
   await page
     .getByLabel('Do you lean sweet, savory, or a little of both?', { exact: true })
     .fill('Sweet tooth');
@@ -183,7 +191,7 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   await expect(page.getByText('Ready to help with dinner.')).toBeVisible();
   await page.getByRole('button', { name: 'Assistant settings' }).click();
   await expect(
-    page.getByText('Allow additional paid suggestions in this conversation'),
+    page.getByRole('checkbox', { name: /^Allow additional paid suggestions/ }),
   ).toBeVisible();
   await page.screenshot({ path: '/tmp/bord-mobile-chat.png', fullPage: true });
   await page.getByRole('button', { name: 'Assistant settings' }).click();

@@ -51,10 +51,7 @@ export type HouseholdProfile = {
   id: string;
   displayName: string;
   color: string;
-  units: 'metric' | 'imperial';
-  temperatureUnit: 'C' | 'F';
-  locale: string;
-  timezone: string;
+  avatarUrl?: string;
   archivedAt?: string | null;
 };
 export type PantryItem = {

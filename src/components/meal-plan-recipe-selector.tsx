@@ -597,8 +597,7 @@ export function MealPlanRecipeSelector({
                 disabled={busy}
                 onClick={() => {
                   setAssignments({});
-                  setUncertain(false);
-                  setError(null);
+                  if (!uncertain) setError(null);
                 }}
               >
                 Clear selections

@@ -5,8 +5,8 @@ import {
   requireNutritionPrincipal,
 } from '@/app/api/v1/nutrition/_shared';
 import { getNutritionRecommendations } from '@/lib/services/nutrition-recommendation-service';
-export async function GET(_request: Request, context: { params: Promise<{ profileId: string }> }) {
-  const auth = await requireNutritionPrincipal();
+export async function GET(request: Request, context: { params: Promise<{ profileId: string }> }) {
+  const auth = await requireNutritionPrincipal(request);
   if (auth.response) return auth.response;
   try {
     const profileId = parseNutritionProfileId((await context.params).profileId);

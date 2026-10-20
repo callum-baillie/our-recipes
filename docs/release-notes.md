@@ -1,5 +1,15 @@
 # Release notes
 
+## 1.0.0-rc.17 refinement branch
+
+- Resolve the 33 retained UI verification findings across recipe review, cooking, Pantry, shopping, planner, Nutrition and scoped settings; record behavioral and current browser evidence under `docs/refinement/`.
+- Add progressive web/native assistant streaming, durable turn recovery, typed dependent actions, editable version-bound proposals, focused sharing and direct authenticated handler guards.
+- Add administrator prompt history/preview/rollback, enforced personal/model/request limits, personal instructions and reviewed generated-photo candidates. Live image quality is a separate explicit paid evaluation.
+- Complete native catalog identity and reviewed Pantry/shopping confirmation, measures/guidance/enrichment/store contracts, read-effect permissions and completed-operation replay during outages. Catalog acquisition remains separate operator work.
+- Preserve hidden personal fields during household identity saves, omitted interview facts during adaptive updates, true small stock quantities, unknown values and historical records.
+- Add migrations `0069_ai_chat_turn_recovery`, `0070_recipe_image_candidates` and `0071_ai_prompt_versions`. Applied history is unchanged. Back up before upgrading; follow existing startup migration and recovery procedures.
+- Refresh compatible native dependencies and add independent native CI gates. Remaining upstream advisories, device/live-provider checks and deployment evidence are explicitly listed in the refinement register. Branch publication is not a deployment or release tag.
+
 ## 1.0.0-rc.15
 
 - Increase the default immediate AI allowance to 10 actions per account per ten minutes.

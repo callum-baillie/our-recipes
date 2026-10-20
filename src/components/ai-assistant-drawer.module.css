@@ -168,11 +168,28 @@
 .messageBody {
   display: grid;
   gap: 0.6rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .messageBody p,
-.messageBody ul {
+.messageBody ul,
+.messageBody ol,
+.messageBody pre {
   margin: 0;
+}
+.messageBody pre {
+  max-width: 100%;
+  overflow: auto;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--linen);
+  white-space: pre;
+}
+.messageBody a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .typing {
@@ -243,7 +260,8 @@
   opacity: 0.55;
 }
 
-.messageBody ul {
+.messageBody ul,
+.messageBody ol {
   display: grid;
   gap: 0.28rem;
   padding-left: 1.15rem;
@@ -661,7 +679,7 @@
 .viewport {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  height: var(--assistant-viewport-height, 100dvh);
+  height: calc(var(--assistant-viewport-height, 100dvh) - var(--app-notice-height, 0px));
   transform: translateY(var(--assistant-viewport-top, 0px));
   min-height: 0;
 }
@@ -782,4 +800,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
+}
+.recoveryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }

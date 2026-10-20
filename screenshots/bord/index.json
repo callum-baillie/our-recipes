@@ -1064,9 +1064,7 @@
       "label": "add-recipe-dialog",
       "path": "/",
       "filePath": "desktop/overlays/dialogs/global--add-recipe-dialog.png",
-      "visibleDialogs": [
-        "add-recipe-title"
-      ]
+      "visibleDialogs": ["add-recipe-title"]
     },
     {
       "device": "desktop",
@@ -1075,9 +1073,7 @@
       "label": "Switch profile password dialog",
       "path": "/",
       "filePath": "desktop/overlays/dialogs/global--switch-profile-password-dialog.png",
-      "visibleDialogs": [
-        "count 1"
-      ]
+      "visibleDialogs": ["count 1"]
     },
     {
       "device": "desktop",
@@ -1086,9 +1082,7 @@
       "label": "Add a meal",
       "path": "/planner",
       "filePath": "desktop/overlays/dialogs/meal-planner--add-a-meal.png",
-      "visibleDialogs": [
-        "recipe-selector-title"
-      ]
+      "visibleDialogs": ["recipe-selector-title"]
     },
     {
       "device": "desktop",
@@ -1096,9 +1090,7 @@
       "key": "meal-planner",
       "label": "edit-meal-dialog",
       "filePath": "desktop/overlays/dialogs/meal-planner--edit-meal-dialog.png",
-      "visibleDialogs": [
-        "meal-editor-title"
-      ]
+      "visibleDialogs": ["meal-editor-title"]
     },
     {
       "device": "desktop",
@@ -1106,9 +1098,7 @@
       "key": "meal-planner",
       "label": "meal-plan-generator-lower-section",
       "path": "/planner",
-      "visibleDialogs": [
-        "meal-plan-generator-title"
-      ],
+      "visibleDialogs": ["meal-plan-generator-title"],
       "filePath": "desktop/overlays/dialogs/meal-planner--meal-plan-generator-bottom.png"
     },
     {
@@ -1118,9 +1108,7 @@
       "label": "meal-plan-generator",
       "path": "/planner",
       "filePath": "desktop/overlays/dialogs/meal-planner--meal-plan-generator.png",
-      "visibleDialogs": [
-        "meal-plan-generator-title"
-      ]
+      "visibleDialogs": ["meal-plan-generator-title"]
     },
     {
       "device": "desktop",
@@ -1129,9 +1117,7 @@
       "label": "settings-panel",
       "path": "/planner",
       "filePath": "desktop/overlays/dialogs/meal-planner--settings-panel.png",
-      "visibleDialogs": [
-        "planner-settings-title"
-      ]
+      "visibleDialogs": ["planner-settings-title"]
     },
     {
       "device": "desktop",
@@ -1140,9 +1126,7 @@
       "label": "Choose nutrition profile",
       "path": "/nutrition",
       "filePath": "desktop/overlays/dialogs/nutrition-dashboard--choose-nutrition-profile.png",
-      "visibleDialogs": [
-        "nutrition-profile-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-profile-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1151,9 +1135,7 @@
       "label": "edit-nutrition-goals",
       "path": "/nutrition",
       "filePath": "desktop/overlays/dialogs/nutrition-dashboard--edit-nutrition-goals.png",
-      "visibleDialogs": [
-        "nutrition-goal-setup-title"
-      ]
+      "visibleDialogs": ["nutrition-goal-setup-title"]
     },
     {
       "device": "desktop",
@@ -1162,9 +1144,7 @@
       "label": "log-food",
       "path": "/nutrition",
       "filePath": "desktop/overlays/dialogs/nutrition-dashboard--log-food.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1172,9 +1152,7 @@
       "key": "nutrition-log",
       "label": "log-food-copy",
       "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-copy.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1182,9 +1160,7 @@
       "key": "nutrition-log",
       "label": "log-food-manual",
       "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-manual.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1192,9 +1168,7 @@
       "key": "nutrition-log",
       "label": "log-food-product",
       "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-product.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1202,9 +1176,7 @@
       "key": "nutrition-log",
       "label": "log-food-recipe",
       "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-recipe.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1212,9 +1184,7 @@
       "key": "nutrition-log",
       "label": "log-food-skipped",
       "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-skipped.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1222,9 +1192,7 @@
       "key": "nutrition-log",
       "label": "log-food-weight",
       "filePath": "desktop/overlays/dialogs/nutrition-log--log-food-weight.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1240,9 +1208,7 @@
       "label": "Add pantry item",
       "path": "/pantry",
       "filePath": "desktop/overlays/dialogs/pantry--add-pantry-item.png",
-      "visibleDialogs": [
-        "add-pantry-item-title"
-      ]
+      "visibleDialogs": ["add-pantry-item-title"]
     },
     {
       "device": "desktop",
@@ -1251,9 +1217,7 @@
       "label": "Advanced pantry search",
       "path": "/pantry",
       "filePath": "desktop/overlays/dialogs/pantry--advanced-pantry-search.png",
-      "visibleDialogs": [
-        "pantry-filter-dialog-title"
-      ]
+      "visibleDialogs": ["pantry-filter-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1262,9 +1226,7 @@
       "label": "Review pantry",
       "path": "/pantry",
       "filePath": "desktop/overlays/dialogs/pantry--review-pantry.png",
-      "visibleDialogs": [
-        "review-pantry_review"
-      ]
+      "visibleDialogs": ["review-pantry_review"]
     },
     {
       "device": "desktop",
@@ -1273,9 +1235,7 @@
       "label": "Add recipe to collection",
       "path": "/recipes",
       "filePath": "desktop/overlays/dialogs/recipe-library--add-recipe-to-collection.png",
-      "visibleDialogs": [
-        "recipe-collection-5e61e988-5134-4296-9a43-7f14e8328856-title"
-      ]
+      "visibleDialogs": ["recipe-collection-5e61e988-5134-4296-9a43-7f14e8328856-title"]
     },
     {
       "device": "desktop",
@@ -1284,9 +1244,7 @@
       "label": "Advanced search",
       "path": "/recipes",
       "filePath": "desktop/overlays/dialogs/recipe-library--advanced-search.png",
-      "visibleDialogs": [
-        "library-filter-dialog-title"
-      ]
+      "visibleDialogs": ["library-filter-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1295,9 +1253,7 @@
       "label": "Review recipe data",
       "path": "/recipes",
       "filePath": "desktop/overlays/dialogs/recipe-library--review-recipe-data.png",
-      "visibleDialogs": [
-        "review-cleanup"
-      ]
+      "visibleDialogs": ["review-cleanup"]
     },
     {
       "device": "desktop",
@@ -1306,9 +1262,7 @@
       "label": "Food catalog picker",
       "path": "/recipes/new",
       "filePath": "desktop/overlays/dialogs/recipe-new--food-catalog-picker.png",
-      "visibleDialogs": [
-        "_R_7njav5ubrdb_"
-      ]
+      "visibleDialogs": ["_R_7njav5ubrdb_"]
     },
     {
       "device": "desktop",
@@ -1324,9 +1278,7 @@
       "label": "add-profile",
       "path": "/settings/profiles",
       "filePath": "desktop/overlays/dialogs/settings-profiles--add-profile.png",
-      "visibleDialogs": [
-        "profile-onboarding-dialog-title"
-      ]
+      "visibleDialogs": ["profile-onboarding-dialog-title"]
     },
     {
       "device": "desktop",
@@ -1375,9 +1327,7 @@
       "label": "meal-type-settings",
       "path": "/planner",
       "filePath": "desktop/overlays/disclosures/meal-planner--meal-type-settings.png",
-      "visibleDialogs": [
-        "planner-settings-title"
-      ]
+      "visibleDialogs": ["planner-settings-title"]
     },
     {
       "device": "desktop",
@@ -1578,9 +1528,7 @@
       "label": "ai-assistant-drawer",
       "path": "/",
       "filePath": "desktop/overlays/drawers/global--ai-assistant-drawer.png",
-      "visibleDialogs": [
-        "ai-assistant-title"
-      ]
+      "visibleDialogs": ["ai-assistant-title"]
     },
     {
       "device": "desktop",
@@ -1589,9 +1537,7 @@
       "label": "assistant-settings",
       "path": "/",
       "filePath": "desktop/overlays/drawers/global--assistant-settings.png",
-      "visibleDialogs": [
-        "ai-assistant-title"
-      ]
+      "visibleDialogs": ["ai-assistant-title"]
     },
     {
       "device": "desktop",
@@ -1600,9 +1546,7 @@
       "label": "date-range-picker",
       "path": "/planner",
       "filePath": "desktop/overlays/dropdowns/meal-planner--date-range-picker.png",
-      "visibleDialogs": [
-        "planner-settings-title"
-      ]
+      "visibleDialogs": ["planner-settings-title"]
     },
     {
       "device": "desktop",
@@ -1643,9 +1587,7 @@
       "label": "add-recipe-dialog",
       "path": "/",
       "filePath": "mobile/overlays/dialogs/global--add-recipe-dialog.png",
-      "visibleDialogs": [
-        "add-recipe-title"
-      ]
+      "visibleDialogs": ["add-recipe-title"]
     },
     {
       "device": "mobile",
@@ -1654,9 +1596,7 @@
       "label": "Switch profile password dialog",
       "path": "/",
       "filePath": "mobile/overlays/dialogs/global--switch-profile-password-dialog.png",
-      "visibleDialogs": [
-        "count 1"
-      ]
+      "visibleDialogs": ["count 1"]
     },
     {
       "device": "mobile",
@@ -1665,9 +1605,7 @@
       "label": "Add a meal",
       "path": "/planner",
       "filePath": "mobile/overlays/dialogs/meal-planner--add-a-meal.png",
-      "visibleDialogs": [
-        "recipe-selector-title"
-      ]
+      "visibleDialogs": ["recipe-selector-title"]
     },
     {
       "device": "mobile",
@@ -1675,9 +1613,7 @@
       "key": "meal-planner",
       "label": "edit-meal-dialog",
       "filePath": "mobile/overlays/dialogs/meal-planner--edit-meal-dialog.png",
-      "visibleDialogs": [
-        "meal-editor-title"
-      ]
+      "visibleDialogs": ["meal-editor-title"]
     },
     {
       "device": "mobile",
@@ -1685,9 +1621,7 @@
       "key": "meal-planner",
       "label": "meal-plan-generator-lower-section",
       "path": "/planner",
-      "visibleDialogs": [
-        "meal-plan-generator-title"
-      ],
+      "visibleDialogs": ["meal-plan-generator-title"],
       "filePath": "mobile/overlays/dialogs/meal-planner--meal-plan-generator-bottom.png"
     },
     {
@@ -1697,9 +1631,7 @@
       "label": "meal-plan-generator",
       "path": "/planner",
       "filePath": "mobile/overlays/dialogs/meal-planner--meal-plan-generator.png",
-      "visibleDialogs": [
-        "meal-plan-generator-title"
-      ]
+      "visibleDialogs": ["meal-plan-generator-title"]
     },
     {
       "device": "mobile",
@@ -1708,9 +1640,7 @@
       "label": "settings-panel",
       "path": "/planner",
       "filePath": "mobile/overlays/dialogs/meal-planner--settings-panel.png",
-      "visibleDialogs": [
-        "planner-settings-title"
-      ]
+      "visibleDialogs": ["planner-settings-title"]
     },
     {
       "device": "mobile",
@@ -1719,9 +1649,7 @@
       "label": "Choose nutrition profile",
       "path": "/nutrition",
       "filePath": "mobile/overlays/dialogs/nutrition-dashboard--choose-nutrition-profile.png",
-      "visibleDialogs": [
-        "nutrition-profile-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-profile-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1730,9 +1658,7 @@
       "label": "edit-nutrition-goals",
       "path": "/nutrition",
       "filePath": "mobile/overlays/dialogs/nutrition-dashboard--edit-nutrition-goals.png",
-      "visibleDialogs": [
-        "nutrition-goal-setup-title"
-      ]
+      "visibleDialogs": ["nutrition-goal-setup-title"]
     },
     {
       "device": "mobile",
@@ -1741,9 +1667,7 @@
       "label": "log-food",
       "path": "/nutrition",
       "filePath": "mobile/overlays/dialogs/nutrition-dashboard--log-food.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1751,9 +1675,7 @@
       "key": "nutrition-log",
       "label": "log-food-copy",
       "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-copy.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1761,9 +1683,7 @@
       "key": "nutrition-log",
       "label": "log-food-manual",
       "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-manual.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1771,9 +1691,7 @@
       "key": "nutrition-log",
       "label": "log-food-product",
       "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-product.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1781,9 +1699,7 @@
       "key": "nutrition-log",
       "label": "log-food-recipe",
       "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-recipe.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1791,9 +1707,7 @@
       "key": "nutrition-log",
       "label": "log-food-skipped",
       "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-skipped.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1801,9 +1715,7 @@
       "key": "nutrition-log",
       "label": "log-food-weight",
       "filePath": "mobile/overlays/dialogs/nutrition-log--log-food-weight.png",
-      "visibleDialogs": [
-        "nutrition-log-dialog-title"
-      ]
+      "visibleDialogs": ["nutrition-log-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1819,9 +1731,7 @@
       "label": "Add pantry item",
       "path": "/pantry",
       "filePath": "mobile/overlays/dialogs/pantry--add-pantry-item.png",
-      "visibleDialogs": [
-        "add-pantry-item-title"
-      ]
+      "visibleDialogs": ["add-pantry-item-title"]
     },
     {
       "device": "mobile",
@@ -1830,9 +1740,7 @@
       "label": "Advanced pantry search",
       "path": "/pantry",
       "filePath": "mobile/overlays/dialogs/pantry--advanced-pantry-search.png",
-      "visibleDialogs": [
-        "pantry-filter-dialog-title"
-      ]
+      "visibleDialogs": ["pantry-filter-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1841,9 +1749,7 @@
       "label": "Review pantry",
       "path": "/pantry",
       "filePath": "mobile/overlays/dialogs/pantry--review-pantry.png",
-      "visibleDialogs": [
-        "review-pantry_review"
-      ]
+      "visibleDialogs": ["review-pantry_review"]
     },
     {
       "device": "mobile",
@@ -1852,9 +1758,7 @@
       "label": "Add recipe to collection",
       "path": "/recipes",
       "filePath": "mobile/overlays/dialogs/recipe-library--add-recipe-to-collection.png",
-      "visibleDialogs": [
-        "recipe-collection-5e61e988-5134-4296-9a43-7f14e8328856-title"
-      ]
+      "visibleDialogs": ["recipe-collection-5e61e988-5134-4296-9a43-7f14e8328856-title"]
     },
     {
       "device": "mobile",
@@ -1863,9 +1767,7 @@
       "label": "Advanced search",
       "path": "/recipes",
       "filePath": "mobile/overlays/dialogs/recipe-library--advanced-search.png",
-      "visibleDialogs": [
-        "library-filter-dialog-title"
-      ]
+      "visibleDialogs": ["library-filter-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1874,9 +1776,7 @@
       "label": "Review recipe data",
       "path": "/recipes",
       "filePath": "mobile/overlays/dialogs/recipe-library--review-recipe-data.png",
-      "visibleDialogs": [
-        "review-cleanup"
-      ]
+      "visibleDialogs": ["review-cleanup"]
     },
     {
       "device": "mobile",
@@ -1885,9 +1785,7 @@
       "label": "Food catalog picker",
       "path": "/recipes/new",
       "filePath": "mobile/overlays/dialogs/recipe-new--food-catalog-picker.png",
-      "visibleDialogs": [
-        "_R_7njav5ubrdb_"
-      ]
+      "visibleDialogs": ["_R_7njav5ubrdb_"]
     },
     {
       "device": "mobile",
@@ -1903,9 +1801,7 @@
       "label": "add-profile",
       "path": "/settings/profiles",
       "filePath": "mobile/overlays/dialogs/settings-profiles--add-profile.png",
-      "visibleDialogs": [
-        "profile-onboarding-dialog-title"
-      ]
+      "visibleDialogs": ["profile-onboarding-dialog-title"]
     },
     {
       "device": "mobile",
@@ -1954,9 +1850,7 @@
       "label": "meal-type-settings",
       "path": "/planner",
       "filePath": "mobile/overlays/disclosures/meal-planner--meal-type-settings.png",
-      "visibleDialogs": [
-        "planner-settings-title"
-      ]
+      "visibleDialogs": ["planner-settings-title"]
     },
     {
       "device": "mobile",
@@ -2125,9 +2019,7 @@
       "label": "ai-assistant-drawer",
       "path": "/",
       "filePath": "mobile/overlays/drawers/global--ai-assistant-drawer.png",
-      "visibleDialogs": [
-        "ai-assistant-title"
-      ]
+      "visibleDialogs": ["ai-assistant-title"]
     },
     {
       "device": "mobile",
@@ -2136,9 +2028,7 @@
       "label": "assistant-settings",
       "path": "/",
       "filePath": "mobile/overlays/drawers/global--assistant-settings.png",
-      "visibleDialogs": [
-        "ai-assistant-title"
-      ]
+      "visibleDialogs": ["ai-assistant-title"]
     },
     {
       "device": "mobile",
@@ -2147,9 +2037,7 @@
       "label": "date-range-picker",
       "path": "/planner",
       "filePath": "mobile/overlays/dropdowns/meal-planner--date-range-picker.png",
-      "visibleDialogs": [
-        "planner-settings-title"
-      ]
+      "visibleDialogs": ["planner-settings-title"]
     },
     {
       "device": "mobile",

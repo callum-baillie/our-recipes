@@ -1,5 +1,6 @@
 'use client';
 
+import { CatalogFoodContext } from '@/components/catalog-food-context';
 import { CatalogRetailEvidence } from '@/components/catalog-retail-evidence';
 
 import dynamic from 'next/dynamic';
@@ -90,6 +91,15 @@ export function FoodCatalogPicker({
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
   const readVersion = useRef(0);
+  const importAttempt = useRef<{
+    fingerprint: string;
+    operationId: string;
+    path: string;
+    payload: unknown;
+    displayName: string;
+    existingProductId?: string;
+  } | null>(null);
+  const importLock = useRef(false);
   const readController = useRef<AbortController | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const modal = useModalSurface({ open: open && !embedded, onClose: close, panelRef });
@@ -105,8 +115,13 @@ export function FoodCatalogPicker({
   const [rapidLocation, setRapidLocation] = useState(locations[0]?.id ?? '');
   const rapidQueue = usePantryRapidScan(onImported);
   useEffect(() => {
-    onSavingChange?.(savingImport || rapidQueue.busy);
-  }, [onSavingChange, savingImport, rapidQueue.busy]);
+    onSavingChange?.(
+      savingImport ||
+        rapidQueue.busy ||
+        !!importAttempt.current ||
+        rapidQueue.entries.some((entry) => entry.saveAttempted),
+    );
+  }, [onSavingChange, savingImport, rapidQueue.busy, rapidQueue.entries]);
 
   useEffect(() => {
     if (embedded) return;
@@ -123,6 +138,12 @@ export function FoodCatalogPicker({
 
   function close() {
     if (savingImport || rapidQueue.busy) return;
+    if (importAttempt.current) {
+      setError(
+        'This confirmation may have saved. Use Retry previous confirmation to reconcile its outcome before closing.',
+      );
+      return;
+    }
     readController.current?.abort();
     readVersion.current++;
     setBusy(false);
@@ -164,7 +185,7 @@ export function FoodCatalogPicker({
     }
   }
 
-  async function post(url: string, body: unknown) {
+  async function post(url: string, body: unknown, operationId?: string) {
     const readOnly = [
       '/api/v1/food-data/searches',
       '/api/v1/food-data/barcode-lookups',
@@ -177,12 +198,18 @@ export function FoodCatalogPicker({
     const response = await fetch(url, {
       signal: readOnly ? readController.current?.signal : undefined,
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(operationId ? { 'Idempotency-Key': operationId } : {}),
+      },
       body: JSON.stringify(body),
     });
     const parsed = await response.json().catch(() => null);
     if (!response.ok)
-      throw new Error(message(parsed, 'Food data could not complete this request.'));
+      throw Object.assign(
+        new Error(message(parsed, 'Food data could not complete this request.')),
+        { status: response.status },
+      );
     return parsed;
   }
 
@@ -285,10 +312,11 @@ export function FoodCatalogPicker({
   async function importRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     event.stopPropagation();
-    if (!selected) return;
-    setBusy(true);
-    setSavingImport(true);
-    setError('');
+    if (!selected || importLock.current) return;
+    if (importAttempt.current) {
+      await retryImport();
+      return;
+    }
     const data = new FormData(event.currentTarget);
     const base = {
       operationId: createClientUuid(),
@@ -351,23 +379,50 @@ export function FoodCatalogPicker({
           ],
         }
       : base;
+    const fingerprint = JSON.stringify(payload);
+    importAttempt.current = {
+      fingerprint,
+      operationId: payload.operationId,
+      path: pantry ? '/api/v1/pantry/catalog-imports' : '/api/v1/food-data/imports',
+      payload,
+      displayName: base.product.displayName,
+    };
+    await retryImport();
+  }
+
+  async function retryImport() {
+    const attempt = importAttempt.current;
+    if (!attempt || importLock.current) return;
+    importLock.current = true;
+    setBusy(true);
+    setSavingImport(true);
+    setError('');
     try {
-      const result = (await post(
-        pantry ? '/api/v1/pantry/catalog-imports' : '/api/v1/food-data/imports',
-        payload,
-      )) as { product?: { id: string; displayName: string }; productId?: string };
-      const product = result.product ?? {
-        id: result.productId ?? '',
-        displayName: base.product.displayName,
+      const result = (await post(attempt.path, attempt.payload, attempt.operationId)) as {
+        product?: { id: string; displayName: string };
+        productId?: string;
       };
+      const product = result.product ?? {
+        id: result.productId ?? attempt.existingProductId ?? '',
+        displayName: attempt.displayName,
+      };
+      importAttempt.current = null;
       onImported?.(product);
       setOpen(false);
       setSelected(null);
+      setSelectedLocal(null);
       setRecords([]);
       setLocalProducts([]);
     } catch (value) {
+      if (
+        value instanceof Error &&
+        'status' in value &&
+        [400, 401, 403, 404, 409, 422].includes(Number(value.status))
+      )
+        importAttempt.current = null;
       setError(value instanceof Error ? value.message : 'The reviewed food could not be imported.');
     } finally {
+      importLock.current = false;
       setBusy(false);
       setSavingImport(false);
     }
@@ -382,49 +437,49 @@ export function FoodCatalogPicker({
       close();
       return;
     }
-    setBusy(true);
-    setSavingImport(true);
-    setError('');
-    const data = new FormData(event.currentTarget);
-    try {
-      await post('/api/v1/pantry/batches', {
-        productId: selectedLocal.id,
-        quantityRemaining: Number(data.get('quantityRemaining') ?? 1),
-        originalQuantity: Number(data.get('quantityRemaining') ?? 1),
-        unit: String(data.get('unit') ?? 'each'),
-        packageCount: null,
-        amountPerPackage: null,
-        packageUnit: '',
-        approximateState: null,
-        locationId: String(data.get('locationId') ?? ''),
-        sublocation: '',
-        purchaseDate: '',
-        bestBeforeDate: String(data.get('bestBeforeDate') ?? ''),
-        useByDate: '',
-        sellByDate: '',
-        openedDate: '',
-        frozenDate: '',
-        thawedDate: '',
-        preparedDate: '',
-        expiryPrecision: data.get('bestBeforeDate') ? 'exact' : 'unknown',
-        status: 'unopened',
-        purchasePriceCents: null,
-        source: 'Existing Pantry product',
-        notes: '',
-        excludeFromGrocery: false,
-        sourceRecipeId: '',
-        sourceMealPlanEntryId: '',
-        sourceShoppingListItemId: '',
-      });
-      onImported?.(selectedLocal);
-      setOpen(false);
-      setSelectedLocal(null);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'The Pantry batch could not be added.');
-    } finally {
-      setBusy(false);
-      setSavingImport(false);
+    if (importAttempt.current) {
+      await retryImport();
+      return;
     }
+    const data = new FormData(event.currentTarget);
+    const payload = {
+      productId: selectedLocal.id,
+      quantityRemaining: Number(data.get('quantityRemaining') ?? 1),
+      originalQuantity: Number(data.get('quantityRemaining') ?? 1),
+      unit: String(data.get('unit') ?? 'each'),
+      packageCount: null,
+      amountPerPackage: null,
+      packageUnit: '',
+      approximateState: null,
+      locationId: String(data.get('locationId') ?? ''),
+      sublocation: '',
+      purchaseDate: '',
+      bestBeforeDate: String(data.get('bestBeforeDate') ?? ''),
+      useByDate: '',
+      sellByDate: '',
+      openedDate: '',
+      frozenDate: '',
+      thawedDate: '',
+      preparedDate: '',
+      expiryPrecision: data.get('bestBeforeDate') ? 'exact' : 'unknown',
+      status: 'unopened',
+      purchasePriceCents: null,
+      source: 'Existing Pantry product',
+      notes: '',
+      excludeFromGrocery: false,
+      sourceRecipeId: '',
+      sourceMealPlanEntryId: '',
+      sourceShoppingListItemId: '',
+    };
+    importAttempt.current = {
+      fingerprint: JSON.stringify(payload),
+      operationId: createClientUuid(),
+      path: '/api/v1/pantry/batches',
+      payload,
+      displayName: selectedLocal.displayName,
+      existingProductId: selectedLocal.id,
+    };
+    await retryImport();
   }
 
   return (
@@ -510,6 +565,18 @@ export function FoodCatalogPicker({
             <p className={styles.providerNotice} role="status">
               Saving this food record. Please wait before closing.
             </p>
+          )}
+          {importAttempt.current && !savingImport && (
+            <div className={styles.providerNotice} role="status">
+              <p>
+                The last confirmation for {importAttempt.current.displayName} has no acknowledged
+                result. Retry uses exactly the submitted source, amount and operation; it does not
+                submit later edits.
+              </p>
+              <button type="button" className="secondary-button" onClick={() => void retryImport()}>
+                Retry previous confirmation
+              </button>
+            </div>
           )}
           {!selected && !selectedLocal ? (
             <>
@@ -643,7 +710,7 @@ export function FoodCatalogPicker({
                         <button
                           type="button"
                           aria-label={`Remove scan ${entry.barcode}`}
-                          disabled={rapidQueue.busy}
+                          disabled={rapidQueue.busy || entry.saveAttempted}
                           onClick={() => rapidQueue.remove(entry.barcode)}
                         >
                           <X size={16} />
@@ -780,7 +847,10 @@ export function FoodCatalogPicker({
                 </div>
               </div>
               {context === 'pantry' ? (
-                <div className={styles.reviewGrid}>
+                <fieldset
+                  className={styles.reviewGrid}
+                  disabled={savingImport || !!importAttempt.current}
+                >
                   <label>
                     Quantity
                     <input
@@ -817,7 +887,7 @@ export function FoodCatalogPicker({
                     Best before
                     <input name="bestBeforeDate" type="date" />
                   </label>
-                </div>
+                </fieldset>
               ) : (
                 <p className={styles.provenance}>
                   This uses the existing local product and does not add Pantry stock or Food Diary
@@ -866,13 +936,23 @@ export function FoodCatalogPicker({
                   </small>
                 </details>
               )}
+              {selected.catalogRef && (
+                <CatalogFoodContext
+                  key={`${selected.provider}:${selected.providerRecordId}:${selected.catalogRef.source_revision}`}
+                  name={selected.displayName}
+                  reference={selected.catalogRef}
+                />
+              )}
               {selected.catalogRef?.canonical_product_id && (
                 <CatalogRetailEvidence
                   key={`${selected.provider}:${selected.providerRecordId}`}
                   reference={selected.catalogRef}
                 />
               )}
-              <div className={styles.reviewGrid}>
+              <fieldset
+                className={styles.reviewGrid}
+                disabled={savingImport || !!importAttempt.current}
+              >
                 <label>
                   Name
                   <input
@@ -953,7 +1033,7 @@ export function FoodCatalogPicker({
                     </label>
                   </>
                 ) : null}
-              </div>
+              </fieldset>
               {selected.allergens.length ? (
                 <p className={styles.warning}>
                   <strong>Allergens:</strong> {selected.allergens.join(', ')}

@@ -35,8 +35,10 @@ test('onboarding calculates a gradual target timeline only from entered measurem
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Maya');
-  await page.getByLabel('Email').fill(onboardingEmail('The Timeline Table', 'Maya'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('The Timeline Table', 'Maya'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Enter my details manually' }).click();
   await page.getByLabel('When were you born?').fill('1990-01-01');
@@ -72,8 +74,10 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
-  await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('The Garden Table', 'Callum'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('checkbox', { name: /Feel organized at mealtime/u }).click();
@@ -91,8 +95,10 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
   await page.getByLabel('I saved these one-time codes somewhere private.').check();
   await page.getByRole('button', { name: 'Continue to sign in' }).click();
-  await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('The Garden Table', 'Callum'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
   await page.goto('/');
@@ -121,16 +127,28 @@ test('a fresh household can complete the supported local release acceptance work
   await page.goto('/account/ai');
   await expect(page).toHaveURL('/account/ai');
   await expect(page.getByRole('heading', { name: 'AI preferences', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save AI settings' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Save my AI defaults', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Save privacy and summary settings', exact: true }),
+  ).toBeVisible();
   await page.goto('/settings/lists');
   await page.getByRole('button', { name: /Add supermarket.*Start with a useful route/u }).click();
   await page.getByLabel('Store name').fill('Garden Market');
   await page.getByLabel('Section 1 name').fill('Produce');
+  await page
+    .locator('details')
+    .filter({ has: page.getByLabel('Section 1 keywords') })
+    .locator('summary')
+    .click();
   await page.getByLabel('Section 1 keywords').fill('lemons, fruit, vegetables, herbs');
   await page.getByRole('button', { name: 'Add supermarket', exact: true }).click();
   await expect(page.locator('.toast').filter({ hasText: 'Supermarket added.' })).toBeVisible();
-  await page.getByLabel('Default supermarket').selectOption({ label: 'Garden Market' });
-  await page.getByRole('button', { name: 'Save preferences' }).click();
+  await page
+    .getByRole('combobox', { name: /^Default for new lists/ })
+    .selectOption({ label: 'Garden Market' });
+  await page.getByRole('button', { name: 'Save list preferences' }).click();
   await expect(page.locator('.toast').filter({ hasText: 'List preferences saved.' })).toBeVisible();
   await page.goto('/recipes/new');
   await page.locator('.editor-optional').evaluateAll((nodes) =>
@@ -142,11 +160,11 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByLabel('Recipe name')).toBeVisible();
   await page.goto('/settings/profiles');
   await expect(page.getByRole('heading', { name: 'Household members & roles' })).toBeVisible();
-  await page.getByRole('button', { name: 'Add another profile' }).click();
+  await page.getByRole('button', { name: 'Add profile', exact: true }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await profileOnboarding.getByLabel('Display name').fill('Jon');
-  await profileOnboarding.getByLabel('Email').fill('jon-setup@example.test');
-  await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await profileOnboarding.getByRole('textbox', { name: /^Email\b/ }).fill('jon-setup@example.test');
+  await profileOnboarding.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
   await profileOnboarding.getByRole('checkbox', { name: /Cook at home more/u }).click();
@@ -157,7 +175,12 @@ test('a fresh household can complete the supported local release acceptance work
   await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
   await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();
   await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
-  await expect(page.getByRole('heading', { name: 'Jon' })).toBeVisible();
+  await page
+    .locator('.settings-member')
+    .filter({ has: page.locator('summary strong', { hasText: /^Jon$/ }) })
+    .locator('summary')
+    .click();
+  await expect(page.getByRole('heading', { name: 'Jon', exact: true })).toBeVisible();
   const jonProfile = page.locator('.profile-editor', {
     has: page.getByRole('heading', { name: 'Jon', exact: true }),
   });
@@ -199,7 +222,7 @@ test('a fresh household can complete the supported local release acceptance work
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/import');
-  await expect(page.getByRole('heading', { name: 'Add from an image.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Photos or PDF', exact: true })).toBeVisible();
   let visionRequest: unknown;
   await page.route('**/api/v1/ai/reviews', async (route) => {
     visionRequest = route.request().postDataJSON();
@@ -386,7 +409,10 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.locator('.import-source-preview-frame .import-preview-ready')).toHaveCount(2);
   expect(importRequestCount).toBe(1);
   await page.unroute('**/api/v1/imports');
-  await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
+  await page
+    .getByRole('button', { name: 'Confirm and add to cookbook', exact: true })
+    .last()
+    .click();
   await expect(page.getByRole('heading', { name: 'Lemon pasta' })).toBeVisible();
   await page.unroute('**/api/v1/ai/reviews');
 
@@ -453,7 +479,7 @@ test('a fresh household can complete the supported local release acceptance work
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/import');
-  await page.getByRole('button', { name: /Paste Schema\.org JSON-LD/ }).click();
+  await page.getByRole('button', { name: /Structured recipe data \(JSON-LD\)/ }).click();
   await page.getByLabel('Schema.org JSON-LD').fill(
     JSON.stringify({
       '@context': 'https://schema.org',
@@ -474,7 +500,10 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'JSON-LD tomato toast' })).toBeVisible();
   await page.getByRole('button', { name: 'Review this Recipe' }).click();
   await expect(page.getByText('Portable recipe review')).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
+  await page
+    .getByRole('button', { name: 'Confirm and add to cookbook', exact: true })
+    .last()
+    .click();
   await expect(page.getByRole('heading', { name: 'JSON-LD tomato toast' })).toBeVisible();
   await page.goto('/capture');
   await page.route('**/api/v1/capture-drafts', async (route) => {
@@ -533,7 +562,10 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'Structured URL soup' })).toBeVisible();
   await page.getByRole('button', { name: 'Review with AI' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
+  await page
+    .getByRole('button', { name: 'Confirm and add to cookbook', exact: true })
+    .last()
+    .click();
   await expect(page.getByRole('heading', { name: 'Structured URL soup' })).toBeVisible();
   await page.unroute('**/api/v1/capture-drafts');
   await page.goto('/capture');
@@ -544,7 +576,10 @@ test('a fresh household can complete the supported local release acceptance work
     );
   await page.getByRole('button', { name: 'Create draft with AI' }).click();
   await expect(page.getByText('Review before saving')).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm and add to cookbook' }).click();
+  await page
+    .getByRole('button', { name: 'Confirm and add to cookbook', exact: true })
+    .last()
+    .click();
   await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
   const recipeUrl = page.url();
   const recipeId = new URL(recipeUrl).pathname.split('/').at(-1);
@@ -577,7 +612,9 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('link', { name: 'Lemon pasta' })).toBeVisible();
   await page.getByLabel('A small note (optional)').fill('A shelf for busy evenings.');
   await page.getByRole('button', { name: 'Save collection' }).click();
-  await expect(page.getByText('A shelf for busy evenings.', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('main header').getByText('A shelf for busy evenings.', { exact: true }),
+  ).toBeVisible();
   await page.goto(recipeUrl);
   const tinyRecipePhoto = await sharp({
     create: { width: 2, height: 2, channels: 3, background: '#9f482f' },
@@ -604,6 +641,7 @@ test('a fresh household can complete the supported local release acceptance work
     .first();
   const likeReaction = homeRecipeCard.getByRole('button', {
     name: 'Like this recipe',
+    exact: true,
   });
   const savedReaction = page.waitForResponse(
     (response) =>
@@ -623,7 +661,7 @@ test('a fresh household can complete the supported local release acceptance work
       .locator('.recipe-summary-card')
       .filter({ hasText: 'Weeknight tomato soup' })
       .first()
-      .getByRole('button', { name: 'Like this recipe' }),
+      .getByRole('button', { name: 'Like this recipe', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await homeRecipeCard.getByRole('button', { name: 'Mark this recipe as a staple' }).click();
   await page.goto(recipeUrl);
@@ -637,12 +675,15 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByText('Current collection cover')).toBeVisible();
   await page.goto(recipeUrl);
   await page.getByRole('link', { name: 'Edit recipe' }).click();
-  await page.locator('.editor-optional').evaluateAll((nodes) =>
-    nodes.forEach((node) => {
-      (node as HTMLDetailsElement).open = true;
-    }),
-  );
+  await expect(
+    page.getByRole('heading', { name: 'Edit Weeknight tomato soup', exact: true }),
+  ).toBeVisible();
   await page.getByLabel('Cook minutes').fill('30');
+  for (const label of ['Original author (optional)', 'Calories (kcal)']) {
+    const disclosure = page.locator('details').filter({ has: page.getByLabel(label) });
+    if ((await disclosure.getAttribute('open')) === null)
+      await disclosure.locator('summary').click();
+  }
   await page.getByLabel('Original author (optional)').fill('Callum');
   await page.getByLabel('Cooking method (optional)').fill('oven-roasted');
   await page
@@ -687,6 +728,20 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Add timer', exact: true }).click();
   await expect(page.getByText('1:00')).toBeVisible();
   await page.getByRole('button', { name: 'Finish cooking', exact: true }).last().click();
+  const cookingConfirmation = page.getByRole('dialog', {
+    name: 'Confirm Pantry changes',
+    exact: true,
+  });
+  await expect(
+    cookingConfirmation.getByText('No exact mapped ingredient deductions are proposed.'),
+  ).toBeVisible();
+  await cookingConfirmation
+    .getByRole('button', {
+      name: 'Confirm deductions and finish · Confirm Pantry changes and finish cooking',
+      exact: true,
+    })
+    .click();
+  await expect(cookingConfirmation).not.toBeVisible();
   await page.getByRole('link', { name: '← Recipe details' }).click();
   await page.goto('/planner');
   await page.getByRole('button', { name: 'Plan settings', exact: true }).click();
@@ -697,18 +752,21 @@ test('a fresh household can complete the supported local release acceptance work
   const weekEnd = weekEndDate.toISOString().slice(0, 10);
   await page
     .getByRole('group', { name: 'Choose planning date range' })
-    .getByRole('button', { name: 'Done', exact: true })
+    .getByRole('button', { name: 'Close date range', exact: true })
     .click();
   await page.getByRole('button', { name: 'Close plan settings' }).click();
   await page.locator(`[data-planner-slot="${weekStart}:dinner"]`).click();
   const recipeSelector = page.getByRole('dialog', { name: 'Add meals' });
   await expect(recipeSelector).toBeVisible();
-  await recipeSelector.getByRole('tab', { name: /Dinner/u }).click();
   await recipeSelector
-    .getByPlaceholder('Search recipes, tags, categories, or collections')
+    .getByRole('group', { name: 'Meals to fill' })
+    .getByRole('button', { name: /^Dinner/ })
+    .click();
+  await recipeSelector
+    .getByRole('textbox', { name: 'Search recipes', exact: true })
     .fill('Weeknight tomato soup');
   await recipeSelector.getByRole('button', { name: /Weeknight tomato soup.*Select/u }).click();
-  await recipeSelector.getByRole('button', { name: 'Add 1 recipe to plan' }).click();
+  await recipeSelector.getByRole('button', { name: 'Add 1 meal', exact: true }).click();
   await expect(
     page
       .getByRole('region', { name: 'Meal calendar' })
@@ -721,7 +779,11 @@ test('a fresh household can complete the supported local release acceptance work
   expect(calendarResponse.ok()).toBe(true);
   await expect(calendarResponse.text()).resolves.toContain('BEGIN:VCALENDAR');
   await page.getByText('More actions', { exact: true }).click();
-  await page.getByRole('button', { name: 'Copy week' }).click();
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Existing meals stay.');
+    await dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Copy to next week', exact: true }).click();
   await expect(page).toHaveURL(/\/planner\?view=week&date=/);
   await expect(
     page
@@ -730,7 +792,7 @@ test('a fresh household can complete the supported local release acceptance work
       .filter({ visible: true }),
   ).toBeVisible();
   await page.goto(`/planner?view=week&date=${weekStart}`);
-  await page.getByRole('button', { name: 'Make Pantry-aware grocery list' }).click();
+  await page.getByRole('button', { name: 'Make grocery list', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: /^Meal Plan \d{2}\/\d{2} - \d{2}\/\d{2}$/u }),
   ).toBeVisible();
@@ -770,23 +832,19 @@ test('a fresh household can complete the supported local release acceptance work
     await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Tomato soup in a cream bowl' })).toBeVisible();
     await expect(
-      page.getByText('Offline reading only. Changes are unavailable and will not be queued.', {
-        exact: true,
-      }),
+      page.getByText(/Kitchen unavailable\. Changes need a connection and are not queued\./),
     ).toBeVisible();
   } finally {
     await page.context().setOffline(false);
   }
   await page.goto('/settings/backups');
   await page.getByRole('button', { name: 'Create backup' }).click();
-  await expect(
-    page.locator('.toast').filter({ hasText: 'Backup created and verified.' }),
-  ).toBeVisible({
+  await expect(page.locator('.toast').filter({ hasText: 'Backup created.' })).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByRole('button', { name: 'Review restore' })).toBeVisible({
     timeout: 30_000,
   });
   await page.getByRole('button', { name: 'Review restore' }).click();
-  await expect(page.getByRole('heading', { name: 'Restore this backup' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review restore', exact: true })).toBeVisible();
 });

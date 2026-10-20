@@ -53,6 +53,15 @@ export function CatalogStoreLink({
   onChange: (workspace: unknown) => void;
 }) {
   const [query, setQuery] = useState('');
+  const [area, setArea] = useState('');
+  const [chainId, setChainId] = useState('');
+  const [chains, setChains] = useState<Array<{ id: string; name: string }>>([]);
+  const [chainCursor, setChainCursor] = useState<string | null>(null);
+  const [chainsLoaded, setChainsLoaded] = useState(false);
+  const [nearby, setNearby] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [radiusKm, setRadiusKm] = useState('10');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [submittedSearch, setSubmittedSearch] = useState<Record<string, unknown> | null>(null);
   const [stores, setStores] = useState<Store[] | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [busy, setBusy] = useState(false);
@@ -212,7 +221,16 @@ export function CatalogStoreLink({
             event.preventDefault();
             run(async () => {
               setStores(null);
-              const result = await request('/api/v1/food-data/catalog/stores', 'POST', { query });
+              const criteria = {
+                ...(query.trim() ? { query: query.trim() } : {}),
+                ...(area.trim() ? { state: area.trim().toUpperCase() } : {}),
+                ...(chainId.trim() ? { chainId: chainId.trim() } : {}),
+                ...(nearby ?? {}),
+                radiusKm: Number(radiusKm),
+              };
+              const result = await request('/api/v1/food-data/catalog/stores', 'POST', criteria);
+              setSubmittedSearch(criteria);
+              setNextCursor(result.nextCursor);
               setStores(result.stores);
             });
           }}
@@ -222,6 +240,7 @@ export function CatalogStoreLink({
             <input
               id={`branch-search-${profile.id}`}
               value={query}
+              disabled={busy}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Store name, town or postcode"
               minLength={2}
@@ -229,13 +248,121 @@ export function CatalogStoreLink({
             />
             <button
               className="secondary-button compact"
-              disabled={busy || query.trim().length < 2}
+              disabled={
+                busy || (!nearby && !area.trim() && !chainId.trim() && query.trim().length < 2)
+              }
               aria-busy={busy}
               type="submit"
             >
               <Search size={16} /> {busy ? 'Please wait…' : 'Search'}
             </button>
           </div>
+          <details>
+            <summary>Area, chain and nearby filters</summary>
+            <label>
+              State or region code
+              <input
+                value={area}
+                disabled={busy}
+                maxLength={2}
+                onChange={(event) => setArea(event.target.value)}
+                placeholder="IA"
+              />
+            </label>
+            <label>
+              Chain (optional)
+              <select
+                value={chainId}
+                disabled={busy}
+                onChange={(event) => setChainId(event.target.value)}
+              >
+                <option value="">Any chain</option>
+                {chains.map((chain) => (
+                  <option key={chain.id} value={chain.id}>
+                    {chain.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {(!chainsLoaded || chainCursor) && (
+              <button
+                type="button"
+                className="secondary-button compact"
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    const result = await request('/api/v1/food-data/catalog/chains', 'POST', {
+                      country: 'US',
+                      ...(chainCursor ? { cursor: chainCursor } : {}),
+                    });
+                    setChains((current) => [...current, ...result.chains]);
+                    setChainCursor(result.nextCursor);
+                    setChainsLoaded(true);
+                  })
+                }
+              >
+                {chainsLoaded ? 'Show more chains' : 'Load available US chains'}
+              </button>
+            )}
+            {chainsLoaded && !chains.length && (
+              <p>No chains are available in this catalog. Name and area search remain available.</p>
+            )}
+            <label>
+              Search radius (km)
+              <input
+                value={radiusKm}
+                disabled={busy}
+                type="number"
+                min="0.1"
+                max="100"
+                step="0.1"
+                onChange={(event) => setRadiusKm(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="secondary-button compact"
+              disabled={busy}
+              onClick={() => {
+                if (!navigator.geolocation) {
+                  setError('Location is unavailable. Search by name or area.');
+                  return;
+                }
+                setBusy(true);
+                setError('');
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    setNearby({
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                    });
+                    setBusy(false);
+                  },
+                  () => {
+                    setError('Location could not be read. Search by name or area.');
+                    setBusy(false);
+                  },
+                  { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+                );
+              }}
+            >
+              Use my location for this search
+            </button>
+            {nearby && (
+              <p>
+                Nearby filter selected. Coordinates are sent to your configured catalog only when
+                you search.{' '}
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setNearby(null)}
+                  disabled={busy}
+                >
+                  Clear location
+                </button>
+              </p>
+            )}
+          </details>
         </form>
       )}
       {busy && <InlineSkeleton label="Loading official branch details" width="100%" />}
@@ -262,6 +389,25 @@ export function CatalogStoreLink({
           </button>
         </div>
       ))}
+      {nextCursor && submittedSearch && (
+        <button
+          type="button"
+          disabled={busy}
+          className="secondary-button compact"
+          onClick={() =>
+            void run(async () => {
+              const result = await request('/api/v1/food-data/catalog/stores', 'POST', {
+                ...submittedSearch,
+                cursor: nextCursor,
+              });
+              setStores((current) => [...(current ?? []), ...result.stores]);
+              setNextCursor(result.nextCursor);
+            })
+          }
+        >
+          Show more branches
+        </button>
+      )}
       <p className={styles.help}>
         Your store name, notes and shopping route stay under your control. Directory results don’t
         confirm stock or aisle numbers.

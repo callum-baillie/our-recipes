@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { SettingsConflictReview } from './settings-conflict-review';
 import type { AiRuntimeSettings, AiUserPreferences } from '@/lib/domain/ai-runtime-settings';
 import { SettingsPane, SettingsField, SettingsActionBar } from './settings-primitives';
 import {
@@ -23,12 +24,24 @@ type Props = {
   personal?: AiUserPreferences;
   enabled?: boolean;
 };
+type CurrentRuntime = {
+  settings?: AiRuntimeSettings;
+  global?: AiRuntimeSettings;
+  workloads: Workload[];
+  users?: Account[];
+  version?: number;
+  account?: { preferences: AiUserPreferences; version: number };
+};
 export function AiRuntimeSettingsForm(props: Props) {
   const shared = !props.personal;
   const [settings, setSettings] = useState(props.global);
   const [workloads, setWorkloads] = useState(props.workloads);
   const [personal, setPersonal] = useState(props.personal);
   const [accounts, setAccounts] = useState(props.accounts ?? []);
+  const [global, setGlobal] = useState(props.global);
+  const [conflict, setConflict] = useState(false);
+  const [current, setCurrent] = useState<CurrentRuntime | null>(null);
+  const lock = useRef(false);
   const [version, setVersion] = useState(props.version);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
@@ -36,7 +49,7 @@ export function AiRuntimeSettingsForm(props: Props) {
     JSON.stringify([props.global, props.workloads, props.personal, props.accounts ?? []]),
   );
   const dirty = JSON.stringify([settings, workloads, personal, accounts]) !== saved;
-  const processing = shared ? settings : (personal?.processing ?? props.global);
+  const processing = shared ? settings : (personal?.processing ?? global);
   function changeProcessing(changes: Partial<AiRuntimeSettings>) {
     if (shared) setSettings((current) => ({ ...current, ...changes }));
     else
@@ -50,6 +63,8 @@ export function AiRuntimeSettingsForm(props: Props) {
       }));
   }
   async function save() {
+    if (lock.current || conflict) return;
+    lock.current = true;
     setPending(true);
     setStatus('Saving…');
     try {
@@ -68,7 +83,13 @@ export function AiRuntimeSettingsForm(props: Props) {
         ),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error?.message ?? 'Could not save AI settings.');
+      if (!response.ok) {
+        if (response.status === 409) {
+          setConflict(true);
+          setCurrent(null);
+        }
+        throw new Error(body.error?.message ?? 'Could not save AI settings.');
+      }
       if (shared) {
         setSettings(body.settings);
         setWorkloads(body.workloads);
@@ -84,8 +105,72 @@ export function AiRuntimeSettingsForm(props: Props) {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not save settings.');
     } finally {
+      lock.current = false;
       setPending(false);
     }
+  }
+  async function loadCurrent() {
+    if (lock.current) return;
+    lock.current = true;
+    setPending(true);
+    try {
+      const response = await fetch(`/api/v1/ai/settings${shared ? '?scope=global' : ''}`, {
+        cache: 'no-store',
+      });
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(body.error?.message ?? 'Could not load current AI settings.');
+      setCurrent(body);
+      setStatus('Current saved settings loaded. Review before keeping or discarding your draft.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not load current settings.');
+    } finally {
+      lock.current = false;
+      setPending(false);
+    }
+  }
+  function reconcile(keep: boolean) {
+    if (!current) return;
+    if (shared) {
+      const savedSettings = current.settings!;
+      const savedAccounts = current.users ?? [];
+      setVersion(current.version!);
+      setSaved(JSON.stringify([savedSettings, current.workloads, personal, savedAccounts]));
+      setSettings(keep ? settings : savedSettings);
+      setWorkloads(
+        keep
+          ? current.workloads.map((item) => ({
+              ...item,
+              ...workloads.find((draft) => draft.workload === item.workload),
+              version: item.version,
+            }))
+          : current.workloads,
+      );
+      setAccounts(
+        keep
+          ? savedAccounts.map((item) => ({
+              ...item,
+              enabled: accounts.find((draft) => draft.id === item.id)?.enabled ?? item.enabled,
+            }))
+          : savedAccounts,
+      );
+    } else {
+      setVersion(current.account!.version);
+      setGlobal(current.global!);
+      setSettings(current.global!);
+      setWorkloads(current.workloads);
+      setSaved(
+        JSON.stringify([current.global, current.workloads, current.account!.preferences, accounts]),
+      );
+      if (!keep) setPersonal(current.account!.preferences);
+    }
+    setConflict(false);
+    setCurrent(null);
+    setStatus(
+      keep
+        ? 'Draft retained against the reviewed version. Save explicitly to apply it.'
+        : 'Current saved settings loaded.',
+    );
   }
   return (
     <div
@@ -99,7 +184,7 @@ export function AiRuntimeSettingsForm(props: Props) {
         description={
           shared
             ? 'Shared defaults apply unless an account chooses an override. Disabling AI prevents new requests; already submitted batches can still finish.'
-            : `AI access is ${props.enabled && props.global.enabled ? 'enabled' : 'disabled by an administrator'}. Your choices apply to your signed-in account.`
+            : `AI access is ${props.enabled && global.enabled ? 'enabled' : 'disabled by an administrator'}. Your choices apply to your signed-in account.`
         }
       >
         {shared && (
@@ -115,6 +200,101 @@ export function AiRuntimeSettingsForm(props: Props) {
                 disabled={pending}
                 onChange={(event) =>
                   setSettings((current) => ({ ...current, enabled: event.target.checked }))
+                }
+              />
+            </SettingsField>
+            <SettingsField
+              title="Allow personal model overrides"
+              description="Personal and conversation choices cannot enable a disabled workload or exceed installation limits."
+            >
+              <input
+                type="checkbox"
+                role="switch"
+                checked={settings.allowPersonalModelOverrides ?? true}
+                disabled={pending}
+                onChange={(event) =>
+                  setSettings((value) => ({
+                    ...value,
+                    allowPersonalModelOverrides: event.target.checked,
+                  }))
+                }
+              />
+            </SettingsField>
+            {(
+              [
+                ['maxOutputTokens', 'Maximum response tokens', 512, 16384],
+                ['requestTimeoutSeconds', 'Request timeout (seconds)', 15, 300],
+                ['toolRoundLimit', 'Maximum tool rounds per turn', 1, 12],
+              ] as const
+            ).map(([key, title, min, max]) => (
+              <SettingsField
+                key={key}
+                title={title}
+                description="Applies to new supported AI requests. Server policy remains authoritative."
+              >
+                <input
+                  type="number"
+                  min={min}
+                  max={max}
+                  value={settings[key]}
+                  disabled={pending}
+                  onChange={(event) =>
+                    setSettings((value) => ({ ...value, [key]: Number(event.target.value) }))
+                  }
+                />
+              </SettingsField>
+            ))}
+            <SettingsField
+              title="Generated image quality"
+              description="Applies to new supported image requests. Higher quality can increase generation cost and time."
+            >
+              <select
+                value={settings.imageQuality}
+                disabled={pending}
+                onChange={(event) =>
+                  setSettings((value) => ({
+                    ...value,
+                    imageQuality: event.target.value as AiRuntimeSettings['imageQuality'],
+                  }))
+                }
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </SettingsField>
+            <SettingsField
+              title="Generated image framing"
+              description="The selected image is kept until a replacement succeeds and is accepted."
+            >
+              <select
+                value={settings.imageSize}
+                disabled={pending}
+                onChange={(event) =>
+                  setSettings((value) => ({
+                    ...value,
+                    imageSize: event.target.value as AiRuntimeSettings['imageSize'],
+                  }))
+                }
+              >
+                <option value="1024x1024">Square · 1024 × 1024</option>
+                <option value="1536x1024">Landscape · 1536 × 1024</option>
+                <option value="1024x1536">Portrait · 1024 × 1536</option>
+              </select>
+            </SettingsField>
+            <SettingsField
+              title="Allow personal image choices"
+              description="Permits supported task controls to override image quality and framing. Paid-request consent and workload policy still apply."
+            >
+              <input
+                type="checkbox"
+                checked={settings.allowPersonalImageOverrides}
+                disabled={pending}
+                onChange={(event) =>
+                  setSettings((value) => ({
+                    ...value,
+                    allowPersonalImageOverrides: event.target.checked,
+                  }))
                 }
               />
             </SettingsField>
@@ -151,8 +331,8 @@ export function AiRuntimeSettingsForm(props: Props) {
                   processing: event.target.checked
                     ? null
                     : {
-                        executionMode: props.global.executionMode,
-                        batchMinItems: props.global.batchMinItems,
+                        executionMode: global.executionMode,
+                        batchMinItems: global.batchMinItems,
                       },
                 }))
               }
@@ -195,6 +375,52 @@ export function AiRuntimeSettingsForm(props: Props) {
           />
         </SettingsField>
       </SettingsPane>
+      {!shared && (
+        <SettingsPane
+          title="Personal instructions"
+          description="Applies to your signed-in account. Style and planning preferences follow administrator policy, explicit constraints and the permissions for each request."
+        >
+          <SettingsField
+            title="Response style and planning preferences"
+            description="Optional. Keep sensitive details in their dedicated sharing controls; these instructions cannot grant access or change recorded allergies."
+          >
+            <textarea
+              rows={4}
+              maxLength={2000}
+              disabled={pending}
+              value={personal?.instructions ?? ''}
+              onChange={(event) =>
+                setPersonal((value) => ({ ...value!, instructions: event.target.value }))
+              }
+            />
+          </SettingsField>
+          <button
+            type="button"
+            className="text-button"
+            disabled={pending || !personal?.instructions}
+            onClick={() => setPersonal((value) => ({ ...value!, instructions: '' }))}
+          >
+            Reset instructions to default
+          </button>
+          <details>
+            <summary>Preview instruction scope</summary>
+            <p>
+              {personal?.instructions?.trim() ||
+                'No personal instructions. Use the task’s inherited behavior.'}
+            </p>
+            <p>
+              Server authorization, administrator limits, required output formats and recorded
+              constraints take precedence. Save my AI defaults to apply this draft.
+            </p>
+          </details>
+        </SettingsPane>
+      )}
+      {!shared && global.allowPersonalModelOverrides === false && (
+        <p role="note">
+          Models are controlled by the administrator. Saved personal model choices remain retained
+          but inactive.
+        </p>
+      )}
       <SettingsPane
         title="Models by task"
         description={
@@ -204,7 +430,10 @@ export function AiRuntimeSettingsForm(props: Props) {
         }
       >
         {workloads.map((base, index) => {
-          const override = personal?.workloads.find((item) => item.workload === base.workload);
+          const override =
+            !shared && global.allowPersonalModelOverrides !== false
+              ? personal?.workloads.find((item) => item.workload === base.workload)
+              : undefined;
           const item = shared ? base : (override ?? base);
           const choices = AI_MODEL_CATALOG.filter((model) =>
             (model.workloads as readonly string[]).includes(item.workload),
@@ -240,7 +469,7 @@ export function AiRuntimeSettingsForm(props: Props) {
                   <input
                     type="checkbox"
                     checked={!override}
-                    disabled={pending}
+                    disabled={pending || global.allowPersonalModelOverrides === false}
                     onChange={(event) =>
                       event.target.checked
                         ? setPersonal((current) => ({
@@ -258,7 +487,10 @@ export function AiRuntimeSettingsForm(props: Props) {
                 <select
                   aria-label={`${item.workload.charAt(0).toUpperCase() + item.workload.slice(1).replaceAll('_', ' ')} model`}
                   value={item.model}
-                  disabled={pending || (!shared && !override)}
+                  disabled={
+                    pending ||
+                    (!shared && (!override || global.allowPersonalModelOverrides === false))
+                  }
                   onChange={(event) =>
                     update({
                       model:
@@ -285,7 +517,10 @@ export function AiRuntimeSettingsForm(props: Props) {
                 >
                   <input
                     value={item.model}
-                    disabled={pending || (!shared && !override)}
+                    disabled={
+                      pending ||
+                      (!shared && (!override || global.allowPersonalModelOverrides === false))
+                    }
                     onChange={(event) => update({ model: event.target.value })}
                   />
                 </SettingsField>
@@ -293,7 +528,10 @@ export function AiRuntimeSettingsForm(props: Props) {
               <SettingsField title="Reasoning effort">
                 <select
                   value={item.reasoningEffort ?? ''}
-                  disabled={pending || (!shared && !override)}
+                  disabled={
+                    pending ||
+                    (!shared && (!override || global.allowPersonalModelOverrides === false))
+                  }
                   onChange={(event) =>
                     update({
                       reasoningEffort: (event.target.value || null) as AiReasoningEffort | null,
@@ -313,7 +551,10 @@ export function AiRuntimeSettingsForm(props: Props) {
                   type="checkbox"
                   role="switch"
                   checked={item.enabled}
-                  disabled={pending || (!shared && !override)}
+                  disabled={
+                    pending ||
+                    (!shared && (!override || global.allowPersonalModelOverrides === false))
+                  }
                   onChange={(event) => update({ enabled: event.target.checked })}
                 />
               </SettingsField>
@@ -346,13 +587,32 @@ export function AiRuntimeSettingsForm(props: Props) {
           ))}
         </SettingsPane>
       )}
+      {conflict && (
+        <SettingsConflictReview
+          pending={pending}
+          loaded={Boolean(current)}
+          onLoad={() => void loadCurrent()}
+          onKeepDraft={() => reconcile(true)}
+          onUseSaved={() => reconcile(false)}
+        >
+          <details open>
+            <summary>
+              Current saved AI defaults · version{' '}
+              {shared ? current?.version : current?.account?.version}
+            </summary>
+            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {JSON.stringify(shared ? current?.settings : current?.account?.preferences, null, 2)}
+            </pre>
+          </details>
+        </SettingsConflictReview>
+      )}
       <SettingsActionBar
         status={status || (dirty ? 'Unsaved AI defaults' : 'No unsaved AI defaults')}
       >
         <button
           type="button"
           className="primary-button"
-          disabled={pending || !dirty}
+          disabled={pending || !dirty || conflict}
           onClick={() => void save()}
         >
           {pending ? 'Saving…' : shared ? 'Save global AI settings' : 'Save my AI defaults'}

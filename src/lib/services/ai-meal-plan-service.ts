@@ -294,7 +294,10 @@ export async function generateAiMealPlanProposal(input: {
       const generated = aiMealPlanCandidateSchema.parse(
         await getAiAssistantProvider().generateMealPlan({
           model: setting.model,
+          promptGuidance: setting.promptGuidance,
+          requestTimeoutSeconds: setting.requestTimeoutSeconds,
           reasoningEffort: setting.reasoningEffort,
+          maxOutputTokens: setting.maxOutputTokens,
           safetyIdentifier: aiSafetyIdentifier(input.actorProfileId),
           instructions:
             'Create complete new recipes only for meal slots not already covered by the supplied saved-plan candidate. Preserve every supplied saved assignment.',
@@ -317,7 +320,10 @@ export async function generateAiMealPlanProposal(input: {
     rawCandidate = aiMealPlanCandidateSchema.parse(
       await getAiAssistantProvider().generateMealPlan({
         model: setting.model,
+        promptGuidance: setting.promptGuidance,
+        requestTimeoutSeconds: setting.requestTimeoutSeconds,
         reasoningEffort: setting.reasoningEffort,
+        maxOutputTokens: setting.maxOutputTokens,
         safetyIdentifier: aiSafetyIdentifier(input.actorProfileId),
         instructions: [
           'Create a practical household meal-plan candidate from the supplied bounded context.',

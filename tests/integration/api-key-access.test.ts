@@ -338,3 +338,87 @@ describe('catalog companion routes retain real actor/origin guards', () => {
     }
   });
 });
+
+describe('session and API create replay remains authorized and atomic', () => {
+  function createRequest(body: string, key: string, bearer?: string) {
+    return new Request(`${origin}/api/v1/collections`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': key,
+        ...(bearer ? { authorization: `Bearer ${bearer}` } : { cookie, origin }),
+      },
+      body,
+    });
+  }
+  it('replays a native session create after a lost response and normalizes JSON ordering', async () => {
+    const { POST } = await import('@/app/api/v1/collections/route');
+    const key = 'native-collection-confirmation-1';
+    const first = await POST(
+      createRequest('{"name":"Native replay","description":"Reviewed"}', key),
+    );
+    expect(first.status).toBe(201);
+    const saved = await first.json();
+    const retry = await POST(
+      createRequest('{ "description": "Reviewed", "name": "Native replay" }', key),
+    );
+    expect(retry.status).toBe(201);
+    expect(retry.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(await retry.json()).toEqual(saved);
+    const { listCollections } = await import('@/lib/services/collection-service');
+    expect(listCollections().filter((item) => item.name === 'Native replay')).toHaveLength(1);
+    const changed = await POST(createRequest('{"name":"A different intent"}', key));
+    expect(changed.status).toBe(409);
+  });
+  it('rechecks under the SQLite write lock and rolls a mutation back if its receipt cannot serialize', async () => {
+    const { prepareIdempotentMutation, executeIdempotentMutation } =
+      await import('@/lib/api-idempotency');
+    const principal = await authentication.requireAdminSession(request('/collections', { cookie }));
+    const requestBody = '{"name":"Atomic replay"}';
+    const a = await prepareIdempotentMutation(
+      createRequest(requestBody, 'atomic-create-1'),
+      principal,
+      'test-a',
+    );
+    const b = await prepareIdempotentMutation(
+      createRequest(requestBody, 'atomic-create-1'),
+      principal,
+      'test-b',
+    );
+    expect(a.context).not.toBeNull();
+    expect(b.context).not.toBeNull();
+    let executions = 0;
+    executeIdempotentMutation(a.context!, () => ({ count: ++executions }), 'test-a');
+    const replay = executeIdempotentMutation(b.context!, () => ({ count: ++executions }), 'test-b');
+    expect(executions).toBe(1);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    const pending = await prepareIdempotentMutation(
+      createRequest(requestBody, 'atomic-rollback-1'),
+      principal,
+      'test-c',
+    );
+    const { createCollection, listCollections } = await import('@/lib/services/collection-service');
+    const { collectionInputSchema } = await import('@/lib/domain/collection');
+    expect(() =>
+      executeIdempotentMutation(
+        pending.context!,
+        () => {
+          createCollection(collectionInputSchema.parse({ name: 'Must roll back' }), profileId);
+          const circular: { result?: unknown } = {};
+          circular.result = circular;
+          return circular;
+        },
+        'test-c',
+      ),
+    ).toThrow();
+    expect(listCollections().some((item) => item.name === 'Must roll back')).toBe(false);
+  });
+  it('does not replay a completed create through a revoked API key', async () => {
+    const { POST } = await import('@/app/api/v1/collections/route');
+    const key = await createKey({ collections: ['create'] });
+    const body = '{"name":"Authorized before revocation"}';
+    expect((await POST(createRequest(body, 'revoked-create-1', key.secret))).status).toBe(201);
+    await keys.rotateAdminApiKey({ userId, profileId, keyId: key.apiKey.id });
+    expect((await POST(createRequest(body, 'revoked-create-1', key.secret))).status).toBe(401);
+  });
+});

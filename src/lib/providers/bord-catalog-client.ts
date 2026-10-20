@@ -6,6 +6,9 @@ import { getRuntimeConfig } from '@/lib/config';
 import { FoodDataError, normalizeGtin } from '@/lib/domain/food-data';
 import {
   capabilitiesSchema,
+  catalogChainSchema,
+  catalogEnrichmentSchema,
+  catalogGuidanceSchema,
   catalogMapSchema,
   catalogRecordSchema,
   catalogStoreSchema,
@@ -166,6 +169,9 @@ export class BordCatalogClient {
   generation() {
     return this.envelope('v1/catalog/generations/current', z.record(z.string(), z.unknown()));
   }
+  chains(params: URLSearchParams) {
+    return this.envelope(`v1/chains?${params}`, z.array(catalogChainSchema).max(100));
+  }
   stores(params: URLSearchParams) {
     return this.envelope(`v1/stores?${params}`, z.array(catalogStoreSchema).max(100));
   }
@@ -200,6 +206,23 @@ export class BordCatalogClient {
       `v1/products/${segment(product)}/retail-evidence?${new URLSearchParams(store ? { store_id: store } : {})}`,
       retailEvidenceSchema,
     );
+  }
+  measures(
+    source: 'usda_fdc' | 'open_food_facts',
+    record: string,
+    revision: string,
+    filters: { form?: string; basis?: string } = {},
+  ) {
+    return this.envelope(
+      `v1/foods/${source}/${segment(record)}/measures?${new URLSearchParams({ revision, ...filters })}`,
+      z.array(z.record(z.string(), z.unknown())).max(1000),
+    );
+  }
+  storageGuidance(params: URLSearchParams) {
+    return this.envelope(`v1/guidance/storage?${params}`, z.array(catalogGuidanceSchema).max(100));
+  }
+  enrich(lines: Array<{ line_id: string; product_id: string; store_id?: string }>) {
+    return this.envelope('v1/shopping/enrich', catalogEnrichmentSchema, { lines });
   }
   // The native API preserves the USDA-compatible search surface and original source payload.
   usdaSearch(query: string, page: number, kind: 'any' | 'generic' | 'branded' = 'any') {

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { LoadingIndicator } from '@/components/skeleton';
 import { authClient } from '@/lib/auth/client';
@@ -59,12 +59,39 @@ export function ProfileSwitcher({
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const destination = useRef('');
   const dialogRef = useRef<HTMLDialogElement>(null);
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? profiles[0];
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null;
 
+  useEffect(() => {
+    function navigateDiary(event: Event) {
+      const detail = (event as CustomEvent<{ householdProfileId: string; date: string }>).detail;
+      if (
+        pending ||
+        !detail ||
+        !profiles.some((profile) => profile.id === detail.householdProfileId) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(detail.date)
+      )
+        return;
+      const href = `/nutrition?view=diary&date=${encodeURIComponent(detail.date)}`;
+      if (detail.householdProfileId === activeProfileId) {
+        router.push(href);
+        return;
+      }
+      destination.current = href;
+      setSelectedProfileId(detail.householdProfileId);
+      setPassword('');
+      setError(null);
+      window.requestAnimationFrame(() => dialogRef.current?.showModal());
+    }
+    window.addEventListener('bord:open-profile-diary', navigateDiary);
+    return () => window.removeEventListener('bord:open-profile-diary', navigateDiary);
+  }, [activeProfileId, profiles, pending, router]);
+
   function requestProfileSwitch(profileId: string) {
     if (profileId === activeProfileId) return;
+    destination.current = '';
     setSelectedProfileId(profileId);
     setPassword('');
     setError(null);
@@ -73,6 +100,7 @@ export function ProfileSwitcher({
 
   function closeDialog() {
     if (pending) return;
+    destination.current = '';
     dialogRef.current?.close();
     setSelectedProfileId(null);
     setPassword('');
@@ -100,9 +128,12 @@ export function ProfileSwitcher({
         `Now cooking as ${selectedProfile?.displayName ?? 'the selected profile'}.`,
         'success',
       );
+      const href = destination.current;
+      destination.current = '';
       dialogRef.current?.close();
       setSelectedProfileId(null);
       setPassword('');
+      if (href) router.push(href);
       router.refresh();
     } catch (caught) {
       const message =
@@ -234,6 +265,7 @@ export function ProfileSwitcher({
           if (pending) event.preventDefault();
         }}
         onClose={() => {
+          destination.current = '';
           setSelectedProfileId(null);
           setPassword('');
           setError(null);

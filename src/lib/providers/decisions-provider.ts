@@ -2,6 +2,9 @@ import 'server-only';
 import { z } from 'zod';
 import { getOpenAiApiKey } from '@/lib/providers/openai-key';
 
+// Verified against the provider Decisions contract on 2026-10-20. No model fallback is implicit.
+export const DECISIONS_MODEL = 'gpt-6-luna' as const;
+
 export class DecisionError extends Error {
   constructor(
     message: string,
@@ -31,9 +34,16 @@ export async function requestDecisions(input: {
   questions: DecisionQuestion[];
   safetyIdentifier: string;
   allowPaidCall: boolean;
+  model?: typeof DECISIONS_MODEL;
+  requestTimeoutSeconds?: number;
 }) {
   if (!input.allowPaidCall)
     throw new DecisionError('Confirm the paid AI request before continuing.', 403);
+  if (input.model && input.model !== DECISIONS_MODEL)
+    throw new DecisionError(
+      'This model does not support the Decisions API. Use the configured supported classification model.',
+      409,
+    );
   const key = getOpenAiApiKey();
   if (!key) throw new DecisionError('Configure an OpenAI API key in the server environment.', 503);
   let response: Response;
@@ -41,10 +51,10 @@ export async function requestDecisions(input: {
     response = await fetch('https://api.openai.com/v1/decisions', {
       method: 'POST',
       redirect: 'error',
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout((input.requestTimeoutSeconds ?? 60) * 1000),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-6-luna',
+        model: DECISIONS_MODEL,
         safety_identifier: input.safetyIdentifier,
         input: JSON.stringify(input.evidence),
         questions: input.questions.map((q) => ({ ...q, type: 'choice' })),

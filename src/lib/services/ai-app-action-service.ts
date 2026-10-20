@@ -1,11 +1,13 @@
 import 'server-only';
+import { recipeImageInput } from '@/lib/domain/recipe-image-generation';
 import { and, eq, desc } from 'drizzle-orm';
 import { getDatabase } from '@/lib/db/client';
-import { aiDecisionRecords } from '@/lib/db/schema';
+import { nutritionProfiles, aiDecisionRecords, aiChatThreads } from '@/lib/db/schema';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { APP_OPERATIONS, APP_ROUTE_LOADERS, type AppOperation } from './ai-app-operation-catalog';
-import type { RequestPrincipal } from './auth-service';
+import { getAuthenticatedSessionPrincipal, type RequestPrincipal } from './auth-service';
+import { canAccountUseAi } from './ai-access-service';
 import { getAiDataPolicy } from './ai-settings-service';
 import {
   decisionHash,
@@ -22,24 +24,43 @@ import { getAiReadiness } from './ai-readiness-service';
 import { getAiWorkloadSetting } from './ai-settings-service';
 import { appRoleCan } from '@/lib/domain/permissions';
 
-const focusedListOperations = new Set([
-  'listShoppingLists',
-  'getShoppingList',
-  'createOrGenerateShoppingList',
-  'reorderShoppingListItems',
-  'deleteShoppingList',
-  'addShoppingListItem',
-  'updateShoppingListItem',
-  'deleteShoppingListItem',
-  'addShoppingListNamesBulk',
-  'setShoppingListSupermarket',
-]);
-
+const dependencySchema = z
+  .object({
+    fromStep: z.number().int().min(0).max(19),
+    result: z.enum(['list.id', 'recipe.id', 'collection.id', 'product.id', 'meal.id']),
+    target: z.enum([
+      'parameters.listId',
+      'parameters.recipeId',
+      'parameters.collectionId',
+      'parameters.productId',
+      'parameters.entryId',
+      'body.recipeId',
+      'body.productId',
+      'body.pantryProductId',
+      'body.collectionId',
+    ]),
+  })
+  .strict();
+const producedIds: Record<string, string> = {
+  createOrGenerateShoppingList: 'list.id',
+  createRecipe: 'recipe.id',
+  createCollection: 'collection.id',
+  createPantryProduct: 'product.id',
+  addMealPlanEntry: 'meal.id',
+};
+const expectedTarget = {
+  'list.id': ['parameters.listId'],
+  'recipe.id': ['parameters.recipeId', 'body.recipeId'],
+  'collection.id': ['parameters.collectionId', 'body.collectionId'],
+  'product.id': ['parameters.productId', 'body.productId', 'body.pantryProductId'],
+  'meal.id': ['parameters.entryId'],
+};
 const actionSchema = z
   .object({
     operationId: z.string().max(100),
     parametersJson: z.string().max(4000),
     bodyJson: z.string().max(60000),
+    bindings: z.array(dependencySchema).max(4).default([]),
   })
   .strict();
 export const appActionRequestSchema = z
@@ -59,6 +80,7 @@ export type AppActionReview = {
     path: string;
     parameters: Record<string, string>;
     body: unknown;
+    bindings?: z.infer<typeof dependencySchema>[];
     recordLabel?: string;
     changeLabel?: string;
   }[];
@@ -67,7 +89,8 @@ export type AppActionReview = {
     summary: string;
     ok: boolean;
     message: string;
-    state?: 'completed' | 'failed' | 'pending' | 'not-attempted';
+    state?: 'completed' | 'failed' | 'pending' | 'not-attempted' | 'outcome-unknown';
+    href?: string;
   }[];
   jobId?: string;
 };
@@ -83,28 +106,56 @@ function operation(p: RequestPrincipal, id: string) {
       );
     return op;
   }
-  if (focusedListOperations.has(id)) {
-    if (!policy.shareShoppingLists)
-      throw new DecisionError('Enable shopping-list sharing to use this tool.', 403);
-    return op;
+  const requirements = new Set<keyof ReturnType<typeof getAiDataPolicy>>();
+  if (/^\/(recipes|collections|tags)(?:\/|$)/u.test(op.path))
+    requirements.add('shareSharedRecipes');
+  if (op.path.startsWith('/meal-plan')) {
+    requirements.add('shareMealPlans');
+    requirements.add('shareSharedRecipes');
   }
-  if (id === 'generateRecipeImage') {
-    if (!policy.shareSharedRecipes)
-      throw new DecisionError('Enable recipe sharing to generate an image.', 403);
-    return op;
+  if (op.path.startsWith('/pantry')) requirements.add('sharePantry');
+  if (op.path.startsWith('/cook-sessions')) {
+    requirements.add('shareSharedRecipes');
+    requirements.add('sharePantry');
   }
-  // Core API objects may contain linked recipes, stock, lists and plan references.
+  if (op.path.startsWith('/shopping-lists') || op.path.startsWith('/supermarket-profiles'))
+    requirements.add('shareShoppingLists');
+  if (id === 'importReviewedCatalogFood') requirements.add('sharePantry');
+  if (/pantry-intake|pantry-controls|pantry-match|catalog-items|pantry-shortages/u.test(op.path))
+    requirements.add('sharePantry');
+  if (op.path.includes('/pantry/mappings')) requirements.add('shareSharedRecipes');
+  for (const requirement of requirements)
+    if (!policy[requirement])
+      throw new DecisionError(
+        `This operation needs ${requirement
+          .replace(/^share/, '')
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .toLowerCase()} sharing. Other private categories can remain off.`,
+        403,
+      );
   if (
-    !policy.shareSharedRecipes ||
-    !policy.sharePantry ||
-    !policy.shareShoppingLists ||
-    !policy.shareMealPlans ||
-    !policy.shareRecipePreferences
+    !appRoleCan(
+      p.accountRole,
+      op.path.startsWith('/nutrition')
+        ? op.effect === 'read'
+          ? 'personal.read'
+          : 'personal.update'
+        : op.effect === 'read'
+          ? 'shared.read'
+          : 'shared.update',
+    ) ||
+    !appRoleCan(
+      p.role,
+      op.path.startsWith('/nutrition')
+        ? op.effect === 'read'
+          ? 'personal.read'
+          : 'personal.update'
+        : op.effect === 'read'
+          ? 'shared.read'
+          : 'shared.update',
+    )
   )
-    throw new DecisionError(
-      'Core app tools require sharing recipes, recipe preferences, pantry, shopping lists and meal plans. Use the page controls if you prefer to keep those private.',
-      403,
-    );
+    throw new DecisionError('This account cannot perform this operation.', 403);
   return op;
 }
 function parseAction(p: RequestPrincipal, action: Action) {
@@ -126,9 +177,21 @@ function parseAction(p: RequestPrincipal, action: Action) {
         403,
       );
   }
-  if (op.validator && body !== undefined) op.validator.parse(body);
+  if (op.path.startsWith('/nutrition')) {
+    const target = getDatabase()
+      .select({ householdProfileId: nutritionProfiles.linkedHouseholdProfileId })
+      .from(nutritionProfiles)
+      .where(eq(nutritionProfiles.id, parameters.profileId))
+      .get();
+    if (!target?.householdProfileId || !getAiDataPolicy(target.householdProfileId).shareRawDiary)
+      throw new DecisionError(
+        'The receiving person must permit raw diary sharing for this nutrition operation. Use the protected Nutrition workspace to continue without sharing it with AI.',
+        403,
+      );
+  }
+  if (op.validator) op.validator.parse(body);
   for (const match of op.path.matchAll(/\{([^}]+)\}/g)) {
-    if (!parameters[match[1]] || !/^[a-zA-Z0-9_-]+$/.test(parameters[match[1]]))
+    if (!parameters[match[1]] || /[\/\\\u0000-\u001f]/u.test(parameters[match[1]]))
       throw new DecisionError(`Supply a valid ${match[1]}.`);
   }
   return { op, parameters, body };
@@ -157,6 +220,9 @@ export function listAppActions(p: RequestPrincipal, resource: string, operationI
         operationId: op.id,
         summary: op.summary,
         method: op.method,
+        effect: op.effect,
+        requiresReview: op.effect !== 'read',
+        producedId: producedIds[op.id] ?? null,
         parameters: op.parameters,
         ...(operationId ? { bodySchema: schema } : {}),
       },
@@ -168,6 +234,7 @@ async function invoke(
   op: AppOperation,
   parameters: Record<string, string>,
   body: unknown,
+  commandKey?: string,
 ) {
   const path = op.path.replace(/\{([^}]+)\}/g, (_, key: string) =>
     encodeURIComponent(parameters[key]),
@@ -176,6 +243,7 @@ async function invoke(
   for (const [key, value] of Object.entries(parameters))
     if (!op.path.includes(`{${key}}`)) url.searchParams.set(key, value);
   const headers = new Headers({ 'Content-Type': 'application/json' });
+  if (commandKey) headers.set('Idempotency-Key', commandKey);
   for (const key of ['cookie', 'origin']) {
     const value = request.headers.get(key);
     if (value) headers.set(key, value);
@@ -195,9 +263,10 @@ async function invoke(
   return handler(forwarded, { params: Promise.resolve(parameters) });
 }
 export async function readAppData(p: RequestPrincipal, request: Request, input: unknown) {
+  p = await currentActor(p, request);
   const action = actionSchema.parse(input);
   const parsed = parseAction(p, action);
-  if (parsed.op.method !== 'GET')
+  if (parsed.op.effect !== 'read' || action.bindings.length)
     throw new DecisionError('Use a reviewed proposal for this operation.');
   if (parsed.op.id === 'listShoppingLists' || parsed.op.id === 'getShoppingList')
     return readAiKitchenContext(p, {
@@ -207,7 +276,7 @@ export async function readAppData(p: RequestPrincipal, request: Request, input: 
       offset: Number(parsed.parameters.offset ?? 0),
       limit: Number(parsed.parameters.limit ?? 50),
     });
-  const response = await invoke(request, parsed.op, parsed.parameters, undefined);
+  const response = await invoke(request, parsed.op, parsed.parameters, parsed.body);
   if (!response.headers.get('content-type')?.includes('application/json'))
     throw new DecisionError('Open this export in the app.');
   const value = await response.text();
@@ -226,10 +295,12 @@ async function snapshot(
   op: AppOperation,
   parameters: Record<string, string>,
 ): Promise<Snapshot | null> {
-  // Image generation reads the current recipe at execution; it does not edit recipe fields.
-  if (op.id === 'generateRecipeImage') return null;
+  // Creating a record has no existing record version to approve. In particular,
+  // GET /meal-plan requires an explicit range; it is not a version of POST's new meal.
+  if (op.method === 'POST' && !op.path.includes('{')) return null;
   const reader = APP_OPERATIONS.filter(
     (candidate) =>
+      candidate.effect === 'read' &&
       candidate.method === 'GET' &&
       (op.path === candidate.path || op.path.startsWith(`${candidate.path}/`)) &&
       [...candidate.path.matchAll(/\{([^}]+)\}/g)].every((m) => parameters[m[1]]),
@@ -288,7 +359,20 @@ export function listPendingAppActions(p: RequestPrincipal, threadId: string): Ap
                       ? 'Not attempted. The task was cancelled.'
                       : 'Waiting for generation.',
             }))
-          : correction?.results,
+          : correction?.activeState === 'outcome-unknown'
+            ? [
+                ...(correction.results ?? []),
+                {
+                  summary:
+                    JSON.parse(row.evidenceJson)[correction.activeStep]?.summary ??
+                    'Interrupted change',
+                  ok: false,
+                  state: 'outcome-unknown' as const,
+                  message:
+                    'This change started but its outcome has not been acknowledged. Inspect the affected records; do not submit it again as a new change.',
+                },
+              ]
+            : correction?.results,
         jobId: correction?.jobId,
         status: job
           ? job.status === 'completed'
@@ -304,12 +388,94 @@ export function listPendingAppActions(p: RequestPrincipal, threadId: string): Ap
       };
     });
 }
+function bindAction(actions: Action[], index: number, outputs?: unknown[]): Action {
+  const action = actions[index];
+  const parameters = JSON.parse(action.parametersJson) as Record<string, unknown>;
+  const body = action.bodyJson.trim() ? JSON.parse(action.bodyJson) : undefined;
+  const seen = new Set<string>();
+  for (const binding of action.bindings ?? []) {
+    if (
+      binding.fromStep >= index ||
+      producedIds[actions[binding.fromStep]?.operationId] !== binding.result ||
+      !expectedTarget[binding.result].includes(binding.target) ||
+      seen.has(binding.target)
+    )
+      throw new DecisionError(
+        'Dependencies must use a supported ID returned by an earlier step, with one binding per field.',
+      );
+    seen.add(binding.target);
+    const [section, key] = binding.target.split('.');
+    const destination = section === 'parameters' ? parameters : body;
+    if (!destination || typeof destination !== 'object' || Array.isArray(destination))
+      throw new DecisionError('The dependency destination must be an object field.');
+    const result = outputs
+      ? binding.result
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object'
+                ? (value as Record<string, unknown>)[part]
+                : undefined,
+            outputs[binding.fromStep],
+          )
+      : '00000000-0000-4000-8000-000000000000';
+    destination[key] = z.string().uuid().parse(result);
+  }
+  return {
+    ...action,
+    parametersJson: JSON.stringify(parameters),
+    bodyJson: body === undefined ? '' : JSON.stringify(body),
+  };
+}
+async function currentActor(p: RequestPrincipal, request: Request) {
+  const current = await getAuthenticatedSessionPrincipal(request);
+  if (
+    !current ||
+    current.userId !== p.userId ||
+    current.profileId !== p.profileId ||
+    !canAccountUseAi(current.userId)
+  )
+    throw new DecisionError(
+      'Your session, profile or AI access changed. Review this operation again after signing in.',
+      403,
+    );
+  return current;
+}
+function resultDestination(
+  op: AppOperation,
+  parameters: Record<string, string>,
+  payload: unknown,
+): string | undefined {
+  const output = payload as Record<string, { id?: string }> | null;
+  const listId = output?.list?.id ?? parameters.listId;
+  const recipeId = output?.recipe?.id ?? parameters.recipeId;
+  if (listId && op.path.startsWith('/shopping-lists'))
+    return `/lists/${encodeURIComponent(listId)}`;
+  if (recipeId && op.path.startsWith('/recipes')) return `/recipes/${encodeURIComponent(recipeId)}`;
+  if (op.path.startsWith('/pantry')) return '/pantry';
+  if (op.path.startsWith('/meal-plan')) return '/planner';
+  if (op.path.startsWith('/nutrition')) return '/nutrition?view=diary';
+  if (op.path.startsWith('/cook-sessions')) return '/recipes';
+  return undefined;
+}
 export async function prepareAppActions(
   p: RequestPrincipal,
   request: Request,
   threadId: string,
   input: unknown,
+  replacement?: { id: string; version: number },
 ) {
+  p = await currentActor(p, request);
+  const thread = getDatabase()
+    .select()
+    .from(aiChatThreads)
+    .where(eq(aiChatThreads.id, z.string().uuid().parse(threadId)))
+    .get();
+  if (!thread || thread.profileId !== p.profileId)
+    throw new DecisionError(
+      'Use a conversation owned by your account profile for this review.',
+      403,
+    );
   const parsed = appActionRequestSchema.parse(input);
   if (
     parsed.actions.some((action) => action.operationId === 'generateRecipeImage') &&
@@ -318,9 +484,9 @@ export async function prepareAppActions(
     throw new DecisionError(
       'Prepare image generation as its own group so it can run in the background.',
     );
-  const previews = parsed.actions.map((action) => {
-    const { op, parameters, body } = parseAction(p, action);
-    if (op.method === 'GET') throw new DecisionError('Read operations do not need a proposal.');
+  const previews = parsed.actions.map((action, index) => {
+    const { op, parameters, body } = parseAction(p, bindAction(parsed.actions, index));
+    if (op.effect === 'read') throw new DecisionError('Read operations do not need a proposal.');
     const recipe = parameters.recipeId ? getRecipe(parameters.recipeId, p.profileId) : null;
     return {
       summary: op.summary,
@@ -328,6 +494,7 @@ export async function prepareAppActions(
       path: op.path,
       parameters,
       body: body ?? null,
+      bindings: action.bindings,
       recordLabel: recipe?.title,
       changeLabel:
         op.id === 'generateRecipeImage'
@@ -338,19 +505,37 @@ export async function prepareAppActions(
     };
   });
   const snapshots: Snapshot[] = [];
-  for (const action of parsed.actions) {
-    const { op, parameters } = parseAction(p, action);
+  for (const [index, action] of parsed.actions.entries()) {
+    const { op, parameters } = parseAction(p, bindAction(parsed.actions, index));
+    // Only a newly created path target is absent. A body dependency must not skip
+    // the reviewed version of an already-existing target record.
+    if (
+      action.bindings.some(
+        (binding) =>
+          binding.target.startsWith('parameters.') &&
+          op.path.includes(`{${binding.target.slice('parameters.'.length)}}`),
+      )
+    )
+      continue;
     const current = await snapshot(request, op, parameters);
     if (current) snapshots.push(current);
   }
   enforceDecisionBudget(p);
-  const row = storeDecision(p, {
-    task: 'app_actions',
-    subject: randomUUID(),
-    hash: decisionHash(parsed),
-    evidence: previews,
-    result: { ...parsed, threadId, snapshots },
-    ttlMs: 30 * 60 * 1000,
+  const row = getDatabase().transaction(() => {
+    const created = storeDecision(p, {
+      task: 'app_actions',
+      subject: randomUUID(),
+      hash: decisionHash(parsed),
+      evidence: previews,
+      result: { ...parsed, threadId, snapshots },
+      ttlMs: 30 * 60 * 1000,
+    });
+    if (replacement)
+      saveDecisionCorrection(p, replacement.id, replacement.version, 'app_action_superseded', {
+        status: 'superseded',
+        replacementId: created.id,
+      });
+    return created;
   });
   return {
     appAction: {
@@ -362,7 +547,63 @@ export async function prepareAppActions(
     } satisfies AppActionReview,
   };
 }
+export async function reviseAppActions(p: RequestPrincipal, request: Request, raw: unknown) {
+  p = await currentActor(p, request);
+  const input = z
+    .object({
+      id: z.uuid(),
+      version: z.number().int().positive(),
+      title: z.string().trim().min(1).max(160),
+      bodyEdits: z
+        .array(
+          z
+            .object({
+              step: z.number().int().min(0).max(19),
+              bodyJson: z.string().min(2).max(60000),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(20),
+    })
+    .strict()
+    .parse(raw);
+  const old = ownedDecision(p, input.id);
+  if (
+    old.task !== 'app_actions' ||
+    old.correctionJson ||
+    old.version !== input.version ||
+    old.expiresAt.getTime() < Date.now()
+  )
+    throw new DecisionError(
+      'This proposal changed or was already handled. Reload the conversation before editing it.',
+      409,
+    );
+  const value = JSON.parse(old.resultJson) as { actions: Action[]; threadId: string };
+  const next = value.actions.map((action) => actionSchema.parse(action));
+  const seen = new Set<number>();
+  for (const edit of input.bodyEdits) {
+    if (
+      !next[edit.step] ||
+      seen.has(edit.step) ||
+      next[edit.step].operationId === 'generateRecipeImage'
+    )
+      throw new DecisionError(
+        'Choose each editable change once. Image requests need a new explicit review.',
+      );
+    seen.add(edit.step);
+    next[edit.step] = { ...next[edit.step], bodyJson: edit.bodyJson };
+  }
+  return prepareAppActions(
+    p,
+    request,
+    value.threadId,
+    { title: input.title, actions: next },
+    { id: old.id, version: old.version },
+  );
+}
 export async function confirmAppActions(p: RequestPrincipal, request: Request, input: unknown) {
+  p = await currentActor(p, request);
   const { id, version, decision } = z
     .object({
       id: z.string().uuid(),
@@ -372,6 +613,11 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
     .strict()
     .parse(input);
   const row = ownedDecision(p, id);
+  if (row.task === 'app_actions' && row.correctionJson) {
+    const existing = JSON.parse(row.correctionJson);
+    if (decision === 'apply' && ['applied', 'partial', 'queued'].includes(existing.status))
+      return { ...existing, replayed: true };
+  }
   if (row.task !== 'app_actions' || row.correctionJson || row.expiresAt.getTime() < Date.now())
     throw new DecisionError(
       'This proposal is expired or has already been handled. Prepare a new review.',
@@ -382,6 +628,17 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
     snapshots?: Snapshot[];
     threadId: string;
   };
+  value.actions = value.actions.map((action) => actionSchema.parse(action));
+  if (decision === 'apply')
+    for (const saved of value.snapshots ?? []) {
+      const op = operation(p, saved.operationId);
+      const response = await invoke(request, op, saved.parameters, undefined);
+      if (!response.ok || decisionHash(await response.json()) !== saved.hash)
+        throw new DecisionError(
+          'The source data changed since this review. Ask chat to prepare a fresh proposal.',
+          409,
+        );
+    }
   const imageGroup = value.actions.every((action) => action.operationId === 'generateRecipeImage');
   if (decision === 'apply' && imageGroup) {
     if (!appRoleCan(p.role, 'shared.update') || !appRoleCan(p.accountRole, 'shared.update'))
@@ -398,11 +655,7 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
         throw new DecisionError('A recipe no longer exists. Prepare a fresh review.', 409);
       return {
         recipeId: recipe.id,
-        recipeTitle: recipe.title,
-        recipeSummary: recipe.summary,
-        ingredientNames: recipe.ingredientGroups.flatMap((group) =>
-          group.ingredients.map((ingredient) => ingredient.item),
-        ),
+        ...recipeImageInput(recipe),
       };
     });
     return getDatabase().transaction(() => {
@@ -425,47 +678,72 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
       return { status: 'queued', results, jobId: job!.id, skipped: 0 };
     });
   }
-  if (decision === 'apply')
-    for (const saved of value.snapshots ?? []) {
-      const op = operation(p, saved.operationId);
-      const response = await invoke(request, op, saved.parameters, undefined);
-      if (!response.ok || decisionHash(await response.json()) !== saved.hash)
-        throw new DecisionError(
-          'The source data changed since this review. Ask chat to prepare a fresh proposal.',
-          409,
-        );
-    }
   // Lock before the first write. A crash cannot cause a second confirmation to replay partial writes.
   saveDecisionCorrection(p, id, version, 'app_action_started', {
     status: decision === 'dismiss' ? 'dismissed' : 'running',
   });
   if (decision === 'dismiss') return { status: 'dismissed', results: [] };
-  const results: { summary: string; ok: boolean; message: string }[] = [];
-  for (const action of value.actions) {
+  const results: NonNullable<AppActionReview['results']> = [];
+  const outputs: unknown[] = [];
+  let correctionVersion = version + 1;
+  for (const [index, action] of value.actions.entries()) {
+    let attempted = false;
     try {
-      const { op, parameters, body } = parseAction(p, action);
-      const response = await invoke(request, op, parameters, body);
+      p = await currentActor(p, request);
+      const { op, parameters, body } = parseAction(p, bindAction(value.actions, index, outputs));
+      // Persist the boundary before invoking a mutation; an interrupted result is never labelled failed/not attempted.
+      saveDecisionCorrection(p, id, correctionVersion++, 'app_action_step_started', {
+        status: 'running',
+        results,
+        activeStep: index,
+        activeState: 'outcome-unknown',
+      });
+      attempted = true;
+      const response = await invoke(request, op, parameters, body, `ai-${id}-${index}`);
       const payload = await response.json().catch(() => null);
+      outputs.push(payload);
+      const uncertain =
+        response.status >= 500 || (response.ok && response.status !== 204 && payload === null);
       results.push({
         summary: op.summary,
-        ok: response.ok,
-        message: response.ok
-          ? 'Saved.'
-          : typeof payload?.error?.message === 'string'
-            ? payload.error.message
-            : 'The app rejected this change.',
+        ok: response.ok && !uncertain,
+        state: uncertain ? 'outcome-unknown' : response.ok ? 'completed' : 'failed',
+        href: resultDestination(op, parameters, payload),
+        message: uncertain
+          ? 'The outcome is uncertain. Inspect the affected records before starting another operation.'
+          : response.ok
+            ? 'Change acknowledged by the app.'
+            : typeof payload?.error?.message === 'string'
+              ? payload.error.message
+              : 'The app rejected this change.',
       });
-    } catch {
+    } catch (error) {
       results.push({
         summary: action.operationId,
         ok: false,
-        message: 'Unable to confirm this change. Inspect the source before retrying.',
+        state: attempted ? 'outcome-unknown' : 'not-attempted',
+        message: attempted
+          ? 'The response was interrupted. This change may have committed; review its record before retrying.'
+          : error instanceof DecisionError
+            ? error.message
+            : 'The dependency or input could not be validated. This step was not attempted.',
       });
     }
+    saveDecisionCorrection(p, id, correctionVersion++, 'app_action_step_result', {
+      status: 'running',
+      results,
+    });
     if (!results.at(-1)?.ok) break;
   }
-  const status =
-    results.length === value.actions.length && results.every((r) => r.ok) ? 'applied' : 'partial';
-  saveDecisionCorrection(p, id, version + 1, 'app_action_completed', { status, results });
-  return { status, results, skipped: value.actions.length - results.length };
+  const completedCount = results.length;
+  for (const action of value.actions.slice(completedCount))
+    results.push({
+      summary: action.operationId,
+      ok: false,
+      state: 'not-attempted',
+      message: 'Not attempted because a preceding step did not complete.',
+    });
+  const status = results.every((r) => r.ok) ? 'applied' : 'partial';
+  saveDecisionCorrection(p, id, correctionVersion, 'app_action_completed', { status, results });
+  return { status, results, skipped: value.actions.length - completedCount };
 }

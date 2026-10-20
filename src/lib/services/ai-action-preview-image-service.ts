@@ -1,3 +1,7 @@
+import {
+  recipeImageInput,
+  RECIPE_IMAGE_PROMPT_VERSION,
+} from '@/lib/domain/recipe-image-generation';
 import 'server-only';
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -73,6 +77,7 @@ export async function generateAiActionPreviewImage(input: {
       sourceLabel: input.recipe.title.slice(0, 160),
       provider: 'OpenAI',
       model: setting.model,
+      promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
       reasoningEffort: null,
       inputTokens: null,
       outputTokens: null,
@@ -92,13 +97,7 @@ export async function generateAiActionPreviewImage(input: {
   let storageKey: string | null = null;
   try {
     const generated = await getAiProvider().generateRecipeImage(
-      {
-        recipeTitle: input.recipe.title,
-        recipeSummary: input.recipe.summary,
-        ingredientNames: input.recipe.ingredientGroups.flatMap((group) =>
-          group.ingredients.map((ingredient) => ingredient.item),
-        ),
-      },
+      recipeImageInput(input.recipe),
       setting,
     );
     const imageId = randomUUID();

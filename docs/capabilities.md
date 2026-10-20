@@ -1,8 +1,8 @@
 # V1 capability matrix
 
-Review-first food discovery includes Open Food Facts exact barcode lookup, USDA name search/detail, branded GTIN fallback, and optional web-camera scanning over trusted HTTPS. See [food-data-integrations.md](food-data-integrations.md).
+Review-first food discovery includes the native Bòrd Food API and compatible direct Open Food Facts/USDA adapters, exact source revisions, measures, guidance, identified enrichment, store linking and optional scanning. See [bord-catalog-integration.md](bord-catalog-integration.md).
 
-This is the canonical product-status page for `1.0.0-rc.10`. Bòrd is a self-hosted app
+This page summarizes the product for `1.0.0-rc.17`; the [current capability matrix](refinement/capability-matrix.md) and [verification register](refinement/README.md) record implementation and evidence separately. Bòrd is a self-hosted app
 for one household. Better Auth email/passphrase accounts control access; household profiles select
 preferences and preserve attribution inside a session and are not an independent authorization
 boundary.
@@ -18,7 +18,7 @@ boundary.
 | Profiles    | Signed active-profile selection, actor attribution, personalized preferences, and automatic one-to-one Nutrition linkage                                                                                                                                                               | Anyone who can reach the trusted app can switch profiles                                               |
 | Offline     | Warmed recipe/library reads and local images; honest fallback for uncached pages                                                                                                                                                                                                       | Read-only: writes are never queued or replayed                                                         |
 | Recovery    | Scheduled/manual checksummed backup, validation, safety backup, atomic restore, and startup migration copy                                                                                                                                                                             | Keep an independently protected off-machine copy                                                       |
-| API         | 104-operation stable OpenAPI surface with every remaining handler explicitly classified as internal or retired                                                                                                                                                                         | Internal first-party UI routes have no external compatibility promise                                  |
+| API         | 174-operation documented OpenAPI surface with every remaining handler explicitly classified as internal or retired                                                                                                                                                                     | Internal first-party UI routes have no external compatibility promise                                  |
 | Diagnostics | App/schema/migration status and a redacted support bundle                                                                                                                                                                                                                              | Default bundle excludes household content, paths, origins, and secret values                           |
 
 ## Supported release environment
@@ -26,7 +26,7 @@ boundary.
 - Node 24 with pnpm 11 for source installs.
 - Docker with a persistent `/data` mount and non-root UID/GID `1001` runtime after mount initialization.
 - Current Chromium, Firefox, and Safari releases; iPhone Safari remains a release-candidate device acceptance gate until recorded on the target device.
-- Exact `APP_ORIGIN`, a unique `COOKIE_SECRET` of at least 32 characters, and trusted-network access only.
+- Matching exact `APP_ORIGIN`/`BETTER_AUTH_URL`, separate high-entropy `COOKIE_SECRET`/`BETTER_AUTH_SECRET`, intended verification/SMTP policy and a deliberately configured trusted deployment.
 - SQLite, uploads, generated artifacts, and backup bundles on one durable local data root.
 
 Nutrition is informational and non-medical. The app does not diagnose conditions, establish individual clinical requirements, or make food-safety decisions.

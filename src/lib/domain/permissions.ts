@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { integrationPermission } from './integration-routes';
 
 export const appRoles = ['admin', 'parent', 'child'] as const;
 export const appRoleSchema = z.enum(appRoles);
@@ -85,7 +86,9 @@ export function authorizeAppRequest(input: {
 }): RequestPermissionDecision {
   const { role, profileId, pathname } = input;
   const method = input.method.toUpperCase();
-  const isRead = readMethods.has(method);
+  // Explicit operation metadata determines effects; search/export POSTs are reads.
+  const isRead =
+    readMethods.has(method) || integrationPermission(pathname, method)?.action === 'read';
 
   // Integration routes enforce real account ownership and target permissions themselves.
   if (

@@ -71,6 +71,7 @@ const VIEW_EXPLAINERS: Record<NutritionView, string> = {
 };
 export type ProfileSummary = {
   id: string;
+  linkedHouseholdProfileId?: string | null;
   displayName: string;
   profileType: string;
   relationship: string;
@@ -219,6 +220,7 @@ type Recommendation = {
 };
 
 export type NutritionDashboardProps = {
+  initialGoalsOpen?: boolean;
   initialDiaryDate?: string;
   initialTask?: string;
   initialLogMode?: 'product' | 'recipe' | 'manual' | 'weight';
@@ -282,7 +284,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
   const [recordSelection, setRecordSelection] = useState('');
   const recoveryFocusRef = useRef<HTMLElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [goalsOpen, setGoalsOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(Boolean(props.initialGoalsOpen));
   const [status, setStatus] = useState('');
   const [openTool, setOpenTool] = useState('');
   const [dataOpen, setDataOpen] = useState(Boolean(props.initialTask));

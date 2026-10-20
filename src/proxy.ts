@@ -181,9 +181,13 @@ export async function proxy(request: NextRequest) {
   if (personalSettingsRedirects[pathname] && request.method === 'GET')
     return redirectTo(request, personalSettingsRedirects[pathname]);
 
+  const nutritionScope =
+    pathname === '/nutrition' ||
+    pathname === '/account/nutrition' ||
+    pathname.startsWith('/api/v1/nutrition/');
   const permission = authorizeAppRequest({
-    role: principal.role,
-    profileId: principal.profileId,
+    role: nutritionScope ? principal.accountRole : principal.role,
+    profileId: nutritionScope ? principal.linkedProfileId : principal.profileId,
     pathname,
     method: request.method,
   });

@@ -344,7 +344,7 @@ describe('bulk import results and upgrade compatibility', () => {
       await getSqliteDatabase().backup(path);
       const legacy = new Database(path);
       legacy.exec(
-        'DROP TABLE ai_user_settings; DROP TABLE ai_runtime_settings; DELETE FROM __drizzle_migrations WHERE created_at = 1792281600001;',
+        'DROP TABLE ai_prompt_versions; DROP TABLE recipe_image_candidates; DROP TABLE ai_chat_turns; ALTER TABLE ai_operation_audits DROP COLUMN prompt_version; DROP TABLE ai_user_settings; DROP TABLE ai_runtime_settings; DELETE FROM __drizzle_migrations WHERE created_at >= 1792281600001;',
       );
       legacy.close();
       resetDatabaseForTests();

@@ -195,6 +195,7 @@ const aiChatAttachmentSchema = z
 
 export const aiChatMessageInputSchema = z
   .object({
+    operationId: z.string().uuid().optional(),
     message: z.string().trim().max(8_000).default(''),
     allowPaidTools: z.boolean().default(false),
     attachments: z.array(aiChatAttachmentSchema).max(20).default([]),

@@ -1,4 +1,5 @@
 'use client';
+import { AssistantMessage } from './assistant-message';
 import { SuggestionCard } from '@/components/decision-assistance';
 import { AiJobCard, isActiveJob, type AiJob } from './ai-job-card';
 import { InlineAlert } from './inline-alert';
@@ -6,6 +7,7 @@ import { AiAppActionCard } from '@/components/ai-app-action-card';
 import type { DecisionCard } from '@/lib/domain/decision-assistance';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 
+import { readNdjson } from '@/lib/client/ndjson-stream';
 import { Plus, ArrowUp, Sparkles, SquarePen, Settings, X } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
@@ -15,6 +17,8 @@ import { useModalSurface } from '@/components/use-modal-surface';
 
 import { AiActionCard, type AiDrawerAction } from './ai-action-card';
 import styles from './ai-assistant-drawer.module.css';
+
+type TurnState = { id: string; status: 'running' | 'completed' | 'failed' | 'cancelled' };
 
 type Attachment = { kind: 'image'; name: string; mimeType: string; dataBase64: string };
 
@@ -49,48 +53,6 @@ function compactProposalMessage(message: Message, action?: AiDrawerAction): stri
   return 'I prepared that change for you. Review it below when you’re ready.';
 }
 
-function inlineText(value: string) {
-  return value
-    .split(/(\*\*[^*]+\*\*)/gu)
-    .map((part, index) =>
-      part.startsWith('**') && part.endsWith('**') ? (
-        <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>
-      ) : (
-        part
-      ),
-    );
-}
-
-function AssistantMessage({ content }: { content: string }) {
-  const blocks = content.split(/\n\s*\n/gu).filter(Boolean);
-  return (
-    <div className={styles.messageBody}>
-      {blocks.map((block, blockIndex) => {
-        const lines = block.split('\n').filter(Boolean);
-        if (lines.every((line) => line.trimStart().startsWith('- '))) {
-          return (
-            <ul key={`${block}-${blockIndex}`}>
-              {lines.map((line, lineIndex) => (
-                <li key={`${line}-${lineIndex}`}>{inlineText(line.replace(/^\s*-\s*/u, ''))}</li>
-              ))}
-            </ul>
-          );
-        }
-        return (
-          <p key={`${block}-${blockIndex}`}>
-            {lines.map((line, lineIndex) => (
-              <span key={`${line}-${lineIndex}`}>
-                {inlineText(line)}
-                {lineIndex < lines.length - 1 ? <br /> : null}
-              </span>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
 async function errorMessage(response: Response): Promise<string> {
   const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
   return body?.error?.message ?? 'The assistant request could not be completed.';
@@ -101,6 +63,7 @@ export function AiAssistantDrawer({
   onClose,
   returnFocusRef,
   initialDraft,
+  interviewMode = false,
   startNewThreadOnOpen = false,
   canManageAiSettings = false,
 }: {
@@ -108,9 +71,26 @@ export function AiAssistantDrawer({
   onClose: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
   initialDraft?: string;
+  interviewMode?: boolean;
   startNewThreadOnOpen?: boolean;
   canManageAiSettings?: boolean;
 }) {
+  const turnAbort = useRef<AbortController | null>(null);
+  const submittedTurn = useRef<{
+    operationId: string;
+    threadId: string;
+    message: string;
+    attachments: Attachment[];
+    allowPaidTools: boolean;
+  } | null>(null);
+  const [recoveryRequired, setRecoveryRequired] = useState(false);
+  const [newResponse, setNewResponse] = useState(false);
+  const [conversationList, setConversationList] = useState<Array<{ id: string; title: string }>>(
+    [],
+  );
+  const drafts = useRef(
+    new Map<string, { text: string; attachments: Attachment[]; scroll: number }>(),
+  );
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [actions, setActions] = useState<AiDrawerAction[]>([]);
@@ -202,6 +182,12 @@ export function AiAssistantDrawer({
       const body = (await response.json()) as { thread: { id: string } };
       stickToBottom.current = true;
       setThreadId(body.thread.id);
+      setRecoveryRequired(false);
+      submittedTurn.current = null;
+      setConversationList((current) => [
+        { id: body.thread.id, title: 'New conversation' },
+        ...current,
+      ]);
       setMessages([]);
       setDraft(initialDraft ?? '');
       setAttachments([]);
@@ -254,7 +240,8 @@ export function AiAssistantDrawer({
       try {
         const response = await fetch('/api/v1/ai/chat/threads', { cache: 'no-store' });
         if (!response.ok) throw new Error(await errorMessage(response));
-        const body = (await response.json()) as { threads: Array<{ id: string }> };
+        const body = (await response.json()) as { threads: Array<{ id: string; title: string }> };
+        setConversationList(body.threads);
         if (!body.threads[0]) {
           await newThread();
           return;
@@ -267,13 +254,19 @@ export function AiAssistantDrawer({
           messages: Message[];
           actions?: AiDrawerAction[];
           jobs?: AiJob[];
+          turns?: TurnState[];
         };
+        setRecoveryRequired(Boolean(historyBody.turns?.some((turn) => turn.status === 'running')));
         setMessages(historyBody.messages);
         setDraft(historyBody.messages.length ? '' : (initialDraft ?? ''));
         setThreadId(body.threads[0].id);
         setActions(historyBody.actions ?? []);
         setJobs(historyBody.jobs ?? []);
-        setStatus('');
+        setStatus(
+          historyBody.turns?.some((turn) => turn.status === 'running')
+            ? 'A previous request is running or its outcome is uncertain. Review the conversation before starting separate work.'
+            : '',
+        );
       } catch (error) {
         setStatusError(true);
         setStatus(error instanceof Error ? error.message : 'Could not load the assistant.');
@@ -407,113 +400,218 @@ export function AiAssistantDrawer({
     }
   }
 
+  useEffect(() => {
+    if (threadId)
+      drafts.current.set(threadId, {
+        text: draft,
+        attachments,
+        scroll: messagesRef.current?.scrollTop ?? 0,
+      });
+  }, [draft, attachments, threadId]);
+
+  useEffect(() => () => turnAbort.current?.abort(), []);
+
+  async function loadConversation(id: string) {
+    if (turnInFlight.current) return;
+    setBusy(true);
+    setStatusError(false);
+    try {
+      const response = await fetch(`/api/v1/ai/chat/threads/${id}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      const body = (await response.json()) as {
+        messages: Message[];
+        actions?: AiDrawerAction[];
+        jobs?: AiJob[];
+        turns?: TurnState[];
+      };
+      const saved = drafts.current.get(id);
+      setThreadId(id);
+      setMessages(body.messages);
+      setActions(body.actions ?? []);
+      setJobs(body.jobs ?? []);
+      setDraft(saved?.text ?? '');
+      setAttachments(saved?.attachments ?? []);
+      const running = body.turns?.some((turn) => turn.status === 'running') ?? false;
+      setRecoveryRequired(running);
+      if (!running) submittedTurn.current = null;
+      setStatus(
+        running
+          ? 'A previous request is still running or its outcome is uncertain. Review the results; use a new conversation only for deliberate separate work.'
+          : 'Conversation reloaded. Review saved previews and tasks before deliberately sending a new request.',
+      );
+      requestAnimationFrame(() => {
+        if (messagesRef.current)
+          messagesRef.current.scrollTop = saved?.scroll ?? messagesRef.current.scrollHeight;
+      });
+    } catch (error) {
+      setStatusError(true);
+      setStatus(error instanceof Error ? error.message : 'Could not reload this conversation.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault();
+    if (recoveryRequired) return;
+    await sendTurn();
+  }
+
+  async function sendTurn(retry = false) {
     const message = draft.trim();
+    if (
+      turnInFlight.current ||
+      busy ||
+      attaching ||
+      !threadId ||
+      (!retry && !message && !attachments.length)
+    )
+      return;
+    const attempt = retry
+      ? submittedTurn.current
+      : { operationId: createClientUuid(), threadId, message, attachments, allowPaidTools };
+    if (!attempt) return;
+    submittedTurn.current = attempt;
+    const abort = new AbortController();
+    turnAbort.current = abort;
+    const partialId = `response-${attempt.operationId}`;
+    if (!retry) {
+      setAttachments([]);
+      setDraft('');
+      setMessages((current) => [
+        ...current,
+        {
+          id: `request-${attempt.operationId}`,
+          role: 'user',
+          attachments: attempt.attachments,
+          content: attempt.message || 'Please review the attached images.',
+        },
+      ]);
+    }
     stickToBottom.current = true;
-    if (!threadId || (!message && !attachments.length) || busy || attaching) return;
-    const sentAttachments = attachments;
-    setAttachments([]);
-    setDraft('');
-    setMessages((current) => [
-      ...current,
-      {
-        id: createClientUuid(),
-        role: 'user',
-        attachments: sentAttachments,
-        content: `${message || 'Please review the attached images.'}${sentAttachments.length ? `\n\nAttached: ${sentAttachments.map((file) => file.name).join(', ')}` : ''}`,
-      },
-    ]);
     setStatusError(false);
     turnInFlight.current = true;
     setBusy(true);
-    setStatus('Thinking…');
+    setRecoveryRequired(false);
+    setStatus('Preparing a response…');
+    let assistantText = '';
+    let completed = false;
+    let sequence = 0;
+    let lastActionId: string | null = null;
+    const showText = () => {
+      setMessages((current) => [
+        ...current.filter((item) => item.id !== partialId),
+        { id: partialId, role: 'assistant', content: assistantText },
+      ]);
+      if (!stickToBottom.current) setNewResponse(true);
+    };
     try {
-      const response = await fetch(`/api/v1/ai/chat/threads/${threadId}/messages`, {
+      const response = await fetch(`/api/v1/ai/chat/threads/${attempt.threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, allowPaidTools, attachments: sentAttachments }),
+        signal: abort.signal,
+        body: JSON.stringify({
+          operationId: attempt.operationId,
+          message: attempt.message,
+          allowPaidTools: attempt.allowPaidTools,
+          attachments: attempt.attachments,
+        }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('The assistant returned an empty response.');
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let assistantText = '';
-      let lastActionId: string | null = null;
-      while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) break;
-        buffer += decoder.decode(chunk.value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines.filter(Boolean)) {
-          const event = JSON.parse(line) as {
-            type: string;
-            delta?: string;
-            message?: string;
-            messageId?: string;
-            actionId?: string;
-            kind?: string;
-            preview?: unknown;
-            job?: AiJob;
-            card?: DecisionCard;
-            proposal?: AppActionReview;
-          };
-          if (event.type === 'suggestion' && event.card)
-            setSuggestions((current) => [
-              ...current.filter((c) => c.id !== event.card!.id),
-              event.card!,
-            ]);
-          if (event.type === 'app_action' && event.proposal)
-            setAppActions((current) => [
-              ...current.filter((p) => p.id !== event.proposal!.id),
-              event.proposal!,
-            ]);
-          if (event.type === 'status') setStatus(event.message ?? 'Working…');
-          if (event.type === 'text') assistantText += event.delta ?? '';
-          if (event.type === 'action' && event.actionId) {
-            lastActionId = event.actionId;
-            setActions((current) =>
-              current.some((action) => action.id === event.actionId)
-                ? current
-                : [
-                    ...current,
-                    {
-                      id: event.actionId!,
-                      kind: event.kind ?? 'change',
-                      preview: event.preview,
-                      status: 'pending',
-                    },
-                  ],
+      if (!response.body) throw new Error('The assistant returned an empty response.');
+      for await (const event of readNdjson<{
+        type: string;
+        sequence?: number;
+        delta?: string;
+        content?: string;
+        message?: string;
+        messageId?: string;
+        actionId?: string;
+        kind?: string;
+        preview?: unknown;
+        job?: AiJob;
+        card?: DecisionCard;
+        proposal?: AppActionReview;
+      }>(response.body, abort.signal)) {
+        if (event.sequence !== undefined) {
+          if (event.sequence <= sequence) continue;
+          if (sequence && event.sequence !== sequence + 1)
+            throw new Error(
+              'Part of the response was lost. Reload the conversation to reconcile it.',
             );
-          }
-          if (event.type === 'job' && event.job) {
-            setJobs((current) =>
-              current.some((job) => job.id === event.job!.id)
-                ? current.map((job) => (job.id === event.job!.id ? event.job! : job))
-                : [...current, event.job!],
-            );
-          }
-          if (event.type === 'done')
-            setMessages((current) => [
-              ...current,
-              {
-                id: event.messageId ?? createClientUuid(),
-                role: 'assistant',
-                content: assistantText,
-                actionId: event.actionId ?? lastActionId,
-              },
-            ]);
+          sequence = event.sequence;
+        }
+        if (event.type === 'error')
+          throw new Error(event.message ?? 'The response could not finish.');
+        if (event.type === 'text_reset') {
+          assistantText = '';
+          setMessages((current) => current.filter((item) => item.id !== partialId));
+        }
+        if (event.type === 'status') setStatus(event.message ?? 'Preparing a response…');
+        if (event.type === 'text') {
+          assistantText += event.delta ?? '';
+          showText();
+        }
+        if (event.type === 'suggestion' && event.card)
+          setSuggestions((current) => [
+            ...current.filter((c) => c.id !== event.card!.id),
+            event.card!,
+          ]);
+        if (event.type === 'app_action' && event.proposal)
+          setAppActions((current) => [
+            ...current.filter((p) => p.id !== event.proposal!.id),
+            event.proposal!,
+          ]);
+        if (event.type === 'action' && event.actionId) {
+          lastActionId = event.actionId;
+          setActions((current) =>
+            current.some((action) => action.id === event.actionId)
+              ? current
+              : [
+                  ...current,
+                  {
+                    id: event.actionId!,
+                    kind: event.kind ?? 'change',
+                    preview: event.preview,
+                    status: 'pending',
+                  },
+                ],
+          );
+        }
+        if (event.type === 'job' && event.job)
+          setJobs((current) => [...current.filter((job) => job.id !== event.job!.id), event.job!]);
+        if (event.type === 'done') {
+          completed = true;
+          setMessages((current) => [
+            ...current.filter((item) => item.id !== partialId && item.id !== event.messageId),
+            {
+              id: event.messageId ?? partialId,
+              role: 'assistant',
+              content: event.content ?? assistantText,
+              actionId: event.actionId ?? lastActionId,
+            },
+          ]);
         }
       }
-      setStatus('');
+      if (!completed)
+        throw new Error(
+          'The connection ended before completion. Review the saved conversation before another request.',
+        );
+      submittedTurn.current = null;
+      setStatus('Response ready.');
     } catch (error) {
-      setDraft(message);
-      setAttachments(sentAttachments);
-      setStatus(error instanceof Error ? error.message : 'The assistant request failed.');
+      setRecoveryRequired(true);
+      setStatusError(true);
+      setStatus(
+        abort.signal.aborted
+          ? 'Response stopped. Saved previews or background tasks may still exist; reload the conversation to review them.'
+          : error instanceof Error
+            ? error.message
+            : 'The response could not finish.',
+      );
     } finally {
       turnInFlight.current = false;
+      turnAbort.current = null;
       setBusy(false);
     }
   }
@@ -573,7 +671,9 @@ export function AiAssistantDrawer({
       const body = (await response.json()) as { job: AiJob };
       setJobs((current) => current.map((job) => (job.id === jobId ? body.job : job)));
       setStatus(
-        command === 'cancel' ? 'Background task cancelled.' : 'Background task queued again.',
+        command === 'cancel'
+          ? 'Cancellation requested. Provider work already started may still finish; review the task status.'
+          : 'Background task queued again.',
       );
     } catch (error) {
       setStatusError(true);
@@ -587,7 +687,7 @@ export function AiAssistantDrawer({
   const linkedActionIds = new Set(
     messages.flatMap((message) => (message.actionId ? [message.actionId] : [])),
   );
-  const isThinking = busy && status === 'Thinking…';
+  const isThinking = busy && turnInFlight.current;
   const openingConversation = busy && !messages.length && !actions.length && !jobs.length;
 
   if (!open) return null;
@@ -659,13 +759,27 @@ export function AiAssistantDrawer({
             role="log"
             aria-label="Conversation"
             tabIndex={0}
-            aria-live="polite"
+            aria-live="off"
             aria-busy={busy}
           >
             <div ref={messageContentRef} className={styles.messageStack}>
               {settingsOpen ? (
                 <section className={styles.settingsPanel} aria-label="Assistant settings">
                   <h3>Assistant settings</h3>
+                  <label>
+                    Conversation
+                    <select
+                      value={threadId ?? ''}
+                      disabled={busy}
+                      onChange={(event) => void loadConversation(event.target.value)}
+                    >
+                      {conversationList.map((thread) => (
+                        <option key={thread.id} value={thread.id}>
+                          {thread.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className={styles.paidTools}>
                     <input
                       type="checkbox"
@@ -819,6 +933,34 @@ export function AiAssistantDrawer({
             </div>
           </div>
           <div className={styles.composer}>
+            {interviewMode && (
+              <details className={styles.draftTray}>
+                <summary>Interview controls</summary>
+                <p>These add a draft reply. Review or edit it before sending.</p>
+                {[
+                  ['Skip this topic', 'Skip this topic for now; keep my saved answers.'],
+                  [
+                    'Previous topic',
+                    'Go back to the previous interview topic so I can edit my answer.',
+                  ],
+                  [
+                    'Review my answers',
+                    'Show the stated answers and covered topics, and prepare a reviewed update for my own saved kitchen context.',
+                  ],
+                ].map(([label, reply]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setDraft((current) => `${current.trim() ? `${current}\n\n` : ''}${reply}`);
+                      textareaRef.current?.focus();
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </details>
+            )}
             {actions.some((action) => action.status === 'pending') ? (
               <details className={styles.draftTray}>
                 <summary>
@@ -837,7 +979,10 @@ export function AiAssistantDrawer({
                       key={action.id}
                       disabled={busy}
                       onClick={() => {
-                        setDraft(`Revise draft ${index + 1} (${action.id}): `);
+                        setDraft(
+                          (current) =>
+                            `${current.trim() ? `${current}\n\n` : ''}Revise draft ${index + 1} (${action.id}): `,
+                        );
                         textareaRef.current?.focus();
                       }}
                     >
@@ -904,18 +1049,57 @@ export function AiAssistantDrawer({
                 }}
                 placeholder="Ask about your kitchen…"
                 aria-label="Message the AI assistant"
-                disabled={busy || !threadId}
+                disabled={!threadId}
               />
               <button
                 type="submit"
                 aria-label="Send message"
                 title="Send message"
-                disabled={busy || attaching || !threadId || (!draft.trim() && !attachments.length)}
+                disabled={
+                  busy ||
+                  recoveryRequired ||
+                  attaching ||
+                  !threadId ||
+                  (!draft.trim() && !attachments.length)
+                }
               >
                 {isThinking ? <LoadingIndicator label="Sending message" /> : <ArrowUp />}
               </button>
             </form>
             <div className={styles.composerMeta}>
+              {turnInFlight.current ? (
+                <button type="button" onClick={() => turnAbort.current?.abort()}>
+                  Stop generating
+                </button>
+              ) : null}
+              {recoveryRequired ? (
+                <div className={styles.recoveryActions}>
+                  {submittedTurn.current && (
+                    <button type="button" disabled={busy} onClick={() => void sendTurn(true)}>
+                      Check the same request
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => threadId && void loadConversation(threadId)}
+                  >
+                    Review current conversation
+                  </button>
+                </div>
+              ) : null}
+              {newResponse ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    stickToBottom.current = true;
+                    setNewResponse(false);
+                    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
+                  }}
+                >
+                  Jump to latest response
+                </button>
+              ) : null}
               {status ? (
                 <InlineAlert tone={statusError ? 'error' : 'info'}>{status}</InlineAlert>
               ) : null}

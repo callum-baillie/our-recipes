@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
-import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
+import { executeIdempotentMutation, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import {
   shoppingListCreateSchema,
   shoppingListGenerateSchema,
@@ -51,18 +51,18 @@ export async function POST(request: Request) {
   const raw = idempotency.context.body;
   const tagged = shoppingListRequestSchema.safeParse(raw);
   if (tagged.success && tagged.data.kind === 'manual') {
-    const list = createManualShoppingList(
-      tagged.data.name,
-      authorization.principal.profileId,
-      false,
-    );
-    if (tagged.data.makeAutomaticRestockTarget) {
-      switchAutomaticRestockTarget(list.id, authorization.principal.profileId);
-    }
-    return idempotentJsonResponse(
+    const manualInput = tagged.data;
+    return executeIdempotentMutation(
       idempotency.context,
-      {
-        list: getShoppingList(list.id),
+      () => {
+        const list = createManualShoppingList(
+          manualInput.name,
+          authorization.principal.profileId,
+          false,
+        );
+        if (manualInput.makeAutomaticRestockTarget)
+          switchAutomaticRestockTarget(list.id, authorization.principal.profileId);
+        return { list: getShoppingList(list.id) };
       },
       authorization.requestId,
       201,
@@ -70,11 +70,11 @@ export async function POST(request: Request) {
   }
   const manual = shoppingListCreateSchema.safeParse(raw);
   if (manual.success) {
-    return idempotentJsonResponse(
+    return executeIdempotentMutation(
       idempotency.context,
-      {
+      () => ({
         list: createManualShoppingList(manual.data.name, authorization.principal.profileId),
-      },
+      }),
       authorization.requestId,
       201,
     );
@@ -88,24 +88,26 @@ export async function POST(request: Request) {
         : null;
   if (!planner) return jsonError(400, 'invalid_list', 'Use a list name or valid week range.');
   try {
-    const generated = generatePantryShortageList(
-      {
-        weekStart: planner.weekStart,
-        weekEnd: planner.weekEnd,
-        mode: planner.sourceMode === 'pantry_missing' ? 'missing' : 'all',
-      },
-      authorization.principal.profileId,
-    );
-    if (
-      tagged.success &&
-      tagged.data.kind === 'planner' &&
-      tagged.data.makeAutomaticRestockTarget
-    ) {
-      switchAutomaticRestockTarget(generated.listId, authorization.principal.profileId);
-    }
-    return idempotentJsonResponse(
+    return executeIdempotentMutation(
       idempotency.context,
-      { list: getShoppingList(generated.listId), restored: generated.restored },
+      () => {
+        const generated = generatePantryShortageList(
+          {
+            weekStart: planner.weekStart,
+            weekEnd: planner.weekEnd,
+            mode: planner.sourceMode === 'pantry_missing' ? 'missing' : 'all',
+          },
+          authorization.principal.profileId,
+        );
+        if (
+          tagged.success &&
+          tagged.data.kind === 'planner' &&
+          tagged.data.makeAutomaticRestockTarget
+        ) {
+          switchAutomaticRestockTarget(generated.listId, authorization.principal.profileId);
+        }
+        return { list: getShoppingList(generated.listId), restored: generated.restored };
+      },
       authorization.requestId,
       201,
     );

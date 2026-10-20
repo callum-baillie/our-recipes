@@ -1,10 +1,13 @@
 import * as React from 'react';
+import { fetch as expoFetch } from 'expo/fetch';
+import { readNdjson } from '../../../shared/mobile-domain/ndjson';
 import * as SecureStore from 'expo-secure-store';
 import type { ImageSourcePropType } from 'react-native';
 import { createAuthClient } from 'better-auth/react';
 import { expoClient } from '@better-auth/expo/client';
 import { normalizeBaseUrl } from '@/data/connection-config';
-import { authFailureMessage } from '@/auth/auth-errors';
+import { authFailureMessage, sessionExpiredResponse } from '@/auth/auth-errors';
+import { clearAssistantDrafts } from '@/data/assistant-drafts';
 
 const INSTANCE_KEY = 'bord.mobile.instance-url';
 const SCHEME = 'bord';
@@ -70,6 +73,11 @@ type AuthContextValue = {
   ) => Promise<{ bytes: ArrayBuffer; mimeType: string }>;
   requestNdjson: <T>(path: string) => Promise<T[]>;
   requestEvents: <T>(path: string, init?: RequestInit) => Promise<T[]>;
+  requestEventStream: <T>(
+    path: string,
+    onEvent: (event: T) => void,
+    init?: RequestInit,
+  ) => Promise<void>;
   assetSource: (path: string) => ImageSourcePropType | undefined;
 };
 
@@ -215,7 +223,15 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   );
 
   const signOut = React.useCallback(async () => {
-    await clientRef.current?.signOut();
+    clearAssistantDrafts();
+    try {
+      const result = await clientRef.current?.signOut();
+      if (result?.error)
+        setError('Signed out on this device. Server session revocation could not be confirmed.');
+    } catch {
+      setError('Signed out on this device. Server session revocation could not be confirmed.');
+    }
+    clientRef.current = null;
     if (instanceUrl) await SecureStore.deleteItemAsync(profileCookieKey(instanceUrl));
     profileCookieRef.current = '';
     setUser(null);
@@ -223,6 +239,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, [instanceUrl]);
 
   const forgetInstance = React.useCallback(async () => {
+    clearAssistantDrafts();
     await clientRef.current?.signOut().catch(() => undefined);
     await SecureStore.deleteItemAsync(INSTANCE_KEY);
     if (instanceUrl) await SecureStore.deleteItemAsync(profileCookieKey(instanceUrl));
@@ -234,7 +251,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, [instanceUrl]);
 
   const authenticatedFetch = React.useCallback(
-    async (path: string, init: RequestInit = {}) => {
+    async (path: string, init: RequestInit = {}, streaming = false) => {
       const client = clientRef.current;
       if (!instanceUrl || !client) throw new Error('No Bòrd instance is connected.');
       const headers = new Headers(init.headers);
@@ -247,22 +264,43 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       if (init.method && init.method !== 'GET' && init.method !== 'HEAD') {
         headers.set('Origin', new URL(instanceUrl).origin);
       }
-      const response = await fetch(`${instanceUrl}${path}`, {
+      const response = await (streaming ? expoFetch : fetch)(`${instanceUrl}${path}`, {
         ...init,
         credentials: 'omit',
+        body: init.body ?? undefined,
+        signal: init.signal ?? undefined,
         headers,
       });
+      if (client !== clientRef.current)
+        throw new Error(
+          'The account changed before the response completed. Review the saved result after signing in.',
+        );
       const setCookie = response.headers.get('set-cookie') ?? '';
       const activeProfile = setCookie.match(/(?:^|,\s*)bord_active_profile=([^;]+)/u)?.[1];
       if (activeProfile) {
         profileCookieRef.current = `bord_active_profile=${activeProfile}`;
         await SecureStore.setItemAsync(profileCookieKey(instanceUrl), profileCookieRef.current);
       }
-      if (response.status === 401) {
+      // Expo FetchResponse does not implement clone(); consume an error once.
+      const failure = !response.ok ? await response.json().catch(() => null) : null;
+      const errorCode = failure?.error?.code;
+      if (sessionExpiredResponse(response.status, errorCode, path)) {
+        clearAssistantDrafts();
         setUser(null);
         setStatus('needs-auth');
       }
-      if (!response.ok) throw new Error(await errorMessage(response));
+      if (!response.ok)
+        throw Object.assign(
+          new Error(
+            failure?.error?.message ??
+              failure?.message ??
+              `The server returned ${response.status}.`,
+          ),
+          {
+            status: response.status,
+            code: errorCode,
+          },
+        );
       return response;
     },
     [instanceUrl],
@@ -303,21 +341,35 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     [authenticatedFetch],
   );
 
-  const requestEvents = React.useCallback(
-    async <T,>(path: string, init: RequestInit = {}) => {
-      const response = await authenticatedFetch(path, {
-        ...init,
-        headers: {
-          Accept: 'application/x-ndjson',
-          ...Object.fromEntries(new Headers(init.headers)),
+  const requestEventStream = React.useCallback(
+    async <T,>(path: string, onEvent: (event: T) => void, init: RequestInit = {}) => {
+      const response = await authenticatedFetch(
+        path,
+        {
+          ...init,
+          headers: {
+            Accept: 'application/x-ndjson',
+            ...Object.fromEntries(new Headers(init.headers)),
+          },
         },
-      });
-      return (await response.text())
-        .split(/\r?\n/u)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as T);
+        true,
+      );
+      if (!response.body)
+        throw new Error(
+          'The server returned no response stream. Reload the conversation to review any saved work.',
+        );
+      for await (const event of readNdjson<T>(response.body, init.signal ?? undefined))
+        onEvent(event);
     },
     [authenticatedFetch],
+  );
+  const requestEvents = React.useCallback(
+    async <T,>(path: string, init: RequestInit = {}) => {
+      const events: T[] = [];
+      await requestEventStream<T>(path, (event) => events.push(event), init);
+      return events;
+    },
+    [requestEventStream],
   );
 
   const assetSource = React.useCallback(
@@ -349,6 +401,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       requestDocument,
       requestNdjson,
       requestEvents,
+      requestEventStream,
       assetSource,
     }),
     [
@@ -366,6 +419,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       requestDocument,
       requestNdjson,
       requestEvents,
+      requestEventStream,
       assetSource,
     ],
   );

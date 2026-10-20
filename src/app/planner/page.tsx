@@ -1,4 +1,5 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { MealPlanner } from '@/components/meal-planner';
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import {
@@ -173,9 +174,15 @@ export default async function PlannerPage({
   const imageAiSetting = actor.profileId
     ? getAiWorkloadSetting(actor.profileId, 'image_generation')
     : { ...AI_WORKLOAD_DEFAULTS.image_generation, enabled: true };
-  const aiSummary = actor.profileId
-    ? listAiSummaries(actor.profileId).find((item) => item.domain === 'meal_plans')
-    : null;
+  const summaryPrincipal = await getAuthenticatedSessionPrincipal(
+    new Request('http://localhost/planner', { headers: await headers() }),
+  );
+  const aiSummary =
+    actor.profileId &&
+    summaryPrincipal?.linkedProfileId === actor.profileId &&
+    summaryPrincipal.profileId === actor.profileId
+      ? listAiSummaries(actor.profileId).find((item) => item.domain === 'meal_plans')
+      : null;
   return (
     <main className="recipe-page">
       <MealPlanner

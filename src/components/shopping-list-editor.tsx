@@ -2597,6 +2597,17 @@ export function ShoppingListEditor({
                   aria-describedby="buy-quantity-help"
                 />
               </label>
+              {items.find((item) => item.id === editingItem.id)?.quantity === null &&
+                items.find((item) => item.id === editingItem.id)?.pantry?.demandState ===
+                  'uncertain' && (
+                  <p>
+                    Planned recipe demand:{' '}
+                    {shoppingQuantitySummary(
+                      items.find((item) => item.id === editingItem.id)!,
+                    ).primary.replace(/ recipe demand$/u, '')}
+                    . This is context only; enter the amount you intend to buy separately.
+                  </p>
+                )}
               <p id="buy-quantity-help">
                 Blank means the buy quantity is unknown.{' '}
                 {

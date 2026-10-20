@@ -19,6 +19,7 @@ export type IdempotencyContext = {
   method: string;
   path: string;
   requestHash: string;
+  legacyRequestHash: string;
   principal: RequestPrincipal;
 };
 
@@ -27,12 +28,27 @@ export type IdempotencyPreparation =
 
 function keyDigest(principal: RequestPrincipal, key: string): string {
   return createHmac('sha256', getRuntimeConfig().auth.secret)
-    .update(`${principal.apiKeyId}:${key}`)
+    .update(
+      principal.kind === 'session'
+        ? `session:${principal.userId}:${principal.profileId}:${key}`
+        : `${principal.apiKeyId}:${key}`,
+    )
     .digest('base64url');
 }
 
 function requestDigest(method: string, path: string, rawBody: string): string {
   return createHash('sha256').update(`${method}\n${path}\n${rawBody}`).digest('base64url');
+}
+
+// JSON object ordering and insignificant whitespace do not change intent. Arrays retain order.
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
 }
 
 function responseWithRequestId(response: NextResponse, requestId: string): NextResponse {
@@ -45,7 +61,31 @@ export async function prepareIdempotentMutation(
   principal: RequestPrincipal,
   requestId: string,
 ): Promise<IdempotencyPreparation> {
-  const rawBody = await request.text();
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    if (reader)
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        bytes += chunk.value.byteLength;
+        if (bytes > 2 * 1024 * 1024) {
+          await reader.cancel();
+          return {
+            context: null,
+            response: responseWithRequestId(
+              jsonError(413, 'request_too_large', 'This request exceeds the 2 MB limit.'),
+              requestId,
+            ),
+          };
+        }
+        chunks.push(chunk.value);
+      }
+  } finally {
+    reader?.releaseLock();
+  }
+  const rawBody = Buffer.concat(chunks).toString('utf8');
   let body: unknown = null;
   try {
     body = rawBody ? JSON.parse(rawBody) : null;
@@ -62,10 +102,11 @@ export async function prepareIdempotentMutation(
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
   const path = url.pathname;
-  const requestHash = requestDigest(method, path, rawBody);
-  if (principal.kind === 'session') {
+  const legacyRequestHash = requestDigest(method, path, rawBody);
+  const requestHash = requestDigest(method, path, canonicalJson(body));
+  if (principal.kind === 'session' && !request.headers.has('idempotency-key')) {
     return {
-      context: { body, keyHash: null, method, path, requestHash, principal },
+      context: { body, keyHash: null, method, path, requestHash, legacyRequestHash, principal },
       response: null,
     };
   }
@@ -78,7 +119,7 @@ export async function prepareIdempotentMutation(
         jsonError(
           400,
           'idempotency_key_required',
-          'API-key create requests require a valid Idempotency-Key header.',
+          'Provide a valid Idempotency-Key header for this create request.',
         ),
         requestId,
       ),
@@ -102,7 +143,10 @@ export async function prepareIdempotentMutation(
     )
     .get();
   if (existing) {
-    if (existing.requestHash !== requestHash) {
+    if (
+      existing.userId !== principal.userId ||
+      ![requestHash, legacyRequestHash].includes(existing.requestHash)
+    ) {
       return {
         context: null,
         response: responseWithRequestId(
@@ -126,7 +170,7 @@ export async function prepareIdempotentMutation(
   }
 
   return {
-    context: { body, keyHash, method, path, requestHash, principal },
+    context: { body, keyHash, method, path, requestHash, legacyRequestHash, principal },
     response: null,
   };
 }
@@ -166,4 +210,58 @@ export function idempotentJsonResponse(
     },
   });
   return responseWithRequestId(response, requestId);
+}
+
+/** Synchronous SQLite mutations and their acknowledged receipts commit or roll back together. */
+export function executeIdempotentMutation<T>(
+  context: IdempotencyContext,
+  operation: () => T,
+  requestId: string,
+  status = 200,
+): NextResponse {
+  ensureDatabase();
+  return getDatabase().transaction(
+    () => {
+      // Recheck under the write lock: another process may have completed after preparation.
+      if (context.keyHash) {
+        const existing = getDatabase()
+          .select()
+          .from(apiIdempotencyRecords)
+          .where(
+            and(
+              eq(apiIdempotencyRecords.keyHash, context.keyHash),
+              eq(apiIdempotencyRecords.method, context.method),
+              eq(apiIdempotencyRecords.path, context.path),
+            ),
+          )
+          .get();
+        if (existing) {
+          if (
+            existing.userId !== context.principal.userId ||
+            ![context.requestHash, context.legacyRequestHash].includes(existing.requestHash)
+          )
+            return responseWithRequestId(
+              jsonError(
+                409,
+                'idempotency_key_conflict',
+                'That operation key belongs to a different request.',
+              ),
+              requestId,
+            );
+          return responseWithRequestId(
+            new NextResponse(existing.responseBody, {
+              status: existing.status,
+              headers: { 'Content-Type': 'application/json', 'Idempotency-Replayed': 'true' },
+            }),
+            requestId,
+          );
+        }
+      }
+      const payload = operation();
+      if (payload && typeof payload === 'object' && 'then' in payload)
+        throw new Error('Idempotent SQLite operations must complete synchronously.');
+      return idempotentJsonResponse(context, payload, requestId, status);
+    },
+    { behavior: 'immediate' },
+  );
 }

@@ -33,3 +33,26 @@ describe('native authentication errors', () => {
     expect(authFailureMessage({ status: 404 })).toMatch(/update and restart the web app/iu);
   });
 });
+
+import { profileSwitchRequest, sessionExpiredResponse } from '../src/auth/auth-errors';
+
+it('uses destination passwords without retaining the obsolete profile PIN contract', () => {
+  const command = profileSwitchRequest('person-id', ' not-a-PIN ');
+  expect(command.path).toBe('/api/v1/profiles/person-id/active');
+  expect(command.init.method).toBe('PATCH');
+  expect(JSON.parse(command.init.body)).toEqual({ password: ' not-a-PIN ' });
+  expect(() => profileSwitchRequest('person-id', '')).toThrow();
+  expect(() => profileSwitchRequest('person-id', 'a'.repeat(129))).toThrow();
+});
+it('keeps the account session after a rejected destination password, but not after real expiry', () => {
+  expect(
+    sessionExpiredResponse(401, 'invalid_profile_password', '/api/v1/profiles/person-id/active'),
+  ).toBe(false);
+  expect(
+    sessionExpiredResponse(401, 'authentication_required', '/api/v1/profiles/person-id/active'),
+  ).toBe(true);
+  expect(sessionExpiredResponse(401, undefined, '/api/v1/recipes')).toBe(true);
+  expect(
+    sessionExpiredResponse(403, 'reauthentication_required', '/api/v1/profiles/person-id/active'),
+  ).toBe(false);
+});

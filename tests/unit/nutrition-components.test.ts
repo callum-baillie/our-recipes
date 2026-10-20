@@ -250,8 +250,20 @@ describe('Nutrition rendered boundary', () => {
     expect(markup).toContain('Optional goals and preferences');
     expect(markup).toContain('Daily nutrient goals');
     expect(markup).toContain('Set daily nutrition goal');
-    expect(markup).toContain('Enable weight tracking');
+    expect(markup).toContain('Review Nutrition preferences');
     expect(markup).toContain('No food recorded today');
+    HTMLDialogElement.prototype.showModal = function () {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function () {
+      this.open = false;
+    };
+    render(
+      createElement(NutritionDashboard, { ...props, goals: [], weightTrend: disabledWeightTrend }),
+    );
+    fireEvent.click(screen.getByText('Optional goals and preferences'));
+    fireEvent.click(screen.getByRole('button', { name: 'Set daily nutrition goal' }));
+    expect(screen.getByRole('dialog', { name: 'Nutrition goals' })).toBeTruthy();
   });
 
   it('places daily calorie goals in the onboarding dialog and shows a saved weight plan', () => {

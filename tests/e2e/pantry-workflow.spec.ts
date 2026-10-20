@@ -96,7 +96,7 @@ async function addPantryBatch(
   await panel.getByRole('button', { name: 'Add item', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(
-    page.getByRole('status').filter({ hasText: 'Pantry item added.' }).last(),
+    page.getByRole('status').filter({ hasText: '1 Pantry batch added.' }).last(),
   ).toBeVisible();
 }
 
@@ -243,7 +243,9 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
   const pantryPanel = page.getByRole('region', { name: 'What you have on hand' });
   await pantryPanel.getByLabel('Pantry product').selectOption({ label: 'Red lentils' });
-  await expect(pantryPanel.getByRole('status')).toHaveText('Pantry mapping saved.');
+  await expect(
+    pantryPanel.getByRole('status').filter({ hasText: 'Pantry mapping saved.' }),
+  ).toHaveText('Pantry mapping saved.');
   await page.reload();
   await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
   await expect(pantryPanel.getByText('Pantry ready', { exact: true }).first()).toBeVisible();
@@ -303,10 +305,11 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   const listId = shortageBody.listId;
   await page.goto(`/lists/${listId}`);
 
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
   const shoppingRow = page.locator('article', {
-    has: page.getByLabel('Red lentils quantity'),
+    has: page.locator('strong', { hasText: /^Red lentils$/ }),
   });
-  await expect(shoppingRow.getByLabel('Red lentils quantity')).toHaveValue('50');
+  await expect(shoppingRow).toContainText('50 g to buy');
   const generatedExplanation = shoppingRow.locator('details', {
     hasText: 'Pantry details',
   });
@@ -318,12 +321,15 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     generatedExplanation.getByText(/Pantry lentil stew · 2027-04-05 · 2 servings/u),
   ).toBeVisible();
   await shoppingRow.getByLabel('Edit Red lentils').click();
-  const quantityInput = shoppingRow.getByLabel('Red lentils quantity');
+  const itemEditor = page.getByRole('dialog', { name: 'Edit item', exact: true });
+  const quantityInput = itemEditor.getByLabel('To buy quantity', { exact: true });
+  await expect(quantityInput).toHaveValue('50');
   const manualSave = page.waitForResponse(
     (response) => response.request().method() === 'PATCH' && response.url().includes(`/items/`),
   );
   await quantityInput.fill('60');
-  await quantityInput.press('Tab');
+  await itemEditor.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(itemEditor).not.toBeVisible();
   expect((await manualSave).ok()).toBe(true);
 
   for (const mealId of plannedMeals) {
@@ -338,7 +344,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   });
   expect(regenerate.ok()).toBe(true);
   await page.reload();
-  await expect(shoppingRow.getByLabel('Red lentils quantity')).toHaveValue('60');
+  await expect(shoppingRow).toContainText('60 g to buy');
   await shoppingRow.getByText('Pantry details', { exact: true }).click();
   await expect(
     shoppingRow.getByText('Obsolete generated demand · kept as a manual item'),
@@ -384,7 +390,9 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   );
   await shoppingRow.getByRole('button', { name: 'Add to cart', exact: true }).click();
   expect((await checkedSave).ok()).toBe(true);
-  await page.getByRole('button', { name: 'Unpack groceries into Pantry' }).click();
+  await page.getByText('Shopping tools', { exact: true }).click();
+  await page.getByRole('button', { name: 'Unpack groceries into Pantry', exact: true }).click();
+  await page.keyboard.press('Escape');
   const unpack = shoppingRow.locator('details', {
     has: page.getByText('Unpack into Pantry', { exact: true }),
   });
@@ -414,7 +422,7 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
     page.getByRole('button', { name: 'Finish cooking', exact: true }).last(),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Finish cooking', exact: true }).last().click();
-  const confirmation = page.getByRole('region', { name: 'Confirm Pantry changes' });
+  const confirmation = page.getByRole('dialog', { name: 'Confirm Pantry changes', exact: true });
   await expect(confirmation.getByLabel('Deduction 1 quantity')).toHaveValue('200');
   await screenshot(page, testInfo, 'cooking-explicit-confirmation');
   const completionResponse = page.waitForResponse(

@@ -1,16 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
-  principal: vi.fn(async () => ({ linkedProfileId: 'owned-person' })),
+  principal: vi.fn(),
+  allowed: vi.fn(() => true),
   refresh: vi.fn(async () => []),
   unavailable: vi.fn(() => 'disabled_workload'),
 }));
-vi.mock('next/headers', () => ({
-  cookies: async () => ({ get: () => ({ value: 'signed-view' }) }),
-}));
-vi.mock('@/lib/actor-context', () => ({
-  ACTIVE_PROFILE_COOKIE: 'profile',
-  getActorContext: () => ({ profileId: 'viewed-person' }),
-}));
+vi.mock('@/lib/services/ai-access-service', () => ({ canAccountUseAi: mocks.allowed }));
 vi.mock('@/lib/services/auth-service', () => ({
   getAuthenticatedSessionPrincipal: mocks.principal,
 }));
@@ -25,6 +20,7 @@ vi.mock('@/lib/services/household-service', () => ({
 vi.mock('@/lib/services/ai-summary-service', () => ({
   refreshAiSummaryBundle: mocks.refresh,
   aiSummaryUnavailableReason: mocks.unavailable,
+  aiSummaryAvailability: () => [],
   listAiSummaries: vi.fn(() => []),
   AiSummaryInProgressError: class extends Error {},
 }));
@@ -34,7 +30,17 @@ vi.mock('@/lib/http', () => ({
   jsonError: (status: number, code: string, message: string) =>
     Response.json({ error: { code, message } }, { status }),
 }));
-import { POST } from '@/app/api/v1/ai/summaries/route';
+import { GET, POST } from '@/app/api/v1/ai/summaries/route';
+beforeEach(() => {
+  mocks.principal.mockResolvedValue({
+    linkedProfileId: 'owned-person',
+    profileId: 'owned-person',
+    userId: 'account-1',
+    role: 'parent',
+    accountRole: 'parent',
+  });
+  mocks.allowed.mockReturnValue(true);
+});
 afterEach(() => vi.clearAllMocks());
 function request(scope = '') {
   return new Request(`https://bord.test/api/v1/ai/summaries${scope}`, {
@@ -51,9 +57,40 @@ describe('summary recipient and outcome', () => {
       outcome: 'disabled_workload',
     });
   });
-  it('preserves the existing explicitly active-profile consumer', async () => {
+  it('default refresh keeps the signed-in recipient when another household person is viewed', async () => {
+    mocks.principal.mockResolvedValue({
+      linkedProfileId: 'owned-person',
+      profileId: 'viewed-person',
+      userId: 'account-1',
+      role: 'parent',
+      accountRole: 'parent',
+    });
     await POST(request());
-    expect(mocks.refresh).toHaveBeenCalledWith('viewed-person');
+    expect(mocks.refresh).toHaveBeenCalledWith('owned-person');
+    expect((await GET(new Request('https://bord.test/api/v1/ai/summaries'))).status).toBe(403);
+  });
+  it('rejects signed-out direct calls and disabled-account generation', async () => {
+    mocks.principal.mockResolvedValue(null);
+    expect((await GET(new Request('https://bord.test/api/v1/ai/summaries'))).status).toBe(401);
+    expect((await POST(request())).status).toBe(401);
+    mocks.principal.mockResolvedValue({
+      linkedProfileId: 'owned-person',
+      profileId: 'owned-person',
+      userId: 'account-1',
+      role: 'parent',
+      accountRole: 'parent',
+    });
+    mocks.allowed.mockReturnValue(false);
+    expect((await POST(request())).status).toBe(403);
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+  it('allows only bounded, private reads for the authenticated recipient', async () => {
+    const response = await GET(new Request('https://bord.test/api/v1/ai/summaries?limit=12'));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect((await GET(new Request('https://bord.test/api/v1/ai/summaries?limit=99'))).status).toBe(
+      400,
+    );
   });
   it('rejects unsupported recipient selection and lookalike origins before any generation', async () => {
     expect((await POST(request('?scope=another-person'))).status).toBe(400);

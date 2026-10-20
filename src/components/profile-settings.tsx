@@ -72,6 +72,9 @@ export function ProfileSettings({
   const [profiles, setProfiles] = useState(initialProfiles);
   const [adding, setAdding] = useState(false);
   const [guardians, setGuardians] = useState(initialGuardians);
+  const [guardianFeedback, setGuardianFeedback] = useState<
+    Record<string, { error: boolean; message: string }>
+  >({});
   const [pendingGuardian, setPendingGuardian] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +95,12 @@ export function ProfileSettings({
     const response = await fetch(`/api/v1/profiles/${profile.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        scope: 'identity',
+        displayName: data.displayName,
+        color: data.color,
+        avatarUrl: data.avatarUrl,
+      }),
     });
     const body = (await response.json().catch(() => null)) as {
       profile?: Profile;
@@ -174,7 +182,14 @@ export function ProfileSettings({
   }
 
   async function setGuardian(parentProfileId: string, childProfileId: string, enabled: boolean) {
-    setError(null);
+    const pair = `${parentProfileId}:${childProfileId}`;
+    const parentName =
+      profiles.find((item) => item.id === parentProfileId)?.displayName ?? 'Guardian';
+    const childName = profiles.find((item) => item.id === childProfileId)?.displayName ?? 'child';
+    setGuardianFeedback((current) => ({
+      ...current,
+      [pair]: { error: false, message: `Saving ${parentName}’s access to ${childName}…` },
+    }));
     const response = await fetch('/api/v1/admin/guardians', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -185,8 +200,7 @@ export function ProfileSettings({
     } | null;
     if (!response.ok) {
       const message = body?.error?.message ?? 'We could not change guardian access.';
-      setError(message);
-      showToast(message, 'error');
+      setGuardianFeedback((current) => ({ ...current, [pair]: { error: true, message } }));
       return;
     }
     setGuardians((current) =>
@@ -197,7 +211,13 @@ export function ProfileSettings({
               item.parentProfileId !== parentProfileId || item.childProfileId !== childProfileId,
           ),
     );
-    showToast(enabled ? 'Guardian access granted.' : 'Guardian access revoked.', 'success');
+    setGuardianFeedback((current) => ({
+      ...current,
+      [pair]: {
+        error: false,
+        message: `${parentName}’s Nutrition access to ${childName} ${enabled ? 'granted' : 'revoked'}.`,
+      },
+    }));
   }
 
   return (
@@ -229,7 +249,7 @@ export function ProfileSettings({
           className="guardian-settings"
           eyebrow="PERMISSIONS"
           title="Guardian access"
-          description="Allow an Admin or Parent to manage a Child's Nutrition data. Guardians cannot delete the child's entries."
+          description="Allow an Admin or Parent to manage a Child's Nutrition data. Guardians cannot delete the child's entries. Each switch saves immediately."
           aria-labelledby="guardian-heading"
         >
           {profiles
@@ -253,7 +273,9 @@ export function ProfileSettings({
                         key={parent.id}
                         title={
                           <>
-                            <span>{parent.displayName}</span>
+                            <span>
+                              {parent.displayName}’s access to {child.displayName}
+                            </span>
                           </>
                         }
                         description={
@@ -272,12 +294,29 @@ export function ProfileSettings({
                             setPendingGuardian(`${parent.id}:${child.id}`);
                             void setGuardian(parent.id, child.id, event.target.checked)
                               .catch(() =>
-                                setError('Could not save the guardian assignment. Try again.'),
+                                setGuardianFeedback((current) => ({
+                                  ...current,
+                                  [`${parent.id}:${child.id}`]: {
+                                    error: true,
+                                    message: `Could not confirm ${parent.displayName}’s access to ${child.displayName}. Refresh members before retrying.`,
+                                  },
+                                })),
                               )
                               .finally(() => setPendingGuardian(null));
                           }}
                         />
                         {pendingGuardian === `${parent.id}:${child.id}` ? <ButtonSpinner /> : null}
+                        {guardianFeedback[`${parent.id}:${child.id}`] && (
+                          <span
+                            role={
+                              guardianFeedback[`${parent.id}:${child.id}`]!.error
+                                ? 'alert'
+                                : 'status'
+                            }
+                          >
+                            {guardianFeedback[`${parent.id}:${child.id}`]!.message}
+                          </span>
+                        )}
                       </SettingsField>
                     );
                   })}
@@ -539,7 +578,9 @@ export function ProfileEditor({
               : values;
             setValues(next);
             setSaved(next);
-            setSavedMessage('Profile and cooking preferences saved.');
+            setSavedMessage(
+              personal ? 'Profile and cooking preferences saved.' : 'Profile identity saved.',
+            );
           });
         }}
       >

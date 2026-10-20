@@ -85,6 +85,9 @@ export function ShoppingListsOverview({
   const [sort, setSort] = useState<ListSort>('updated');
   const [descending, setDescending] = useState(true);
   const [nameError, setNameError] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [renameError, setRenameError] = useState('');
+  const [listErrors, setListErrors] = useState<Record<string, string>>({});
   const [copyId, setCopyId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -132,6 +135,7 @@ export function ShoppingListsOverview({
       return;
     }
     setNameError('');
+    setCreateError('');
     setBusy('create');
     setPendingAction('create');
     try {
@@ -140,15 +144,18 @@ export function ShoppingListsOverview({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'manual', name, makeAutomaticRestockTarget: makeNextShop }),
       });
-      const body = (await response.json().catch(() => null)) as { list?: { id: string } } | null;
+      const body = (await response.json().catch(() => null)) as {
+        list?: { id: string };
+        error?: { message?: string };
+      } | null;
       if (!response.ok || !body?.list) {
-        showToast('The list could not be created.', 'error');
+        setCreateError(body?.error?.message ?? 'The list could not be created.');
         return;
       }
       showToast('Shopping list created.', 'success');
       router.push(`/lists/${body.list.id}`);
     } catch {
-      showToast('The list could not be created. Check the connection and try again.', 'error');
+      setCreateError('The list could not be created. Check the connection and try again.');
     } finally {
       setBusy(null);
       setPendingAction(null);
@@ -162,10 +169,11 @@ export function ShoppingListsOverview({
   ) {
     if (busy) return;
     if (action === 'rename' && !nextName?.trim()) {
-      setNameError('Enter a list name.');
+      setRenameError('Enter a list name.');
       return;
     }
-    setNameError('');
+    setRenameError('');
+    setListErrors((current) => ({ ...current, [listId]: '' }));
     setBusy(listId);
     setPendingAction(action);
     try {
@@ -176,7 +184,10 @@ export function ShoppingListsOverview({
       });
       const result = await response.json().catch(() => null);
       if (!response.ok) {
-        setNameError(result?.error?.message ?? 'The list change could not be saved.');
+        setListErrors((current) => ({
+          ...current,
+          [listId]: result?.error?.message ?? 'The list change could not be saved.',
+        }));
         showToast(result?.error?.message ?? 'The list change could not be saved.', 'error');
         return;
       }
@@ -204,7 +215,10 @@ export function ShoppingListsOverview({
       setEditingId(null);
       router.refresh();
     } catch {
-      showToast('The list change could not be saved. Check the connection and try again.', 'error');
+      setListErrors((current) => ({
+        ...current,
+        [listId]: 'The list change could not be saved. Check the connection and try again.',
+      }));
     } finally {
       setBusy(null);
       setPendingAction(null);
@@ -215,22 +229,26 @@ export function ShoppingListsOverview({
     if (busy) return;
     setBusy(listId);
     setPendingAction('delete');
+    setListErrors((current) => ({ ...current, [listId]: '' }));
     try {
       const response = await fetch(`/api/v1/shopping-lists/${listId}`, { method: 'DELETE' });
       const body = (await response.json().catch(() => null)) as {
         error?: { message?: string };
       } | null;
       if (!response.ok) {
-        showToast(
-          body?.error?.message ?? 'The list could not be deleted. Archive it instead.',
-          'error',
-        );
+        setListErrors((current) => ({
+          ...current,
+          [listId]: body?.error?.message ?? 'The list could not be deleted. Archive it instead.',
+        }));
         return;
       }
       showToast('Shopping list deleted.', 'success');
       router.refresh();
     } catch {
-      showToast('The list could not be deleted. Check the connection and try again.', 'error');
+      setListErrors((current) => ({
+        ...current,
+        [listId]: 'The list could not be deleted. Check the connection and try again.',
+      }));
     } finally {
       setBusy(null);
       setPendingAction(null);
@@ -294,6 +312,7 @@ export function ShoppingListsOverview({
                 <span>List name</span>
                 <input
                   value={name}
+                  disabled={busy === 'create'}
                   maxLength={120}
                   placeholder="e.g. Weekend market"
                   aria-invalid={!!nameError}
@@ -311,12 +330,14 @@ export function ShoppingListsOverview({
                 <input
                   type="checkbox"
                   checked={makeNextShop}
+                  disabled={busy === 'create'}
                   onChange={(event) => setMakeNextShop(event.target.checked)}
                 />{' '}
                 <span>
                   Use as Next shop<small>New automatic-restock items go to this list.</small>
                 </span>
               </label>
+              {createError && <p role="alert">{createError}</p>}
               <button type="submit" aria-busy={busy === 'create'} disabled={busy !== null}>
                 {busy === 'create' ? <ButtonSpinner /> : null}
                 {busy === 'create' ? 'Creating…' : 'Create list'}
@@ -434,6 +455,7 @@ export function ShoppingListsOverview({
                         </dl>
                       </Link>
 
+                      {listErrors[list.id] && <p role="alert">{listErrors[list.id]}</p>}
                       {editingId === list.id ? (
                         <form
                           className={styles.renameForm}
@@ -452,12 +474,13 @@ export function ShoppingListsOverview({
                               maxLength={120}
                               required
                               autoFocus
-                              aria-invalid={!!nameError}
-                              aria-describedby={nameError ? `rename-error-${list.id}` : undefined}
+                              disabled={busy === list.id}
+                              aria-invalid={!!renameError}
+                              aria-describedby={renameError ? `rename-error-${list.id}` : undefined}
                             />
-                            {nameError && (
+                            {renameError && (
                               <small id={`rename-error-${list.id}`} role="alert">
-                                {nameError}
+                                {renameError}
                               </small>
                             )}
                           </label>
@@ -471,7 +494,11 @@ export function ShoppingListsOverview({
                             ) : null}
                             {busy === list.id && pendingAction === 'rename' ? 'Saving…' : 'Save'}
                           </button>
-                          <button type="button" onClick={() => setEditingId(null)}>
+                          <button
+                            type="button"
+                            disabled={busy === list.id}
+                            onClick={() => setEditingId(null)}
+                          >
                             Cancel
                           </button>
                         </form>

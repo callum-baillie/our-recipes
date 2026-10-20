@@ -1,3 +1,4 @@
+import { RECIPE_IMAGE_PROMPT_VERSION } from '@/lib/domain/recipe-image-generation';
 import 'server-only';
 import {
   assertProfileAiEnabled,
@@ -37,7 +38,7 @@ import { recipeImagePrompt, type AiImageGenerationInput } from '@/lib/providers/
 import { getAiAssistantProvider } from '@/lib/providers/ai-assistant-provider';
 import { getOpenAiApiKey } from '@/lib/providers/openai-key';
 import { getAiProvider } from '@/lib/services/ai-readiness-service';
-import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
+import { getAiWorkloadSetting, getAiDataPolicy } from '@/lib/services/ai-settings-service';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import { removeRecipeImage, storeRecipeImage } from '@/lib/storage/recipe-image-storage';
 
@@ -57,6 +58,10 @@ type AiJobItemRow = typeof aiJobItems.$inferSelect;
 
 type RecipeImageJobInput = AiImageGenerationInput & { recipeId: string };
 type RecipeGenerationJobInput = {
+  promptGuidance?: string;
+  promptVersion?: string;
+  maxOutputTokens?: number;
+  requestTimeoutSeconds?: number;
   images?: AiRecipeImage[];
   label?: string;
   instructions: string;
@@ -103,13 +108,41 @@ const imageItemSchema = z
     recipeTitle: z.string().trim().min(1).max(160),
     recipeSummary: z.string().max(800),
     ingredientNames: z.array(z.string().max(160)).max(80),
+    servings: z.string().max(120).optional(),
+    ingredients: z
+      .array(
+        z.object({
+          quantity: z.number().nullable(),
+          unit: z.string().max(40),
+          item: z.string().max(160),
+          note: z.string().max(160),
+        }),
+      )
+      .max(80)
+      .optional(),
+    instructionSteps: z.array(z.string().max(600)).max(40).optional(),
   })
   .strict();
+
+const imageOptionsSchema = z.object({
+  imageQuality: z.enum(['low', 'medium', 'high']).default('low'),
+  imageSize: z.enum(['1024x1024', '1536x1024', '1024x1536']).default('1024x1024'),
+  promptGuidance: z.string().max(12000).optional(),
+  promptVersion: z.string().optional(),
+  requestTimeoutSeconds: z.number().optional(),
+});
+function savedImageOptions(job: AiJobRow) {
+  return imageOptionsSchema.parse(parseJson(job.payload));
+}
 
 const recipeItemSchema = z
   .object({
     images: z.array(aiRecipeImageSchema).max(4).optional(),
     label: z.string().max(2048).optional(),
+    promptGuidance: z.string().max(12000).optional(),
+    promptVersion: z.string().max(160).optional(),
+    maxOutputTokens: z.number().int().min(512).max(16384).optional(),
+    requestTimeoutSeconds: z.number().int().min(15).max(300).optional(),
     instructions: z.string().min(1).max(12_000),
     context: z.unknown(),
     safetyIdentifier: z.string().min(1).max(160),
@@ -251,6 +284,7 @@ function insertImageAudit(input: {
   threadId: string | null;
   actionId: string | null;
   model: string;
+  promptVersion?: string;
   image: RecipeImageJobInput;
   now: Date;
 }) {
@@ -264,6 +298,7 @@ function insertImageAudit(input: {
       sourceLabel: input.image.recipeTitle.slice(0, 160),
       provider: 'OpenAI',
       model: input.model,
+      promptVersion: input.promptVersion ?? null,
       reasoningEffort: null,
       inputTokens: null,
       outputTokens: null,
@@ -293,6 +328,8 @@ export function enqueueRecipeImageJob(input: {
   const setting = getAiWorkloadSetting(input.profileId, 'image_generation');
   if (!setting.enabled)
     throw new AiJobForbiddenError('Image generation is disabled for this account.');
+  if (!getAiDataPolicy(input.profileId).shareSharedRecipes)
+    throw new AiJobForbiddenError('Recipe sharing is disabled for this account.');
   const id = randomUUID();
   const mode = taskExecutionMode(input.profileId, input.images.length);
   getDatabase().transaction(() => {
@@ -307,7 +344,11 @@ export function enqueueRecipeImageJob(input: {
         status: 'queued',
         executionMode: mode,
         model: setting.model,
-        payload: JSON.stringify({ ownerUserId: aiUserIdForProfile(input.profileId) }),
+        payload: JSON.stringify({
+          ownerUserId: aiUserIdForProfile(input.profileId),
+          ...imageOptionsSchema.parse(setting),
+          promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
+        }),
         result: null,
         sourceDigest: digest(input.images),
         providerBatchId: null,
@@ -330,6 +371,7 @@ export function enqueueRecipeImageJob(input: {
         threadId: input.threadId ?? null,
         actionId: input.actionId ?? null,
         model: setting.model,
+        promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
         image,
         now,
       });
@@ -455,7 +497,7 @@ class OpenAiBatchClient implements AiBatchClient {
   private readonly client: OpenAI;
 
   constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey });
+    this.client = new OpenAI({ apiKey, maxRetries: 0, timeout: 120_000 });
   }
 
   async submit(input: Parameters<AiBatchClient['submit']>[0]) {
@@ -555,9 +597,9 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
           url: '/v1/images/generations',
           body: {
             model: job.model,
-            prompt: recipeImagePrompt(image),
-            size: '1024x1024',
-            quality: 'low',
+            prompt: recipeImagePrompt(image, savedImageOptions(job).promptGuidance),
+            size: savedImageOptions(job).imageSize,
+            quality: savedImageOptions(job).imageQuality,
             output_format: 'webp',
           },
         });
@@ -569,7 +611,12 @@ function batchLines(job: AiJobRow, items: AiJobItemRow[]) {
         url: '/v1/responses',
         body: {
           model: job.model,
-          instructions: [AI_GROUNDING_INSTRUCTIONS, recipe.instructions].join('\n'),
+          instructions: [
+            AI_GROUNDING_INSTRUCTIONS,
+            recipe.instructions,
+            recipe.promptGuidance ?? '',
+          ].join('\n'),
+          max_output_tokens: recipe.maxOutputTokens ?? 4096,
           input: [
             {
               role: 'user',
@@ -688,10 +735,16 @@ async function attachRecipeImage(
 async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
   try {
     assertJobAiAccess(job);
-    if (!getAiWorkloadSetting(job.profileId, 'image_generation').enabled)
+    if (
+      !getAiWorkloadSetting(job.profileId, 'image_generation').enabled ||
+      !getAiDataPolicy(job.profileId).shareSharedRecipes
+    )
       throw new AiJobForbiddenError('AI is disabled.');
     const image = imageItemSchema.parse(parseJson(item.payload));
-    const generated = await getAiProvider().generateRecipeImage(image, { model: job.model });
+    const generated = await getAiProvider().generateRecipeImage(image, {
+      model: job.model,
+      ...savedImageOptions(job),
+    });
     await attachRecipeImage(item, image, generated.bytes, job, generated.altText);
   } catch {
     if (ownsActiveLease(job)) updateItemFailure(item, 'image_generation_failed');
@@ -707,6 +760,9 @@ async function processDirectRecipe(item: AiJobItemRow, job: AiJobRow) {
     const recipe = recipeInputSchema.parse(
       await getAiAssistantProvider().generateRecipe({
         model: job.model,
+        promptGuidance: request.promptGuidance,
+        maxOutputTokens: request.maxOutputTokens,
+        requestTimeoutSeconds: request.requestTimeoutSeconds,
         reasoningEffort: request.reasoningEffort,
         safetyIdentifier: request.safetyIdentifier,
         instructions: [AI_GROUNDING_INSTRUCTIONS, request.instructions].join('\n'),
@@ -1046,6 +1102,8 @@ async function runOneAiJob(candidate: AiJobRow) {
             : 'recipe_generation',
       );
       if (!setting.enabled) throw new AiJobForbiddenError('This AI task is disabled.');
+      if (job.kind === 'recipe_images' && !getAiDataPolicy(job.profileId).shareSharedRecipes)
+        throw new AiJobForbiddenError('Recipe sharing is disabled for this account.');
     }
     if (job.kind === 'meal_plan_generation') {
       const { runScheduledPlanJob } = await import('./task-scheduler-service');

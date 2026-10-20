@@ -42,8 +42,10 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
-  await page.getByLabel('Email').fill(onboardingEmail('Planner test kitchen', 'Callum'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('Planner test kitchen', 'Callum'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -51,17 +53,21 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
   await page.getByLabel('I saved these one-time codes somewhere private.').check();
   await page.getByRole('button', { name: 'Continue to sign in' }).click();
-  await page.getByLabel('Email').fill(onboardingEmail('Planner test kitchen', 'Callum'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('Planner test kitchen', 'Callum'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
 
   await page.goto('/settings/profiles');
-  await page.getByRole('button', { name: 'Add another profile' }).click();
+  await page.getByRole('button', { name: 'Add profile', exact: true }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await profileOnboarding.getByLabel('Display name').fill('Julia');
-  await profileOnboarding.getByLabel('Email').fill('julia-planner@example.test');
-  await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await profileOnboarding
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill('julia-planner@example.test');
+  await profileOnboarding.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
@@ -182,9 +188,13 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   await page.getByRole('button', { name: 'Close item editor' }).click();
 
   await page.goto('/settings/ai');
-  const imageTask = page
-    .locator('.settings-subsection')
-    .filter({ has: page.getByRole('heading', { name: 'image generation', exact: true }) });
+  const modelPane = page
+    .getByRole('heading', { name: 'Models by task', exact: true })
+    .locator('xpath=ancestor::section[1]');
+  const imageTask = modelPane
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: /^Image generation/ }) });
+  await imageTask.locator('summary').click();
   const globalImageGeneration = imageTask.getByRole('switch', { name: 'Enable task', exact: true });
   await expect(globalImageGeneration).toBeChecked();
   await globalImageGeneration.uncheck();
@@ -193,6 +203,7 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
     page.getByText('AI settings saved. New requests will use these choices.'),
   ).toBeVisible();
   await page.reload();
+  await imageTask.locator('summary').click();
   await expect(
     imageTask.getByRole('switch', { name: 'Enable task', exact: true }),
   ).not.toBeChecked();

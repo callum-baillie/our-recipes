@@ -530,6 +530,10 @@ export function PrintWorkspace({
                 Append recipe cards to the schedule
               </label>
               <p>
+                Cards use each meal’s planned recipe version, adaptations and servings. Repeated
+                unchanged recipes share a card only when version and servings match.
+              </p>
+              <p>
                 {includeRecipes
                   ? 'PDF: schedule followed by recipe cards. ZIP: schedule PDF, individual card PDFs and a README.'
                   : 'Schedule only. Existing saved meal content is unchanged.'}

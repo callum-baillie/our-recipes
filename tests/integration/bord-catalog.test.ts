@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -28,9 +28,11 @@ import {
 } from '@/lib/services/food-data-service';
 import {
   importFoodCatalogRecord,
+  confirmCatalogShoppingItem,
   replayFoodCatalogImport,
 } from '@/lib/services/food-catalog-import-service';
 import {
+  listCatalogChains,
   linkCatalogStore,
   reviewCatalogStore,
   searchCatalogStores,
@@ -46,6 +48,11 @@ import {
   updateSupermarketProfile,
 } from '@/lib/services/list-settings-service';
 import { createManualShoppingList, getShoppingList } from '@/lib/services/planning-service';
+import {
+  readCatalogMeasures,
+  searchStorageGuidance,
+  enrichCatalogProducts,
+} from '@/lib/services/catalog-food-context-service';
 import { startCatalogFixture, syntheticUsda } from '../fixtures/bord-catalog-server';
 
 describe('native Bòrd catalog companion (synthetic loopback only)', () => {
@@ -215,7 +222,7 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
       getFoodDetails(record.provider, record.providerRecordId, 'en', record.catalogRef),
     ).rejects.toMatchObject({ code: 'REVISION_EXPIRED' });
     fixture.state.unavailable = true;
-    expect(replayFoodCatalogImport(input, 'catalog')).toMatchObject({
+    expect(replayFoodCatalogImport(input, 'catalog', actor)).toMatchObject({
       productId: expect.any(String),
       batchIds: [],
     });
@@ -223,8 +230,147 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
       replayFoodCatalogImport(
         { ...input, product: { ...input.product, displayName: 'Changed' } },
         'catalog',
+        actor,
       ),
     ).toThrow(/different data/u);
+  });
+  it('reads revision-bound measures and attributed guidance without inventing conversions or expiry', async () => {
+    const { record } = await getFoodDetails('usda_fdc', '123', 'en');
+    const result = await readCatalogMeasures({ reference: record.catalogRef });
+    expect(result.measures).toEqual([
+      { label: 'chopped', amount: 1, unit: 'cup', gramWeight: 120, form: 'raw', basis: null },
+      { label: '1 piece', amount: 1, unit: 'piece', gramWeight: null, form: null, basis: null },
+    ]);
+    const guidance = await searchStorageGuidance({ query: 'oats' });
+    expect(guidance.guidance[0]).toMatchObject({
+      attribution: 'USDA FSIS FoodKeeper',
+      preciseExpiry: false,
+      details: { Refrigerate_Min: 0, Refrigerate_Max: null },
+    });
+    expect(JSON.stringify(guidance)).not.toContain('private_unprojected');
+    fixture.state.revision = 'revision_2';
+    await expect(readCatalogMeasures({ reference: record.catalogRef })).rejects.toMatchObject({
+      code: 'REVISION_EXPIRED',
+    });
+    fixture.state.guidanceUnavailable = true;
+    await expect(searchStorageGuidance({ query: 'oats' })).rejects.toMatchObject({
+      code: 'DISABLED',
+    });
+    expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
+  });
+  it('enriches only identified products, preserves unknown availability and rejects response identity drift', async () => {
+    const input = {
+      lines: [{ lineId: 'line-1', productId: 'prd_fixture', storeId: 'sto_fixture' }],
+    };
+    const result = await enrichCatalogProducts(input);
+    expect(result.lines[0]).toMatchObject({
+      lineId: 'line-1',
+      product: { id: 'prd_fixture' },
+      evidence: { availability: 'unknown', offers: [] },
+    });
+    expect(fixture.calls.at(-1)?.body).toEqual({
+      lines: [{ line_id: 'line-1', product_id: 'prd_fixture', store_id: 'sto_fixture' }],
+    });
+    await expect(
+      enrichCatalogProducts({ lines: [{ lineId: 'line-1', query: 'oats' }] }),
+    ).rejects.toThrow();
+    fixture.state.mismatchEnrichment = true;
+    await expect(enrichCatalogProducts(input)).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    });
+  });
+  it('binds durable import replay to the actor and normalized intent before provider access', async () => {
+    const { record } = await getFoodDetails('usda_fdc', '123', 'en');
+    const input = foodCatalogImportInputSchema.parse({
+      operationId: randomUUID(),
+      selection: {
+        provider: record.provider,
+        recordId: record.providerRecordId,
+        catalogRef: record.catalogRef,
+      },
+      product: { displayName: 'Account-bound oats' },
+    });
+    const saved = importFoodCatalogRecord({
+      input,
+      record,
+      actorProfileId: actor,
+      actorUserId: 'account-a',
+      destination: 'catalog',
+    });
+    fixture.state.unavailable = true;
+    const calls = fixture.calls.length;
+    expect(replayFoodCatalogImport(input, 'catalog', actor, [], 'account-a')?.productId).toBe(
+      saved.productId,
+    );
+    expect(() => replayFoodCatalogImport(input, 'catalog', actor, [], 'account-b')).toThrow();
+    expect(() =>
+      replayFoodCatalogImport(input, 'catalog', randomUUID(), [], 'account-a'),
+    ).toThrow();
+    expect(fixture.calls).toHaveLength(calls);
+  });
+  it('atomically preserves scanned identity in a shopping item and safely replays a lost response during outage', async () => {
+    const list = createManualShoppingList('Scan review', actor);
+    const { record } = await getFoodDetails('usda_fdc', '123', 'en');
+    const input = {
+      ...foodCatalogImportInputSchema.parse({
+        operationId: randomUUID(),
+        selection: {
+          provider: record.provider,
+          recordId: record.providerRecordId,
+          catalogRef: record.catalogRef,
+        },
+        product: { displayName: 'Reviewed scanned oats' },
+      }),
+      cartQuantity: 2,
+      cartUnit: 'each',
+    };
+    const args = { input, listId: list.id, actorProfileId: actor, actorUserId: 'account-a' };
+    const saved = await confirmCatalogShoppingItem(args);
+    const item = getShoppingList(list.id)!.items[0];
+    expect(item).toMatchObject({
+      id: saved.itemId,
+      shoppingState: 'in_cart',
+      cartQuantity: 2,
+      quantity: null,
+      pantry: { productId: saved.productId },
+    });
+    expect(getDatabase().select().from(foodProviderSnapshots).get()).toMatchObject({
+      sourceRevision: 'revision_1',
+      transportId: 'bord_food_api',
+    });
+    expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
+    fixture.state.unavailable = true;
+    const calls = fixture.calls.length;
+    expect(await confirmCatalogShoppingItem(args)).toMatchObject({ ...saved, replayed: true });
+    expect(getShoppingList(list.id)!.items).toHaveLength(1);
+    expect(fixture.calls).toHaveLength(calls);
+    await expect(
+      confirmCatalogShoppingItem({ ...args, input: { ...input, cartQuantity: 3 } }),
+    ).rejects.toThrow(/different/u);
+    await expect(
+      confirmCatalogShoppingItem({ ...args, actorUserId: 'another-account' }),
+    ).rejects.toThrow(/different/u);
+  });
+  it('forwards bounded store filters and rejects incomplete coordinates', async () => {
+    await searchCatalogStores({
+      chainId: 'chain_fixture',
+      state: 'IA',
+      latitude: 41.5,
+      longitude: -93.6,
+      radiusKm: 5,
+      cursor: 'opaque-cursor',
+    });
+    const url = new URL(fixture.calls.at(-1)!.path, fixture.baseUrl);
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      chain_id: 'chain_fixture',
+      state: 'IA',
+      lat: '41.5',
+      lon: '-93.6',
+      radius_km: '5',
+      cursor: 'opaque-cursor',
+      limit: '20',
+    });
+    await expect(searchCatalogStores({ latitude: 41.5 })).rejects.toThrow();
   });
   it('T38/39: denies external fallback/images, preserves source identity and does not spend external quota or add stock/cart', async () => {
     const counts = getSqliteDatabase().prepare('SELECT count(*) AS n FROM pantry_products').get();
@@ -306,6 +452,14 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     expect(JSON.stringify(await getCatalogStatus())).not.toContain('synthetic-read-key');
     expect(JSON.stringify(await getCatalogStatus())).not.toContain(fixture.baseUrl);
   });
+  it('lists bounded human chain choices without loading private store details', async () => {
+    const response = await listCatalogChains({ country: 'US' });
+    expect(response.chains).toEqual([
+      { id: 'chn_fixture', name: 'Fixture Market', observedStoreCount: 2 },
+    ]);
+    expect(fixture.calls.at(-1)?.path).toContain('limit=50');
+    await expect(listCatalogChains({ country: 'USA' })).rejects.toThrow();
+  });
   it('upgrades the previous schema additively while preserving manual profiles and routes', async () => {
     const saved = profile();
     const directory = mkdtempSync(join(tmpdir(), 'bord-catalog-migration-'));
@@ -316,23 +470,25 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
         .get();
       await getSqliteDatabase().backup(path);
       const legacy = new Database(path);
-      for (const column of [
-        'catalog_store_id',
-        'catalog_generation',
-        'catalog_revision',
-        'catalog_metadata',
-        'catalog_linked_at',
-      ])
-        legacy.exec(`ALTER TABLE supermarket_profiles DROP COLUMN ${column}`);
-      for (const column of [
-        'transport_id',
-        'source_revision',
-        'catalog_generation',
-        'canonical_product_id',
-      ])
-        legacy.exec(`ALTER TABLE food_provider_snapshots DROP COLUMN ${column}`);
-      // Restore the pre-catalog prefix, including tables introduced after that migration.
-      legacy.exec('DROP TABLE ai_user_settings; DROP TABLE ai_runtime_settings;');
+      const journal = JSON.parse(
+        readFileSync(join(process.cwd(), 'drizzle/meta/_journal.json'), 'utf8'),
+      ) as { entries: Array<{ when: number; tag: string }> };
+      // Rewind tables introduced after the tested prefix as new additive migrations arrive.
+      for (const entry of journal.entries.filter((item) => item.when >= 1792281600000).reverse()) {
+        const sql = readFileSync(join(process.cwd(), `drizzle/${entry.tag}.sql`), 'utf8');
+        for (const match of sql.matchAll(
+          /CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF NOT EXISTS\s+)?[`"]?([a-z_0-9]+)[`"]?/giu,
+        ))
+          legacy.exec(`DROP INDEX IF EXISTS "${match[1]}"`);
+        for (const match of sql.matchAll(
+          /ALTER TABLE\s+[`"]?([a-z_0-9]+)[`"]?\s+ADD COLUMN\s+[`"]?([a-z_0-9]+)[`"]?/giu,
+        ))
+          legacy.exec(`ALTER TABLE "${match[1]}" DROP COLUMN "${match[2]}"`);
+        for (const match of sql.matchAll(
+          /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[`"]?([a-z_0-9]+)[`"]?/giu,
+        ))
+          legacy.exec(`DROP TABLE IF EXISTS "${match[1]}"`);
+      }
       legacy.exec('DELETE FROM __drizzle_migrations WHERE created_at >= 1792281600000');
       legacy.close();
       resetDatabaseForTests();

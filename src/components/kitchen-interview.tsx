@@ -63,10 +63,15 @@ export function KitchenInterview({
   aiEnabled?: boolean;
 }) {
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatStarted, setChatStarted] = useState(false);
   const router = useRouter();
+  const [savedAnswers, setSavedAnswers] = useState<Answers | null>(
+    profile.goalContext.kitchenInterview ?? null,
+  );
   const [answers, setAnswers] = useState<Answers>(
     profile.goalContext.kitchenInterview ?? emptyKitchenInterview,
   );
+  const [changedContext, setChangedContext] = useState<{ interview: Answers | null } | null>(null);
   const [step, setStep] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -80,6 +85,12 @@ export function KitchenInterview({
       const current = await fetch('/api/v1/account/kitchen-context', { cache: 'no-store' });
       if (!current.ok) throw new Error('Could not load your latest kitchen context.');
       const context = await current.json();
+      if (JSON.stringify(context.interview ?? null) !== JSON.stringify(savedAnswers)) {
+        setChangedContext({ interview: context.interview ?? null });
+        throw new Error(
+          'Your saved kitchen context changed elsewhere. Review its current values before saving; your draft has been retained.',
+        );
+      }
       const response = await fetch('/api/v1/account/kitchen-context', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -87,6 +98,7 @@ export function KitchenInterview({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? 'Could not save your interview.');
+      setSavedAnswers({ ...answers });
       setMessage(
         'Your kitchen context is saved. The assistant can use it when dietary preference sharing is enabled.',
       );
@@ -111,7 +123,14 @@ export function KitchenInterview({
       </p>
       {aiEnabled && (
         <>
-          <button className="secondary-button" type="button" onClick={() => setChatOpen(true)}>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => {
+              setChatStarted(true);
+              setChatOpen(true);
+            }}
+          >
             Chat with Kitchen Assistant
           </button>
           <p>
@@ -120,15 +139,57 @@ export function KitchenInterview({
           </p>
         </>
       )}
-      {chatOpen && (
+      {chatStarted && (
         <InterviewChat
-          open
+          open={chatOpen}
+          interviewMode
           onClose={() => setChatOpen(false)}
           startNewThreadOnOpen
           initialDraft="Please interview me to get to know my food preferences and goals. Ask one question at a time, with useful follow-ups about sweet or savory flavors, snacks and when I snack, dessert favorites and frequency, meals I share, cooking routines, and foods I avoid. Read my saved kitchen context if sharing permits it. When we are done, prepare a reviewed update to my kitchen context. Treat taste preferences gently and always respect allergies."
         />
       )}
       {message && <InlineAlert tone={error ? 'error' : 'success'}>{message}</InlineAlert>}
+      {changedContext && (
+        <section aria-label="Review changed kitchen context">
+          <dl>
+            {kitchenInterviewQuestions.map((q) => (
+              <div key={q.key}>
+                <dt>{q.title}</dt>
+                <dd>Saved: {changedContext.interview?.[q.key] || 'Not answered'}</dd>
+                <dd>Your draft: {answers[q.key] || 'Not answered'}</dd>
+              </div>
+            ))}
+          </dl>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setSavedAnswers(changedContext.interview);
+              setChangedContext(null);
+              setError(false);
+              setMessage(
+                'Current context reviewed. Your draft is retained; Save context explicitly to apply it.',
+              );
+            }}
+          >
+            Keep my draft after reviewing current context
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setSavedAnswers(changedContext.interview);
+              setAnswers(changedContext.interview ?? emptyKitchenInterview);
+              setChangedContext(null);
+              setMessage('Current saved context loaded.');
+              setError(false);
+            }}
+          >
+            Use current saved answers
+          </button>
+        </section>
+      )}
+
       {step === null ? (
         <>
           <button
@@ -138,18 +199,26 @@ export function KitchenInterview({
               setMessage('');
             }}
           >
-            {profile.goalContext.kitchenInterview
-              ? 'Redo my interview'
-              : 'Start guided questionnaire'}
+            {JSON.stringify(answers) !== JSON.stringify(savedAnswers ?? emptyKitchenInterview)
+              ? 'Resume unsaved questionnaire'
+              : savedAnswers
+                ? 'Edit guided questionnaire'
+                : 'Start guided questionnaire'}
           </button>
-          {profile.goalContext.kitchenInterview && (
+          {JSON.stringify(answers) !== JSON.stringify(savedAnswers ?? emptyKitchenInterview) && (
+            <p role="status">
+              Unsaved questionnaire answers are retained in this page. Resume to review and save
+              them.
+            </p>
+          )}
+          {savedAnswers && (
             <details>
               <summary>Your saved kitchen context</summary>
               <dl>
                 {kitchenInterviewQuestions.map((q) => (
                   <div key={q.key}>
                     <dt>{q.title}</dt>
-                    <dd>{answers[q.key] || 'Not answered'}</dd>
+                    <dd>{savedAnswers[q.key] || 'Not answered'}</dd>
                   </div>
                 ))}
               </dl>

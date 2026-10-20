@@ -107,7 +107,9 @@ export function CookingMode({
     recipeId: recipe.id,
     targetServings: servingInput,
   }).success;
-  const servings = servingsValid ? Number(servingInput) : (initialServings ?? baseServings);
+  const [sessionServings, setSessionServings] = useState<number | null>(null);
+  const servings =
+    sessionServings ?? (servingsValid ? Number(servingInput) : (initialServings ?? baseServings));
   const [checkedAvailability, setCheckedAvailability] = useState(pantryAvailability);
   const [finishing, setFinishing] = useState(false);
   const finishLock = useRef(false);
@@ -170,7 +172,7 @@ export function CookingMode({
       body: JSON.stringify({ recipeId: recipe.id, targetServings: servings, mealPlanEntryId }),
     });
     const body = (await response.json().catch(() => null)) as {
-      session?: { id: string };
+      session?: { id: string; targetServings?: number };
       pantry?: {
         plannedMeal?: { plannedFor: string; meal: string; title: string } | null;
         recommendedConsumptions?: Array<Omit<ReviewLine, 'decision' | 'note'>>;
@@ -179,6 +181,9 @@ export function CookingMode({
     if (!response.ok || !body?.session)
       throw new Error('Could not start cooking. Please try again.');
     if (body?.session) {
+      const acceptedServings = body.session.targetServings ?? servings;
+      setSessionServings(acceptedServings);
+      setServingInput(String(acceptedServings));
       setSessionId(body.session.id);
       const currentStep = document.getElementById('current-cooking-step');
       currentStep?.scrollIntoView({ block: 'start' });
@@ -517,7 +522,7 @@ export function CookingMode({
                 min="1"
                 max="100"
                 value={servingInput}
-                disabled={Boolean(sessionId)}
+                disabled={Boolean(sessionId) || cookingBusy}
                 aria-invalid={!servingsValid}
                 aria-describedby="cook-serving-context"
                 onChange={(event) => setServingInput(event.target.value)}
@@ -792,21 +797,28 @@ export function CookingMode({
             <summary>Temperature converter</summary>
 
             <div>
-              <input
-                aria-label="Temperature to convert"
-                inputMode="decimal"
-                value={temperature}
-                onChange={(event) => setTemperature(event.target.value)}
-              />
-              <select
-                aria-label="Convert from unit"
-                value={temperatureUnit}
-                onChange={(event) => setTemperatureUnit(event.target.value as 'C' | 'F')}
-              >
-                <option value="C">°C</option>
-                <option value="F">°F</option>
-              </select>
+              <label>
+                Temperature to convert
+                <input
+                  inputMode="decimal"
+                  value={temperature}
+                  onChange={(event) => setTemperature(event.target.value)}
+                />
+              </label>
+              <label>
+                From unit
+                <select
+                  value={temperatureUnit}
+                  onChange={(event) => setTemperatureUnit(event.target.value as 'C' | 'F')}
+                >
+                  <option value="C">°C</option>
+                  <option value="F">°F</option>
+                </select>
+              </label>
             </div>
+            {temperature && !Number.isFinite(Number(temperature)) && (
+              <p role="alert">Enter a number to convert.</p>
+            )}
             {temperature && Number.isFinite(Number(temperature)) && (
               <p>
                 Converted result:{' '}

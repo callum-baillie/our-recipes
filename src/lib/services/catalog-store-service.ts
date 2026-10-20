@@ -2,7 +2,11 @@ import 'server-only';
 
 import { getRuntimeConfig } from '@/lib/config';
 import { FoodDataError } from '@/lib/domain/food-data';
-import { type CatalogStore, storeSearchSchema } from '@/lib/domain/bord-catalog';
+import {
+  type CatalogStore,
+  storeSearchSchema,
+  catalogChainsInputSchema,
+} from '@/lib/domain/bord-catalog';
 import { BordCatalogClient } from '@/lib/providers/bord-catalog-client';
 import {
   getSupermarketProfile,
@@ -67,7 +71,17 @@ export function storeProjection(store: CatalogStore) {
 }
 export async function searchCatalogStores(input: unknown) {
   const parsed = storeSearchSchema.parse(input);
-  const result = await client().stores(new URLSearchParams({ ...parsed, limit: '20' }));
+  const params = new URLSearchParams({ limit: '20', radius_km: String(parsed.radiusKm) });
+  for (const [key, value] of Object.entries({
+    query: parsed.query,
+    state: parsed.state,
+    chain_id: parsed.chainId,
+    lat: parsed.latitude,
+    lon: parsed.longitude,
+    cursor: parsed.cursor,
+  }))
+    if (value !== undefined) params.set(key, String(value));
+  const result = await client().stores(params);
   return {
     stores: result.data.map(storeProjection),
     generation: result.meta.catalog_generation,
@@ -146,5 +160,21 @@ export async function reviewCatalogStore(profileId: string) {
     generation: current.meta.catalog_generation,
     maps,
     mapState,
+  };
+}
+
+export async function listCatalogChains(input: unknown) {
+  const parsed = catalogChainsInputSchema.parse(input);
+  const params = new URLSearchParams({ country: parsed.country, min_stores: '0', limit: '50' });
+  if (parsed.cursor) params.set('cursor', parsed.cursor);
+  const response = await client().chains(params);
+  return {
+    chains: response.data.map((chain) => ({
+      id: chain.id,
+      name: chain.name,
+      observedStoreCount: chain.observed_store_count ?? null,
+    })),
+    nextCursor: response.meta.next_cursor,
+    generation: response.meta.catalog_generation,
   };
 }

@@ -123,9 +123,7 @@ describe('nutrition chart datasets', () => {
       ratio: 1.25,
       visualPercent: 100,
     });
-    expect(rows.find((row) => row.id === 'limit')?.comparison).toBe(
-      '5 g above the configured limit.',
-    );
+    expect(rows.find((row) => row.id === 'limit')?.comparison).toBe('5 g above the 20 g limit.');
   });
 
   it('marks an absent nutrient as no data instead of zero', () => {
@@ -135,7 +133,7 @@ describe('nutrition chart datasets', () => {
       ratio: null,
       visualPercent: 0,
       status: 'no_data',
-      comparison: 'No confirmed value.',
+      comparison: 'No recorded value for this nutrient.',
     });
   });
 

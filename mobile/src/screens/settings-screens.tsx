@@ -1,3 +1,4 @@
+import { profileSwitchRequest } from '@/auth/auth-errors';
 import { ServerPreferences } from '@/components/server-preferences';
 import * as React from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
@@ -473,23 +474,42 @@ function ProfileContent({ user }: { user: { id: string; email: string; name: str
   const { request } = useAuth();
   const { refresh } = useSync();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [pin, setPin] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [switchResult, setSwitchResult] = React.useState('');
+  const switchLock = React.useRef(false);
+  React.useEffect(() => {
+    setPassword('');
+    setSelectedId(null);
+  }, [user?.id]);
   const [switching, setSwitching] = React.useState(false);
   const displayName = user?.name?.trim() || user?.email || 'Bòrd account';
   const switchProfile = async () => {
-    if (!selectedId || pin.length !== 6) return;
+    if (!selectedId || !password.length || password.length > 128 || switchLock.current) return;
+    switchLock.current = true;
+    setSwitchResult('');
     setSwitching(true);
     try {
-      await request(`/api/v1/profiles/${encodeURIComponent(selectedId)}/active`, {
-        method: 'PATCH',
-        body: JSON.stringify({ pin }),
-      });
-      await refresh();
+      const command = profileSwitchRequest(selectedId, password);
+      await request(command.path, command.init);
+      setSwitchResult(
+        `Viewing ${state.profiles.find((profile) => profile.id === selectedId)?.displayName ?? 'the selected profile'}.`,
+      );
+      try {
+        await refresh();
+      } catch {
+        setSwitchResult('Profile switched. Refresh household data to load its current view.');
+      }
       setSelectedId(null);
-      setPin('');
+      setPassword('');
     } catch (error) {
-      Alert.alert('Profile not switched', error instanceof Error ? error.message : 'Try again.');
+      setSwitchResult(
+        error instanceof Error
+          ? error.message
+          : 'The switch could not be acknowledged. Refresh before retrying.',
+      );
     } finally {
+      setPassword('');
+      switchLock.current = false;
       setSwitching(false);
     }
   };
@@ -511,7 +531,7 @@ function ProfileContent({ user }: { user: { id: string; email: string; name: str
           </Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Eyebrow>ACTIVE PROFILE</Eyebrow>
+          <Eyebrow>SIGNED-IN ACCOUNT</Eyebrow>
           <EditorialText variant="section">{displayName}</EditorialText>
           <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
             {user?.email ?? 'No active account'}
@@ -520,84 +540,108 @@ function ProfileContent({ user }: { user: { id: string; email: string; name: str
         <StatusPill>Account</StatusPill>
       </Surface>
       <Group title="HOUSEHOLD PROFILES">
-        {state.profiles.map((profile, index) => (
-          <React.Fragment key={profile.id}>
-            {index ? <Divider /> : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Switch to ${profile.displayName}`}
-              onPress={() => {
-                setSelectedId(profile.id);
-                setPin('');
-              }}
-              style={({ pressed }) => ({
-                minHeight: 62,
-                padding: tokens.space.sm,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: tokens.space.sm,
-                backgroundColor: pressed ? tokens.color.sage : tokens.color.surface,
-              })}
-            >
-              <View
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  backgroundColor: profile.color,
-                  alignItems: 'center',
-                  justifyContent: 'center',
+        {state.profiles
+          .filter((profile) => !profile.archivedAt)
+          .map((profile, index) => (
+            <React.Fragment key={profile.id}>
+              {index ? <Divider /> : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${profile.displayName}`}
+                disabled={switching}
+                onPress={() => {
+                  setSelectedId(profile.id);
+                  setSwitchResult('');
+                  setPassword('');
                 }}
+                style={({ pressed }) => ({
+                  minHeight: 62,
+                  padding: tokens.space.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: tokens.space.sm,
+                  backgroundColor: pressed ? tokens.color.sage : tokens.color.surface,
+                })}
               >
-                <Text
-                  style={[tokens.type.footnote, { color: tokens.color.inverse, fontWeight: '800' }]}
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: profile.color,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                 >
-                  {profile.displayName.slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[tokens.type.footnote, { color: tokens.color.ink, fontWeight: '800' }]}
-                >
-                  {profile.displayName}
-                </Text>
-                <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
-                  {profile.units} · {profile.temperatureUnit} · {profile.timezone}
-                </Text>
-              </View>
-              <Icon name="chevron.right" color={tokens.color.inkSecondary} />
-            </Pressable>
-          </React.Fragment>
-        ))}
+                  <Text
+                    style={[
+                      tokens.type.footnote,
+                      { color: tokens.color.inverse, fontWeight: '800' },
+                    ]}
+                  >
+                    {profile.displayName.slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[tokens.type.footnote, { color: tokens.color.ink, fontWeight: '800' }]}
+                  >
+                    {profile.displayName}
+                  </Text>
+                  <Text style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
+                    Household viewing profile
+                  </Text>
+                </View>
+                <Icon name="chevron.right" color={tokens.color.inkSecondary} />
+              </Pressable>
+            </React.Fragment>
+          ))}
       </Group>
       {selectedId ? (
         <Surface elevated>
-          <EditorialText variant="section">Enter profile PIN</EditorialText>
+          <EditorialText variant="section">Switch viewing profile</EditorialText>
           <Body muted>
-            Six-digit profile PINs provide convenient switching. They do not replace account
-            authentication.
+            Enter{' '}
+            {state.profiles.find((profile) => profile.id === selectedId)?.displayName ??
+              'the selected profile'}
+            ’s password. Your signed-in account and permissions stay the same.
           </Body>
           <FormField
-            label="Profile PIN"
-            value={pin}
-            onChangeText={(value) => setPin(value.replace(/\D/gu, '').slice(0, 6))}
+            label="Destination profile password"
+            value={password}
+            onChangeText={setPassword}
             secureTextEntry
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
+            autoCapitalize="none"
+            autoComplete="current-password"
+            textContentType="password"
+            editable={!switching}
           />
           <View style={{ flexDirection: 'row', gap: tokens.space.xs }}>
             <View style={{ flex: 1 }}>
-              <Button label="Cancel" tone="secondary" onPress={() => setSelectedId(null)} />
+              <Button
+                label="Cancel"
+                tone="secondary"
+                disabled={switching}
+                onPress={() => {
+                  setSelectedId(null);
+                  setPassword('');
+                }}
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Button
                 label={switching ? 'Switching…' : 'Switch profile'}
-                disabled={switching || pin.length !== 6}
+                disabled={switching || !password.length || password.length > 128}
                 onPress={() => void switchProfile()}
               />
             </View>
           </View>
         </Surface>
+      ) : null}
+      {switchResult ? (
+        <Text accessibilityLiveRegion="polite" style={{ color: tokens.color.ink }}>
+          {switchResult}
+        </Text>
       ) : null}
       <Surface>
         <Body muted>

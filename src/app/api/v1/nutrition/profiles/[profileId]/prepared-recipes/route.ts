@@ -16,8 +16,8 @@ import {
 
 type Context = { params: Promise<{ profileId: string }> };
 
-export async function GET(_request: Request, context: Context) {
-  const auth = await requireNutritionPrincipal();
+export async function GET(request: Request, context: Context) {
+  const auth = await requireNutritionPrincipal(request);
   if (auth.response) return auth.response;
   try {
     const profileId = parseNutritionProfileId((await context.params).profileId);
@@ -33,7 +33,7 @@ export async function GET(_request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   const rejected = rejectUntrustedNutritionMutation(request);
   if (rejected) return rejected;
-  const auth = await requireNutritionPrincipal();
+  const auth = await requireNutritionPrincipal(request);
   if (auth.response) return auth.response;
   try {
     const profileId = parseNutritionProfileId((await context.params).profileId);

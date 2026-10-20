@@ -1,4 +1,10 @@
 'use client';
+import {
+  createPantryAddOperation,
+  pantryAddOperationSchema,
+  resumePantryAddOperation,
+  type PantryAddOperation,
+} from '@/lib/client/pantry-add-operation';
 import { AppDialog } from './app-dialog';
 import { DialogViewport } from './dialog-viewport';
 import type { ComponentPropsWithoutRef } from 'react';
@@ -27,7 +33,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { PageSkeleton } from '@/components/skeleton';
 import { FoodCatalogPicker } from '@/components/food-catalog-picker';
@@ -146,6 +152,7 @@ type Dashboard = {
   batches: Batch[];
   recentEvents: PantryEvent[];
   lowStockProductIds: string[];
+  productStock: Record<string, { knownQuantity: number; unit: string; uncertain: boolean }>;
 };
 
 type ErrorBody = { error?: { message?: string } };
@@ -786,11 +793,31 @@ function BatchEditFields({ batch, dashboard }: { batch: Batch; dashboard: Dashbo
   );
 }
 
+function subscribeAddRequest(listener: () => void) {
+  window.addEventListener('storage', listener);
+  window.addEventListener('bord:pantry-add', listener);
+  return () => {
+    window.removeEventListener('storage', listener);
+    window.removeEventListener('bord:pantry-add', listener);
+  };
+}
+function savedAddRequest(key: string) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 export function PantryManager({
   canEdit,
   initialPreferences,
+  profileId = 'current-profile',
+  accountId = 'current-account',
 }: {
   canEdit: boolean;
+  profileId?: string;
+  accountId?: string;
   initialPreferences: {
     defaultView: string;
     defaultSort: string;
@@ -831,9 +858,90 @@ export function PantryManager({
   const [manualSearchBusy, setManualSearchBusy] = useState(false);
   const [manualSearchError, setManualSearchError] = useState('');
   const [manualSearchNotice, setManualSearchNotice] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [mutationBusy, setBusy] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const busy = mutationBusy || needsRefresh;
   const [error, setError] = useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [memoryAddOperation, setMemoryAddOperation] = useState<PantryAddOperation | null>(null);
+  const [addOperationError, setAddOperationError] = useState('');
+  const addOperationLock = useRef(false);
+  const addOperationKey = `bord:pantry-add:${accountId}:${profileId}`;
+  const savedAdd = useSyncExternalStore(
+    subscribeAddRequest,
+    () => savedAddRequest(addOperationKey),
+    () => null,
+  );
+  let restoredAdd: PantryAddOperation | null = null;
+  try {
+    const parsed = pantryAddOperationSchema.safeParse(savedAdd ? JSON.parse(savedAdd) : null);
+    if (parsed.success) restoredAdd = parsed.data;
+  } catch {
+    /* Invalid local metadata never starts a write. */
+  }
+  const addOperation = memoryAddOperation ?? restoredAdd;
+  function rememberAdd(operation: PantryAddOperation | null) {
+    setMemoryAddOperation(operation);
+    try {
+      if (operation) sessionStorage.setItem(addOperationKey, JSON.stringify(operation));
+      else sessionStorage.removeItem(addOperationKey);
+      window.dispatchEvent(new Event('bord:pantry-add'));
+    } catch {
+      setAddOperationError(
+        'Keep this page open; the browser cannot retain this request after navigation.',
+      );
+    }
+  }
+  const additionRecovery = addOperation ? (
+    <section
+      className={styles.manualSearchNotice}
+      aria-label="Pantry addition recovery"
+      tabIndex={-1}
+    >
+      <strong>Pantry addition · {addOperation.label}</strong>
+      <p>
+        {addOperation.acknowledged.length} of {addOperation.batchKeys.length} batches confirmed.{' '}
+        {addOperation.uncertain ? 'The current request outcome is unknown.' : ''} Resume uses the
+        original reviewed amount and request keys; later form edits remain a separate draft.
+      </p>
+      <p role="status">{addOperation.message}</p>
+      {addOperationError && <p role="alert">{addOperationError}</p>}
+      {needsRefresh && (
+        <div>
+          <p role="alert">
+            Confirmed batches remain saved. Refresh Pantry before resuming this addition.
+          </p>
+          <button type="button" disabled={mutationBusy} onClick={() => void load()}>
+            Refresh Pantry
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        disabled={busy || !canEdit}
+        onClick={() => void continueAdding(addOperation, false)}
+      >
+        {mutationBusy ? 'Adding batches…' : 'Resume this addition'}
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          if (
+            window.confirm(
+              `Close this request after reviewing Pantry? ${addOperation.acknowledged.length} batches are confirmed and remain saved.${addOperation.uncertain ? ' Another batch may also have been saved. Check the current records before adding it again.' : ''}`,
+            )
+          ) {
+            rememberAdd(null);
+            setAddOperationError('');
+            void load();
+          }
+        }}
+      >
+        Close request after reviewing Pantry
+      </button>
+    </section>
+  ) : null;
   const addItemDialogRef = useRef<HTMLDialogElement>(null);
   const manualEntryRef = useRef<HTMLDivElement>(null);
   const loadRequestRef = useRef(0);
@@ -910,6 +1018,7 @@ export function PantryManager({
       const body = (await response.json()) as { dashboard: Dashboard };
       if (requestId !== loadRequestRef.current) return;
       setDashboard(body.dashboard);
+      setNeedsRefresh(false);
       setError(null);
     } catch {
       if (requestId === loadRequestRef.current) {
@@ -1109,6 +1218,7 @@ export function PantryManager({
     method = 'POST',
     onSaved?: (body: { batch?: { id: string; version: number; status: string } }) => void,
   ) {
+    if (busy) return false;
     const panel = document.querySelector<HTMLDialogElement>(`dialog.${styles.batchDialog}[open]`);
     if (
       panel?.querySelector('form[data-dirty="true"]:not([data-submitting="true"])') &&
@@ -1134,6 +1244,7 @@ export function PantryManager({
         if (result) onSaved(result);
       }
       showToast(success, 'success');
+      setNeedsRefresh(true);
       await load();
       return true;
     } catch {
@@ -1224,18 +1335,64 @@ export function PantryManager({
     };
   }
 
-  async function addItem(formData: FormData) {
-    const selectedProductId = String(formData.get('productId') ?? '');
-    let productId = selectedProductId;
-    const unit = String(formData.get('unit') ?? 'each');
+  async function continueAdding(operation: PantryAddOperation, closeOnSuccess: boolean) {
+    if (busy || addOperationLock.current || !canEdit) return;
+    addOperationLock.current = true;
     setBusy(true);
-    setError(null);
+    setAddOperationError('');
+    let latest = operation;
     try {
-      if (!productId) {
-        const productResponse = await fetch('/api/v1/pantry/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      const result = await resumePantryAddOperation(operation, (next) => {
+        latest = next;
+        rememberAdd(next);
+      });
+      rememberAdd(null);
+      showToast(
+        `${result.acknowledged.length} Pantry ${result.acknowledged.length === 1 ? 'batch' : 'batches'} added.`,
+        'success',
+      );
+      if (closeOnSuccess) resetAddItemDialog();
+      setNeedsRefresh(true);
+      await load();
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : 'This addition could not be confirmed.';
+      rememberAdd({ ...latest, message });
+      setAddOperationError(message);
+      if (latest.acknowledged.length) {
+        setNeedsRefresh(true);
+        await load();
+      }
+      requestAnimationFrame(() => {
+        const recovery = addItemDialogRef.current?.querySelector<HTMLElement>(
+          '[aria-label="Pantry addition recovery"]',
+        );
+        recovery?.scrollIntoView({ block: 'nearest' });
+        recovery?.focus({ preventScroll: true });
+      });
+    } finally {
+      setBusy(false);
+      addOperationLock.current = false;
+    }
+  }
+  async function addItem(formData: FormData) {
+    if (addOperation || busy || !canEdit) return;
+    const productId = String(formData.get('productId') ?? '');
+    const unit = String(formData.get('unit') ?? 'each');
+    const batchCount = Number(formData.get('batchCount') ?? 1);
+    if (!Number.isInteger(batchCount) || batchCount < 1 || batchCount > 20) {
+      setAddOperationError('Choose between 1 and 20 separate batches.');
+      return;
+    }
+    const operation = createPantryAddOperation({
+      label: productId
+        ? (dashboard?.products.find((product) => product.id === productId)?.displayName ??
+          'Selected product')
+        : String(formData.get('productName') ?? ''),
+      productId,
+      product: productId
+        ? null
+        : {
             displayName: formData.get('productName'),
             brand: formData.get('brand'),
             category: formData.get('category'),
@@ -1246,44 +1403,12 @@ export function PantryManager({
             isStaple: formData.get('isStaple') === 'on',
             restockMode: 'none',
             restockTrigger: 'below_target',
-          }),
-        });
-        if (!productResponse.ok) {
-          showToast(
-            await messageFor(productResponse, 'That product could not be created.'),
-            'error',
-          );
-          return;
-        }
-        const productBody = (await productResponse.json()) as { product: Product };
-        productId = productBody.product.id;
-      }
-      const batchCount = Math.min(20, Math.max(1, Number(formData.get('batchCount') ?? 1)));
-      for (let index = 0; index < batchCount; index += 1) {
-        const batchResponse = await fetch('/api/v1/pantry/batches', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...batchPayload(formData), productId }),
-        });
-        if (!batchResponse.ok) {
-          showToast(
-            await messageFor(batchResponse, 'The stock amount could not be added.'),
-            'error',
-          );
-          return;
-        }
-      }
-      showToast(
-        batchCount > 1 ? `${batchCount} Pantry batches added.` : 'Pantry item added.',
-        'success',
-      );
-      closeAddItemDialog();
-      await load();
-    } catch {
-      showToast('The Pantry item could not be added. Check the connection and try again.', 'error');
-    } finally {
-      setBusy(false);
-    }
+          },
+      batch: batchPayload(formData),
+      batchCount,
+    });
+    rememberAdd(operation);
+    await continueAdding(operation, true);
   }
 
   async function editProduct(product: Product, formData: FormData) {
@@ -1485,6 +1610,7 @@ export function PantryManager({
               </button>
             </header>
             <div className={styles.addPanelBody}>
+              {additionRecovery}
               <FoodCatalogPicker
                 context="pantry"
                 onSavingChange={setCatalogSaving}
@@ -1795,7 +1921,13 @@ export function PantryManager({
                       <input name="excludeFromGrocery" type="checkbox" /> Exclude this batch from
                       grocery calculations
                     </label>
-                    <button disabled={busy || !canEdit || !defaultLocationId} type="submit">
+                    {!addOperation && addOperationError ? (
+                      <p role="alert">{addOperationError}</p>
+                    ) : null}
+                    <button
+                      disabled={busy || !canEdit || !defaultLocationId || Boolean(addOperation)}
+                      type="submit"
+                    >
                       {busy ? 'Saving…' : 'Add item'}
                     </button>
                   </RetainedForm>
@@ -1825,6 +1957,18 @@ export function PantryManager({
       )}
       {!canEdit ? (
         <p className={styles.profilePrompt}>Choose a household profile to change Pantry stock.</p>
+      ) : null}
+      {!addItemOpen && additionRecovery}
+      {needsRefresh ? (
+        <div className={styles.error} role="alert">
+          <p>
+            The stock change was saved. Current Pantry values could not yet be refreshed. Stock
+            actions are paused to protect their versions.
+          </p>
+          <button type="button" onClick={() => void load()} disabled={mutationBusy}>
+            Refresh Pantry
+          </button>
+        </div>
       ) : null}
       {error ? (
         <p className={styles.error} role="alert">
@@ -2111,25 +2255,11 @@ export function PantryManager({
               <div className={styles.grid}>
                 {essentialProducts.map((product) => {
                   const needsSetup = product.restockMode === 'none';
-                  const relevant = dashboard.batches.filter(
-                    (batch) =>
-                      batch.productId === product.id &&
-                      !batch.excludeFromGrocery &&
-                      !['depleted', 'discarded', 'donated'].includes(batch.status),
-                  );
-                  const uncertain = relevant.some(
-                    (batch) =>
-                      batch.quantityRemaining === null ||
-                      batch.approximateState !== null ||
-                      batch.unit !== product.stockUnit,
-                  );
-                  const stock = relevant.reduce(
-                    (total, batch) =>
-                      batch.quantityRemaining !== null && batch.unit === product.stockUnit
-                        ? total + batch.quantityRemaining
-                        : total,
-                    0,
-                  );
+                  const stockSummary = dashboard.productStock?.[product.id];
+                  const uncertain = !stockSummary || stockSummary.uncertain;
+                  const stock = stockSummary?.knownQuantity ?? 0;
+                  const stockUnit =
+                    stockSummary?.unit || product.stockUnit || product.defaultInventoryUnit;
                   const due =
                     needsSetup ||
                     product.restockMode === 'always_buy' ||
@@ -2158,8 +2288,8 @@ export function PantryManager({
                         </div>
                         <p className={styles.quantity}>
                           {uncertain
-                            ? `Known subtotal: ${stock} ${product.stockUnit || ''} · other stock needs review`
-                            : `${stock} ${product.stockUnit}`}
+                            ? `Known subtotal: ${stock} ${stockUnit} · other stock needs review`
+                            : `${stock} ${stockUnit}`}
                         </p>
                         <span className={styles.statusChip}>
                           {needsSetup

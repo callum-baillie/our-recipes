@@ -171,7 +171,7 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
   await page.getByText('Demand and policy breakdown', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('link', { name: 'Open Pantry' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Can’t Find', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Can’t find', exact: true })).toBeVisible();
   await expect(page.getByText('Record an actual Pantry purchase')).toHaveCount(0);
   await page.getByLabel('Extra quantity for Grocery lentils').fill('50');
   await page.getByLabel('Extra unit for Grocery lentils').fill('g');
@@ -190,7 +190,11 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
     data: { weekStart: '2027-04-01', weekEnd: '2027-04-07', mode: 'all', listId },
   });
   await page.reload();
-  await expect(page.getByLabel('Grocery lentils quantity')).toHaveValue('650');
+  await expect(
+    page
+      .getByRole('article')
+      .filter({ has: page.locator('strong', { hasText: /^Grocery lentils$/ }) }),
+  ).toContainText('650 g to buy');
   await expectCleanResponsivePage(page);
   await screenshot(page, testInfo, 'pantry-grocery-controls-390');
 
@@ -213,7 +217,10 @@ test('Pantry grocery formula, controls, and explicit rich intake persist respons
   );
   await page.getByRole('button', { name: 'Add to cart', exact: true }).click();
   expect((await checkedResponse).status()).toBe(200);
-  await page.getByRole('button', { name: 'Unpack groceries into Pantry' }).click();
+  await page
+    .getByRole('navigation', { name: 'Shopping list totals' })
+    .getByRole('button', { name: 'Unpack', exact: true })
+    .click();
   await expect(page.getByText('Unpack into Pantry', { exact: true })).toBeVisible();
   await page.getByLabel('Purchased quantity for Grocery lentils').fill('100');
   await page.getByLabel('Purchased unit for Grocery lentils').fill('g');

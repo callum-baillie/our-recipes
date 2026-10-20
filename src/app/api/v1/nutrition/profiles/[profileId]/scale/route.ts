@@ -26,7 +26,7 @@ async function access(request: Request, context: Context) {
     return {
       response: jsonError(401, 'authentication_required', 'Sign in to manage your scale.'),
     } as const;
-  const auth = await requireNutritionPrincipal();
+  const auth = await requireNutritionPrincipal(request);
   if (auth.response) return { response: auth.response } as const;
   const id = parseNutritionProfileId((await context.params).profileId);
   const profile = authorizeNutritionProfileAction(id, auth.principal.id, 'manage_profile');

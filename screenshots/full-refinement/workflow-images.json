@@ -1,0 +1,178 @@
+{
+  "startingRevision": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
+  "branch": "refinement/full-project-completion",
+  "capturedWorkingTree": "2026-10-19/20; implementation on the named starting revision; final code revision is recorded in docs/refinement/release-evidence.md",
+  "browser": "Playwright Chromium",
+  "specs": [
+    "tests/e2e/workflow-backlog.spec.ts",
+    "tests/e2e/recipe-image-review.spec.ts",
+    "tests/e2e/pantry-add-recovery.spec.ts",
+    "tests/e2e/recipe-enhancement.spec.ts"
+  ],
+  "scope": "Fresh UI interaction evidence; print screenshots do not verify PDF content. Synthetic image previews do not verify live image realism. These files are not the historical baseline captures.",
+  "captures": [
+    {
+      "path": "screenshots/full-refinement/workflow/meal-plan-print-card-scope-1440.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "meal-plan-print-card-scope-1440",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/meal-plan-print-card-scope-390.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "meal-plan-print-card-scope-390",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/source-nutrition-neutral-action.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "source-nutrition-neutral-action",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/uncertain-meal-selection-retained.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "uncertain-meal-selection-retained",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/mobile-list-name-error.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "mobile-list-name-error",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/pantry-acknowledged-refresh-failure.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "pantry-acknowledged-refresh-failure",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/cooking-count-and-converter.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "cooking-count-and-converter",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/ai-review-320x500.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "ai-review-320x500",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/ai-review-390x500.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "ai-review-390x500",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/ai-review-1440x1000.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "ai-review-1440x1000",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/images/image-preview-stale-acceptance.png",
+      "scope": "images",
+      "kind": "after",
+      "state": "image-preview-stale-acceptance",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/images/image-preview-ready-320.png",
+      "scope": "images",
+      "kind": "after",
+      "state": "image-preview-ready-320",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/images/image-preview-ready-390.png",
+      "scope": "images",
+      "kind": "after",
+      "state": "image-preview-ready-390",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/images/image-preview-ready-1440.png",
+      "scope": "images",
+      "kind": "after",
+      "state": "image-preview-ready-1440",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/images/image-preview-pending-390.png",
+      "scope": "images",
+      "kind": "after",
+      "state": "image-preview-pending-390",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/pantry-add-resumed-draft-preserved.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "pantry-add-resumed-draft-preserved",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/pantry-add-uncertain-1440.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "pantry-add-uncertain-1440",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/pantry-add-uncertain-390.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "pantry-add-uncertain-390",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/recipe-toolbar-1440.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "recipe-toolbar-1440",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/recipe-toolbar-320.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "recipe-toolbar-320",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/recipe-toolbar-390.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "recipe-toolbar-390",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/unknown-buy-recipe-demand-1440.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "unknown-buy-recipe-demand-1440",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    },
+    {
+      "path": "screenshots/full-refinement/workflow/unknown-buy-recipe-demand-390.png",
+      "scope": "workflow",
+      "kind": "after",
+      "state": "unknown-buy-recipe-demand-390",
+      "fixture": "Synthetic local household; consequential AI and uncertain-write responses intercepted. No live image-quality claim."
+    }
+  ],
+  "capturedAt": "2026-10-20T15:59:57.627246+00:00",
+  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md"
+}

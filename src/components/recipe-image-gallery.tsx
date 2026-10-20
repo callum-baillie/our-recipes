@@ -1,9 +1,13 @@
 'use client';
 
-import { ImagePlus, Sparkles, Trash2 } from 'lucide-react';
+import { ImagePlus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
+import {
+  RecipeImageGenerator,
+  type ImageGenerationPolicy,
+} from '@/components/recipe-image-generator';
 import { LoadingIndicator } from '@/components/skeleton';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
@@ -13,10 +17,22 @@ import { ClientHeicConversionError, convertHeicFilesInBrowser } from '@/lib/clie
 type RecipeImageGalleryProps = {
   recipeId: string;
   recipeTitle: string;
+  revision: number;
+  profileId: string;
+  accountId: string;
+  imagePolicy: ImageGenerationPolicy;
   images: Array<{ id: string; altText: string; width: number; height: number }>;
 };
 
-export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImageGalleryProps) {
+export function RecipeImageGallery({
+  recipeId,
+  recipeTitle,
+  images,
+  revision,
+  profileId,
+  accountId,
+  imagePolicy,
+}: RecipeImageGalleryProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
@@ -24,7 +40,6 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [editingPhotos, setEditingPhotos] = useState(false);
   const showEditor = editingPhotos;
   const editorRef = useRef<HTMLFormElement>(null);
@@ -133,38 +148,6 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
     }
   }
 
-  async function generateWithOpenAi() {
-    setGenerating(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/v1/recipes/${recipeId}/images/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: true }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setGenerating(false);
-      if (!response.ok) {
-        const message = body?.error?.message ?? 'OpenAI could not generate a recipe image.';
-        setError(message);
-        showToast(message, 'error');
-        return;
-      }
-      setEditingPhotos(false);
-      showToast('Serving image generated and saved.', 'success');
-      router.refresh();
-    } catch {
-      const message =
-        'The photo request could not be completed. Check the connection and try again.';
-      setError(message);
-      showToast(message, 'error');
-    } finally {
-      setGenerating(false);
-    }
-  }
-
   return (
     <section className="recipe-media" aria-labelledby="recipe-photos-heading">
       <div className="recipe-media-heading">
@@ -256,11 +239,6 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
           JPEG, PNG, WebP, HEIC, or HEIF · 10 MB max · HEIC/HEIF converts in this browser before
           upload, then every accepted photo is stored locally as a cleaned WebP.
         </p>
-        <p>
-          Or use OpenAI to generate a serving image from this recipe’s title, summary, and
-          ingredients. This is a paid external action only when you press the button; the result is
-          stored locally after validation.
-        </p>
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -274,15 +252,14 @@ export function RecipeImageGallery({ recipeId, recipeTitle, images }: RecipeImag
           )}
           {converting ? 'Preparing local conversion' : 'Upload photo'}
         </button>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => void generateWithOpenAi()}
-          disabled={generating || pending || converting}
-        >
-          {generating ? <LoadingIndicator label="Generating image" /> : <Sparkles size={16} />}
-          Generate serving image with OpenAI
-        </button>
+        <RecipeImageGenerator
+          key={`${recipeId}:${accountId}:${profileId}`}
+          recipeId={recipeId}
+          revision={revision}
+          profileId={profileId}
+          accountId={accountId}
+          policy={imagePolicy}
+        />
       </form>
     </section>
   );

@@ -1,9 +1,9 @@
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { getHouseholdState } from '@/lib/services/household-service';
-import { cookies } from 'next/headers';
+import { canAccountUseAi } from '@/lib/services/ai-access-service';
+import { appRoleCan } from '@/lib/domain/permissions';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   AiAssistantProviderResponseError,
@@ -11,6 +11,7 @@ import {
 } from '@/lib/providers/ai-assistant-provider';
 import {
   aiSummaryUnavailableReason,
+  aiSummaryAvailability,
   AiSummaryInProgressError,
   listAiSummaries,
   refreshAiSummaryBundle,
@@ -19,21 +20,28 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function profileId() {
-  return getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value).profileId;
-}
-
 export async function GET(request: Request) {
-  const actor = await profileId();
-  if (!actor)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  if (!principal)
+    return jsonError(401, 'authentication_required', 'Sign in to read your summaries.');
+  if (
+    !appRoleCan(principal.accountRole, 'personal.read') ||
+    principal.profileId !== principal.linkedProfileId
+  )
+    return jsonError(
+      403,
+      'personal_scope_required',
+      'Switch to your own profile to read your saved AI summaries.',
+    );
+  const actor = principal.linkedProfileId;
   const limit = Number(new URL(request.url).searchParams.get('limit') ?? 12);
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     return jsonError(400, 'invalid_limit', 'Limit must be an integer between 1 and 50.');
   }
-  return NextResponse.json({
-    summaries: listAiSummaries(actor, limit),
-  });
+  return NextResponse.json(
+    { summaries: listAiSummaries(actor, limit) },
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  );
 }
 
 export async function POST(request: Request) {
@@ -41,18 +49,27 @@ export async function POST(request: Request) {
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
   const scope = new URL(request.url).searchParams.get('scope');
   if (scope && scope !== 'account')
-    return jsonError(400, 'invalid_summary_scope', 'Choose account scope or the active profile.');
-  const principal = scope === 'account' ? await getAuthenticatedSessionPrincipal(request) : null;
-  if (scope === 'account' && !principal)
+    return jsonError(
+      400,
+      'invalid_summary_scope',
+      'Summaries are scoped to your signed-in account.',
+    );
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  if (!principal)
     return jsonError(401, 'authentication_required', 'Sign in to update your summaries.');
-  const actor = principal?.linkedProfileId ?? (await profileId());
-  if (!actor)
-    return jsonError(409, 'profile_selection_required', 'Choose a household profile first.');
+  const actor = principal.linkedProfileId;
+  if (!canAccountUseAi(principal.userId))
+    return jsonError(
+      403,
+      'ai_disabled',
+      'AI is disabled for this account. Review AI preferences or ask an administrator.',
+    );
   try {
     const summaries = await refreshAiSummaryBundle(actor);
     return NextResponse.json(
       {
         summaries,
+        availability: aiSummaryAvailability(actor),
         recipient: {
           id: actor,
           name:
@@ -63,7 +80,7 @@ export async function POST(request: Request) {
           ? 'updated'
           : (aiSummaryUnavailableReason(actor) ?? 'no_eligible_evidence'),
       },
-      { status: 201 },
+      { status: 201, headers: { 'Cache-Control': 'private, no-store' } },
     );
   } catch (error) {
     if (error instanceof AiSummaryInProgressError)

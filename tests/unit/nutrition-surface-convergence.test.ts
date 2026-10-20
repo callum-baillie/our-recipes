@@ -80,9 +80,12 @@ describe('Nutrition surface convergence', () => {
         profile: settings,
         effectiveOn: '2026-07-19',
         nutrientDefinitions: [{ code: 'fiber', displayName: 'Fiber' }],
+        personName: 'Avery',
       }),
     );
-    expect(markup).toContain('household profile selected in the app header');
+    expect(markup).toContain(
+      'Avery · Preferences follow this selected household Nutrition profile.',
+    );
     for (const retired of [
       'name="displayName"',
       'name="avatarUrl"',
@@ -96,12 +99,18 @@ describe('Nutrition surface convergence', () => {
     }
   });
 
-  it('uses a dark-theme Nutrition eyebrow color above 4.5 to 1', () => {
-    const settingsCss = source('src/components/nutrition-profile-settings.module.css');
+  it('keeps shared accent text readable against each palette’s dark settings surfaces', () => {
     const themesCss = source('src/app/themes.css');
-    expect(settingsCss).toContain('color: var(--accent-text)');
-    expect(themesCss).toContain('--accent-text: light-dark(#863c22, #ffad91)');
-    expect(contrast('#ffad91', '#202920')).toBeGreaterThanOrEqual(4.5);
-    expect(contrast('#ffad91', '#273127')).toBeGreaterThanOrEqual(4.5);
+    const palettes = themesCss
+      .split(/(?=:root\[data-palette=)/u)
+      .filter((section) => section.includes('--accent-text:'));
+    expect(palettes).toHaveLength(5);
+    for (const palette of palettes) {
+      const dark = (token: string) =>
+        palette.match(new RegExp(`--${token}: light-dark\\(#[a-f0-9]+, (#[a-f0-9]+)\\)`))?.[1];
+      const foreground = dark('accent-text')!;
+      for (const token of ['page', 'linen'])
+        expect(contrast(foreground, dark(token)!)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

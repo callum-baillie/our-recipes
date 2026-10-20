@@ -1,0 +1,38 @@
+{
+  "scope": "Fresh synthetic fixture PDFs, not blank embedded-preview screenshots",
+  "generatedAt": "2026-10-20",
+  "documents": [
+    {
+      "file": "screenshots/full-refinement/documents/pantry-a4.pdf",
+      "info": ["Pages:           3", "Page size:       595.28 x 841.89 pts (A4)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/pantry-letter.pdf",
+      "info": ["Pages:           3", "Page size:       612 x 792 pts (letter)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/plan-a4.pdf",
+      "info": ["Pages:           12", "Page size:       595.28 x 841.89 pts (A4)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/plan-letter.pdf",
+      "info": ["Pages:           12", "Page size:       612 x 792 pts (letter)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/recipe-a4.pdf",
+      "info": ["Pages:           3", "Page size:       595.28 x 841.89 pts (A4)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/recipe-letter.pdf",
+      "info": ["Pages:           3", "Page size:       612 x 792 pts (letter)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/shopping-a4.pdf",
+      "info": ["Pages:           1", "Page size:       595.28 x 841.89 pts (A4)"]
+    },
+    {
+      "file": "screenshots/full-refinement/documents/shopping-letter.pdf",
+      "info": ["Pages:           1", "Page size:       612 x 792 pts (letter)"]
+    }
+  ]
+}

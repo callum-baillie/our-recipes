@@ -7,10 +7,36 @@ import styles from './catalog-store-link.module.css';
 type Evidence = {
   availability: string;
   assortment_status: string;
-  offers: unknown[];
-  placements: unknown[];
+  offers: Record<string, unknown>[];
+  placements: Record<string, unknown>[];
+  history_truncated: boolean;
   reason: string | null;
 };
+const evidenceText = (value: unknown) =>
+  typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 300) : null;
+function observationSummary(row: Record<string, unknown>, kind: 'offer' | 'placement') {
+  const amount = evidenceText(row.amount_decimal ?? row.amount);
+  const detail =
+    kind === 'offer'
+      ? [
+          amount === null ? 'Price not recorded' : `${amount} ${evidenceText(row.currency) ?? ''}`,
+          evidenceText(row.package_size),
+        ]
+      : [
+          evidenceText(row.aisle) ? `Aisle ${evidenceText(row.aisle)}` : 'Aisle not recorded',
+          evidenceText(row.department),
+        ];
+  return [
+    ...detail,
+    evidenceText(row.channel)?.replaceAll('_', ' '),
+    evidenceText(row.observed_at)
+      ? `Observed ${evidenceText(row.observed_at)}`
+      : 'Observation date not recorded',
+    evidenceText(row.valid_until) ? `Source valid until ${evidenceText(row.valid_until)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 export function CatalogRetailEvidence({ reference }: { reference: CatalogReference }) {
   const [stores, setStores] = useState<Array<{
     id: string;
@@ -120,6 +146,30 @@ export function CatalogRetailEvidence({ reference }: { reference: CatalogReferen
               ? `${evidence.placements.length} placement observations; your saved route takes priority.`
               : 'No branch aisle placement available.'}
           </small>
+          {evidence.history_truncated && (
+            <small>
+              Only the bounded source history is available; these observations are not the complete
+              record.
+            </small>
+          )}
+          {evidence.reason && <small>{evidence.reason.replaceAll('_', ' ')}</small>}
+          {(evidence.offers.length > 0 || evidence.placements.length > 0) && (
+            <details>
+              <summary>Observation dates, channels and details</summary>
+              <ul>
+                {evidence.offers.map((row, index) => (
+                  <li key={`offer-${index}`}>{observationSummary(row, 'offer')}</li>
+                ))}
+                {evidence.placements.map((row, index) => (
+                  <li key={`placement-${index}`}>{observationSummary(row, 'placement')}</li>
+                ))}
+              </ul>
+              <p>
+                These are source observations, not a promise of current stock or your saved aisle
+                route.
+              </p>
+            </details>
+          )}
         </div>
       )}
       {error && <p role="alert">{error}</p>}

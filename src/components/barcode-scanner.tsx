@@ -94,6 +94,7 @@ function ActiveBarcodeScanner({
   const lastAccepted = useRef(-Infinity);
   const [paused, setPaused] = useState(false);
   const [error, setError] = useState('');
+  const [ready, setReady] = useState(false);
   const [wasmUrl] = useState(() =>
     new URL(
       `/vendor/barcode/zxing_reader.wasm?v=${ZXING_WASM_SHA256}`,
@@ -115,16 +116,43 @@ function ActiveBarcodeScanner({
       onDetected(result.rawValue);
     },
     onError(value) {
-      setError(value instanceof Error ? value.message : 'The camera could not start.');
+      const name = typeof value === 'object' && value !== null && 'name' in value ? value.name : '';
+      setError(
+        name === 'NotAllowedError'
+          ? 'Permission denied. Allow camera access in your browser settings.'
+          : name === 'NotFoundError'
+            ? 'No camera was found on this device.'
+            : value instanceof Error
+              ? value.message
+              : 'The camera could not start.',
+      );
     },
   });
 
   return (
     <div className={styles.cameraPanel}>
       <div className={styles.videoFrame}>
-        <video ref={ref} muted playsInline aria-label="Live barcode camera" />
+        <video
+          ref={ref}
+          muted
+          playsInline
+          aria-label="Live barcode camera"
+          onPlaying={() => {
+            setReady(true);
+            setError('');
+          }}
+        />
         <span aria-hidden="true" className={styles.scanGuide} />
       </div>
+      {!error && (
+        <p role="status">
+          {ready
+            ? paused
+              ? 'Scan captured. Review it or scan another.'
+              : 'Camera ready. Hold the barcode inside the frame.'
+            : 'Starting camera… Allow camera access when asked.'}
+        </p>
+      )}
       <div className={styles.cameraActions}>
         {torch.isAvailable ? (
           <button type="button" onClick={() => (torch.isOn ? torch.off() : torch.on())}>
@@ -164,7 +192,10 @@ function ActiveBarcodeScanner({
       </div>
       {error ? (
         <p className={styles.error} role="alert">
-          {error} Enter the barcode manually instead.
+          Camera unavailable: {error} Retry camera access or enter the barcode manually.
+          <button type="button" onClick={onStop}>
+            Try camera again
+          </button>
           {onSearchRequest && (
             <button type="button" onClick={onSearchRequest}>
               Search / Enter barcode

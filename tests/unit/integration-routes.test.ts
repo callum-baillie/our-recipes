@@ -13,7 +13,7 @@ describe('integration operation registry', () => {
       expect(source, file).toMatch(/authorizeApi|authorizeCoreApi/u);
       for (const [method, action] of Object.entries(route.methods)) {
         expect(source, `${method} ${file}`).toMatch(
-          new RegExp(`export (?:async )?function ${method}\\b`),
+          new RegExp(`export (?:(?:async )?function ${method}\\b|const ${method}\\s*=)`),
         );
         expect(
           integrationPermission(

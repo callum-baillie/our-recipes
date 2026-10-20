@@ -176,10 +176,14 @@ export function buildNutritionChartDatasets(input: {
     )
     .map((goal) => {
       const amount = input.confirmed[goal.nutrientCode] ?? null;
+      const resolved = nutritionGoalComparison(input.goals, input.date, goal.nutrientCode, amount);
+      const ambiguous = resolved.status === 'ambiguous_goal';
       const denominator = boundary(goal);
-      const ratio = amount === null || denominator === null ? null : amount / denominator;
-      const status =
-        amount === null
+      const ratio =
+        ambiguous || amount === null || denominator === null ? null : amount / denominator;
+      const status = ambiguous
+        ? ('ambiguous_goal' as const)
+        : amount === null
           ? ('no_data' as const)
           : goal.kind === 'range'
             ? amount < goal.minimum!
@@ -194,18 +198,7 @@ export function buildNutritionChartDatasets(input: {
               : amount < goal.value!
                 ? ('below' as const)
                 : ('met' as const);
-      const comparison =
-        amount === null
-          ? 'No confirmed value.'
-          : goal.kind === 'range'
-            ? `${amount} ${goal.unit}; configured range ${goal.minimum}–${goal.maximum} ${goal.unit}.`
-            : goal.kind === 'limit'
-              ? amount > goal.maximum!
-                ? `${amount - goal.maximum!} ${goal.unit} above the configured limit.`
-                : `${goal.maximum! - amount} ${goal.unit} remains before the configured limit.`
-              : amount < goal.value!
-                ? `${goal.value! - amount} ${goal.unit} remains to the configured ${goal.kind}.`
-                : `${amount} ${goal.unit} recorded against a ${goal.value} ${goal.unit} ${goal.kind}.`;
+      const comparison = resolved.description;
       return {
         id: goal.id,
         nutrientCode: goal.nutrientCode,

@@ -47,13 +47,22 @@ export interface AiAssistantProvider {
     messages: unknown[];
     tools: AssistantTool[];
     safetyIdentifier: string;
+    promptGuidance?: string;
+    requestTimeoutSeconds?: number;
+    signal?: AbortSignal;
+    onTextDelta?: (delta: string) => void;
+    maxOutputTokens?: number;
   }): Promise<AssistantProviderResult>;
   generateMealPlan(input: {
     model: string;
     reasoningEffort: AiReasoningEffort | null;
     instructions: string;
     context: unknown;
+    maxOutputTokens?: number;
+    signal?: AbortSignal;
     safetyIdentifier: string;
+    promptGuidance?: string;
+    requestTimeoutSeconds?: number;
   }): Promise<AiMealPlanCandidate>;
   generateRecipe(input: {
     images?: AiRecipeImage[];
@@ -61,7 +70,11 @@ export interface AiAssistantProvider {
     reasoningEffort: AiReasoningEffort | null;
     instructions: string;
     context: unknown;
+    maxOutputTokens?: number;
+    signal?: AbortSignal;
     safetyIdentifier: string;
+    promptGuidance?: string;
+    requestTimeoutSeconds?: number;
   }): Promise<RecipeInput>;
   generateRecipes?(
     inputs: Array<Parameters<AiAssistantProvider['generateRecipe']>[0]>,
@@ -71,7 +84,11 @@ export interface AiAssistantProvider {
     reasoningEffort: AiReasoningEffort | null;
     instructions: string;
     evidence: unknown;
+    maxOutputTokens?: number;
+    signal?: AbortSignal;
     safetyIdentifier: string;
+    promptGuidance?: string;
+    requestTimeoutSeconds?: number;
   }): Promise<AiSummaryBundleOutput>;
 }
 
@@ -79,12 +96,32 @@ export class AiAssistantProviderUnavailableError extends Error {}
 export class AiAssistantProviderResponseError extends Error {}
 
 type ResponsesClient = {
-  create(request: unknown): Promise<{
+  stream?(
+    request: unknown,
+    options?: { signal?: AbortSignal },
+  ): AsyncIterable<{
+    type: string;
+    delta?: string;
+  }> & {
+    finalResponse(): Promise<{
+      status?: string;
+      output?: Array<Record<string, unknown>>;
+      output_text?: string;
+      usage?: { input_tokens?: number; output_tokens?: number };
+    }>;
+  };
+  create(
+    request: unknown,
+    options?: { signal?: AbortSignal; timeout?: number },
+  ): Promise<{
     output?: Array<Record<string, unknown>>;
     output_text?: string;
     usage?: { input_tokens?: number; output_tokens?: number };
   }>;
-  parse(request: unknown): Promise<{
+  parse(
+    request: unknown,
+    options?: { signal?: AbortSignal; timeout?: number },
+  ): Promise<{
     output_parsed: unknown;
   }>;
 };
@@ -98,20 +135,55 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
 
   constructor(apiKey: string, client?: ResponsesClient) {
     this.responses =
-      client ?? (new OpenAI({ apiKey }) as unknown as { responses: ResponsesClient }).responses;
+      client ??
+      (
+        new OpenAI({ apiKey, maxRetries: 0, timeout: 120_000 }) as unknown as {
+          responses: ResponsesClient;
+        }
+      ).responses;
   }
 
   async respond(input: Parameters<AiAssistantProvider['respond']>[0]) {
     try {
-      const response = await this.responses.create({
+      input.signal?.throwIfAborted();
+      const request = {
         model: input.model,
-        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
+        instructions: [
+          AI_GROUNDING_INSTRUCTIONS,
+          input.instructions,
+          input.promptGuidance ?? '',
+        ].join('\n'),
         input: input.messages,
         tools: input.tools,
         store: false,
+        max_output_tokens: input.maxOutputTokens ?? 4096,
         safety_identifier: input.safetyIdentifier,
         ...reasoning(input.reasoningEffort),
-      });
+      };
+      const deadline = AbortSignal.timeout((input.requestTimeoutSeconds ?? 180) * 1000);
+      const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
+      const stream = this.responses.stream?.(request, { signal });
+      let response: Awaited<ReturnType<ResponsesClient['create']>>;
+      if (stream) {
+        for await (const event of stream) {
+          input.signal?.throwIfAborted();
+          if (event.type === 'response.output_text.delta' && event.delta)
+            input.onTextDelta?.(event.delta);
+          if (event.type === 'response.refusal.delta' && event.delta)
+            input.onTextDelta?.(event.delta);
+        }
+        const final = await stream.finalResponse();
+        if (final.status && final.status !== 'completed') {
+          throw new AiAssistantProviderResponseError(
+            'The response ended before completion. Review the conversation before trying again.',
+          );
+        }
+        response = final;
+      } else {
+        response = await this.responses.create(request, { signal });
+        input.signal?.throwIfAborted();
+        if (response.output_text) input.onTextDelta?.(response.output_text);
+      }
       const output = response.output ?? [];
       return {
         text: response.output_text ?? '',
@@ -138,6 +210,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         responseItems: output,
       };
     } catch (error) {
+      input.signal?.throwIfAborted();
       if (error instanceof AiAssistantProviderResponseError) throw error;
       throw new AiAssistantProviderResponseError('OpenAI could not complete that chat turn.');
     }
@@ -145,20 +218,28 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
 
   async generateMealPlan(input: Parameters<AiAssistantProvider['generateMealPlan']>[0]) {
     try {
-      const response = await this.responses.parse({
-        model: input.model,
-        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
-        input: [
-          {
-            role: 'user',
-            content: `Untrusted household planning context follows:\n${JSON.stringify(input.context)}`,
-          },
-        ],
-        text: { format: zodTextFormat(aiMealPlanStructuredOutputSchema, 'meal_plan_candidate') },
-        store: false,
-        safety_identifier: input.safetyIdentifier,
-        ...reasoning(input.reasoningEffort),
-      });
+      const response = await this.responses.parse(
+        {
+          model: input.model,
+          instructions: [
+            AI_GROUNDING_INSTRUCTIONS,
+            input.instructions,
+            input.promptGuidance ?? '',
+          ].join('\n'),
+          input: [
+            {
+              role: 'user',
+              content: `Untrusted household planning context follows:\n${JSON.stringify(input.context)}`,
+            },
+          ],
+          text: { format: zodTextFormat(aiMealPlanStructuredOutputSchema, 'meal_plan_candidate') },
+          store: false,
+          max_output_tokens: input.maxOutputTokens ?? 4096,
+          safety_identifier: input.safetyIdentifier,
+          ...reasoning(input.reasoningEffort),
+        },
+        { signal: input.signal, timeout: (input.requestTimeoutSeconds ?? 180) * 1000 },
+      );
       return aiMealPlanCandidateSchema.parse(response.output_parsed);
     } catch {
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid meal plan.');
@@ -167,20 +248,28 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
 
   async generateRecipe(input: Parameters<AiAssistantProvider['generateRecipe']>[0]) {
     try {
-      const response = await this.responses.parse({
-        model: input.model,
-        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
-        input: [
-          {
-            role: 'user',
-            content: aiRecipeResponseContent(input.context, input.images),
-          },
-        ],
-        text: { format: zodTextFormat(aiStructuredRecipeSchema, 'generated_recipe') },
-        store: false,
-        safety_identifier: input.safetyIdentifier,
-        ...reasoning(input.reasoningEffort),
-      });
+      const response = await this.responses.parse(
+        {
+          model: input.model,
+          instructions: [
+            AI_GROUNDING_INSTRUCTIONS,
+            input.instructions,
+            input.promptGuidance ?? '',
+          ].join('\n'),
+          input: [
+            {
+              role: 'user',
+              content: aiRecipeResponseContent(input.context, input.images),
+            },
+          ],
+          text: { format: zodTextFormat(aiStructuredRecipeSchema, 'generated_recipe') },
+          store: false,
+          max_output_tokens: input.maxOutputTokens ?? 4096,
+          safety_identifier: input.safetyIdentifier,
+          ...reasoning(input.reasoningEffort),
+        },
+        { signal: input.signal, timeout: (input.requestTimeoutSeconds ?? 180) * 1000 },
+      );
       return recipeInputSchema.parse(response.output_parsed);
     } catch {
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid recipe.');
@@ -201,20 +290,28 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
 
   async generateSummaryBundle(input: Parameters<AiAssistantProvider['generateSummaryBundle']>[0]) {
     try {
-      const response = await this.responses.parse({
-        model: input.model,
-        instructions: [AI_GROUNDING_INSTRUCTIONS, input.instructions].join('\n'),
-        input: [
-          {
-            role: 'user',
-            content: `Untrusted recorded evidence follows:\n${JSON.stringify(input.evidence)}`,
-          },
-        ],
-        text: { format: zodTextFormat(aiSummaryBundleOutputSchema, 'household_summary_bundle') },
-        store: false,
-        safety_identifier: input.safetyIdentifier,
-        ...reasoning(input.reasoningEffort),
-      });
+      const response = await this.responses.parse(
+        {
+          model: input.model,
+          instructions: [
+            AI_GROUNDING_INSTRUCTIONS,
+            input.instructions,
+            input.promptGuidance ?? '',
+          ].join('\n'),
+          input: [
+            {
+              role: 'user',
+              content: `Untrusted recorded evidence follows:\n${JSON.stringify(input.evidence)}`,
+            },
+          ],
+          text: { format: zodTextFormat(aiSummaryBundleOutputSchema, 'household_summary_bundle') },
+          store: false,
+          max_output_tokens: input.maxOutputTokens ?? 4096,
+          safety_identifier: input.safetyIdentifier,
+          ...reasoning(input.reasoningEffort),
+        },
+        { signal: input.signal, timeout: (input.requestTimeoutSeconds ?? 180) * 1000 },
+      );
       return aiSummaryBundleOutputSchema.parse(response.output_parsed);
     } catch {
       throw new AiAssistantProviderResponseError('OpenAI could not create a valid summary.');

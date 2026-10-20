@@ -1,6 +1,11 @@
 'use client';
 
 import { AiSummaryCards, type AiSummaryCardData } from './ai-summary-cards';
+import { SettingsConflictReview } from './settings-conflict-review';
+import {
+  summaryInputCategories,
+  type SummaryAvailability,
+} from '@/lib/domain/ai-summary-availability';
 import { useRef, useState } from 'react';
 
 import { AI_WORKLOAD_DEFAULTS, aiWorkloadSchema } from '@/lib/domain/ai-assistant';
@@ -99,6 +104,9 @@ export function AiSettingsForm({
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [updatedSummaries, setUpdatedSummaries] = useState<AiSummaryCardData[]>([]);
+  const [conflict, setConflict] = useState(false);
+  const [current, setCurrent] = useState<Settings | null>(null);
+  const [availability, setAvailability] = useState<SummaryAvailability[]>([]);
   const [status, setStatus] = useState('');
   const [statusSource, setStatusSource] = useState<'save' | 'refresh'>('save');
   const lock = useRef(false);
@@ -126,14 +134,20 @@ export function AiSettingsForm({
       ),
     });
     const body = (await response.json()) as Settings & { error?: { message?: string } };
-    if (!response.ok) throw new Error(body.error?.message ?? 'AI settings could not be saved.');
+    if (!response.ok) {
+      if (response.status === 409) {
+        setConflict(true);
+        setCurrent(null);
+      }
+      throw new Error(body.error?.message ?? 'AI settings could not be saved.');
+    }
     setSettings(body);
     setSavedPolicy(JSON.stringify(body.dataPolicy));
     return body;
   }
 
   async function save() {
-    if (lock.current) return;
+    if (lock.current || conflict) return;
     lock.current = true;
     setStatusSource('save');
     setSaving(true);
@@ -150,7 +164,7 @@ export function AiSettingsForm({
   }
 
   async function refreshSummaries() {
-    if (lock.current) return;
+    if (lock.current || conflict) return;
     lock.current = true;
     let policySaved = false;
     setStatusSource('refresh');
@@ -163,6 +177,7 @@ export function AiSettingsForm({
       const body = (await response.json().catch(() => null)) as {
         summaries?: AiSummaryCardData[];
         outcome?: string;
+        availability?: SummaryAvailability[];
         recipient?: { id: string; name: string };
         error?: { message?: string };
       } | null;
@@ -170,10 +185,11 @@ export function AiSettingsForm({
         throw new Error(body?.error?.message ?? 'AI summaries could not be refreshed.');
       const count = body?.summaries?.length ?? 0;
       setUpdatedSummaries(body?.summaries ?? []);
+      setAvailability(body?.availability ?? []);
       setStatus(
         count
           ? `${body?.recipient?.name ?? personName}: updated ${count} summary ${count === 1 ? 'section' : 'sections'}. Privacy and summary settings saved.`
-          : `${personName}: privacy and summary settings saved. ${body?.outcome === 'disabled_workload' ? 'Summary requests are disabled by task or account rules.' : body?.outcome === 'disabled_outputs' ? 'No summary outputs are enabled.' : 'No eligible shared evidence is available for the enabled outputs.'}`,
+          : `${personName}: privacy and summary settings saved. ${body?.outcome === 'disabled_workload' ? 'Summary requests are disabled by task or account rules.' : body?.outcome === 'disabled_outputs' ? 'No summary outputs are enabled.' : body?.outcome === 'missing_permission' ? 'Enabled outputs need a permitted input category. Review sharing choices below.' : 'No eligible shared evidence is available for the enabled outputs.'}`,
       );
     } catch (error) {
       setStatus(
@@ -185,6 +201,43 @@ export function AiSettingsForm({
     }
   }
 
+  async function loadCurrent() {
+    if (lock.current) return;
+    lock.current = true;
+    setSaving(true);
+    setStatusSource('save');
+    try {
+      const response = await fetch('/api/v1/ai/settings', { cache: 'no-store' });
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(body.error?.message ?? 'Could not load current privacy settings.');
+      setCurrent(body);
+      setStatus('Current saved privacy settings loaded for review.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not load current settings.');
+    } finally {
+      lock.current = false;
+      setSaving(false);
+    }
+  }
+  function reconcile(keep: boolean) {
+    if (!current) return;
+    setSavedPolicy(JSON.stringify(current.dataPolicy));
+    setSettings((draft) => ({
+      ...current,
+      dataPolicy: keep
+        ? { ...draft.dataPolicy, version: current.dataPolicy.version }
+        : current.dataPolicy,
+    }));
+    setCurrent(null);
+    setConflict(false);
+    setStatusSource('save');
+    setStatus(
+      keep
+        ? 'Privacy draft retained against the reviewed version. Save explicitly to apply it.'
+        : 'Current saved privacy settings loaded.',
+    );
+  }
   return (
     <div id="ai-privacy" className="settings-stack" onChange={() => setStatus('')}>
       <nav className="settings-section-index" aria-label="Privacy and summary sections">
@@ -246,6 +299,17 @@ export function AiSettingsForm({
             <option value="monthly">Monthly</option>
           </select>
         </SettingsField>
+        {Object.entries(summaryInputCategories).map(([domain, categories], index) => {
+          const output = summaryFields[index]!;
+          return settings.dataPolicy[output[0]] &&
+            !categories.some((key) => settings.dataPolicy[key]) ? (
+            <p key={domain}>
+              {output[1]} has no permitted input category.{' '}
+              <a href="#ai-sharing-inputs">Review sharing choices</a>; enabling an output never
+              enables sharing.
+            </p>
+          ) : null;
+        })}
         <SettingsSubsection title="Included sections">
           {summaryFields.map(([key, title, description]) => (
             <SettingsField key={key} title={title} description={description}>
@@ -273,7 +337,7 @@ export function AiSettingsForm({
           <button
             className="secondary-button"
             type="button"
-            disabled={saving || refreshing}
+            disabled={saving || refreshing || conflict}
             onClick={() => void refreshSummaries()}
           >
             {refreshing ? 'Updating summaries…' : 'Update summaries'}
@@ -423,6 +487,47 @@ export function AiSettingsForm({
           </SettingsSubsection>
         ))}
       </SettingsPane>
+      {availability.some(
+        (item) => item.status === 'missing_permission' || item.status === 'no_eligible_evidence',
+      ) && (
+        <section aria-label="Summary availability">
+          <p>Evidence available at the last summary request:</p>
+          {availability
+            .filter(
+              (item) =>
+                item.status === 'missing_permission' || item.status === 'no_eligible_evidence',
+            )
+            .map((item) => (
+              <p key={item.domain}>
+                {item.domain.replaceAll('_', ' ')}:{' '}
+                {item.status === 'missing_permission' ? (
+                  <>
+                    No relevant input category is permitted.{' '}
+                    <a href="#ai-sharing-inputs">Review sharing choices</a>.
+                  </>
+                ) : (
+                  <>
+                    Sharing is permitted, but no eligible recorded evidence is available.{' '}
+                    <a
+                      href={
+                        item.domain === 'nutrition'
+                          ? '/nutrition'
+                          : item.domain === 'recipes'
+                            ? '/recipes'
+                            : item.domain === 'meal_plans'
+                              ? '/planner'
+                              : '/lists'
+                      }
+                    >
+                      Review recorded {item.domain.replaceAll('_', ' ')}
+                    </a>
+                    .
+                  </>
+                )}
+              </p>
+            ))}
+        </section>
+      )}
       {updatedSummaries.length > 0 && (
         <>
           <section id="my-summary-results">
@@ -438,6 +543,30 @@ export function AiSettingsForm({
           </section>
         </>
       )}
+      {conflict && (
+        <SettingsConflictReview
+          pending={saving || refreshing}
+          loaded={Boolean(current)}
+          onLoad={() => void loadCurrent()}
+          onKeepDraft={() => reconcile(true)}
+          onUseSaved={() => reconcile(false)}
+        >
+          <details open>
+            <summary>Current saved privacy choices · version {current?.dataPolicy.version}</summary>
+            <dl>
+              {[...summaryFields, ...policyFields].map(([key, title]) => (
+                <div key={key}>
+                  <dt>{title}</dt>
+                  <dd>
+                    {current?.dataPolicy[key] ? 'On' : 'Off'} saved ·{' '}
+                    {settings.dataPolicy[key] ? 'On' : 'Off'} in your draft
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        </SettingsConflictReview>
+      )}
       <div id="ai-privacy-save">
         <SettingsActionBar
           status={
@@ -450,7 +579,7 @@ export function AiSettingsForm({
           <button
             className="primary-button"
             type="button"
-            disabled={saving || refreshing || !dirty}
+            disabled={saving || refreshing || !dirty || conflict}
             onClick={() => void save()}
           >
             {saving ? (

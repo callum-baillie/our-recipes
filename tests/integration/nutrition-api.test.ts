@@ -93,7 +93,7 @@ describe('Nutrition ActorContext API boundary', () => {
 
   it('resolves the active signed household profile and provisions one Nutrition link each', async () => {
     setupHousehold();
-    const session = await getSession();
+    const session = await getSession(new Request('http://localhost:3000/api/v1/nutrition/session'));
     expect(session.status).toBe(200);
     const actor = (await session.json()).actor;
     const profilesResponse = await listNutritionProfiles(request('/profiles'));

@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server';
 import { z, ZodError } from 'zod';
 
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
+import { authorizeAppRequest } from '@/lib/domain/permissions';
+import {
+  getAuthenticatedSessionPrincipal,
+  isAuthenticationConfigured,
+  RequestAuthError,
+} from '@/lib/services/auth-service';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   NutritionDiaryLifecycleConflictError,
@@ -71,10 +77,32 @@ export function rejectUntrustedNutritionMutation(request: Request): NextResponse
     : jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
 }
 
-export async function requireNutritionPrincipal() {
+export async function requireNutritionPrincipal(request: Request) {
   try {
-    const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+    // Preserve only the established no-auth synthetic-domain fixture seam. A configured
+    // installation always resolves the actual session; a signed profile cookie is not identity.
+    const fixture = process.env.NODE_ENV === 'test' && !isAuthenticationConfigured();
+    const session = fixture ? null : await getAuthenticatedSessionPrincipal(request);
+    if (!fixture && !session)
+      throw new RequestAuthError(401, 'authentication_required', 'Sign in to use Nutrition.');
+    const actor = session
+      ? { profileId: session.linkedProfileId, source: 'auth-session' as const }
+      : getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
     const household = resolveNutritionHouseholdContext(actor);
+    if (session) {
+      const permission = authorizeAppRequest({
+        role: session.accountRole,
+        profileId: household.activeNutritionProfile.id,
+        pathname: new URL(request.url).pathname,
+        method: request.method,
+      });
+      if (!permission.allowed) throw new RequestAuthError(403, permission.code, permission.message);
+    }
+    const viewedNutritionProfile = session
+      ? household.householdNutritionProfiles.find(
+          (profile) => profile.linkedHouseholdProfileId === session.profileId,
+        )
+      : household.activeNutritionProfile;
     return {
       actor: {
         householdProfileId: household.actor.profileId,
@@ -82,6 +110,9 @@ export async function requireNutritionPrincipal() {
       },
       principal: {
         id: household.compatibilityPrincipalId,
+        role: session?.accountRole ?? 'parent',
+        viewedHouseholdProfileId: session?.profileId ?? household.actor.profileId,
+        viewedNutritionProfileId: viewedNutritionProfile?.id ?? household.activeNutritionProfile.id,
         householdProfileId: household.actor.profileId,
         nutritionProfileId: household.activeNutritionProfile.id,
       },
@@ -108,6 +139,7 @@ export function clearNutritionSession(response: NextResponse): NextResponse {
 }
 
 export function nutritionApiError(error: unknown): NextResponse {
+  if (error instanceof RequestAuthError) return jsonError(error.status, error.code, error.message);
   if (error instanceof ZodError) {
     return NextResponse.json(
       {

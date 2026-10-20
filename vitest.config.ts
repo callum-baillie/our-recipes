@@ -6,6 +6,9 @@ const serverOnlyStub = fileURLToPath(new URL('./tests/server-only.ts', import.me
 
 export default defineConfig({
   test: {
+    // Bound jsdom/SQLite workers on developer machines and clean CI installs.
+    // Unbounded host CPU discovery can starve short interaction deadlines.
+    maxWorkers: 4,
     projects: [
       {
         resolve: { alias: { '@': sourceDirectory, 'server-only': serverOnlyStub } },

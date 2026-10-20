@@ -32,6 +32,32 @@ export const kitchenContextUpdateSchema = z
     expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
+/** Adaptive interviews update stated facts only; clearing an answer is deliberate. */
+export const kitchenContextPatchSchema = z
+  .object({
+    expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
+    interviewPatch: kitchenInterviewSchema
+      .partial()
+      .refine(
+        (values) => Object.values(values).every((value) => value.length > 0),
+        'Use clearFields to deliberately remove an answer.',
+      ),
+    clearFields: z.array(kitchenInterviewSchema.keyof()).max(6).default([]),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (!Object.keys(input.interviewPatch).length && !input.clearFields.length)
+      context.addIssue({
+        code: 'custom',
+        message: 'Include a stated answer or an explicit field to clear.',
+      });
+    if (input.clearFields.some((key) => key in input.interviewPatch))
+      context.addIssue({
+        code: 'custom',
+        path: ['clearFields'],
+        message: 'An answer cannot be updated and cleared together.',
+      });
+  });
 
 export const profileGoalContextSchema = z
   .object({

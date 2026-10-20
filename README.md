@@ -4,35 +4,39 @@ Bòrd is a self-hosted recipe keeper, meal planner, nutritional advisor, and gro
 
 Its optional OpenAI assistant can read permitted recipe, planning, and nutrition context; prepare review-first app changes; generate meal plans from new or existing recipes; and create daily or weekly summaries. Model/reasoning choices are configurable per workload, while each profile controls which data categories may be sent.
 
-> Profiles are not passwords or access control. Keep this app behind a trusted local network until an authenticated deployment is intentionally designed and reviewed.
+> Better Auth accounts control access. A household profile is a viewing and attribution context, not a second identity or an independent permission grant. Keep server secrets private and configure exact trusted origins and HTTPS for the intended deployment.
 
 ## Release status
 
-**v1.0.0-rc.9** is a release candidate, not a public v1 tag. It is suitable for candidate testing by a trusted household that keeps regular backups, but it is not an authentication boundary and must not be exposed directly to the public internet. The canonical [capability matrix](docs/capabilities.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish implemented behavior from target-specific evidence still required. Please report issues through the [support and security guide](docs/support.md).
+**v1.0.0-rc.17** is a release candidate, not a public v1 tag. The [current refinement register](docs/refinement/README.md), [capability matrix](docs/refinement/capability-matrix.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish delivered behavior from device, live-provider and deployment checks. Please report issues through the [support and security guide](docs/support.md).
 
 ## Install with Docker
 
 The published image is `ghcr.io/callum-baillie/bord:latest`. Its entrypoint initializes the mounted data directory, then runs the application as non-root UID/GID `1001`; it needs one durable host directory for SQLite, photos, and backups.
 
 ```sh
+cp .env.example .env
+# Configure separate COOKIE_SECRET/BETTER_AUTH_SECRET, the exact browser URL,
+# and your verified email sender/SMTP credentials in .env before starting.
 mkdir -p ./bord-data
 docker run -d \
   --name bord \
   --restart unless-stopped \
   -p 3000:3000 \
   -v "$(pwd)/bord-data:/data" \
-  -e APP_ORIGIN=http://localhost:3000 \
-  -e COOKIE_SECRET="replace-with-a-unique-secret-of-at-least-32-characters" \
+  --env-file .env \
+  -e DATA_DIR=/data \
+  -e DATABASE_URL=/data/bord.db \
   ghcr.io/callum-baillie/bord:latest
 ```
 
-Open `http://localhost:3000`, complete the first-run household setup, then use the in-app **Backups** area before upgrades. Confirm the container is healthy with `curl http://127.0.0.1:3000/api/v1/health`.
+Open the configured `APP_ORIGIN`, complete first-run account/household setup and save the one-time recovery codes. Use the in-app **Backups** area before upgrades. Confirm local liveness with `curl http://127.0.0.1:3000/api/v1/health`; liveness alone does not prove email or provider readiness.
 
 ## Unraid install
 
 1. Create `/mnt/user/appdata/bord`. On first startup the image adjusts this app-specific directory for its non-root runtime user; do not bind it to a shared media directory.
 2. In **Docker → Add Container**, set the repository to `ghcr.io/callum-baillie/bord:latest` (keep the `latest` tag), map an unused host port such as `4123` to container port `3000`, and map `/mnt/user/appdata/bord` to container `/data`.
-3. Add `COOKIE_SECRET` (a unique value of at least 32 characters), `APP_ORIGIN` (for example `http://tower.local:4123`, matching the chosen host port), and `TZ`. `OPENAI_API_KEY` is optional and should be added only when you intentionally enable an AI action.
+3. Configure separate `COOKIE_SECRET` and `BETTER_AUTH_SECRET` values of at least 32 characters; matching `APP_ORIGIN` and `BETTER_AUTH_URL`; and the `AUTH_EMAIL_FROM`/`AUTH_SMTP_*` settings in [.env.example](.env.example). Preserve deliberate email-verification policy. Set `TZ` for operational timestamps. `OPENAI_API_KEY` stays optional and server-only.
 4. Apply the container, visit its WebUI, complete household setup, and confirm `http://tower.local:4123/api/v1/health` reports `{"status":"ok"}`.
 
 You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persistent for the database and images, and use the template's dedicated `/backup` mapping when a host tool such as Kopia will protect recovery bundles. The dedicated [Unraid guide](docs/deployment-unraid.md) covers upgrades and host-specific checks.
@@ -40,7 +44,7 @@ You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persist
 ## Run locally
 
 1. Use Node 24 and Corepack-managed pnpm 11.
-2. Copy `.env.example` to `.env.local` and set a long `COOKIE_SECRET` for any production-like run.
+2. Copy `.env.example` to `.env.local`; configure both secrets, matching local origins and the intended email policy. `AUTH_DEV_EMAIL_LOG` is a deliberate development-only alternative; never enable it for real recovery traffic.
 3. Install exact dependencies with `pnpm install --frozen-lockfile`.
 4. Run `pnpm db:migrate` and `pnpm dev`.
 5. Visit `http://localhost:3000` and complete the first-run form.
@@ -63,9 +67,9 @@ The library marks only the selected profile’s rating/favorite state and offers
 
 ## AI readiness
 
-The kitchen navigation includes **AI status**. Set `OPENAI_API_KEY` only in the server runtime (or use the ignored root `.api_keys` convenience file during local development). The official SDK is server-only; `.api_keys` is never copied into Docker. Pasted text, normalized scan review, and generated serving images each require an explicit household action, have bounded inputs and a process-local rate limit, return an editable suggestion rather than saving a recipe, and write a content-free audit record. Confirmed meal plans save before optional recipe images are generated; a SQLite-backed worker in the same container resumes queued work after restart. Four or more recipe or image generations use OpenAI Batch, which can take up to 24 hours. Tests use deterministic provider doubles; this workspace makes no paid live OpenAI request.
+The kitchen navigation includes **AI status**. Set `OPENAI_API_KEY` only in the server runtime (or use the ignored root `.api_keys` convenience file during local development). The official SDK is server-only; `.api_keys` is never copied into Docker. Shared workload/model/prompt policy caps personal defaults and instructions. Paid generation requires explicit consent. Chat text is progressive, while reviewed mutations report acknowledged, partial or unknown outcomes. Manual generated photos use private previews before acceptance. A SQLite-backed worker resumes queued work after restart; Direct/Batch policy and threshold are configurable, with the current default threshold of two items. A submitted Batch can take up to 24 hours. See [AI operation and recovery contracts](docs/refinement/ai-system.md) and [image evaluation](docs/refinement/recipe-images.md). Tests use deterministic provider doubles; no paid live request is implied by their results.
 
-Pantry, recipe ingredients, and Nutrition also share a review-first food picker. Open Food Facts supplies read-only exact barcode data; USDA FoodData Central search is enabled by the server-only `USDA_FDC_API_KEY`. Camera scanning is optional and requires trusted HTTPS—see [food data providers and barcode scanning](docs/food-data-integrations.md), including the Nginx Proxy Manager/local-CA setup. Manual barcode entry remains available over HTTP.
+Pantry, recipe ingredients, Nutrition and the native scanner share reviewed source identities and exact revisions. Configure the [native Bòrd Food API](docs/bord-catalog-integration.md) for catalog modes, or use the compatible direct USDA/Open Food Facts providers. Reads never import food or record stock, purchases or intake. Camera scanning is optional and requires trusted HTTPS—see [food data providers and barcode scanning](docs/food-data-integrations.md). Manual workflows remain available during a catalog outage.
 
 For a public recipe URL, the server first applies its DNS, private-network, redirect, content-type, timeout, and 1 MB response limits. It then parses only the returned bounded HTML with a server-side markup parser—never rendering the page, executing scripts, or downloading its resources. Embedded Schema.org JSON-LD Recipe candidates take precedence, followed by Microdata; Open Graph and readable page text are an explicitly warned review fallback. Tests use local fixtures and mocked fetch/DNS responses rather than live recipe sites.
 

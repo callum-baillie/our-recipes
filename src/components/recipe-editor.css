@@ -51,9 +51,14 @@
   flex-basis: 100%;
   color: var(--muted);
 }
-.editor-ai-review {
+dialog.editor-ai-review[open] {
+  --dialog-overflow: auto;
+  --dialog-bottom-padding: 1.25rem;
+  display: block;
   padding: 1.25rem;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 1.25rem;
 }
 
 .editor-timings {

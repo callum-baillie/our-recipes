@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
-import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
+import { executeIdempotentMutation, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { recipeInputSchema, recipeLibraryQuerySchema } from '@/lib/domain/recipe';
 import { jsonError } from '@/lib/http';
 import { createRecipe, listRecipeLibrary } from '@/lib/services/recipe-service';
@@ -42,6 +42,10 @@ export async function POST(request: Request) {
   const parsed = recipeInputSchema.safeParse(idempotency.context.body);
   if (!parsed.success)
     return jsonError(400, 'invalid_recipe', 'Check the highlighted recipe details.');
-  const recipe = createRecipe(parsed.data, authorization.principal.profileId);
-  return idempotentJsonResponse(idempotency.context, { recipe }, authorization.requestId, 201);
+  return executeIdempotentMutation(
+    idempotency.context,
+    () => ({ recipe: createRecipe(parsed.data, authorization.principal.profileId) }),
+    authorization.requestId,
+    201,
+  );
 }

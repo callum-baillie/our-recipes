@@ -1,8 +1,10 @@
 import * as React from 'react';
+import { AssistantMessage } from '@/components/assistant-message';
 import {
   ActionSheetIOS,
   Alert,
   Keyboard,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -34,6 +36,12 @@ import { tokens } from '@/theme/tokens';
 import { useBord } from '@/state/bord-store';
 import { useSync } from '@/sync/sync-context';
 import { useAuth } from '@/auth/auth-context';
+import { readAssistantDraft, retainAssistantDraft } from '@/data/assistant-drafts';
+import {
+  initialChatStream,
+  reduceChatStream,
+  reviewedTurnOutcome,
+} from '../../../shared/mobile-domain/chat-stream';
 import { getAssistantSheetHeights } from '@/screens/assistant-sheet-layout';
 import { useReducedMotion } from '@/accessibility/use-reduced-motion';
 import {
@@ -62,22 +70,86 @@ type ChatEvent = {
   actionId?: string;
   kind?: string;
   preview?: unknown;
+  sequence?: number;
+  content?: string;
+  messageId?: string;
+  proposal?: AppProposal;
+  job?: { id: string; status: string; title?: string };
+};
+
+type ChatTurn = {
+  operationId: string;
+  threadId: string;
+  message: string;
+  attachments: ChatAttachment[];
+};
+type RetainedConversation = {
+  message: string;
+  attachments: ChatAttachment[];
+  threadId: string | null;
+  turn: ChatTurn | null;
+};
+type AppProposal = {
+  id: string;
+  title: string;
+  version: number;
+  status: string;
+  actions: {
+    summary: string;
+    recordLabel?: string;
+    changeLabel?: string;
+    body: unknown;
+    path?: string;
+  }[];
+  results?: { summary: string; message: string; ok: boolean; state?: string; href?: string }[];
 };
 
 export function AssistantScreen() {
+  const { instanceUrl, user } = useAuth();
+  return <AssistantConversation key={`${instanceUrl ?? ''}:${user?.id ?? ''}`} />;
+}
+
+function AssistantConversation() {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const keyboard = useAnimatedKeyboard();
-  const { request, requestEvents } = useAuth();
+  const { request, requestEventStream, instanceUrl, user } = useAuth();
+  const { refresh } = useSync();
+  const scope = `${instanceUrl ?? ''}:${user?.id ?? ''}`;
+  const retained = React.useRef(readAssistantDraft<RetainedConversation>(scope));
   const { state } = useBord();
-  const [message, setMessage] = React.useState('');
-  const [threadId, setThreadId] = React.useState<string | null>(null);
+  const [message, setMessage] = React.useState(retained.current?.message ?? '');
+  const [threads, setThreads] = React.useState<{ id: string; title?: string }[]>([]);
+  const [showHistory, setShowHistory] = React.useState(false);
+  const [threadId, setThreadId] = React.useState<string | null>(retained.current?.threadId ?? null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [actions, setActions] = React.useState<ChatAction[]>([]);
   const [status, setStatus] = React.useState('Loading conversation…');
   const [busy, setBusy] = React.useState(false);
-  const [attachments, setAttachments] = React.useState<ChatAttachment[]>([]);
+  const [attachments, setAttachments] = React.useState<ChatAttachment[]>(
+    retained.current?.attachments ?? [],
+  );
+  const [appProposals, setAppProposals] = React.useState<AppProposal[]>([]);
+  const [jobs, setJobs] = React.useState<{ id: string; status: string; title?: string }[]>([]);
+  const turnRef = React.useRef<ChatTurn | null>(retained.current?.turn ?? null);
+  const abortRef = React.useRef<AbortController | null>(null);
+  const sendLock = React.useRef(false);
+  const alive = React.useRef(true);
+  const [recoveryRequired, setRecoveryRequired] = React.useState(!!turnRef.current);
+  const following = React.useRef(true);
+  const [newResponse, setNewResponse] = React.useState(false);
+  const [actionErrors, setActionErrors] = React.useState<Record<string, string>>({});
+  React.useEffect(() => {
+    retainAssistantDraft(scope, { message, attachments, threadId, turn: turnRef.current });
+  }, [scope, message, attachments, threadId, recoveryRequired, busy]);
+  React.useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      abortRef.current?.abort();
+    };
+  }, []);
   const assistantEnabled = state.settings['ai.enabled'] !== false;
   const assistantName =
     typeof state.settings['ai.name'] === 'string' && state.settings['ai.name'].trim()
@@ -153,30 +225,72 @@ export function AssistantScreen() {
   }));
 
   const closeAssistant = React.useCallback(() => {
+    retainAssistantDraft(scope, { message, attachments, threadId, turn: turnRef.current });
+    abortRef.current?.abort();
     Keyboard.dismiss();
     router.back();
-  }, []);
+  }, [scope, message, attachments, threadId]);
 
   React.useEffect(() => () => Keyboard.dismiss(), []);
 
   const loadThread = React.useCallback(
     async (id: string) => {
-      const history = await request<{ messages: ChatMessage[]; actions: ChatAction[] }>(
-        `/api/v1/ai/chat/threads/${encodeURIComponent(id)}`,
+      const history = await request<{
+        messages: ChatMessage[];
+        actions: ChatAction[];
+        jobs?: { id: string; status: string; title?: string }[];
+        turns?: { id: string; status: string }[];
+      }>(`/api/v1/ai/chat/threads/${encodeURIComponent(id)}`);
+      const proposals = await request<{ proposals: AppProposal[] }>(
+        `/api/v1/ai/app-actions?threadId=${encodeURIComponent(id)}`,
       );
+      if (!alive.current) return;
       setMessages(history.messages);
       setActions(history.actions ?? []);
-      setStatus('');
+      setJobs(history.jobs ?? []);
+      setAppProposals(proposals.proposals);
+      const submitted = turnRef.current;
+      const outcome = reviewedTurnOutcome(history.turns, submitted?.operationId);
+      if (outcome.terminal) {
+        turnRef.current = null;
+        setRecoveryRequired(outcome.blocked);
+        setStatus(
+          `Previous request ${outcome.terminal}. Review its saved results${outcome.blocked ? '; another request remains running' : ' before sending another message'}.`,
+        );
+      } else if (outcome.blocked) {
+        setRecoveryRequired(true);
+        setStatus(
+          'The last request may still be running. Review saved results or retry its original operation; no message is resubmitted automatically.',
+        );
+      } else {
+        setRecoveryRequired(false);
+        setStatus('');
+      }
     },
     [request],
   );
   const reset = React.useCallback(async () => {
     setBusy(true);
     try {
-      const result = await request<{ thread: { id: string } }>('/api/v1/ai/chat/threads', {
-        method: 'POST',
-        body: '{}',
-      });
+      const result = await request<{ thread: { id: string; title?: string } }>(
+        '/api/v1/ai/chat/threads',
+        {
+          method: 'POST',
+          body: '{}',
+        },
+      );
+      if (threadId)
+        retainAssistantDraft(`${scope}:${threadId}`, {
+          message,
+          attachments,
+          threadId,
+          turn: turnRef.current,
+        });
+      turnRef.current = null;
+      setRecoveryRequired(false);
+      setAppProposals([]);
+      setJobs([]);
+      setThreads((current) => [result.thread, ...current]);
       setThreadId(result.thread.id);
       setMessages([]);
       setActions([]);
@@ -188,7 +302,7 @@ export function AssistantScreen() {
     } finally {
       setBusy(false);
     }
-  }, [request]);
+  }, [request, scope, threadId, message, attachments]);
 
   const addAttachments = React.useCallback((next: ChatAttachment[]) => {
     setAttachments((current) => {
@@ -324,17 +438,35 @@ export function AssistantScreen() {
       { text: 'Cancel', style: 'cancel' },
     ]);
   }, [pickFiles, pickImages]);
+  const initialLoad = React.useRef({ loadThread, reset });
   React.useEffect(() => {
     let cancelled = false;
-    void request<{ threads: { id: string }[] }>('/api/v1/ai/chat/threads')
+    void request<{ threads: { id: string; title?: string }[] }>('/api/v1/ai/chat/threads')
       .then(async ({ threads }) => {
         if (cancelled) return;
-        if (!threads[0]) {
-          await reset();
+        setThreads(threads);
+        if (
+          retained.current?.threadId &&
+          !threads.some((thread) => thread.id === retained.current?.threadId)
+        ) {
+          setThreadId(null);
+          setRecoveryRequired(true);
+          setStatus(
+            'The retained conversation is no longer available to this account. Your draft is kept here; start a new conversation deliberately to continue.',
+          );
           return;
         }
-        setThreadId(threads[0].id);
-        await loadThread(threads[0].id);
+        if (!threads[0]) {
+          await initialLoad.current.reset();
+          return;
+        }
+        const id =
+          retained.current?.threadId &&
+          threads.some((thread) => thread.id === retained.current?.threadId)
+            ? retained.current.threadId
+            : threads[0].id;
+        setThreadId(id);
+        await initialLoad.current.loadThread(id);
       })
       .catch((error) =>
         setStatus(error instanceof Error ? error.message : 'Could not load the assistant.'),
@@ -342,95 +474,163 @@ export function AssistantScreen() {
     return () => {
       cancelled = true;
     };
-  }, [loadThread, request, reset]);
-  const performSend = React.useCallback(async () => {
-    const nextMessage = message.trim();
-    const pendingAttachments = attachments;
-    if ((!nextMessage && pendingAttachments.length === 0) || !threadId || busy) return;
-    setMessages((current) => [
-      ...current,
-      {
-        id: `local-${Date.now()}`,
-        role: 'user',
-        content: nextMessage,
-        attachments: pendingAttachments.map(({ id, kind, name, size, uri }) => ({
-          id,
-          kind,
-          name,
-          size,
-          uri,
-        })),
-      },
-    ]);
-    setMessage('');
-    setAttachments([]);
+  }, [request]);
+  const switchThread = async (id: string) => {
+    if (busy || id === threadId) return;
+    if (threadId)
+      retainAssistantDraft(`${scope}:${threadId}`, {
+        message,
+        attachments,
+        threadId,
+        turn: turnRef.current,
+      });
+    const saved = readAssistantDraft<RetainedConversation>(`${scope}:${id}`);
+    turnRef.current = saved?.turn ?? null;
+    setMessage(saved?.message ?? '');
+    setAttachments(saved?.attachments ?? []);
+    setRecoveryRequired(!!saved?.turn);
+    setThreadId(id);
     setBusy(true);
-    setStatus('Thinking…');
+    setShowHistory(false);
+    setMessages([]);
+    setActions([]);
+    setAppProposals([]);
+    setJobs([]);
     try {
-      const events = await requestEvents<ChatEvent>(
-        `/api/v1/ai/chat/threads/${encodeURIComponent(threadId)}/messages`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            message: nextMessage,
-            attachments: pendingAttachments.map(({ kind, name, mimeType, dataBase64 }) => ({
-              kind,
-              name,
-              mimeType,
-              dataBase64,
-            })),
-          }),
-        },
-      );
-      const responseText = events
-        .filter((event) => event.type === 'text')
-        .map((event) => event.delta ?? '')
-        .join('');
-      if (responseText)
-        setMessages((current) => [
-          ...current,
-          { id: `assistant-${Date.now()}`, role: 'assistant', content: responseText },
-        ]);
-      const proposedActions = events.flatMap((event): ChatAction[] =>
-        event.type === 'action' && event.actionId && event.kind
-          ? [
-              {
-                id: event.actionId,
-                kind: event.kind,
-                preview: event.preview,
-                status: 'proposed',
-              },
-            ]
-          : [],
-      );
-      if (proposedActions.length) {
-        setActions((current) => [
-          ...current,
-          ...proposedActions.filter(
-            (candidate) => !current.some((action) => action.id === candidate.id),
-          ),
-        ]);
-      }
-      setStatus('');
+      await loadThread(id);
     } catch (error) {
-      setAttachments((current) => (current.length ? current : pendingAttachments));
-      setStatus(error instanceof Error ? error.message : 'The assistant could not respond.');
+      setStatus(error instanceof Error ? error.message : 'Could not load this conversation.');
     } finally {
       setBusy(false);
     }
-  }, [attachments, busy, message, requestEvents, threadId]);
+  };
+  const performSend = React.useCallback(
+    async (retry = false) => {
+      if (sendLock.current || busy || !threadId || (!retry && recoveryRequired)) return;
+      const attempt = retry
+        ? turnRef.current
+        : { operationId: randomUUID(), threadId, message: message.trim(), attachments };
+      if (!attempt || (!attempt.message && !attempt.attachments.length)) return;
+      sendLock.current = true;
+      turnRef.current = attempt;
+      const abort = new AbortController();
+      abortRef.current = abort;
+      const responseId = `response-${attempt.operationId}`;
+      if (!retry) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: `request-${attempt.operationId}`,
+            role: 'user',
+            content: attempt.message,
+            attachments: attempt.attachments.map(({ id, kind, name, size, uri }) => ({
+              id,
+              kind,
+              name,
+              size,
+              uri,
+            })),
+          },
+        ]);
+        setMessage('');
+        setAttachments([]);
+      }
+      following.current = true;
+      setMessages((current) => current.filter((entry) => entry.id !== responseId));
+      setBusy(true);
+      setRecoveryRequired(false);
+      setStatus('Preparing a response…');
+      let stream = { ...initialChatStream };
+      try {
+        await requestEventStream<ChatEvent>(
+          `/api/v1/ai/chat/threads/${encodeURIComponent(attempt.threadId)}/messages`,
+          (event) => {
+            if (!alive.current || abort.signal.aborted) return;
+            const previous = stream;
+            stream = reduceChatStream(stream, event);
+            if (stream === previous) return;
+            if (event.type === 'status') setStatus(stream.status);
+            if (['text', 'text_reset', 'done'].includes(event.type)) {
+              const id = stream.completed ? (stream.messageId ?? responseId) : responseId;
+              setMessages((current) => [
+                ...current.filter((entry) => entry.id !== responseId && entry.id !== id),
+                ...(stream.text ? [{ id, role: 'assistant' as const, content: stream.text }] : []),
+              ]);
+              if (!following.current) setNewResponse(true);
+            }
+            if (event.type === 'action' && event.actionId && event.kind)
+              setActions((current) => [
+                ...current.filter((action) => action.id !== event.actionId),
+                {
+                  id: event.actionId!,
+                  kind: event.kind!,
+                  preview: event.preview,
+                  status: 'pending',
+                },
+              ]);
+            if (event.type === 'app_action' && event.proposal)
+              setAppProposals((current) => [
+                ...current.filter((proposal) => proposal.id !== event.proposal!.id),
+                event.proposal!,
+              ]);
+            if (event.type === 'job' && event.job)
+              setJobs((current) => [
+                ...current.filter((job) => job.id !== event.job!.id),
+                event.job!,
+              ]);
+          },
+          {
+            method: 'POST',
+            signal: abort.signal,
+            body: JSON.stringify({
+              operationId: attempt.operationId,
+              message: attempt.message,
+              attachments: attempt.attachments.map(({ kind, name, mimeType, dataBase64 }) => ({
+                kind,
+                name,
+                mimeType,
+                dataBase64,
+              })),
+            }),
+          },
+        );
+        if (!stream.completed)
+          throw new Error('The connection ended before a completed response was acknowledged.');
+        turnRef.current = null;
+        if (alive.current) {
+          setRecoveryRequired(false);
+          setStatus('');
+        }
+      } catch (error) {
+        if (alive.current) {
+          setRecoveryRequired(true);
+          setStatus(
+            abort.signal.aborted
+              ? 'Response reading stopped. Saved tasks or proposals may remain; reload the conversation to review their outcome.'
+              : `${error instanceof Error ? error.message : 'The response could not finish.'} Review saved results before another request.`,
+          );
+        }
+      } finally {
+        sendLock.current = false;
+        abortRef.current = null;
+        if (alive.current) setBusy(false);
+      }
+    },
+    [attachments, busy, message, requestEventStream, threadId, recoveryRequired],
+  );
   const send = React.useCallback(() => {
     if (!assistantEnabled) {
       setStatus('Kitchen Assistant is turned off in Settings.');
       return;
     }
-    if (!message.trim() && attachments.length === 0) return;
+    if (recoveryRequired || (!message.trim() && attachments.length === 0)) return;
     void performSend();
-  }, [assistantEnabled, attachments.length, message, performSend]);
+  }, [assistantEnabled, attachments.length, message, performSend, recoveryRequired]);
   const decide = React.useCallback(
     async (actionId: string, decision: 'confirm' | 'cancel') => {
       if (!threadId || busy) return;
       setBusy(true);
+      setActionErrors((current) => ({ ...current, [actionId]: '' }));
       try {
         await request(`/api/v1/ai/actions/${encodeURIComponent(actionId)}`, {
           method: 'PATCH',
@@ -438,7 +638,10 @@ export function AssistantScreen() {
         });
         await loadThread(threadId);
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'The proposal could not be updated.');
+        setActionErrors((current) => ({
+          ...current,
+          [actionId]: error instanceof Error ? error.message : 'The proposal could not be updated.',
+        }));
       } finally {
         setBusy(false);
       }
@@ -509,7 +712,18 @@ export function AssistantScreen() {
                 icon="plus"
                 appearance="plain"
                 disabled={busy || !assistantEnabled}
-                onPress={() => void reset()}
+                onPress={() => {
+                  if (message.trim() || attachments.length || turnRef.current)
+                    Alert.alert(
+                      'Start a new conversation?',
+                      'The current draft stays on this device. A previous server request may still finish in its original conversation.',
+                      [
+                        { text: 'Keep conversation', style: 'cancel' },
+                        { text: 'New conversation', onPress: () => void reset() },
+                      ],
+                    );
+                  else void reset();
+                }}
               />
               <IconButton
                 label="Close Kitchen Assistant"
@@ -520,6 +734,28 @@ export function AssistantScreen() {
             </View>
           </View>
 
+          <Button
+            label={showHistory ? 'Hide conversations' : 'Conversations'}
+            tone="quiet"
+            disabled={busy}
+            onPress={() => setShowHistory(!showHistory)}
+          />
+          {showHistory ? (
+            <ScrollView
+              style={{ maxHeight: 180 }}
+              contentContainerStyle={{ paddingHorizontal: tokens.layout.page }}
+            >
+              {threads.map((thread) => (
+                <Button
+                  key={thread.id}
+                  label={`${thread.id === threadId ? 'Current · ' : ''}${thread.title || 'Conversation'}`}
+                  tone="quiet"
+                  disabled={busy || thread.id === threadId}
+                  onPress={() => void switchThread(thread.id)}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
           <Animated.View style={[{ flex: 1 }, conversationMotionStyle]}>
             <ScrollView
               ref={messagesRef}
@@ -535,7 +771,16 @@ export function AssistantScreen() {
                 paddingBottom: tokens.space.sm,
               }}
               style={{ flex: 1 }}
-              onContentSizeChange={() => messagesRef.current?.scrollToEnd({ animated: !compact })}
+              onContentSizeChange={() => {
+                if (following.current) messagesRef.current?.scrollToEnd({ animated: !compact });
+              }}
+              scrollEventThrottle={100}
+              onScroll={(event) => {
+                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                following.current =
+                  contentSize.height - contentOffset.y - layoutMeasurement.height < 80;
+                if (following.current) setNewResponse(false);
+              }}
             >
               {!assistantEnabled ? (
                 <Surface style={{ backgroundColor: tokens.color.sage }}>
@@ -582,7 +827,9 @@ export function AssistantScreen() {
                   {entry.attachments?.map((attachment) => (
                     <MessageAttachmentPreview key={attachment.id} attachment={attachment} />
                   ))}
-                  {entry.content ? (
+                  {entry.content && entry.role === 'assistant' ? (
+                    <AssistantMessage content={entry.content} />
+                  ) : entry.content ? (
                     <Text
                       selectable
                       style={[
@@ -613,6 +860,9 @@ export function AssistantScreen() {
                     <Eyebrow>REVIEW PROPOSAL</Eyebrow>
                     <EditorialText variant="section">{proposalTitle(action)}</EditorialText>
                     <Body muted>{proposalDetail(action)}</Body>
+                    {actionErrors[action.id] ? (
+                      <Text accessibilityRole="alert">{actionErrors[action.id]}</Text>
+                    ) : null}
                     <View style={{ flexDirection: 'row', gap: tokens.space.xs }}>
                       <View style={{ flex: 1 }}>
                         <Button
@@ -644,9 +894,56 @@ export function AssistantScreen() {
                     </View>
                   </Surface>
                 ))}
+              {appProposals.map((proposal) => (
+                <NativeAppProposal
+                  key={proposal.id}
+                  proposal={proposal}
+                  disabled={busy}
+                  onSaved={async () => {
+                    if (threadId) await loadThread(threadId);
+                    await refresh();
+                  }}
+                />
+              ))}
+              {jobs.map((job) => (
+                <Surface key={job.id}>
+                  <Body>
+                    {job.title ?? 'Background task'} · {job.status.replaceAll('_', ' ')}
+                  </Body>
+                  <Body muted>Review the task for its saved results and application state.</Body>
+                  <Button
+                    label="Review tasks in web app"
+                    tone="secondary"
+                    onPress={() => {
+                      if (instanceUrl) void Linking.openURL(`${instanceUrl}/account/automation`);
+                    }}
+                  />
+                </Surface>
+              ))}
+              {recoveryRequired && !busy && (
+                <Surface>
+                  <Body>
+                    The previous request has no current acknowledged outcome. Your next-message
+                    draft is separate.
+                  </Body>
+                  <Button
+                    label="Reload saved conversation"
+                    tone="secondary"
+                    onPress={() => {
+                      if (threadId)
+                        void loadThread(threadId).catch((error) => setStatus(error.message));
+                    }}
+                  />
+                  <Button
+                    label="Retry original request safely"
+                    disabled={!turnRef.current}
+                    onPress={() => void performSend(true)}
+                  />
+                </Surface>
+              )}
               {status ? (
                 <Text
-                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
                   style={[
                     tokens.type.caption,
                     { color: tokens.color.inkSecondary, textAlign: 'center' },
@@ -658,6 +955,24 @@ export function AssistantScreen() {
             </ScrollView>
           </Animated.View>
 
+          {newResponse && (
+            <Button
+              label="New response · jump to latest"
+              tone="quiet"
+              onPress={() => {
+                following.current = true;
+                setNewResponse(false);
+                messagesRef.current?.scrollToEnd({ animated: true });
+              }}
+            />
+          )}
+          {busy && turnRef.current && (
+            <Button
+              label="Stop generating"
+              tone="secondary"
+              onPress={() => abortRef.current?.abort()}
+            />
+          )}
           <View style={{ flexShrink: 0, backgroundColor: tokens.color.paper }}>
             <View
               style={{
@@ -724,9 +1039,10 @@ export function AssistantScreen() {
                     onFocus={() => {
                       snapSheet('expanded');
                       // Keep the latest messages visible as the composer rises above the keyboard.
-                      requestAnimationFrame(() =>
-                        messagesRef.current?.scrollToEnd({ animated: true }),
-                      );
+                      if (following.current)
+                        requestAnimationFrame(() =>
+                          messagesRef.current?.scrollToEnd({ animated: true }),
+                        );
                     }}
                     style={[
                       tokens.type.callout,
@@ -750,6 +1066,7 @@ export function AssistantScreen() {
                       !assistantEnabled ||
                       (!message.trim() && attachments.length === 0) ||
                       busy ||
+                      recoveryRequired ||
                       !threadId
                     }
                     onPress={send}
@@ -904,6 +1221,149 @@ function MessageAttachmentPreview({
         </Text>
       </View>
     </View>
+  );
+}
+
+function NativeAppProposal({
+  proposal,
+  disabled,
+  onSaved,
+}: {
+  proposal: AppProposal;
+  disabled: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const { request, instanceUrl } = useAuth();
+  const [current, setCurrent] = React.useState(proposal);
+  const [pending, setPending] = React.useState<'apply' | 'dismiss' | null>(null);
+  const [error, setError] = React.useState('');
+  const [detail, setDetail] = React.useState(false);
+  const [paidConsent, setPaidConsent] = React.useState(false);
+  const images =
+    current.actions.length > 0 &&
+    current.actions.every((action) => action.path?.endsWith('/images/generate'));
+  React.useEffect(() => setPaidConsent(false), [proposal.id, proposal.version]);
+  const lock = React.useRef(false);
+  React.useEffect(() => setCurrent(proposal), [proposal]);
+  const decide = async (decision: 'apply' | 'dismiss') => {
+    if (lock.current || disabled || (decision === 'apply' && images && !paidConsent)) return;
+    lock.current = true;
+    setPending(decision);
+    setError('');
+    try {
+      const result = await request<AppProposal>('/api/v1/ai/app-actions', {
+        method: 'POST',
+        body: JSON.stringify({ id: current.id, version: current.version, decision }),
+      });
+      setCurrent((previous) => ({ ...previous, ...result }));
+      try {
+        await onSaved();
+      } catch {
+        setError('The result is saved. Refresh the conversation to reload current records.');
+      }
+    } catch (failure) {
+      setError(
+        `${failure instanceof Error ? failure.message : 'The action could not be acknowledged.'} Reload saved results before changing the proposal; an exact retry keeps this reviewed version.`,
+      );
+    } finally {
+      lock.current = false;
+      setPending(null);
+    }
+  };
+  const reviewable = ['proposed', 'pending', 'ready'].includes(current.status);
+  return (
+    <Surface style={{ backgroundColor: tokens.color.sage }}>
+      <Eyebrow>{current.status.replaceAll('_', ' ')}</Eyebrow>
+      <EditorialText variant="section">{current.title}</EditorialText>
+      {current.actions.map((action, index) => (
+        <View key={index} style={{ gap: tokens.space.xs }}>
+          <Body>{action.summary}</Body>
+          {action.recordLabel ? <Body muted>{action.recordLabel}</Body> : null}
+          {action.changeLabel ? <Body muted>{action.changeLabel}</Body> : null}
+          {detail ? (
+            <Text selectable style={[tokens.type.caption, { color: tokens.color.inkSecondary }]}>
+              {JSON.stringify(action.body, null, 2)}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+      <Button
+        label={detail ? 'Hide request details' : 'Review request details'}
+        tone="quiet"
+        onPress={() => setDetail(!detail)}
+      />
+      {current.results?.map((result, index) => (
+        <View key={index}>
+          <Body>
+            {result.summary}: {result.state ?? (result.ok ? 'completed' : 'failed')}
+          </Body>
+          <Body muted>{result.message}</Body>
+          {result.href?.startsWith('/') && !result.href.startsWith('//') && instanceUrl ? (
+            <Button
+              label="Open changed record in web app"
+              tone="quiet"
+              onPress={() => {
+                void Linking.openURL(`${instanceUrl}${result.href}`).catch(() =>
+                  setError('Could not open the web app.'),
+                );
+              }}
+            />
+          ) : null}
+        </View>
+      ))}
+      {error ? (
+        <Text accessibilityRole="alert" style={{ color: tokens.color.ink }}>
+          {error}
+        </Text>
+      ) : null}
+      {reviewable && images ? (
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: paidConsent, disabled: !!pending }}
+          disabled={!!pending}
+          onPress={() => setPaidConsent(!paidConsent)}
+          style={{ minHeight: 48, justifyContent: 'center' }}
+        >
+          <Body>
+            {paidConsent ? '✓ ' : '○ '}I authorize paid image generation for these recipes. Recipe
+            context is sent to the configured provider; candidates need review before selection.
+          </Body>
+        </Pressable>
+      ) : null}
+      {reviewable ? (
+        <View style={{ gap: tokens.space.xs }}>
+          <Button
+            label={
+              pending === 'apply'
+                ? 'Submitting reviewed changes…'
+                : images
+                  ? 'Start paid image generation'
+                  : 'Apply reviewed changes'
+            }
+            disabled={disabled || !!pending || (images && !paidConsent)}
+            onPress={() => {
+              Alert.alert(
+                images ? 'Start paid image generation?' : 'Apply these reviewed changes?',
+                `${current.actions.length} action${current.actions.length === 1 ? '' : 's'} will use the displayed records and quantities.`,
+                [
+                  { text: 'Keep reviewing', style: 'cancel' },
+                  {
+                    text: images ? 'Start paid generation' : 'Apply changes',
+                    onPress: () => void decide('apply'),
+                  },
+                ],
+              );
+            }}
+          />
+          <Button
+            label={pending === 'dismiss' ? 'Dismissing…' : 'Dismiss proposal'}
+            tone="secondary"
+            disabled={disabled || !!pending}
+            onPress={() => void decide('dismiss')}
+          />
+        </View>
+      ) : null}
+    </Surface>
   );
 }
 

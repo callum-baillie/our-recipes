@@ -4,16 +4,21 @@ import {
   requireNutritionPrincipal,
 } from '@/app/api/v1/nutrition/_shared';
 
-export async function GET() {
-  const auth = await requireNutritionPrincipal();
+export async function GET(request: Request) {
+  const auth = await requireNutritionPrincipal(request);
   return (
     auth.response ??
-    NextResponse.json({
-      actor: {
-        householdProfileId: auth.principal!.householdProfileId,
-        nutritionProfileId: auth.principal!.nutritionProfileId,
+    NextResponse.json(
+      {
+        actor: {
+          householdProfileId: auth.principal!.householdProfileId,
+          nutritionProfileId: auth.principal!.nutritionProfileId,
+          viewedHouseholdProfileId: auth.principal!.viewedHouseholdProfileId,
+          viewedNutritionProfileId: auth.principal!.viewedNutritionProfileId,
+        },
       },
-    })
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    )
   );
 }
 

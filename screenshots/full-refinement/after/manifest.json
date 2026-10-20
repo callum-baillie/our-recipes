@@ -1,0 +1,67 @@
+{
+  "baseCommit": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
+  "sourceState": "Current uncommitted refinement branch. Current synthetic fixture contains additional test products/profiles; data is not identical to the separate baseline household. No provider calls.",
+  "capturedAt": "2026-10-20T16:00:11.671Z",
+  "states": [
+    {
+      "name": "today",
+      "width": 1440,
+      "path": "/nutrition"
+    },
+    {
+      "name": "diary",
+      "width": 1440,
+      "path": "/nutrition?view=diary"
+    },
+    {
+      "name": "account",
+      "width": 1440,
+      "path": "/account"
+    },
+    {
+      "name": "ai",
+      "width": 1440,
+      "path": "/settings/ai"
+    },
+    {
+      "name": "profiles",
+      "width": 1440,
+      "path": "/settings/profiles"
+    },
+    {
+      "name": "stores",
+      "width": 1440,
+      "path": "/settings/lists"
+    },
+    {
+      "name": "today",
+      "width": 390,
+      "path": "/nutrition"
+    },
+    {
+      "name": "diary",
+      "width": 390,
+      "path": "/nutrition?view=diary"
+    },
+    {
+      "name": "account",
+      "width": 390,
+      "path": "/account"
+    },
+    {
+      "name": "ai",
+      "width": 390,
+      "path": "/settings/ai"
+    },
+    {
+      "name": "profiles",
+      "width": 390,
+      "path": "/settings/profiles"
+    },
+    {
+      "name": "stores",
+      "width": 390,
+      "path": "/settings/lists"
+    }
+  ]
+}

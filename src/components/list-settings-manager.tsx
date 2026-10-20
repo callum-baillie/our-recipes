@@ -208,6 +208,14 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
   function rememberDraft() {
     drafts.current.set(draft.id ?? 'new', draft);
   }
+  function addStoreDraft() {
+    rememberDraft();
+    selectedStore.current = null;
+    setSelectedId(null);
+    setDraft(drafts.current.get('new') ?? draftFor());
+    setPreviousRoute(null);
+    setMessage('');
+  }
   function selectProfile(profile: Profile) {
     rememberDraft();
     selectedStore.current = profile.id;
@@ -423,6 +431,37 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
         description="Save each store’s departments in the order you shop."
       >
         <SettingsSubsection title="Saved stores">
+          <label className={styles.mobileStoreChoice}>
+            Currently editing
+            <select
+              value={selectedId ?? ''}
+              disabled={isPending}
+              onChange={(event) => {
+                const store = workspace.profiles.find((item) => item.id === event.target.value);
+                if (store) selectProfile(store);
+                else addStoreDraft();
+              }}
+            >
+              <option value="">New store</option>
+              {activeProfiles.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                  {workspace.settings.defaultSupermarketProfileId === store.id
+                    ? ' · Default for new lists'
+                    : ''}
+                </option>
+              ))}
+              {archivedProfiles.length > 0 && (
+                <optgroup label="Archived">
+                  {archivedProfiles.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
           <div className={styles.profiles}>
             <aside className={styles.profileRail}>
               <p className="eyebrow" id="supermarket-profiles-title">
@@ -451,14 +490,7 @@ export function ListSettingsManager({ initialWorkspace }: { initialWorkspace: Wo
                 ))}
                 <button
                   className={selectedId === null ? styles.selectedProfile : ''}
-                  onClick={() => {
-                    rememberDraft();
-                    selectedStore.current = null;
-                    setSelectedId(null);
-                    setDraft(drafts.current.get('new') ?? draftFor());
-                    setPreviousRoute(null);
-                    setMessage('');
-                  }}
+                  onClick={addStoreDraft}
                   type="button"
                 >
                   <Plus size={19} />

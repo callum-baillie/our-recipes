@@ -86,3 +86,19 @@ export function authFailureMessage(value: unknown, instanceUrl?: string | null) 
   if (status !== null) return `Sign-in failed (HTTP ${status}).`;
   return 'Sign-in could not be completed. Check the instance address and try again.';
 }
+
+/** A rejected destination password is a failed profile switch, not an expired account session. */
+export function sessionExpiredResponse(status: number, code: unknown, path: string) {
+  return (
+    status === 401 &&
+    !(code === 'invalid_profile_password' && /^\/api\/v1\/profiles\/[^/]+\/active$/.test(path))
+  );
+}
+export function profileSwitchRequest(profileId: string, password: string) {
+  if (!profileId || !password.length || password.length > 128)
+    throw new Error('Enter the destination profile password (up to 128 characters).');
+  return {
+    path: `/api/v1/profiles/${encodeURIComponent(profileId)}/active`,
+    init: { method: 'PATCH', body: JSON.stringify({ password }) },
+  };
+}

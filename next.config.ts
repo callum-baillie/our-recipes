@@ -15,7 +15,8 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
   { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
+  // Store proximity is an explicit user action and still needs browser consent.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self)' },
 ];
 
 const nextConfig: NextConfig = {

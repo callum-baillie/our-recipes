@@ -27,6 +27,7 @@ import {
 } from '@/lib/domain/ai-assistant';
 
 import { getEffectiveAiPolicy, getGlobalAiPolicy, getUserAiPolicy } from './ai-access-service';
+import { getEffectivePrompt } from './ai-prompt-service';
 import { aiRuntimeSchema, aiUserPreferencesSchema } from '@/lib/domain/ai-runtime-settings';
 
 export class AiSettingsConflictError extends Error {}
@@ -38,6 +39,13 @@ export type AiWorkloadSetting = {
   reasoningEffort: AiReasoningEffort | null;
   enabled: boolean;
   version: number;
+  promptGuidance?: string;
+  promptVersion?: string;
+  maxOutputTokens?: number;
+  requestTimeoutSeconds?: number;
+  imageQuality?: 'low' | 'medium' | 'high';
+  imageSize?: '1024x1024' | '1536x1024' | '1024x1536';
+  allowPersonalImageOverrides?: boolean;
 };
 
 function db() {
@@ -138,7 +146,18 @@ export function getAiWorkloadSetting(profileId: string, workload: AiWorkload): A
   const effective = override
     ? { ...override, enabled: setting.enabled && override.enabled }
     : setting;
-  return { ...effective, enabled: effective.enabled && policy.enabled };
+  const prompt = getEffectivePrompt(workload);
+  return {
+    ...effective,
+    enabled: effective.enabled && policy.enabled,
+    promptGuidance: prompt.promptGuidance,
+    promptVersion: prompt.promptVersion,
+    maxOutputTokens: policy.maxOutputTokens,
+    requestTimeoutSeconds: policy.requestTimeoutSeconds,
+    imageQuality: policy.imageQuality,
+    imageSize: policy.imageSize,
+    allowPersonalImageOverrides: policy.allowPersonalImageOverrides,
+  };
 }
 
 export function getAiDataPolicy(profileId: string): AiDataPolicy {
@@ -351,6 +370,13 @@ export function savePersonalAiSettings(userId: string, profileId: string, raw: u
     input.preferences.workloads.forEach((item) =>
       assertCompatible(item.workload, item.model, item.reasoningEffort),
     );
+    if (
+      !getGlobalAiPolicy().settings.allowPersonalModelOverrides &&
+      input.preferences.workloads.length
+    )
+      throw new AiSettingsValidationError(
+        'Personal model overrides are disabled by the administrator. Reset task overrides to inherited defaults before saving.',
+      );
     if (input.dataPolicy) updateAiSettings(profileId, { dataPolicy: input.dataPolicy });
     transaction
       .insert(aiUserSettings)

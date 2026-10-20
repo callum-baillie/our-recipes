@@ -1,7 +1,6 @@
-import { cookies } from 'next/headers';
+import { adminRequestError } from '@/lib/services/admin-request-service';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { restoreConfirmationSchema } from '@/lib/domain/backup';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
@@ -16,17 +15,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request, context: { params: Promise<{ backupId: string }> }) {
+  const accessError = await adminRequestError(request);
+  if (accessError) return accessError;
   if (!hasTrustedMutationOrigin(request)) {
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
   }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before restoring data.',
-    );
-  }
+
   const parsed = restoreConfirmationSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return jsonError(

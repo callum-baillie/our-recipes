@@ -22,6 +22,7 @@ test('delayed controls and assistant keyboard layout remain usable', async ({ pa
     await route.fulfill({ json: { tags: [{ name: 'weeknight' }] } });
   });
   await page.goto('/recipes/new');
+  await page.getByText(/Source, equipment and tags/).click();
   const tagLoading = page.getByRole('status', { name: 'Loading saved tag suggestions' });
   await expect(tagLoading).toBeVisible();
   await tagLoading.scrollIntoViewIfNeeded();
@@ -68,7 +69,7 @@ test('delayed controls and assistant keyboard layout remain usable', async ({ pa
   await page.screenshot({ path: '/tmp/bord-loading-chat-mobile.png' });
   releaseHistory();
   await expect(dialog.getByText('Latest reply stays in view.')).toBeVisible();
-  const list = dialog.locator('div[aria-live="polite"]').first();
+  const list = dialog.getByRole('log', { name: 'Conversation', exact: true });
   await expect
     .poll(() => list.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight))
     .toBeLessThan(2);

@@ -68,7 +68,7 @@ test('search and tags stay compact, scroll in one row, and filter real results',
     await surface.screenshot({ caret: 'initial', path: `/tmp/bord-search-${width}.png` });
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  const finalTag = shelf.getByRole('button', { name: 'winter warmers 1', exact: true });
+  const finalTag = shelf.getByRole('button', { name: 'winter warmers · Tag 1', exact: true });
   await finalTag.focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/tag=winter\+warmers/);

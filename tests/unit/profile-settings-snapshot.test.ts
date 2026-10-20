@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(async () => ({ userId: 'admin' })),
+  session: vi.fn(async (): Promise<{ userId: string } | null> => ({ userId: 'fixture-account' })),
   state: vi.fn(() => ({
     profiles: [
       { id: 'a', displayName: 'Avery', archivedAt: null },
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/services/auth-service', () => ({
   requireAdminSession: mocks.admin,
   listProfileAccessAccounts: mocks.access,
+  getAuthenticatedSessionPrincipal: mocks.session,
 }));
 vi.mock('@/lib/services/household-service', () => ({
   getHouseholdState: mocks.state,
@@ -49,11 +51,17 @@ describe('authoritative member settings snapshot', () => {
     );
     expect(mocks.access).not.toHaveBeenCalled();
   });
-  it('retains the original bare-profile response contract for ordinary callers', async () => {
+  it('retains the bare identity roster for authenticated ordinary callers without enriched access metadata', async () => {
     const response = await GET(
       new Request('https://bord.test/api/v1/profiles?includeArchived=true'),
     );
     expect(Array.isArray(await response.json())).toBe(true);
+    expect(mocks.session).toHaveBeenCalled();
     expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it('does not expose a roster to signed-out callers', async () => {
+    mocks.session.mockResolvedValueOnce(null);
+    expect((await GET(new Request('https://bord.test/api/v1/profiles'))).status).toBe(401);
+    expect(mocks.state).not.toHaveBeenCalled();
   });
 });

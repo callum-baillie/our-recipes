@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
-import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
+import { executeIdempotentMutation, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { collectionInputSchema } from '@/lib/domain/collection';
 import { jsonError } from '@/lib/http';
 import {
@@ -41,11 +41,9 @@ export async function POST(request: Request) {
   const parsed = collectionInputSchema.safeParse(idempotency.context.body);
   if (!parsed.success) return jsonError(400, 'invalid_collection', 'Check the collection details.');
   try {
-    return idempotentJsonResponse(
+    return executeIdempotentMutation(
       idempotency.context,
-      {
-        collection: createCollection(parsed.data, authorization.principal.profileId),
-      },
+      () => ({ collection: createCollection(parsed.data, authorization.principal.profileId) }),
       authorization.requestId,
       201,
     );

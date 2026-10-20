@@ -604,6 +604,7 @@ export const aiOperationAudits = sqliteTable('ai_operation_audits', {
   provider: text('provider').notNull(),
   model: text('model').notNull(),
   reasoningEffort: text('reasoning_effort'),
+  promptVersion: text('prompt_version'),
   inputTokens: integer('input_tokens'),
   outputTokens: integer('output_tokens'),
   threadId: text('thread_id'),
@@ -719,6 +720,26 @@ export const aiChatMessages = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   },
   (table) => [index('ai_chat_messages_thread_created_idx').on(table.threadId, table.createdAt)],
+);
+
+export const aiChatTurns = sqliteTable(
+  'ai_chat_turns',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('thread_id')
+      .notNull()
+      .references(() => aiChatThreads.id, { onDelete: 'cascade' }),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull(),
+    intentHash: text('intent_hash').notNull(),
+    status: text('status', { enum: ['running', 'completed', 'failed', 'cancelled'] }).notNull(),
+    resultJson: text('result_json'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [index('ai_chat_turns_thread_idx').on(table.threadId, table.createdAt)],
 );
 
 export const aiActionProposals = sqliteTable(
@@ -2605,3 +2626,45 @@ export const aiUserSettings = sqliteTable('ai_user_settings', {
   preferences: text('preferences').notNull().default('{}'),
   version: integer('version').notNull().default(1),
 });
+
+export const aiPromptVersions = sqliteTable(
+  'ai_prompt_versions',
+  {
+    id: text('id').primaryKey(),
+    workload: text('workload').notNull(),
+    version: integer('version').notNull(),
+    template: text('template').notNull(),
+    changeNote: text('change_note').notNull(),
+    updatedByUserId: text('updated_by_user_id').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [uniqueIndex('ai_prompt_workload_version').on(table.workload, table.version)],
+);
+
+// Reviewed image requests retain their identity across uncertain provider outcomes.
+export const recipeImageCandidates = sqliteTable(
+  'recipe_image_candidates',
+  {
+    id: text('id').primaryKey(),
+    recipeId: text('recipe_id')
+      .notNull()
+      .references(() => recipes.id, { onDelete: 'cascade' }),
+    sourceRevision: integer('source_revision').notNull(),
+    ownerUserId: text('owner_user_id').notNull(),
+    profileId: text('profile_id').notNull(),
+    intentHash: text('intent_hash').notNull(),
+    status: text('status').notNull(),
+    storageKey: text('storage_key'),
+    altText: text('alt_text').notNull().default(''),
+    width: integer('width'),
+    height: integer('height'),
+    model: text('model').notNull(),
+    quality: text('quality').notNull(),
+    size: text('size').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    auditId: text('audit_id').notNull(),
+    acceptedImageId: text('accepted_image_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [index('recipe_image_candidate_owner').on(table.ownerUserId, table.recipeId)],
+);

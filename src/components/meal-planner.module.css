@@ -500,9 +500,7 @@
   margin: 0;
 }
 .assignmentTarget {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  position: relative;
   display: grid;
   gap: 0.25rem;
   padding: 0.85rem 0;

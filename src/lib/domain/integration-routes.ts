@@ -9,7 +9,16 @@ export type IntegrationRoute = {
 // Explicit allowlist shared by the proxy, route authorization, and API documentation.
 // Personal nutrition, account security, backups, and AI assistant conversations stay session-only.
 export const integrationRoutes: IntegrationRoute[] = [
+  {
+    path: '/shopping-lists/{listId}/catalog-items',
+    resource: 'shoppingLists',
+    methods: { POST: 'create' },
+  },
+  { path: '/food-data/catalog/measures', resource: 'pantry', methods: { POST: 'read' } },
+  { path: '/food-data/catalog/storage-guidance', resource: 'pantry', methods: { POST: 'read' } },
+  { path: '/food-data/catalog/enrichment', resource: 'shoppingLists', methods: { POST: 'read' } },
   { path: '/food-data/catalog/status', resource: 'pantry', methods: { GET: 'read' } },
+  { path: '/food-data/catalog/chains', resource: 'shoppingLists', methods: { POST: 'read' } },
   { path: '/food-data/catalog/stores', resource: 'shoppingLists', methods: { POST: 'read' } },
   { path: '/food-data/catalog/retail-evidence', resource: 'pantry', methods: { POST: 'read' } },
   {
@@ -121,6 +130,16 @@ export const integrationRoutes: IntegrationRoute[] = [
     path: '/recipes/{recipeId}/images/{imageId}',
     resource: 'recipes',
     methods: { GET: 'read', DELETE: 'delete' },
+  },
+  {
+    path: '/recipes/{recipeId}/image-candidates/{candidateId}',
+    resource: 'recipes',
+    methods: { GET: 'read', POST: 'update', DELETE: 'delete' },
+  },
+  {
+    path: '/recipes/{recipeId}/image-candidates/{candidateId}/file',
+    resource: 'recipes',
+    methods: { GET: 'read' },
   },
   { path: '/recipes/{recipeId}/images/generate', resource: 'recipes', methods: { POST: 'update' } },
   { path: '/recipes/{recipeId}/images', resource: 'recipes', methods: { POST: 'create' } },
@@ -271,6 +290,14 @@ export function additionalIntegrationPermissions(
   pathname: string,
   method: string,
 ): Array<{ resource: ApiResource; action: ApiAction }> {
+  if (
+    /^\/api\/v1\/shopping-lists\/[^/]+\/catalog-items\/?$/u.test(pathname) &&
+    method.toUpperCase() === 'POST'
+  )
+    return [
+      { resource: 'pantry', action: 'create' },
+      { resource: 'shoppingLists', action: 'update' },
+    ];
   if (pathname === '/api/v1/meal-plan/export/pdf' && method.toUpperCase() === 'POST')
     return [{ resource: 'recipes', action: 'read' }];
   if (['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) return [];

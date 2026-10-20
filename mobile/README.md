@@ -6,7 +6,7 @@ Native Expo companion for Bòrd, built from the repository's `bord_expo_ios_mock
 
 ```powershell
 cd mobile
-npm install
+npm ci
 npm run start -- --clear
 ```
 
@@ -51,3 +51,15 @@ Native bundle export is not a device test. Validate camera, photo/document picki
 The matching web server must include the `workspace` field in the prepared-recipes GET response from this change. The existing `preparedRecipes` response field is retained.
 
 The Explore & export screen adds advanced server filters and multi-recipe PDF/ZIP selection. Nutrition now includes energy-estimate preview/apply, body-composition records, recipe-suggestion feedback and preparation from completed cooking sessions. Pantry includes grouped inventory and shared ingredient mappings. Matching server read routes are listed in the parity coverage document.
+
+## Reviewed catalog and assistant execution
+
+The scanner retains the reviewed source identity/revision, nutrition basis and chosen physical amount when adding stock or matching a shopping item. Source measures and attributed storage guidance are optional reads; only explicit confirmation writes. Native callers use the same server validation and operation receipts as web. Preserve an uncertain command and retry its original operation ID; a failed refresh after acknowledgement does not mean the write failed.
+
+Assistant responses use SDK54 `expo/fetch` streams. Text is shown on received events; no timer imitates streaming. UTF-8 fragments and the final line are decoded by a shared bounded parser. Sequence gaps, network loss and Stop require saved-outcome review; closing is not an undo. The next-message draft stays separate from the submitted message. In-memory drafts and attachments are scoped to instance, account and conversation and cleared on logout. They are not persisted after an app process kill. Reopening reads server-owned turns/proposals/jobs without resubmission; running turns remain blocked until reconciled. Generic proposals show their reviewed version and individual outcomes, with explicit consent for paid image requests.
+
+Profile switching uses the destination profile password. It changes the viewing profile, not the signed-in account or its authority. Passwords are ephemeral and clear after an attempt/cancel; a rejected profile password is shown locally without dropping an otherwise valid session.
+
+Pure cross-platform contracts live in `../shared/mobile-domain`; mobile re-exports them and Metro watches that directory. Root parity tests therefore do not require Expo installation. The independent native CI job uses `npm ci`, formatting, lint, type checks, native unit tests and both platform exports.
+
+Current implementation/evidence and remaining device/dependency limitations: [refinement register](../docs/refinement/catalog-native.md).

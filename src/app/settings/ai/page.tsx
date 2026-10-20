@@ -1,3 +1,5 @@
+import { AiPromptSettings } from '@/components/ai-prompt-settings';
+import { getPromptAdministration } from '@/lib/services/ai-prompt-service';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { AiRuntimeSettingsForm } from '@/components/ai-runtime-settings-form';
@@ -24,6 +26,7 @@ export default async function GlobalAiPage() {
         version={data.version}
         accounts={data.users}
       />
+      <AiPromptSettings initial={getPromptAdministration()} />
     </main>
   );
 }

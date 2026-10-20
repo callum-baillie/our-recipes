@@ -1,0 +1,61 @@
+.generator {
+  display: grid;
+  gap: 0.85rem;
+  width: 100%;
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.generator h3,
+.generator p {
+  margin: 0;
+}
+.generator p:empty {
+  display: none;
+}
+.context {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.controls label {
+  display: grid;
+  gap: 0.4rem;
+}
+.controls select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.preview {
+  display: grid;
+  gap: 0.65rem;
+  scroll-margin: 5rem;
+}
+.preview img {
+  width: 100%;
+  max-height: 32rem;
+  object-fit: contain;
+  height: auto;
+  border-radius: 0.75rem;
+}
+@media (max-width: 560px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+  .controls select {
+    font-size: 1rem;
+  }
+  .actions > button {
+    flex: 1 1 12rem;
+  }
+}

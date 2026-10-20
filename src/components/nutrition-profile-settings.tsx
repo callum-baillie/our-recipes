@@ -498,7 +498,9 @@ export function NutritionProfileSettings({
             return;
           const name = input.name;
           if (!name) return;
-          if (name.startsWith('estimate') || name === 'supersedesGoalVersionId') {
+          if (
+            ['estimateEffectiveOn', 'estimatePalCategory', 'supersedesGoalVersionId'].includes(name)
+          ) {
             if (name !== 'supersedesGoalVersionId') invalidateEstimate();
             else estimateOperationId.current = null;
           } else {

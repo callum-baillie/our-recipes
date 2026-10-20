@@ -56,7 +56,8 @@ export function getEffectiveAiPolicy(profileId: string) {
     ...global,
     ...(personal?.preferences.processing ?? {}),
     enabled: global.enabled && (personal?.enabled ?? process.env.NODE_ENV === 'test'),
-    workloads: personal?.preferences.workloads ?? [],
+    workloads: global.allowPersonalModelOverrides ? (personal?.preferences.workloads ?? []) : [],
+    instructions: personal?.preferences.instructions ?? '',
   };
 }
 export function canAccountUseAi(userId: string): boolean {

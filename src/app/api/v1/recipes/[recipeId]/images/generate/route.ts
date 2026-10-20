@@ -1,3 +1,8 @@
+import { recipeImagePreviewRequestSchema } from '@/lib/domain/recipe-image-generation';
+import {
+  prepareRecipeImageCandidate,
+  RecipeImageCandidateError,
+} from '@/lib/services/recipe-image-candidate-service';
 import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
 
 import { NextResponse } from 'next/server';
@@ -25,7 +30,9 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
       access.requestId,
     );
   }
-  if (!aiImageGenerationRequestSchema.safeParse(await request.json().catch(() => null)).success) {
+  const payload = await request.json().catch(() => null);
+  const preview = recipeImagePreviewRequestSchema.safeParse(payload);
+  if (!preview.success && !aiImageGenerationRequestSchema.safeParse(payload).success) {
     return withApiRequestId(
       jsonError(
         400,
@@ -36,6 +43,18 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
     );
   }
   try {
+    if (preview.success) {
+      const candidate = await prepareRecipeImageCandidate(
+        access.principal,
+        (await context.params).recipeId,
+        preview.data,
+        request.signal,
+      );
+      return withApiRequestId(
+        NextResponse.json({ candidate }, { status: candidate.status === 'requested' ? 202 : 200 }),
+        access.requestId,
+      );
+    }
     const created = await generateAiRecipeImage({
       actorProfileId: actor.profileId,
       recipeId: (await context.params).recipeId,
@@ -54,11 +73,19 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
       access.requestId,
     );
   } catch (error) {
+    if (error instanceof RecipeImageCandidateError)
+      return withApiRequestId(jsonError(error.status, error.code, error.message), access.requestId);
     if (error instanceof RecipeNotFoundError)
       return withApiRequestId(jsonError(404, 'recipe_not_found', error.message), access.requestId);
     if (error instanceof AiOperationError) {
       const status =
-        error.code === 'rate_limited' ? 429 : error.code === 'ai_not_configured' ? 503 : 422;
+        error.code === 'ai_sharing_disabled'
+          ? 403
+          : error.code === 'rate_limited'
+            ? 429
+            : error.code === 'ai_not_configured'
+              ? 503
+              : 422;
       return withApiRequestId(jsonError(status, error.code, error.message), access.requestId);
     }
     throw error;

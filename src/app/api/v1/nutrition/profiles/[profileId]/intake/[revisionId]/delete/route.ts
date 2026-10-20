@@ -16,7 +16,7 @@ type Context = { params: Promise<{ profileId: string; revisionId: string }> };
 export async function POST(request: Request, context: Context) {
   const rejected = rejectUntrustedNutritionMutation(request);
   if (rejected) return rejected;
-  const auth = await requireNutritionPrincipal();
+  const auth = await requireNutritionPrincipal(request);
   if (auth.response) return auth.response;
   try {
     const params = await context.params;

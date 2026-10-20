@@ -93,6 +93,40 @@ describe('Pantry service', () => {
     );
   }
 
+  it('keeps essential stock independent of display filters and converts only compatible known units', () => {
+    const lentils = product();
+    const rice = product('Rice');
+    batch(lentils.id, 500, 'g', '2027-01-05');
+    batch(lentils.id, 1, 'kg', '2027-03-01');
+    batch(rice.id, 20, 'g', '2027-01-05');
+    const filtered = getPantryDashboard({
+      q: 'Rice',
+      view: 'all',
+      sort: 'name',
+      includeInactive: false,
+    });
+    expect(filtered.batches.map((entry) => entry.productId)).toEqual([rice.id]);
+    expect(filtered.productStock[lentils.id]).toEqual({
+      knownQuantity: 1500,
+      unit: 'g',
+      uncertain: false,
+    });
+    batch(lentils.id, 1, 'each', '2027-03-01');
+    expect(
+      getPantryDashboard({ q: 'no matches', view: 'all', sort: 'name', includeInactive: false })
+        .productStock[lentils.id],
+    ).toEqual({ knownQuantity: 1500, unit: 'g', uncertain: true });
+    const empty = product('Empty salt');
+    expect(getPantryDashboard().productStock[empty.id]).toEqual({
+      knownQuantity: 0,
+      unit: 'g',
+      uncertain: false,
+    });
+    const small = product('Small recorded quantity');
+    batch(small.id, 0.0000001, 'g', '2027-03-01');
+    expect(getPantryDashboard().productStock[small.id]?.knownQuantity).toBe(0.0000001);
+  });
+
   it('creates canonical products and distinct physical batches with attributed history', () => {
     const lentils = product();
     const first = batch(lentils.id, 500, 'g', '2027-01-05');

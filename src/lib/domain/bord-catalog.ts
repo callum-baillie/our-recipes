@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { catalogReferenceSchema } from './food-data';
 
 export const sourceRefSchema = z.object({
   source_id: z.string().min(1).max(160),
@@ -38,6 +39,7 @@ export const resolveResultSchema = z.object({
 export const retailEvidenceSchema = z.object({
   product_id: id,
   store_id: id.nullable(),
+  history_truncated: z.boolean().default(false),
   assortment_status: z.enum(['unknown', 'source_reported', 'listed', 'historical_only']),
   availability: z.enum(['unknown', 'available', 'unavailable', 'limited']),
   offers: z.array(z.record(z.string(), z.unknown())).max(1000),
@@ -48,11 +50,23 @@ export const retailEvidenceSchema = z.object({
 });
 export const storeSearchSchema = z
   .object({
-    query: z.string().trim().min(2).max(200),
+    query: z.string().trim().min(2).max(200).optional(),
+    chainId: id.optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    radiusKm: z.number().min(0.1).max(100).default(10),
     state: z.string().length(2).optional(),
     cursor: z.string().min(1).max(2048).optional(),
   })
-  .strict();
+  .strict()
+  .refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
+    message: 'Supply both latitude and longitude.',
+    path: ['latitude'],
+  })
+  .refine(
+    (input) => Boolean(input.query || input.state || input.chainId || input.latitude !== undefined),
+    { message: 'Choose a name, area, chain or location.', path: ['query'] },
+  );
 export const storeLinkInputSchema = z
   .object({
     storeId: id,
@@ -76,3 +90,81 @@ export const capabilitiesSchema = z.object({
   sources: z.record(z.string(), packStatusSchema),
   map_assets: z.object({ implemented: z.boolean(), rights_blocked: z.boolean() }).optional(),
 });
+
+/** A measure belongs to one reviewed source revision; it is not a generic density. */
+export const catalogMeasuresInputSchema = z
+  .object({
+    reference: catalogReferenceSchema,
+    form: z.string().trim().min(1).max(80).optional(),
+    basis: z.string().trim().min(1).max(80).optional(),
+  })
+  .strict();
+export const storageGuidanceInputSchema = z
+  .object({
+    query: z.string().trim().min(2).max(200),
+    form: z.string().trim().min(1).max(80).optional(),
+    storageState: z.string().trim().min(1).max(80).optional(),
+    cursor: z.string().min(1).max(2048).optional(),
+  })
+  .strict();
+export const catalogEnrichmentInputSchema = z
+  .object({
+    lines: z
+      .array(
+        z
+          .object({
+            lineId: id,
+            productId: id,
+            storeId: id.optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict()
+  .refine((input) => new Set(input.lines.map((line) => line.lineId)).size === input.lines.length, {
+    message: 'Each line needs a unique identity.',
+    path: ['lines'],
+  });
+export const catalogEnrichmentSchema = z
+  .array(
+    z.object({
+      line_id: id,
+      product: catalogRecordSchema.nullable(),
+      retail_evidence: retailEvidenceSchema.nullable(),
+    }),
+  )
+  .max(100);
+export const catalogGuidanceSchema = catalogRecordSchema.extend({
+  name: z.string().max(500),
+  form: z.string().max(80).nullish(),
+  storage_state: z.string().max(80).nullish(),
+  storage_guidance: z.record(
+    z.string().max(160),
+    z.union([z.string().max(3000), z.number().finite(), z.boolean(), z.null()]),
+  ),
+  attribution: z.string().max(1000).default(''),
+  license: z.string().max(500).default(''),
+  precise_expiry: z.boolean().default(false),
+});
+export type CatalogMeasure = {
+  label: string;
+  amount: number | null;
+  unit: string | null;
+  gramWeight: number | null;
+  form: string | null;
+  basis: string | null;
+};
+
+export const catalogChainSchema = catalogRecordSchema.extend({
+  name: z.string().max(300),
+  country: z.string().max(2).optional(),
+  observed_store_count: z.number().int().nonnegative().optional(),
+});
+export const catalogChainsInputSchema = z
+  .object({
+    country: z.string().length(2).default('US'),
+    cursor: z.string().min(1).max(2048).optional(),
+  })
+  .strict();

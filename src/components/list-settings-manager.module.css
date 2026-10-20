@@ -1,3 +1,6 @@
+.mobileStoreChoice {
+  display: none;
+}
 .manager {
   display: grid;
   max-width: none;
@@ -364,6 +367,17 @@
   }
 }
 @media (max-width: 700px) {
+  .mobileStoreChoice {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .mobileStoreChoice select {
+    width: 100%;
+    min-width: 0;
+  }
+  .profileRail {
+    display: none;
+  }
   .profileList {
     grid-template-columns: minmax(0, 1fr);
   }

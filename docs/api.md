@@ -10,12 +10,13 @@ Application routes are under `/api/v1`; the private Homepage integration is unde
 
 ## Authentication and integration keys
 
-The app uses Better Auth email/passphrase sessions. Every profile has a unique account email and a
-six-digit profile-switch PIN; the PIN changes the active household actor inside an authenticated
-session and is not an independent access-control boundary. Existing installs complete a one-time
+The app uses Better Auth email/passphrase sessions. Enrolled profiles have linked account emails;
+switching the viewed household profile verifies the destination account password and binds the
+signed viewing cookie to the existing session. It does not change the signed-in identity or elevate
+its capabilities. Existing installs complete a one-time
 security upgrade before other routes become available.
 
-Only the first/admin account can manage keys at **Settings → API access**. Keys:
+An authorized administrator in their own account profile can manage keys at **Settings → API access**. Keys:
 
 - start with `bord_sk_`, are shown once, and are stored hashed;
 - expire after 1–365 days (90 by default);
@@ -26,7 +27,7 @@ Only the first/admin account can manage keys at **Settings → API access**. Key
 
 Send a key as `Authorization: Bearer bord_sk_…`. The core create endpoints for recipes, meal-plan entries, grocery lists, collections,
 pantry products, and pantry batches also require an `Idempotency-Key` header (1–128 visible ASCII characters). Identical retries replay the stored JSON
-response for 24 hours; changing the body while reusing the same key returns `409`.
+response for 24 hours; changing the normalized body, actor or operation while reusing the same key returns `409`. These six synchronous creates commit the data and receipt in one SQLite transaction. Authenticated browser/native sessions can opt into the same header; a session request without it retains the existing non-replay contract. Authority is checked before returning a saved receipt.
 
 Authenticated integration responses include `X-Request-Id`. The five `/bulk` endpoints return
 `application/x-ndjson`: the first line is snapshot metadata and later lines contain records. A

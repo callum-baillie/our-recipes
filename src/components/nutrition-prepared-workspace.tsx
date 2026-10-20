@@ -1,5 +1,5 @@
 'use client';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
@@ -236,7 +236,7 @@ function PreparedTaskForm({
   const router = useRouter();
   const task = `${mode}:${allocation?.seriesId ?? 'new'}`;
   const defaultServings = allocation?.servings ?? Math.min(1, prepared.remainingServings);
-  const { draft, update, clear, notice } = useNutritionDraft(
+  const { draft, update, clear, notice, dirty } = useNutritionDraft(
     `${context.profileId}:prepared:${prepared.id}:${allocation?.seriesId ?? 'new'}:${mode}:${context.date}`,
     {
       date: context.date,
@@ -259,13 +259,45 @@ function PreparedTaskForm({
       uncertain: '',
     },
   );
+  const [acknowledgedAllocation, setAcknowledgedAllocation] = useState<{
+    id: string;
+    revision: number;
+  } | null>(null);
+  const allocationChanged = Boolean(
+    allocation &&
+    allocation.id !== draft.expectedId &&
+    !(
+      acknowledgedAllocation?.id === draft.expectedId &&
+      allocation.revision < acknowledgedAllocation.revision
+    ),
+  );
+  useEffect(() => {
+    if (!allocationChanged || dirty || draft.uncertain || !allocation) return;
+    clear({
+      ...draft,
+      expectedId: allocation.id,
+      seriesId: allocation.seriesId,
+      servings: allocation.servings?.toString() ?? '',
+      grams: allocation.portionWeightGrams?.toString() ?? '',
+      portionBasis: allocation.portionWeightGrams != null ? 'weight' : 'servings',
+      state:
+        allocation.state === 'leftover' || allocation.state === 'skipped'
+          ? allocation.state
+          : 'served',
+      note: allocation.note,
+      operationId: '',
+      uncertain: '',
+    });
+    // Only an acknowledged allocation identity change can refresh an untouched draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allocation?.id, allocationChanged, dirty]);
   const [savedDate, setSavedDate] = useState('');
   function change(patch: Partial<typeof draft>) {
     update({ ...patch, operationId: '' });
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!context.canManage || request.isPending()) return;
+    if (!context.canManage || request.isPending() || allocationChanged) return;
     try {
       const operationId = draft.operationId || createClientUuid();
       update({ operationId });
@@ -298,15 +330,12 @@ function PreparedTaskForm({
           note: draft.note,
         };
       }
-      const result = await request.send<{ allocation?: { id: string; seriesId: string } }>(
-        task,
-        url,
-        body,
-        {
-          replay: true,
-          pending: mode === 'consume' ? 'Confirming eaten portion…' : 'Saving portion state…',
-        },
-      );
+      const result = await request.send<{
+        allocation?: { id: string; seriesId: string; revision: number };
+      }>(task, url, body, {
+        replay: true,
+        pending: mode === 'consume' ? 'Confirming eaten portion…' : 'Saving portion state…',
+      });
       if (!result) {
         if (request.isUncertain(task)) update({ uncertain: 'yes' });
         return;
@@ -319,15 +348,20 @@ function PreparedTaskForm({
           : `Portion state saved for ${context.profileName}. Nothing was recorded as eaten.`,
       );
       setSavedDate(draft.date);
-      if (allocation)
+      if (allocation) {
+        setAcknowledgedAllocation(
+          result.allocation
+            ? { id: result.allocation.id, revision: result.allocation.revision }
+            : null,
+        );
         clear({
           ...draft,
-          operationId: '',
-          uncertain: '',
           expectedId: result.allocation?.id ?? draft.expectedId,
           seriesId: result.allocation?.seriesId ?? draft.seriesId,
+          operationId: '',
+          uncertain: '',
         });
-      else clear();
+      } else clear();
       router.refresh();
     } catch (error) {
       request.message(
@@ -347,6 +381,30 @@ function PreparedTaskForm({
           : 'This does not change consumed totals.'}
       </p>
       {notice && <p className={styles.helper}>{notice}</p>}
+      {allocationChanged && allocation && (
+        <div role="status" className={styles.helper}>
+          <p>
+            This portion changed to {allocation.state}, {allocation.servings ?? 'unknown'} servings
+            (revision {allocation.revision}). Your entered values are retained. Review the current
+            portion before continuing.
+          </p>
+          {!draft.uncertain && (
+            <button
+              type="button"
+              disabled={request.pending}
+              onClick={() =>
+                update({
+                  expectedId: allocation.id,
+                  seriesId: allocation.seriesId,
+                  operationId: '',
+                })
+              }
+            >
+              Use current version and keep my entries
+            </button>
+          )}
+        </div>
+      )}
       <fieldset
         className={formStyles.formFields}
         disabled={request.pending || !context.canManage || Boolean(draft.uncertain)}
@@ -443,7 +501,7 @@ function PreparedTaskForm({
       <button
         className={mode === 'consume' ? formStyles.primaryAction : undefined}
         type="submit"
-        disabled={request.pending || !context.canManage}
+        disabled={request.pending || !context.canManage || allocationChanged}
       >
         {request.busyTask === task
           ? 'Saving…'

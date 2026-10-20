@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
-import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
+import { executeIdempotentMutation, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { pantryBatchInputSchema, pantryQuerySchema } from '@/lib/domain/pantry';
 import { jsonError } from '@/lib/http';
 import { createPantryBatch, getPantryDashboard } from '@/lib/services/pantry-service';
@@ -48,12 +48,12 @@ export async function POST(request: Request) {
       'Enter a product, location, and an exact or approximate quantity.',
     );
   try {
-    const batch = createPantryBatch(parsed.data, authorization.principal.profileId);
-    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
-    return idempotentJsonResponse(
+    return executeIdempotentMutation(
       idempotency.context,
-      {
-        batch,
+      () => {
+        const batch = createPantryBatch(parsed.data, authorization.principal.profileId);
+        reconcileAutomaticRestockPolicies(authorization.principal.profileId);
+        return { batch };
       },
       authorization.requestId,
       201,

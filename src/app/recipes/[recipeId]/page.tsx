@@ -1,7 +1,9 @@
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
+import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { PageHeader } from '@/components/page-header';
 import { Settings2 } from 'lucide-react';
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import { RecipeDetailToolbar } from '@/components/recipe-detail-toolbar';
@@ -42,6 +44,9 @@ export default async function RecipeDetailPage({
   params: Promise<{ recipeId: string }>;
 }) {
   const { recipeId } = await params;
+  const principal = await getAuthenticatedSessionPrincipal(
+    new Request('http://localhost/recipes', { headers: await headers() }),
+  );
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
   const recipe = getRecipe(recipeId, actor.profileId);
   if (!recipe) notFound();
@@ -56,6 +61,15 @@ export default async function RecipeDetailPage({
   const pantryAvailability = getRecipePantryAvailability(recipe.id);
   const pantryProducts = listPantryProducts().map(({ id, displayName }) => ({ id, displayName }));
   const normalizedNutrition = getRecipeNutritionPresentation(recipe.id);
+  const imagePolicy = actor.profileId
+    ? getAiWorkloadSetting(actor.profileId, 'image_generation')
+    : {
+        enabled: false,
+        model: 'Unavailable',
+        imageQuality: 'low' as const,
+        imageSize: '1024x1024' as const,
+        allowPersonalImageOverrides: false,
+      };
   return (
     <main className="recipe-page recipe-detail">
       <article>
@@ -77,8 +91,19 @@ export default async function RecipeDetailPage({
           Jump to ingredients and method ↓
         </a>
         <RecipeImageGallery
+          key={`${principal?.userId}:${actor.profileId}:${recipe.id}`}
           recipeId={recipe.id}
           recipeTitle={recipe.title}
+          revision={recipe.currentRevision}
+          profileId={actor.profileId ?? 'none'}
+          accountId={principal?.userId ?? 'signed-out'}
+          imagePolicy={{
+            enabled: imagePolicy.enabled,
+            model: imagePolicy.model,
+            quality: imagePolicy.imageQuality ?? 'low',
+            size: imagePolicy.imageSize ?? '1024x1024',
+            allowOverrides: imagePolicy.allowPersonalImageOverrides ?? false,
+          }}
           images={recipe.images.map(({ id, altText, width, height }) => ({
             id,
             altText,

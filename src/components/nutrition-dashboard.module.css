@@ -502,6 +502,7 @@
 }
 .formGrid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
   gap: 0.8rem;
   min-width: 0;

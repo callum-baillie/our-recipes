@@ -1,11 +1,11 @@
 import { isNutritionDate } from '@/lib/domain/nutrition-ui';
 import { bodyMetricsSchema } from '@/lib/domain/body-metrics';
 import { parseCompositionEstimate } from '@/lib/domain/qn-body-composition';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { redirect } from 'next/navigation';
 
 import { NutritionDashboard, type NutritionView } from '@/components/nutrition-dashboard';
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { evaluateNutritionInsights } from '@/lib/domain/nutrition-insights';
 import { buildAdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
 import { buildNutritionChartDatasets } from '@/lib/domain/nutrition-chart-datasets';
@@ -62,18 +62,27 @@ export default async function NutritionPage({
     returnLog?: string;
     recipe?: string;
     portions?: string;
+    goals?: string;
   }>;
 }) {
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
+  const session = await getAuthenticatedSessionPrincipal(
+    new Request('http://localhost/nutrition', { headers: await headers() }),
+  );
+  if (!session) redirect('/sign-in');
+  const actor = { profileId: session.linkedProfileId, source: 'auth-session' as const };
   const household = resolveNutritionHouseholdContext(actor);
   const principalId = household.compatibilityPrincipalId;
-  const profiles = listAccessibleNutritionProfiles(principalId);
+  const profiles = listAccessibleNutritionProfiles(principalId).filter(
+    (profile) =>
+      session.accountRole !== 'child' ||
+      profile.linkedHouseholdProfileId === session.linkedProfileId,
+  );
   const requested = await searchParams;
   if (requested.view === 'settings') redirect('/account/nutrition');
   if (requested.view === 'goals') redirect('/nutrition');
-  const activeProfile = profiles.find(
-    (profile) => profile.id === household.activeNutritionProfile.id,
-  )!;
+  const activeProfile =
+    profiles.find((profile) => profile.linkedHouseholdProfileId === session.profileId) ??
+    profiles.find((profile) => profile.linkedHouseholdProfileId === session.linkedProfileId)!;
   const view = VIEWS.has(requested.view as NutritionView)
     ? (requested.view as NutritionView)
     : 'overview';
@@ -225,14 +234,21 @@ export default async function NutritionPage({
   const latestMeasurement = activeProfile.canViewMeasurements
     ? listBodyMeasurements(activeProfile.id, principalId)[0]
     : null;
-  const aiSummary = actor.profileId
-    ? listAiSummaries(actor.profileId).find((item) => item.domain === 'nutrition')
-    : null;
+  const summaryPrincipal = await getAuthenticatedSessionPrincipal(
+    new Request('http://localhost/nutrition', { headers: await headers() }),
+  );
+  const aiSummary =
+    actor.profileId &&
+    summaryPrincipal?.linkedProfileId === actor.profileId &&
+    summaryPrincipal.profileId === actor.profileId
+      ? listAiSummaries(actor.profileId).find((item) => item.domain === 'nutrition')
+      : null;
 
   return (
     <>
       <NutritionDashboard
         key={`${activeProfile.id}:${view}`}
+        initialGoalsOpen={requested.goals === '1'}
         initialDiaryDate={
           requested.date && isNutritionDate(requested.date) && requested.date <= today
             ? requested.date

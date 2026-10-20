@@ -40,7 +40,7 @@ describe('Nutrition household API', () => {
       },
     });
     cookieJar.set(ACTIVE_PROFILE_COOKIE, createSignedProfileValue(state.profiles[0]!.id));
-    const response = await GET();
+    const response = await GET(new Request('http://localhost:3000/api/v1/nutrition/household'));
     expect(response.status).toBe(200);
     const comparison = (await response.json()).comparison;
     expect(comparison.range).toEqual(

@@ -128,7 +128,11 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
       .getByRole('region', { name: 'Recipe results' })
       .getByRole('link', { name: 'Open Planner lentil stew', exact: true }),
   ).toBeVisible();
-  await expect(page.getByText(/1 covered · 0 short · 0 unknown/u)).toBeVisible();
+  await expect(
+    page
+      .getByRole('link', { name: 'Open Planner lentil stew', exact: true })
+      .getByText('Pantry ready · 1 covered', { exact: true }),
+  ).toBeVisible();
   await expectContained(page);
   expect((await appAxe(page).analyze()).violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-recipe-library-768');
@@ -156,7 +160,9 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/planner?view=week&date=2027-04-01');
-  const mealActions = page.locator('summary[aria-label="Actions for Planner lentil stew"]:visible');
+  const mealActions = page
+    .getByRole('button', { name: 'Actions for Planner lentil stew', exact: true })
+    .filter({ visible: true });
   await mealActions.nth(1).click();
   const statusControls = page.getByRole('combobox', { name: 'Status for Planner lentil stew' });
   await expect(statusControls).toHaveCount(1);
@@ -169,8 +175,22 @@ test('recipe and planner Pantry insight is truthful, durable, accessible, and re
   await expect(page.getByRole('combobox', { name: 'Status for Planner lentil stew' })).toHaveValue(
     'skipped',
   );
-  await expect(page.getByText('100%', { exact: true })).toBeVisible();
-  await expect(page.getByText('0 ingredients missing', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close meal actions', exact: true }).click();
+  const coverage = page
+    .getByRole('heading', { name: 'Pantry and shopping', exact: true })
+    .locator('..');
+  for (const [label, count] of [
+    ['Covered', '1'],
+    ['Short', '0'],
+    ['Needs review', '0'],
+  ]) {
+    await expect(
+      coverage
+        .locator('dl > div')
+        .filter({ has: page.getByText(label!, { exact: true }) })
+        .locator('dd'),
+    ).toHaveText(count!);
+  }
   await expectContained(page);
   expect((await appAxe(page).analyze()).violations).toEqual([]);
   await screenshot(page, testInfo, 'pantry-planner-1280');

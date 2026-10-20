@@ -491,6 +491,27 @@
       "when": 1792281600001,
       "tag": "0068_ai_account_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1792368000000,
+      "tag": "0069_ai_chat_turn_recovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "6",
+      "when": 1792368000001,
+      "tag": "0070_recipe_image_candidates",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "6",
+      "when": 1792368000002,
+      "tag": "0071_ai_prompt_versions",
+      "breakpoints": true
     }
   ]
 }

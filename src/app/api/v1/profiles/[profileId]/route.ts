@@ -1,8 +1,7 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
-import { profileUpdateSchema } from '@/lib/domain/setup';
+import { appRoleCan } from '@/lib/domain/permissions';
+import { profileUpdateSchema, profileIdentityUpdateSchema } from '@/lib/domain/setup';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import {
   ConflictError,
@@ -10,7 +9,11 @@ import {
   setProfileArchived,
   updateProfile,
 } from '@/lib/services/household-service';
-import { countActiveAdmins, getProfileAccessRole } from '@/lib/services/auth-service';
+import {
+  countActiveAdmins,
+  getProfileAccessRole,
+  getAuthenticatedSessionPrincipal,
+} from '@/lib/services/auth-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,9 +22,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ profi
   if (!hasTrustedMutationOrigin(request)) {
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
   }
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  if (!principal)
+    return jsonError(401, 'authentication_required', 'Sign in to manage household profiles.');
+  if (
+    !appRoleCan(principal.role, 'profiles.manage') ||
+    principal.profileId !== principal.linkedProfileId
+  )
+    return jsonError(
+      403,
+      'admin_required',
+      'Switch to your own administrator profile to manage household profiles.',
+    );
   const { profileId } = await context.params;
-  const parsed = profileUpdateSchema.safeParse(await request.json().catch(() => null));
+  const parsed = profileIdentityUpdateSchema
+    .or(profileUpdateSchema.strict())
+    .safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_profile', 'Check the profile details.');
+  if (!('scope' in parsed.data)) {
+    if (principal?.linkedProfileId !== profileId)
+      return jsonError(
+        403,
+        'personal_profile_scope',
+        'Personal preferences belong to the signed-in account. Use an identity-only update for household members.',
+      );
+  }
   try {
     return NextResponse.json({ profile: updateProfile(profileId, parsed.data) });
   } catch (error) {
@@ -34,13 +59,24 @@ export async function POST(request: Request, context: { params: Promise<{ profil
   if (!hasTrustedMutationOrigin(request)) {
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
   }
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  if (!principal)
+    return jsonError(401, 'authentication_required', 'Sign in to manage household profiles.');
+  if (
+    !appRoleCan(principal.role, 'profiles.manage') ||
+    principal.profileId !== principal.linkedProfileId
+  )
+    return jsonError(
+      403,
+      'admin_required',
+      'Switch to your own administrator profile to manage household profiles.',
+    );
   const body = (await request.json().catch(() => null)) as { archived?: unknown } | null;
   if (typeof body?.archived !== 'boolean') {
     return jsonError(400, 'invalid_profile_archive', 'Choose whether this profile is archived.');
   }
   const { profileId } = await context.params;
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (body.archived && actor.profileId === profileId) {
+  if (body.archived && principal.profileId === profileId) {
     return jsonError(
       409,
       'active_profile_archive',

@@ -37,6 +37,26 @@ The catalog details pane can check public store evidence. Unknown availability i
 
 Native search cache keys include endpoint/key/config fingerprint, generation, normalizer version and locale. Capabilities/generation metadata are polled at most once every five minutes per configuration in each server process; source search results expire after one minute. Partial source statuses remain attached to cached results. Native reads do not consume direct USDA/OFF request budgets. Exact review confirmation is always fresh. Direct provider cache keys are also isolated by endpoint/configuration and mode.
 
+## Application contracts and native review
+
+The native scanner uses the same source review and confirmed imports as the web picker. A scan retains the full source reference and basis, offers distinct alternatives, and asks for quantity/unit and destination. Pantry confirmation creates the reviewed source product and stock batch together; shopping confirmation matches or creates the intended item and records the reviewed cart amount. Neither route is a retailer purchase or Nutrition intake. Saved provider identity is structured data, not a note or display-name match.
+
+Supported read contracts are:
+
+| Endpoint (POST under `/api/v1`)       | Input and meaning                                                                                                                                           |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/food-data/catalog/measures`         | `reference`, optional `form`/`basis`; exact-revision serving measures. A gram equivalent is usable only when supplied for that measure                      |
+| `/food-data/catalog/storage-guidance` | `query`, optional `form`, `storageState`, `cursor`; attributed guidance, separate missing/error states                                                      |
+| `/food-data/catalog/chains`           | Optional `country` (US) and `cursor`; human chain labels, bounded pagination                                                                                |
+| `/food-data/catalog/stores`           | Name query, chain, two-letter state or explicit latitude/longitude; optional radius/cursor. Browser location is requested only through Use my location      |
+| `/food-data/catalog/enrichment`       | Up to 100 uniquely identified lines `{lineId,productId,storeId?}`. The inspected provider does not implement free-text matching, so it is not accepted here |
+
+These POST endpoints are reads. They require the relevant read capability, never import implicitly, and have bounded validated responses. Directory endpoints additionally respect the installation's directory gate. See [OpenAPI](openapi.yaml) for exact schemas and error envelopes.
+
+`POST /shopping-lists/{listId}/catalog-items` accepts the reviewed food import contract plus `cartQuantity`/`cartUnit`; matching an existing item also requires its `itemId` and `expectedUpdatedAt`. Shared services validate the source revision and commit the product snapshot, item match/cart state and acknowledgement in one transaction. Existing recipe demand and item notes remain separate.
+
+An uncertain web/native confirmation keeps its original operation ID and submitted values. Retry that command; do not create a fresh ID merely because the response was lost. A successful receipt is checked before contacting the provider, so an outage cannot prevent replay of an already committed confirmation. New receipts bind account identity, active profile and normalized intent. Compatibility replay of older receipts retains their existing profile/intent binding. A failed current-data refresh does not undo an acknowledged import.
+
 ## Saved stores and maps
 
 In **Settings → Lists**, save a custom store, then use **Official branch** to search and link its directory record. Linking, unlinking and accepting official metadata keep the existing profile UUID, custom name/location/notes, section and aisle IDs, order, manual corrections and shopping-list relationships. Unsaved household edits in the form are retained too.
@@ -57,7 +77,7 @@ Synthetic fixtures in `tests/fixtures/bord-catalog-server.ts` serve bounded loop
 
 The browser test `tests/e2e/bord-catalog.spec.ts` uses synthetic directory responses to check linking/unlinking, unsaved edits, pending map rights, accessibility and viewport widths 320/390/768/1440. It does not prove a live API deployment.
 
-No live source verification, crawler/download, paid connector, Docker/Unraid deployment, Git push or release is part of this implementation run. Before activation, verify the actual API/network/read-key configuration, source-pack readiness and source/map permissions. Existing local stores/products remain usable without the catalog.
+The historical companion validation below did not perform live source verification, crawler/download, paid connector calls or Docker/Unraid deployment. Current refinement evidence and publication status are recorded separately in the refinement handoff. Before activation, verify the actual API/network/read-key configuration, source-pack readiness and source/map permissions. Existing local stores/products remain usable without the catalog.
 
 ### Recorded companion validation — 2026-10-18
 
@@ -75,3 +95,7 @@ No live source verification, crawler/download, paid connector, Docker/Unraid dep
 | `pnpm diff:check`                                | Passed.                                                                                |
 
 The migration test upgrades a synthetic database from the prior schema, retains the original profile/route identities and passes SQLite foreign-key checks. Tests use temporary databases and synthetic source responses. This evidence does not establish a live food API connection, retailer/map rights approval, deployment or source ingestion. The full release-wide browser oracle, Docker/Unraid execution and live source verification were not run for this change.
+
+## Current refinement evidence
+
+See [catalog and native register](refinement/catalog-native.md) for current behavioral checks, capability/ownership matrices, synthetic screenshots, native build evidence and remaining device/dependency limits. The historical results above are retained as historical evidence, not reused as current acceptance.

@@ -49,7 +49,9 @@ export const auth = betterAuth({
         to: user.email,
         subject: 'Reset your Bòrd passphrase',
         text: `Use this one-time link to reset your Bòrd passphrase:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
-      }).catch((error) => console.error('Could not send the password reset email.', error));
+      }).catch(() =>
+        console.error('Could not send the password reset email. Check the configured transport.'),
+      );
     },
   },
   emailVerification: {
@@ -60,7 +62,9 @@ export const auth = betterAuth({
         to: user.email,
         subject: 'Verify your Bòrd email',
         text: `Verify your email address to finish securing your Bòrd profile:\n\n${url}`,
-      }).catch((error) => console.error('Could not send the verification email.', error));
+      }).catch(() =>
+        console.error('Could not send the verification email. Check the configured transport.'),
+      );
     },
   },
   rateLimit: {

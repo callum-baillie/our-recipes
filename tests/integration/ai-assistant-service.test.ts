@@ -1,6 +1,8 @@
 import { effectivePlanEntries } from '@/lib/domain/planner-workflow';
 import { prepareAppActions, confirmAppActions } from '@/lib/services/ai-app-action-service';
 import type { RequestPrincipal } from '@/lib/services/auth-service';
+import * as authentication from '@/lib/services/auth-service';
+import * as aiAccess from '@/lib/services/ai-access-service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 
@@ -173,6 +175,7 @@ describe('AI assistant services', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     setAiAssistantProviderForTests(null);
     setAiProviderForTests(null);
     setAiBatchClientForTests(null);
@@ -1088,6 +1091,8 @@ describe('AI assistant services', () => {
         linkedProfileId: profile.id,
         profileId: profile.id,
       };
+      vi.spyOn(authentication, 'getAuthenticatedSessionPrincipal').mockResolvedValue(principal);
+      vi.spyOn(aiAccess, 'canAccountUseAi').mockReturnValue(true);
       const imageBytes = await sharp({
         create: { width: 48, height: 48, channels: 3, background: '#758c58' },
       })
@@ -1155,13 +1160,13 @@ describe('AI assistant services', () => {
       });
       expect(result.status).toBe('queued');
       expect(getDatabase().select().from(aiJobs).all()).toHaveLength(1);
-      await expect(
-        confirmAppActions(principal, request, {
-          id: appAction.id,
-          version: appAction.version,
-          decision: 'apply',
-        }),
-      ).rejects.toThrow(/handled/);
+      const replay = await confirmAppActions(principal, request, {
+        id: appAction.id,
+        version: appAction.version,
+        decision: 'apply',
+      });
+      expect(replay).toMatchObject({ status: 'queued', replayed: true });
+      expect(getDatabase().select().from(aiJobs).all()).toHaveLength(1);
 
       await runDueAiJobs();
       expect(submittedLines.split('\n')).toHaveLength(10);

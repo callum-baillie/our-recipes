@@ -18,8 +18,10 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Display name').fill('Callum');
-  await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('The Garden Table', 'Callum'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Set up nutrition later' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -27,8 +29,10 @@ test('first-run setup and household organization have no automatically detectabl
   await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
   await page.getByLabel('I saved these one-time codes somewhere private.').check();
   await page.getByRole('button', { name: 'Continue to sign in' }).click();
-  await page.getByLabel('Email').fill(onboardingEmail('The Garden Table', 'Callum'));
-  await page.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await page
+    .getByRole('textbox', { name: /^Email\b/ })
+    .fill(onboardingEmail('The Garden Table', 'Callum'));
+  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
 
@@ -36,14 +40,14 @@ test('first-run setup and household organization have no automatically detectabl
   await expect(page.getByRole('heading', { name: 'Household members & roles' })).toBeVisible();
   const profileResults = await axe(page).analyze();
   expect(profileResults.violations).toEqual([]);
-  await page.getByRole('button', { name: 'Add another profile' }).click();
+  await page.getByRole('button', { name: 'Add profile', exact: true }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
   await expect(profileOnboarding).toBeVisible();
   const profileOnboardingResults = await axe(page).include('#profile-onboarding-dialog').analyze();
   expect(profileOnboardingResults.violations).toEqual([]);
   await profileOnboarding.getByLabel('Display name').fill('Jon');
-  await profileOnboarding.getByLabel('Email').fill('jon-a11y@example.test');
-  await profileOnboarding.getByLabel('Passphrase').fill(TEST_PASSPHRASE);
+  await profileOnboarding.getByRole('textbox', { name: /^Email\b/ }).fill('jon-a11y@example.test');
+  await profileOnboarding.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
   await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
   await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
@@ -109,7 +113,7 @@ test('first-run setup and household organization have no automatically detectabl
   expect(importReviewResults.violations).toEqual([]);
 
   await page.goto('/import');
-  await page.getByRole('button', { name: /Paste Schema\.org JSON-LD/ }).click();
+  await page.getByRole('button', { name: /Structured recipe data \(JSON-LD\)/ }).click();
   await page.getByLabel('Schema.org JSON-LD').fill(
     JSON.stringify({
       '@context': 'https://schema.org',

@@ -18,6 +18,9 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const [name, setName] = useState(listName);
   const [busy, setBusy] = useState('');
+  const pending = useRef(false);
+  const [nameError, setNameError] = useState('');
+  const [actionError, setActionError] = useState('');
 
   async function request(body: { action: 'rename'; name: string } | { action: ManageAction }) {
     const response = await fetch(`/api/v1/shopping-lists/${listId}`, {
@@ -36,7 +39,15 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
 
   async function rename(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim() || name.trim() === listName) return;
+    if (pending.current) return;
+    if (!name.trim()) {
+      setNameError('Enter a list name.');
+      return;
+    }
+    if (name.trim() === listName) return;
+    pending.current = true;
+    setNameError('');
+    setActionError('');
     setBusy('rename');
     try {
       await request({ action: 'rename', name: name.trim() });
@@ -47,18 +58,22 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
       showToast('List renamed.', 'success');
       router.refresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'The list could not be renamed.', 'error');
+      setActionError(error instanceof Error ? error.message : 'The list could not be renamed.');
     } finally {
+      pending.current = false;
       setBusy('');
     }
   }
 
   async function manage(action: ManageAction) {
+    if (pending.current) return;
     if (
       action === 'archive' &&
       !window.confirm('Archive this shopping list? You can restore it from the Lists page.')
     )
       return;
+    pending.current = true;
+    setActionError('');
     setBusy(action);
     try {
       const result = await request({ action });
@@ -69,10 +84,11 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
       if (action === 'duplicate') router.push(`/lists/${result.id}`);
       else router.push('/lists');
     } catch (error) {
-      showToast(
+      setActionError(
         error instanceof Error ? error.message : 'The list change could not be saved.',
-        'error',
       );
+    } finally {
+      pending.current = false;
       setBusy('');
     }
   }
@@ -96,20 +112,41 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
               id="mobile-list-name"
               value={name}
               maxLength={120}
-              onChange={(event) => setName(event.target.value)}
+              disabled={!!busy}
+              aria-invalid={!!nameError}
+              aria-describedby={nameError ? 'mobile-list-name-error' : undefined}
+              onChange={(event) => {
+                setName(event.target.value);
+                setNameError('');
+              }}
             />
-            <button type="submit" disabled={!!busy || !name.trim() || name.trim() === listName}>
-              Save
+            <button type="submit" disabled={!!busy || name.trim() === listName}>
+              {busy === 'rename' ? 'Saving name…' : 'Save name'}
             </button>
           </div>
+          {nameError && (
+            <p role="alert" id="mobile-list-name-error">
+              {nameError}
+            </p>
+          )}
         </form>
+        {actionError && <p role="alert">{actionError}</p>}
+        {busy && (
+          <p role="status">
+            {busy === 'archive'
+              ? 'Archiving list…'
+              : busy === 'duplicate'
+                ? 'Duplicating list…'
+                : 'Saving list name…'}
+          </p>
+        )}
         <Link href="/settings/lists">
           <Settings />
           Shopping settings
         </Link>
         <button type="button" disabled={Boolean(busy)} onClick={() => void manage('duplicate')}>
           <Copy />
-          Duplicate list
+          {busy === 'duplicate' ? 'Duplicating…' : 'Duplicate list'}
         </button>
         <Link href="/lists">
           <List />
@@ -122,7 +159,7 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
           onClick={() => void manage('archive')}
         >
           <Archive />
-          Archive list
+          {busy === 'archive' ? 'Archiving…' : 'Archive list'}
         </button>
       </div>
     </DismissibleDetails>

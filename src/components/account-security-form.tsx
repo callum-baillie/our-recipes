@@ -13,6 +13,7 @@ export function AccountSecurityForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pending, setPending] = useState<'password' | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const lock = useRef(false);
   const [revealed, setRevealed] = useState(false);
@@ -45,10 +46,14 @@ export function AccountSecurityForm() {
         }),
       });
       const body = (await response.json().catch(() => null)) as {
+        code?: string;
         message?: string;
-        error?: { message?: string };
+        error?: { code?: string; message?: string };
       } | null;
       if (!response.ok) {
+        const code = body?.error?.code ?? body?.code;
+        if (code === 'INVALID_PASSWORD') setErrorField('current');
+        if (code === 'PASSWORD_TOO_SHORT' || code === 'PASSWORD_TOO_LONG') setErrorField('new');
         throw new Error(
           body?.error?.message ?? body?.message ?? 'The password could not be changed.',
         );
@@ -63,8 +68,10 @@ export function AccountSecurityForm() {
       const message =
         caught instanceof Error ? caught.message : 'The password could not be changed.';
       setError(message);
-      setErrorField('current');
-      formRef.current?.querySelector<HTMLInputElement>('[name=current]')?.focus();
+      window.requestAnimationFrame(() => {
+        const field = formRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]');
+        (field ?? errorRef.current)?.focus();
+      });
       showToast(message, 'error');
     } finally {
       lock.current = false;
@@ -136,7 +143,13 @@ export function AccountSecurityForm() {
             {revealed ? 'Hide passwords' : 'Show passwords'}
           </button>
           {error && (
-            <p id="password-error" role="alert" className="form-error settings-inline-status">
+            <p
+              ref={errorRef}
+              tabIndex={-1}
+              id="password-error"
+              role="alert"
+              className="form-error settings-inline-status"
+            >
               {error}
             </p>
           )}

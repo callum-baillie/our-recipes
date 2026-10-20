@@ -1,21 +1,13 @@
-import { cookies } from 'next/headers';
+import { personalAiPrincipal } from '@/lib/services/ai-personal-request';
+import { decisionErrorResponse } from '@/lib/services/decision-request-service';
 import { NextResponse } from 'next/server';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { aiReviewActionSchema } from '@/lib/domain/ai';
 import { hasTrustedMutationOrigin, jsonError } from '@/lib/http';
 import { AiOperationError, createAiReviewCandidate } from '@/lib/services/ai-operation-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function profileRequired() {
-  return jsonError(
-    409,
-    'profile_selection_required',
-    'Choose a household profile before using OpenAI for a review draft.',
-  );
-}
 
 function aiError(error: AiOperationError) {
   const status =
@@ -31,15 +23,19 @@ export async function POST(request: Request) {
       'This OpenAI action must come from a trusted app origin.',
     );
   }
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) return profileRequired();
+  let principal;
+  try {
+    principal = await personalAiPrincipal(request);
+  } catch (error) {
+    return decisionErrorResponse(error);
+  }
   const parsed = aiReviewActionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return jsonError(400, 'invalid_ai_review', 'Choose a valid, bounded recipe source for review.');
   }
   try {
     const created = await createAiReviewCandidate({
-      actorProfileId: actor.profileId,
+      actorProfileId: principal.linkedProfileId,
       action: parsed.data,
     });
     return NextResponse.json(

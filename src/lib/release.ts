@@ -6,8 +6,8 @@ import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
 import { ensureDatabase, getSqliteDatabase } from '@/lib/db/client';
 
 export const APPLICATION_VERSION = '1.0.0-rc.17';
-export const SCHEMA_VERSION = '0068_ai_account_settings';
-export const EXPECTED_MIGRATION_COUNT = 70;
+export const SCHEMA_VERSION = '0071_ai_prompt_versions';
+export const EXPECTED_MIGRATION_COUNT = 73;
 
 export type ReleaseStatus = {
   applicationVersion: string;

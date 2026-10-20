@@ -23,6 +23,12 @@ export const profileInputSchema = z.object({
 });
 
 export const profileUpdateSchema = profileInputSchema;
+/** Household identity edits may never carry hidden personal preferences. */
+export const profileIdentityUpdateSchema = profileInputSchema
+  .pick({ displayName: true, color: true, avatarUrl: true })
+  .extend({ scope: z.literal('identity') })
+  .strict();
+export type ProfileIdentityUpdate = z.infer<typeof profileIdentityUpdateSchema>;
 
 const optionalDate = z.union([
   z.literal(''),

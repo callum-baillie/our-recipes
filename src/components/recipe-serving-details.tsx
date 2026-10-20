@@ -286,7 +286,7 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
               {estimatingNutrition
                 ? 'Updating nutrition…'
                 : nutrition.some(([, value]) => value !== null)
-                  ? 'Update estimate'
+                  ? 'Estimate replacement nutrition'
                   : 'Estimate nutrition'}
             </button>
             {nutrition.some(([, value]) => value !== null) && (

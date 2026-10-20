@@ -1,3 +1,7 @@
+import {
+  recipeImageInput,
+  RECIPE_IMAGE_PROMPT_VERSION,
+} from '@/lib/domain/recipe-image-generation';
 import 'server-only';
 import { getEffectiveAiPolicy, aiUserIdForProfile } from './ai-access-service';
 
@@ -15,11 +19,12 @@ import type {
 import type { RecipePayload } from '@/lib/domain/recipe';
 import { AiProviderRequestError, AiProviderUnavailableError } from '@/lib/providers/ai-provider';
 import { getAiProvider, getAiReadiness } from '@/lib/services/ai-readiness-service';
-import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
+import { getAiWorkloadSetting, getAiDataPolicy } from '@/lib/services/ai-settings-service';
 import { getImportArtifact, getImportOperation } from '@/lib/services/import-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
 import {
   getRecipe,
+  recipePayloadFromDetail,
   RecipeConflictError,
   RecipeNotFoundError,
   updateRecipeNutritionEstimateWithIntegrations,
@@ -35,7 +40,12 @@ type AiAuditRow = typeof aiOperationAudits.$inferSelect;
 
 export class AiOperationError extends Error {
   constructor(
-    readonly code: 'ai_not_configured' | 'rate_limited' | 'invalid_ai_source' | 'ai_request_failed',
+    readonly code:
+      | 'ai_not_configured'
+      | 'rate_limited'
+      | 'invalid_ai_source'
+      | 'ai_request_failed'
+      | 'ai_sharing_disabled',
     message: string,
   ) {
     super(message);
@@ -92,6 +102,7 @@ function beginAudit(input: {
   importId?: string | null;
   model: string;
   reasoningEffort?: string | null;
+  promptVersion?: string;
 }): AiOperationAudit {
   ensureDatabase();
   const audit: AiAuditRow = {
@@ -103,6 +114,7 @@ function beginAudit(input: {
     provider: 'OpenAI',
     model: input.model,
     reasoningEffort: input.reasoningEffort ?? null,
+    promptVersion: input.promptVersion ?? null,
     inputTokens: null,
     outputTokens: null,
     profileId: input.profileId,
@@ -190,6 +202,7 @@ export async function createAiReviewCandidate(input: {
       profileId: input.actorProfileId,
       model: setting.model,
       reasoningEffort: setting.reasoningEffort,
+      promptVersion: setting.promptVersion,
     });
     try {
       const candidate = await provider.createTextReviewCandidate(
@@ -256,6 +269,7 @@ export async function createAiReviewCandidate(input: {
     importId: loaded.operation.id,
     model: setting.model,
     reasoningEffort: setting.reasoningEffort,
+    promptVersion: setting.promptVersion,
   });
   try {
     const candidate = await provider.createVisionReviewCandidate(
@@ -313,6 +327,7 @@ export async function improveAiRecipe(input: {
     recipeId: input.recipeId,
     model: setting.model,
     reasoningEffort: setting.reasoningEffort,
+    promptVersion: setting.promptVersion,
   });
   try {
     const candidate = await provider.improveRecipe(
@@ -368,6 +383,11 @@ export async function generateAiRecipeImage(input: {
       'AI recipe image generation is disabled in household settings.',
     );
   }
+  if (!getAiDataPolicy(input.actorProfileId).shareSharedRecipes)
+    throw new AiOperationError(
+      'ai_sharing_disabled',
+      'Allow shared recipes in your AI privacy settings before sending this recipe to OpenAI.',
+    );
   const provider = configuredProvider();
   const audit = beginAudit({
     kind: 'image-generation',
@@ -378,16 +398,11 @@ export async function generateAiRecipeImage(input: {
     profileId: input.actorProfileId,
     recipeId: recipe.id,
     model: setting.model,
+    promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
   });
   try {
     const generated = await provider.generateRecipeImage(
-      {
-        recipeTitle: recipe.title,
-        recipeSummary: recipe.summary,
-        ingredientNames: recipe.ingredientGroups.flatMap((group) =>
-          group.ingredients.map((ingredient) => ingredient.item),
-        ),
-      },
+      recipeImageInput(recipePayloadFromDetail(recipe)),
       setting,
     );
     const image = await createRecipeImage(
@@ -444,6 +459,7 @@ export async function estimateAiRecipeNutrition(input: {
     recipeId: recipe.id,
     model: setting.model,
     reasoningEffort: setting.reasoningEffort,
+    promptVersion: setting.promptVersion,
   });
   try {
     const estimate = await provider.estimateRecipeNutrition(

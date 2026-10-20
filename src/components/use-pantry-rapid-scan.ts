@@ -22,7 +22,10 @@ async function post(url: string, body: unknown, signal?: AbortSignal, key?: stri
     body: JSON.stringify(body),
   });
   const result = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(result?.error?.message ?? 'This item could not be saved.');
+  if (!response.ok)
+    throw Object.assign(new Error(result?.error?.message ?? 'This item could not be saved.'), {
+      status: response.status,
+    });
   return result;
 }
 
@@ -56,7 +59,9 @@ export function usePantryRapidScan(
     const previous = pending.current.get(barcode);
     if (previous) {
       if (previous.saveAttempted) {
-        setMessage('Retry or remove the failed item before scanning it again.');
+        setMessage(
+          'Retry this unresolved confirmation before scanning it again; it may already have saved.',
+        );
         return;
       }
       pending.current.set(barcode, { ...previous, count: Math.min(10000, previous.count + 1) });
@@ -109,6 +114,10 @@ export function usePantryRapidScan(
   }
   function remove(barcode: string) {
     if (saving.current) return;
+    if (pending.current.get(barcode)?.saveAttempted) {
+      setMessage('This item may have saved. Retry the same confirmation before removing it.');
+      return;
+    }
     pending.current.delete(barcode);
     publish();
   }
@@ -208,11 +217,15 @@ export function usePantryRapidScan(
           pending.current.delete(entry.barcode);
           publish();
         } catch (error) {
+          const rejected =
+            error instanceof Error &&
+            'status' in error &&
+            [400, 401, 403, 404, 409, 422].includes(Number(error.status));
           pending.current.set(entry.barcode, {
             ...entry,
-            saveAttempted: true,
+            saveAttempted: !rejected,
             status: 'ready',
-            error: error instanceof Error ? error.message : 'Save failed. Retry this item.',
+            error: `${error instanceof Error ? error.message : 'Save response unavailable.'}${rejected ? ' Review this item before retrying.' : ' Outcome unknown; retry uses the same confirmation.'}`,
           });
           publish();
         }
@@ -220,8 +233,8 @@ export function usePantryRapidScan(
       if (lastProduct) onImported?.(lastProduct, { keepOpen: true });
       setMessage(
         added
-          ? `Added ${added} items. Any unresolved scans remain below.`
-          : 'No items were added. Review the messages below.',
+          ? `Confirmed ${added} items added. Any unresolved scans remain below.`
+          : 'No new saves were acknowledged. Unresolved items may have saved; retry their same confirmations.',
       );
     } finally {
       saving.current = false;

@@ -128,3 +128,36 @@
 .badge[data-status='partial'] {
   color: var(--warning);
 }
+
+.editor fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.editor fieldset fieldset {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+.editor label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+.editor input {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0.5rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 1rem;
+}
+.editor input[type='checkbox'] {
+  justify-self: start;
+}

@@ -24,6 +24,8 @@ export async function startCatalogFixture() {
     missingFood: false,
     productsUnavailable: false,
     barcodeMatch: false,
+    guidanceUnavailable: false,
+    mismatchEnrichment: false,
   };
   const calls: Array<{ path: string; method: string; body: unknown; key: string | undefined }> = [];
   const store = () => ({
@@ -67,6 +69,19 @@ export async function startCatalogFixture() {
     if (state.unavailable) return send(503, { error: { code: 'CATALOG_UNAVAILABLE' } });
     if (state.initializing) return send(503, { error: { code: 'CATALOG_NOT_READY' } });
     if (state.rightsBlocked) return send(403, { error: { code: 'RIGHTS_BLOCKED' } });
+    if (url.pathname === '/v1/chains')
+      return send(
+        200,
+        envelope([
+          {
+            id: 'chn_fixture',
+            name: 'Fixture Market',
+            content_revision: 'chain_1',
+            source_refs: [],
+            observed_store_count: 2,
+          },
+        ]),
+      );
     if (url.pathname === '/v1/capabilities')
       return send(
         200,
@@ -115,10 +130,78 @@ export async function startCatalogFixture() {
           },
         ]),
       );
+    if (url.pathname === '/v1/shopping/enrich') {
+      const input = JSON.parse(bytes) as {
+        lines: Array<{ line_id: string; product_id: string; store_id?: string }>;
+      };
+      return send(
+        200,
+        envelope(
+          input.lines.map((line) => ({
+            line_id: line.line_id,
+            product: {
+              id: state.mismatchEnrichment ? 'wrong-product' : line.product_id,
+              name: 'Synthetic oats',
+              content_revision: state.revision,
+              source_refs: [{ source_id: 'open_food_facts', record_id: '4006381333931' }],
+            },
+            retail_evidence: {
+              product_id: line.product_id,
+              store_id: line.store_id ?? null,
+              assortment_status: 'unknown',
+              availability: 'unknown',
+              offers: [],
+              placements: [],
+              chain_evidence: [],
+              capabilities: {},
+              reason: 'No current branch evidence.',
+            },
+          })),
+        ),
+      );
+    }
+    if (url.pathname === '/v1/guidance/storage') {
+      if (state.guidanceUnavailable) return send(503, { error: { code: 'PACK_DISABLED' } });
+      return send(
+        200,
+        envelope([
+          {
+            id: 'guidance_fixture',
+            name: 'Synthetic oats',
+            content_revision: 'guidance_1',
+            source_refs: [{ source_id: 'foodkeeper', record_id: '1' }],
+            storage_guidance: {
+              Refrigerate_Min: 0,
+              Refrigerate_Max: null,
+              Refrigerate_Metric: 'Days',
+              Notes: 'Under the stated source conditions only.',
+            },
+            attribution: 'USDA FSIS FoodKeeper',
+            license: 'CC0-1.0_as_catalogued',
+            precise_expiry: false,
+            source_record: { private_unprojected_field: 'discard me' },
+          },
+        ]),
+      );
+    }
     if (url.pathname.startsWith('/v1/foods/')) {
       if (state.missingFood) return send(404, { error: { code: 'NOT_FOUND' } });
       if (url.searchParams.has('revision') && url.searchParams.get('revision') !== state.revision)
         return send(409, { error: { code: 'REVISION_EXPIRED' } });
+      if (url.pathname.endsWith('/measures'))
+        return send(
+          200,
+          envelope([
+            {
+              amount: 1,
+              measureUnit: { name: 'cup' },
+              modifier: 'chopped',
+              gramWeight: 120,
+              form: 'raw',
+            },
+            { amount: 1, unit: 'piece' },
+          ]),
+        );
       const off = url.pathname.includes('/open_food_facts/');
       return send(
         200,

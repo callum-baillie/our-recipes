@@ -226,25 +226,25 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(createMenu).toHaveJSProperty('open', true);
   await expect(
     createMenu.locator('.create-menu-panel > button, .create-menu-panel > a'),
-  ).toHaveText(['Recipe', 'Meal Plan', 'Nutrition Entry', 'Shopping List']);
-  await expect(createMenu.getByRole('link', { name: 'Meal Plan', exact: true })).toHaveAttribute(
+  ).toHaveText(['Add recipe', 'Create meal plan', 'Log food', 'Create shopping list']);
+  await expect(
+    createMenu.getByRole('link', { name: 'Create meal plan', exact: true }),
+  ).toHaveAttribute('href', '/planner#meal-plan-setup-title');
+  await expect(createMenu.getByRole('link', { name: 'Log food', exact: true })).toHaveAttribute(
     'href',
-    '/planner#meal-plan-setup-title',
+    '/nutrition?view=diary',
   );
   await expect(
-    createMenu.getByRole('link', { name: 'Nutrition Entry', exact: true }),
-  ).toHaveAttribute('href', '/nutrition?view=diary');
-  await expect(
-    createMenu.getByRole('link', { name: 'Shopping List', exact: true }),
+    createMenu.getByRole('link', { name: 'Create shopping list', exact: true }),
   ).toHaveAttribute('href', '/lists#new-shopping-list');
-  await createMenu.getByRole('button', { name: 'Recipe', exact: true }).click();
+  await createMenu.getByRole('button', { name: 'Add recipe', exact: true }).click();
   await expect(addRecipeDialog).toBeVisible();
   await expect(page).toHaveURL('/collections');
   await page.getByRole('button', { name: 'Close add recipe dialog' }).click();
   await expect(addRecipeDialog).toBeHidden();
   await expect(page).toHaveURL('/collections');
   await createMenuTrigger.click();
-  await createMenu.getByRole('button', { name: 'Recipe', exact: true }).click();
+  await createMenu.getByRole('button', { name: 'Add recipe', exact: true }).click();
   await page.locator('.add-recipe-dialog-dismiss').click({
     force: true,
     position: { x: 2, y: 2 },
@@ -373,7 +373,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     .evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(darkBackground).not.toBe(lightBackground);
   await expect(page.getByRole('heading', { name: 'Your recipe library' })).toBeVisible();
-  // Product requirement: the installed touch UI intentionally locks pinch zoom.
+  // Include viewport accessibility alongside the rendered theme checks.
   expect((await appAxe(page).analyze()).violations).toEqual([]);
   const darkScreenshot = testInfo.outputPath('library-dark.png');
   await page.screenshot({ path: darkScreenshot, fullPage: false });
@@ -407,29 +407,33 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(page.getByRole('heading', { name: 'Export & print' })).toBeVisible();
   const printOptions = page.getByRole('complementary', { name: 'Print options' });
   await expect(printOptions).toBeVisible();
-  await expect(page.getByTitle('Your printable PDF')).toBeVisible({ timeout: 30_000 });
-  await printOptions.getByText('Other formats', { exact: true }).click();
-  await expect(printOptions.getByRole('link', { name: 'JSON-LD', exact: true })).toHaveAttribute(
-    'href',
-    /\/api\/v1\/recipes\/[^/]+\/export$/u,
-  );
-  await expect(printOptions.getByRole('link', { name: 'Markdown', exact: true })).toHaveAttribute(
-    'href',
-    /\/export\/markdown$/u,
-  );
+  await expect(page.getByTitle(/^Recipe cards · 1 recipe selected/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await printOptions.getByText('Other recipe formats', { exact: true }).click();
+  await expect(
+    printOptions.getByRole('link', { name: 'Download JSON-LD', exact: true }),
+  ).toHaveAttribute('href', /\/api\/v1\/recipes\/[^/]+\/export$/u);
+  await expect(
+    printOptions.getByRole('link', { name: 'Download Markdown', exact: true }),
+  ).toHaveAttribute('href', /\/export\/markdown$/u);
   await page.goto(recipeUrl);
   await page.getByText('Recipe-source nutrition', { exact: true }).click();
   await expect(page.getByText('230 kcal', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Update estimate' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Estimate replacement nutrition', exact: true }),
+  ).toBeVisible();
   const classificationToolbar = page.getByRole('region', { name: 'Recipe details and tags' });
   await expect(classificationToolbar.getByText('Dinner', { exact: true })).toBeVisible();
   await expect(classificationToolbar.getByText('Main Dish', { exact: true })).toBeVisible();
   await expect(classificationToolbar.getByText('Italian', { exact: true })).toBeVisible();
   await expect(classificationToolbar.getByText('Family Table', { exact: true })).toBeVisible();
+  await classificationToolbar.getByRole('button', { name: 'Edit tags', exact: true }).click();
   await classificationToolbar.getByLabel('Add a tag').fill('Weeknight');
   await classificationToolbar.getByRole('button', { name: 'Attach tag' }).click();
   await expect(page.locator('.toast').filter({ hasText: 'Weeknight tag added.' })).toBeVisible();
   await expect(classificationToolbar.getByText('Weeknight', { exact: true })).toBeVisible();
+  await classificationToolbar.getByRole('button', { name: 'Edit tags', exact: true }).click();
   await classificationToolbar.getByRole('button', { name: 'Remove weeknight tag' }).click();
   await expect(page.locator('.toast').filter({ hasText: 'Weeknight tag removed.' })).toBeVisible();
   await expect(classificationToolbar.getByText('Weeknight', { exact: true })).toHaveCount(0);
@@ -456,7 +460,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await imageEditButton.click();
   await expect(page.getByRole('button', { name: 'Remove photo 1' })).toBeVisible();
   await expect(page.locator('#recipe-image-editor')).toBeVisible();
-  await imageEditButton.click();
+  await page.getByRole('button', { name: 'Close photo tools', exact: true }).click();
   await expect(page.locator('#recipe-image-editor')).toBeHidden();
 
   const maintenancePanel = page.getByRole('region', { name: 'Recipe management' });
@@ -642,6 +646,18 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
       hasText: 'AI improvement draft ready. Review the changes, then save a new revision.',
     }),
   ).toBeVisible();
+  const improvementReview = page.getByRole('dialog', {
+    name: 'Review AI improvement',
+    exact: true,
+  });
+  await expect(improvementReview).toBeVisible();
+  await expect(page.getByLabel('Method section 1, step 1')).toHaveValue('Simmer gently.');
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Replace the current unsaved editor');
+    await dialog.accept();
+  });
+  await improvementReview.getByRole('button', { name: 'Apply draft', exact: true }).click();
+  await expect(improvementReview).not.toBeVisible();
   await expect(page.getByLabel('Ingredient 1-1 quantity')).toHaveValue('2');
   await expect(page.getByLabel('Ingredient 1-1 item')).toHaveValue('tomatoes');
   await expect(page.getByLabel('Method section 1, step 1')).toHaveValue(

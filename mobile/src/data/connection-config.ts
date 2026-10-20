@@ -10,6 +10,8 @@ export function normalizeBaseUrl(value: string): string {
       'Use HTTPS for remote Bòrd instances. Plain HTTP is allowed only on a private local network.',
     );
   }
+  if (parsed.username || parsed.password)
+    throw new Error('Do not include credentials in the instance URL.');
   parsed.pathname = parsed.pathname.replace(/\/+$/u, '');
   parsed.search = '';
   parsed.hash = '';
@@ -19,7 +21,14 @@ export function normalizeBaseUrl(value: string): string {
 function isPrivateNetworkHost(hostname: string) {
   const normalized = hostname.toLowerCase();
   if (normalized === 'localhost' || normalized.endsWith('.local')) return true;
-  if (/^(?:127|10)\./u.test(normalized) || /^192\.168\./u.test(normalized)) return true;
-  const match = normalized.match(/^172\.(\d{1,2})\./u);
-  return match ? Number(match[1]) >= 16 && Number(match[1]) <= 31 : false;
+  const parts = normalized.split('.');
+  if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/u.test(part) || Number(part) > 255))
+    return normalized === '[::1]';
+  const [first, second] = parts.map(Number);
+  return (
+    first === 127 ||
+    first === 10 ||
+    (first === 192 && second === 168) ||
+    (first === 172 && second >= 16 && second <= 31)
+  );
 }

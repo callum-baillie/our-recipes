@@ -1,0 +1,1923 @@
+{
+  "generatedAt": "2026-10-20T13:41:35.790624+00:00",
+  "baseCommit": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
+  "scope": "Current working refinement branch. Static inventory locates contracts; boundary call names alone do not prove authorization. Behavioral evidence is in the registers.",
+  "counts": {
+    "apiPaths": 174,
+    "webPages": 44,
+    "services": 74,
+    "nativeRoutes": 67,
+    "curatedOperations": 112
+  },
+  "api": [
+    {
+      "path": "/api/auth/{...all}",
+      "methods": ["GET", "POST", "PATCH", "PUT", "DELETE"],
+      "source": "src/app/api/auth/[...all]/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/integrations/homepage/v1/summary",
+      "methods": ["GET"],
+      "source": "src/app/api/integrations/homepage/v1/summary/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/account/automation",
+      "methods": ["GET", "PATCH"],
+      "source": "src/app/api/v1/account/automation/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/account/kitchen-context",
+      "methods": ["GET", "PATCH"],
+      "source": "src/app/api/v1/account/kitchen-context/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/account/profile",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/account/profile/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/admin/api-keys/{keyId}/rotate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/admin/api-keys/[keyId]/rotate/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/admin/api-keys/{keyId}",
+      "methods": ["PATCH", "DELETE"],
+      "source": "src/app/api/v1/admin/api-keys/[keyId]/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/admin/api-keys",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/admin/api-keys/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/admin/guardians",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/admin/guardians/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/admin/profiles/{profileId}/role",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/admin/profiles/[profileId]/role/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/ai/actions/{actionId}/image",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/ai/actions/[actionId]/image/route.ts",
+      "boundaryCalls": ["personalAiPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/actions/{actionId}",
+      "methods": ["PATCH", "GET"],
+      "source": "src/app/api/v1/ai/actions/[actionId]/route.ts",
+      "boundaryCalls": ["decisionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/app-actions",
+      "methods": ["POST", "GET", "PUT"],
+      "source": "src/app/api/v1/ai/app-actions/route.ts",
+      "boundaryCalls": ["decisionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/chat/threads/{threadId}/messages",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/ai/chat/threads/[threadId]/messages/route.ts",
+      "boundaryCalls": ["personalAiPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/chat/threads/{threadId}",
+      "methods": ["GET", "DELETE"],
+      "source": "src/app/api/v1/ai/chat/threads/[threadId]/route.ts",
+      "boundaryCalls": ["personalAiPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/chat/threads",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/ai/chat/threads/route.ts",
+      "boundaryCalls": ["personalAiPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/decisions",
+      "methods": ["GET", "POST", "PATCH"],
+      "source": "src/app/api/v1/ai/decisions/route.ts",
+      "boundaryCalls": ["decisionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/imports",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/ai/imports/route.ts",
+      "boundaryCalls": ["decisionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/jobs/{jobId}",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/ai/jobs/[jobId]/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/jobs",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/ai/jobs/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/meal-plans/generate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/ai/meal-plans/generate/route.ts",
+      "boundaryCalls": ["personalAiPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/prompts",
+      "methods": ["GET", "PUT"],
+      "source": "src/app/api/v1/ai/prompts/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/ai/reviews",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/ai/reviews/route.ts",
+      "boundaryCalls": ["personalAiPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/settings",
+      "methods": ["GET", "PATCH"],
+      "source": "src/app/api/v1/ai/settings/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal", "requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/ai/status",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/ai/status/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/store-map",
+      "methods": ["POST", "PATCH"],
+      "source": "src/app/api/v1/ai/store-map/route.ts",
+      "boundaryCalls": ["decisionPrincipal"]
+    },
+    {
+      "path": "/api/v1/ai/summaries",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/ai/summaries/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/auth/enroll",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/auth/enroll/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/auth/recover",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/auth/recover/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/backups/{backupId}/download",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/backups/[backupId]/download/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/backups/{backupId}/restore",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/backups/[backupId]/restore/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/backups/{backupId}",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/backups/[backupId]/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/backups",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/backups/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/branding/icons/v1/{palette}/{icon}/{size}",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/branding/icons/v1/[palette]/[icon]/[size]/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/capture-drafts",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/capture-drafts/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/collections/{collectionId}/recipes",
+      "methods": ["POST", "PUT"],
+      "source": "src/app/api/v1/collections/[collectionId]/recipes/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/collections/{collectionId}",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "source": "src/app/api/v1/collections/[collectionId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/collections/bulk",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/collections/bulk/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/collections/order",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/collections/order/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/collections",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/collections/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/cook-sessions/{sessionId}/complete",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/cook-sessions/[sessionId]/complete/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/cook-sessions/{sessionId}/pantry",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/cook-sessions/[sessionId]/pantry/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/cook-sessions/{sessionId}/pantry/undo",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/cook-sessions/[sessionId]/pantry/undo/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/cook-sessions",
+      "methods": ["POST", "GET"],
+      "source": "src/app/api/v1/cook-sessions/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/diagnostics",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/diagnostics/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/exports/recipes/pdf",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/exports/recipes/pdf/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/exports/recipes",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/exports/recipes/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/barcode-lookups",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/barcode-lookups/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/chains",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/catalog/chains/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/enrichment",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/catalog/enrichment/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/measures",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/catalog/measures/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/retail-evidence",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/catalog/retail-evidence/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/status",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/food-data/catalog/status/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/storage-guidance",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/catalog/storage-guidance/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/catalog/stores",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/catalog/stores/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/details",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/details/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/imports",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/imports/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/searches",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/food-data/searches/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/food-data/status",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/food-data/status/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/health",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/health/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/imports/{importId}/confirm",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/imports/[importId]/confirm/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/imports/{importId}/file",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/imports/[importId]/file/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/imports/{importId}/files/{artifactId}",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/imports/[importId]/files/[artifactId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/imports/{importId}",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/imports/[importId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/imports",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/imports/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/integrations",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/integrations/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/jsonld-drafts/confirm",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/jsonld-drafts/confirm/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/jsonld-drafts",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/jsonld-drafts/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/{entryId}/refresh-recipe",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/meal-plan/[entryId]/refresh-recipe/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/{entryId}",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "source": "src/app/api/v1/meal-plan/[entryId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/batch",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/meal-plan/batch/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/bulk",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/meal-plan/bulk/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/duplicate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/meal-plan/duplicate/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/export/pdf",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/meal-plan/export/pdf/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/export",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/meal-plan/export/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/meal-plan/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/meal-plan/swap",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/meal-plan/swap/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/nutrition/household",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/nutrition/household/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/identity",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/identity/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/nutrition/products/{productId}/records",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/products/[productId]/records/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/allocations",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/allocations/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/data",
+      "methods": ["DELETE"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/data/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/diary-commands",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/diary-commands/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/export",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/export/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/goals/estimate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/goals/estimate/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/goals",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/goals/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/intake/{revisionId}/delete",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/intake/[revisionId]/delete/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/intake/manual",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/intake/manual/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/intake/product",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/intake/product/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/intake/recipe",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/intake/recipe/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/intake",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/intake/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/measurements",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/measurements/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/permissions",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/permissions/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/prepared-recipes/{preparedId}/allocations",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/[preparedId]/allocations/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/prepared-recipes/{preparedId}/consume",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/[preparedId]/consume/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/prepared-recipes",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/prepared-recipes/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/recommendations/{recommendationKey}/feedback",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/recommendations/[recommendationKey]/feedback/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/recommendations",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/recommendations/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}",
+      "methods": ["GET", "PATCH"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles/{profileId}/scale",
+      "methods": ["GET", "DELETE", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/[profileId]/scale/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal", "requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/profiles",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/profiles/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/nutrition/recipes/{recipeId}/calculations",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/nutrition/recipes/[recipeId]/calculations/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/nutrition/session",
+      "methods": ["GET", "POST", "DELETE"],
+      "source": "src/app/api/v1/nutrition/session/route.ts",
+      "boundaryCalls": ["requireNutritionPrincipal"]
+    },
+    {
+      "path": "/api/v1/pantry/batches/{batchId}/actions",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/pantry/batches/[batchId]/actions/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/batches/{batchId}",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "source": "src/app/api/v1/pantry/batches/[batchId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/pantry/batches/bulk",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/pantry/batches/bulk/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/pantry/batches",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/pantry/batches/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/pantry/catalog-imports",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/pantry/catalog-imports/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/demand",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/pantry/demand/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/events",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/pantry/events/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/export/pdf",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/pantry/export/pdf/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/locations/{locationId}",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/pantry/locations/[locationId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/locations",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/pantry/locations/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/mappings/{ingredientId}",
+      "methods": ["PUT", "DELETE"],
+      "source": "src/app/api/v1/pantry/mappings/[ingredientId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/products/{productId}",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "source": "src/app/api/v1/pantry/products/[productId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/pantry/products",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/pantry/products/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/pantry/recipes/{recipeId}/availability",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/pantry/recipes/[recipeId]/availability/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/pantry/summary",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/pantry/summary/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/profiles/{profileId}/active",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/profiles/[profileId]/active/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/profiles/{profileId}",
+      "methods": ["PATCH", "POST"],
+      "source": "src/app/api/v1/profiles/[profileId]/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal"]
+    },
+    {
+      "path": "/api/v1/profiles/onboarding",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/profiles/onboarding/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/profiles",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/profiles/route.ts",
+      "boundaryCalls": ["getAuthenticatedSessionPrincipal", "requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/duplicate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/recipes/[recipeId]/duplicate/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/export/markdown",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/recipes/[recipeId]/export/markdown/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/export/pdf",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/recipes/[recipeId]/export/pdf/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/export",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/recipes/[recipeId]/export/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/favorite",
+      "methods": ["PUT"],
+      "source": "src/app/api/v1/recipes/[recipeId]/favorite/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/image-candidates/{candidateId}/file",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/recipes/[recipeId]/image-candidates/[candidateId]/file/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/image-candidates/{candidateId}",
+      "methods": ["GET", "POST", "DELETE"],
+      "source": "src/app/api/v1/recipes/[recipeId]/image-candidates/[candidateId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/images/{imageId}",
+      "methods": ["GET", "DELETE"],
+      "source": "src/app/api/v1/recipes/[recipeId]/images/[imageId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/images/generate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/recipes/[recipeId]/images/generate/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/images",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/recipes/[recipeId]/images/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/improve",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/recipes/[recipeId]/improve/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/nutrition/estimate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/recipes/[recipeId]/nutrition/estimate/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/preference",
+      "methods": ["PUT", "PATCH"],
+      "source": "src/app/api/v1/recipes/[recipeId]/preference/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/revisions/{revision}/restore",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/recipes/[recipeId]/revisions/[revision]/restore/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}",
+      "methods": ["GET", "PUT", "DELETE"],
+      "source": "src/app/api/v1/recipes/[recipeId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/status",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/recipes/[recipeId]/status/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/{recipeId}/tags",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/recipes/[recipeId]/tags/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/recipes/bulk",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/recipes/bulk/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/recipes",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/recipes/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/settings/fresh-install",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/settings/fresh-install/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/settings/lists",
+      "methods": ["GET", "PATCH"],
+      "source": "src/app/api/v1/settings/lists/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/settings/preferences",
+      "methods": ["GET", "PATCH"],
+      "source": "src/app/api/v1/settings/preferences/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/settings",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/settings/route.ts",
+      "boundaryCalls": ["adminRequestError"]
+    },
+    {
+      "path": "/api/v1/setup",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/setup/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/setup/vesync",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/setup/vesync/route.ts",
+      "boundaryCalls": ["requireAdminSession"]
+    },
+    {
+      "path": "/api/v1/shopping-list-aisles/{aisleId}",
+      "methods": ["DELETE"],
+      "source": "src/app/api/v1/shopping-list-aisles/[aisleId]/route.ts",
+      "boundaryCalls": []
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/catalog-items",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/catalog-items/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/export/pdf",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/export/pdf/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/instacart",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/instacart/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/items/{itemId}/pantry-controls",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-controls/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/items/{itemId}/pantry-intake",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-intake/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/items/{itemId}/pantry-match",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/pantry-match/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/items/{itemId}",
+      "methods": ["PATCH", "DELETE"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/items/[itemId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/items/bulk",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/items/bulk/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/items",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/items/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/policies/{productId}",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/policies/[productId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/retry-store",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/retry-store/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/{listId}/supermarket-profile",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/shopping-lists/[listId]/supermarket-profile/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/aisles/{aisleId}",
+      "methods": ["DELETE"],
+      "source": "src/app/api/v1/shopping-lists/aisles/[aisleId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/aisles",
+      "methods": ["GET", "POST", "PATCH"],
+      "source": "src/app/api/v1/shopping-lists/aisles/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/bulk",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/shopping-lists/bulk/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/pantry-shortages",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/shopping-lists/pantry-shortages/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists/recent-items",
+      "methods": ["GET"],
+      "source": "src/app/api/v1/shopping-lists/recent-items/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/shopping-lists",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/shopping-lists/route.ts",
+      "boundaryCalls": ["authorizeApi"]
+    },
+    {
+      "path": "/api/v1/supermarket-profiles/{profileId}/catalog-link",
+      "methods": ["GET", "PATCH", "DELETE"],
+      "source": "src/app/api/v1/supermarket-profiles/[profileId]/catalog-link/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/supermarket-profiles/{profileId}/duplicate",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/supermarket-profiles/[profileId]/duplicate/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/supermarket-profiles/{profileId}",
+      "methods": ["PATCH"],
+      "source": "src/app/api/v1/supermarket-profiles/[profileId]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/supermarket-profiles",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/supermarket-profiles/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/tags/{tagName}/merge",
+      "methods": ["POST"],
+      "source": "src/app/api/v1/tags/[tagName]/merge/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/tags/{tagName}",
+      "methods": ["PATCH", "DELETE"],
+      "source": "src/app/api/v1/tags/[tagName]/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    },
+    {
+      "path": "/api/v1/tags",
+      "methods": ["GET", "POST"],
+      "source": "src/app/api/v1/tags/route.ts",
+      "boundaryCalls": ["authorizeCoreApi"]
+    }
+  ],
+  "webPages": [
+    "src/app/account/ai/page.tsx",
+    "src/app/account/automation/page.tsx",
+    "src/app/account/integrations/page.tsx",
+    "src/app/account/nutrition/page.tsx",
+    "src/app/account/page.tsx",
+    "src/app/account/security/page.tsx",
+    "src/app/assist/page.tsx",
+    "src/app/capture/bulk/page.tsx",
+    "src/app/capture/page.tsx",
+    "src/app/collections/[collectionId]/page.tsx",
+    "src/app/collections/page.tsx",
+    "src/app/forgot-password/page.tsx",
+    "src/app/import/page.tsx",
+    "src/app/lists/[listId]/page.tsx",
+    "src/app/lists/page.tsx",
+    "src/app/nutrition/page.tsx",
+    "src/app/offline/page.tsx",
+    "src/app/page.tsx",
+    "src/app/pantry/inventory/page.tsx",
+    "src/app/pantry/page.tsx",
+    "src/app/planner/page.tsx",
+    "src/app/print/page.tsx",
+    "src/app/recipes/[recipeId]/cook/page.tsx",
+    "src/app/recipes/[recipeId]/edit/page.tsx",
+    "src/app/recipes/[recipeId]/page.tsx",
+    "src/app/recipes/new/page.tsx",
+    "src/app/recipes/page.tsx",
+    "src/app/reset-password/page.tsx",
+    "src/app/security-upgrade/page.tsx",
+    "src/app/settings/ai/page.tsx",
+    "src/app/settings/api/page.tsx",
+    "src/app/settings/automation/page.tsx",
+    "src/app/settings/backups/page.tsx",
+    "src/app/settings/integrations/page.tsx",
+    "src/app/settings/lists/page.tsx",
+    "src/app/settings/meal-plan/page.tsx",
+    "src/app/settings/nutrition/page.tsx",
+    "src/app/settings/page.tsx",
+    "src/app/settings/pantry/page.tsx",
+    "src/app/settings/profiles/page.tsx",
+    "src/app/settings/recipes/page.tsx",
+    "src/app/settings/system/page.tsx",
+    "src/app/sign-in/page.tsx",
+    "src/app/tags/page.tsx"
+  ],
+  "nativeRoutes": [
+    "mobile/app/(app)/(lists)/[listId].tsx",
+    "mobile/app/(app)/(lists)/_layout.tsx",
+    "mobile/app/(app)/(lists)/home.tsx",
+    "mobile/app/(app)/(lists)/index.tsx",
+    "mobile/app/(app)/(lists)/manage.tsx",
+    "mobile/app/(app)/(nutrition)/_layout.tsx",
+    "mobile/app/(app)/(nutrition)/home.tsx",
+    "mobile/app/(app)/(nutrition)/index.tsx",
+    "mobile/app/(app)/(nutrition)/products.tsx",
+    "mobile/app/(app)/(nutrition)/record.tsx",
+    "mobile/app/(app)/(nutrition)/workspace.tsx",
+    "mobile/app/(app)/(pantry)/[itemId].tsx",
+    "mobile/app/(app)/(pantry)/_layout.tsx",
+    "mobile/app/(app)/(pantry)/edit/[itemId].tsx",
+    "mobile/app/(app)/(pantry)/home.tsx",
+    "mobile/app/(app)/(pantry)/index.tsx",
+    "mobile/app/(app)/(pantry)/inventory.tsx",
+    "mobile/app/(app)/(pantry)/locations.tsx",
+    "mobile/app/(app)/(pantry)/new.tsx",
+    "mobile/app/(app)/(pantry)/policy/[productId].tsx",
+    "mobile/app/(app)/(plan)/_layout.tsx",
+    "mobile/app/(app)/(plan)/entry.tsx",
+    "mobile/app/(app)/(plan)/home.tsx",
+    "mobile/app/(app)/(plan)/index.tsx",
+    "mobile/app/(app)/(recipes)/[recipeId]/cook.tsx",
+    "mobile/app/(app)/(recipes)/[recipeId]/edit.tsx",
+    "mobile/app/(app)/(recipes)/[recipeId]/index.tsx",
+    "mobile/app/(app)/(recipes)/[recipeId]/metadata.tsx",
+    "mobile/app/(app)/(recipes)/[recipeId]/nutrition.tsx",
+    "mobile/app/(app)/(recipes)/_layout.tsx",
+    "mobile/app/(app)/(recipes)/archive.tsx",
+    "mobile/app/(app)/(recipes)/capture.tsx",
+    "mobile/app/(app)/(recipes)/collection/[collectionId].tsx",
+    "mobile/app/(app)/(recipes)/collections.tsx",
+    "mobile/app/(app)/(recipes)/explore.tsx",
+    "mobile/app/(app)/(recipes)/home.tsx",
+    "mobile/app/(app)/(recipes)/import.tsx",
+    "mobile/app/(app)/(recipes)/index.tsx",
+    "mobile/app/(app)/(recipes)/new.tsx",
+    "mobile/app/(app)/(recipes)/tags.tsx",
+    "mobile/app/(app)/_layout.tsx",
+    "mobile/app/(auth)/_layout.tsx",
+    "mobile/app/(auth)/forgot-password.tsx",
+    "mobile/app/(auth)/instance.tsx",
+    "mobile/app/(auth)/reset-password.tsx",
+    "mobile/app/(auth)/sign-in.tsx",
+    "mobile/app/+not-found.tsx",
+    "mobile/app/_layout.tsx",
+    "mobile/app/assistant.tsx",
+    "mobile/app/index.tsx",
+    "mobile/app/offline.tsx",
+    "mobile/app/recipe-filters.tsx",
+    "mobile/app/scanner.tsx",
+    "mobile/app/security.tsx",
+    "mobile/app/settings/_layout.tsx",
+    "mobile/app/settings/ai.tsx",
+    "mobile/app/settings/api.tsx",
+    "mobile/app/settings/backups.tsx",
+    "mobile/app/settings/index.tsx",
+    "mobile/app/settings/lists.tsx",
+    "mobile/app/settings/meal-plan.tsx",
+    "mobile/app/settings/nutrition.tsx",
+    "mobile/app/settings/pantry.tsx",
+    "mobile/app/settings/profiles.tsx",
+    "mobile/app/settings/recipes.tsx",
+    "mobile/app/settings/stores.tsx",
+    "mobile/app/settings/system.tsx"
+  ],
+  "services": [
+    "src/lib/services/admin-request-service.ts",
+    "src/lib/services/ai-access-service.ts",
+    "src/lib/services/ai-action-preview-image-service.ts",
+    "src/lib/services/ai-action-service.ts",
+    "src/lib/services/ai-app-action-service.ts",
+    "src/lib/services/ai-app-operation-catalog.ts",
+    "src/lib/services/ai-bulk-import-service.ts",
+    "src/lib/services/ai-chat-service.ts",
+    "src/lib/services/ai-context-service.ts",
+    "src/lib/services/ai-job-service.ts",
+    "src/lib/services/ai-kitchen-context-service.ts",
+    "src/lib/services/ai-meal-plan-service.ts",
+    "src/lib/services/ai-operation-service.ts",
+    "src/lib/services/ai-personal-request.ts",
+    "src/lib/services/ai-prompt-service.ts",
+    "src/lib/services/ai-readiness-service.ts",
+    "src/lib/services/ai-settings-service.ts",
+    "src/lib/services/ai-summary-service.ts",
+    "src/lib/services/api-key-service.ts",
+    "src/lib/services/app-preferences-service.ts",
+    "src/lib/services/auth-service.ts",
+    "src/lib/services/backup-service.ts",
+    "src/lib/services/bord-catalog-service.ts",
+    "src/lib/services/capture-service.ts",
+    "src/lib/services/catalog-food-context-service.ts",
+    "src/lib/services/catalog-store-service.ts",
+    "src/lib/services/collection-service.ts",
+    "src/lib/services/cooking-service.ts",
+    "src/lib/services/decision-assistance-service.ts",
+    "src/lib/services/decision-cache-service.ts",
+    "src/lib/services/decision-jobs-service.ts",
+    "src/lib/services/decision-request-service.ts",
+    "src/lib/services/food-catalog-import-service.ts",
+    "src/lib/services/food-data-service.ts",
+    "src/lib/services/fresh-install-service.ts",
+    "src/lib/services/homepage-integration-service.ts",
+    "src/lib/services/household-service.ts",
+    "src/lib/services/import-service.ts",
+    "src/lib/services/instacart-service.ts",
+    "src/lib/services/integration-scheduler.ts",
+    "src/lib/services/integration-service.ts",
+    "src/lib/services/jsonld-service.ts",
+    "src/lib/services/kitchen-context-service.ts",
+    "src/lib/services/list-settings-service.ts",
+    "src/lib/services/nutrition-comparison-service.ts",
+    "src/lib/services/nutrition-diary-lifecycle-service.ts",
+    "src/lib/services/nutrition-energy-estimate-service.ts",
+    "src/lib/services/nutrition-food-diary-service.ts",
+    "src/lib/services/nutrition-foundation-service.ts",
+    "src/lib/services/nutrition-household-profile-service.ts",
+    "src/lib/services/nutrition-individual-chart-service.ts",
+    "src/lib/services/nutrition-intake-service.ts",
+    "src/lib/services/nutrition-meal-planning-service.ts",
+    "src/lib/services/nutrition-planning-orchestration-service.ts",
+    "src/lib/services/nutrition-prepared-consumption-service.ts",
+    "src/lib/services/nutrition-profile-service.ts",
+    "src/lib/services/nutrition-recipe-calculation-service.ts",
+    "src/lib/services/nutrition-recommendation-service.ts",
+    "src/lib/services/nutrition-scale-service.ts",
+    "src/lib/services/nutrition-weight-trend-service.ts",
+    "src/lib/services/pantry-availability-service.ts",
+    "src/lib/services/pantry-grocery-cooking-service.ts",
+    "src/lib/services/pantry-service.ts",
+    "src/lib/services/pdf-export-service.tsx",
+    "src/lib/services/planning-service.ts",
+    "src/lib/services/portable-recipe-export-service.ts",
+    "src/lib/services/recipe-image-candidate-service.ts",
+    "src/lib/services/recipe-image-service.ts",
+    "src/lib/services/recipe-service.ts",
+    "src/lib/services/shopping-shortcuts-service.ts",
+    "src/lib/services/store-map-service.ts",
+    "src/lib/services/task-queue-service.ts",
+    "src/lib/services/task-scheduler-service.ts",
+    "src/lib/services/task-settings-service.ts"
+  ],
+  "curatedOperations": [
+    {
+      "id": "readCookHistory",
+      "path": "/cook-sessions",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "startReviewedCookSession",
+      "path": "/cook-sessions",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "readCookPantryPreview",
+      "path": "/cook-sessions/{sessionId}/pantry",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "previewCookProductConsumption",
+      "path": "/cook-sessions/{sessionId}/pantry",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "confirmCookAndStock",
+      "path": "/cook-sessions/{sessionId}/complete",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "readHistoricalRetailEvidence",
+      "path": "/food-data/catalog/retail-evidence",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "readCatalogChains",
+      "path": "/food-data/catalog/chains",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "readNutritionDiaryRevisions",
+      "path": "/nutrition/profiles/{profileId}/intake",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "logManualNutrition",
+      "path": "/nutrition/profiles/{profileId}/intake/manual",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "logProductNutrition",
+      "path": "/nutrition/profiles/{profileId}/intake/product",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "logRecipeNutrition",
+      "path": "/nutrition/profiles/{profileId}/intake/recipe",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "deleteNutritionDiaryEntry",
+      "path": "/nutrition/profiles/{profileId}/intake/{revisionId}/delete",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "copyMoveNutritionDiary",
+      "path": "/nutrition/profiles/{profileId}/diary-commands",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "readPreparedNutrition",
+      "path": "/nutrition/profiles/{profileId}/prepared-recipes",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "prepareRecipeServings",
+      "path": "/nutrition/profiles/{profileId}/prepared-recipes",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "savePreparedAllocation",
+      "path": "/nutrition/profiles/{profileId}/prepared-recipes/{preparedId}/allocations",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "confirmPreparedEaten",
+      "path": "/nutrition/profiles/{profileId}/prepared-recipes/{preparedId}/consume",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "searchCatalogFoods",
+      "path": "/food-data/searches",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "lookupCatalogBarcode",
+      "path": "/food-data/barcode-lookups",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "readCatalogFood",
+      "path": "/food-data/details",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "readCatalogMeasures",
+      "path": "/food-data/catalog/measures",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "readStorageGuidance",
+      "path": "/food-data/catalog/storage-guidance",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "enrichIdentifiedProducts",
+      "path": "/food-data/catalog/enrichment",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "searchCatalogStores",
+      "path": "/food-data/catalog/stores",
+      "method": "POST",
+      "effect": "read"
+    },
+    {
+      "id": "importReviewedCatalogFood",
+      "path": "/food-data/imports",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "importReviewedPantryStock",
+      "path": "/pantry/catalog-imports",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "matchReviewedShoppingProduct",
+      "path": "/shopping-lists/{listId}/catalog-items",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "linkCatalogStore",
+      "path": "/supermarket-profiles/{profileId}/catalog-link",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "readMyKitchenContext",
+      "path": "/account/kitchen-context",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "updateMyKitchenContext",
+      "path": "/account/kitchen-context",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "generateRecipeImage",
+      "path": "/recipes/{recipeId}/images/generate",
+      "method": "POST",
+      "effect": "paid"
+    },
+    {
+      "id": "listRecentShoppingItems",
+      "path": "/shopping-lists/recent-items",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "addShoppingListNamesBulk",
+      "path": "/shopping-lists/{listId}/items/bulk",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "listTags",
+      "path": "/tags",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createTag",
+      "path": "/tags",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "updateTag",
+      "path": "/tags/{tagName}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "deleteTag",
+      "path": "/tags/{tagName}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "mergeTag",
+      "path": "/tags/{tagName}/merge",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "listCollections",
+      "path": "/collections",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createCollection",
+      "path": "/collections",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "reorderCollections",
+      "path": "/collections/order",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "getCollection",
+      "path": "/collections/{collectionId}",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "updateCollection",
+      "path": "/collections/{collectionId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "deleteCollection",
+      "path": "/collections/{collectionId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "addRecipeToCollection",
+      "path": "/collections/{collectionId}/recipes",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "replaceCollectionRecipes",
+      "path": "/collections/{collectionId}/recipes",
+      "method": "PUT",
+      "effect": "write"
+    },
+    {
+      "id": "exportCollectionsBulk",
+      "path": "/collections/bulk",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "listRecipes",
+      "path": "/recipes",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createRecipe",
+      "path": "/recipes",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "getRecipe",
+      "path": "/recipes/{recipeId}",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "updateRecipe",
+      "path": "/recipes/{recipeId}",
+      "method": "PUT",
+      "effect": "write"
+    },
+    {
+      "id": "trashRecipe",
+      "path": "/recipes/{recipeId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "exportRecipesBulk",
+      "path": "/recipes/bulk",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "updateRecipeTags",
+      "path": "/recipes/{recipeId}/tags",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "setRecipePreference",
+      "path": "/recipes/{recipeId}/preference",
+      "method": "PUT",
+      "effect": "write"
+    },
+    {
+      "id": "setRecipeReaction",
+      "path": "/recipes/{recipeId}/preference",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "restoreRecipeRevision",
+      "path": "/recipes/{recipeId}/revisions/{revision}/restore",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "duplicateRecipe",
+      "path": "/recipes/{recipeId}/duplicate",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "updateRecipeStatus",
+      "path": "/recipes/{recipeId}/status",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "listMealPlan",
+      "path": "/meal-plan",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "addMealPlanEntry",
+      "path": "/meal-plan",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "getMealPlanEntry",
+      "path": "/meal-plan/{entryId}",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "deleteMealPlanEntry",
+      "path": "/meal-plan/{entryId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "updateMealPlanEntry",
+      "path": "/meal-plan/{entryId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "exportMealPlanBulk",
+      "path": "/meal-plan/bulk",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "swapMealPlanEntries",
+      "path": "/meal-plan/swap",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "duplicateMealPlanWeek",
+      "path": "/meal-plan/duplicate",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "listShoppingLists",
+      "path": "/shopping-lists",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createOrGenerateShoppingList",
+      "path": "/shopping-lists",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "listSupermarketProfiles",
+      "path": "/supermarket-profiles",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createSupermarketProfile",
+      "path": "/supermarket-profiles",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "updateSupermarketProfile",
+      "path": "/supermarket-profiles/{profileId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "duplicateSupermarketProfile",
+      "path": "/supermarket-profiles/{profileId}/duplicate",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "generatePantryShortageList",
+      "path": "/shopping-lists/pantry-shortages",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "getShoppingList",
+      "path": "/shopping-lists/{listId}",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "reorderShoppingListItems",
+      "path": "/shopping-lists/{listId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "deleteShoppingList",
+      "path": "/shopping-lists/{listId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "addShoppingListItem",
+      "path": "/shopping-lists/{listId}/items",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "setShoppingListSupermarket",
+      "path": "/shopping-lists/{listId}/supermarket-profile",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "retryShoppingListAtStore",
+      "path": "/shopping-lists/{listId}/retry-store",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "updateShoppingListItem",
+      "path": "/shopping-lists/{listId}/items/{itemId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "deleteShoppingListItem",
+      "path": "/shopping-lists/{listId}/items/{itemId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "exportShoppingListsBulk",
+      "path": "/shopping-lists/bulk",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "intakePurchasedShoppingItem",
+      "path": "/shopping-lists/{listId}/items/{itemId}/pantry-intake",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "updateShoppingItemPantryControl",
+      "path": "/shopping-lists/{listId}/items/{itemId}/pantry-controls",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "matchShoppingItemToPantryProduct",
+      "path": "/shopping-lists/{listId}/items/{itemId}/pantry-match",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "updateShoppingPolicyForTrip",
+      "path": "/shopping-lists/{listId}/policies/{productId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "listShoppingAisles",
+      "path": "/shopping-lists/aisles",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createShoppingAisle",
+      "path": "/shopping-lists/aisles",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "reorderShoppingAisles",
+      "path": "/shopping-lists/aisles",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "getPantrySummary",
+      "path": "/pantry/summary",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "listPantryProducts",
+      "path": "/pantry/products",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createPantryProduct",
+      "path": "/pantry/products",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "getPantryProduct",
+      "path": "/pantry/products/{productId}",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "updatePantryProduct",
+      "path": "/pantry/products/{productId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "archivePantryProduct",
+      "path": "/pantry/products/{productId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "listPantryLocations",
+      "path": "/pantry/locations",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createPantryLocation",
+      "path": "/pantry/locations",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "updatePantryLocation",
+      "path": "/pantry/locations/{locationId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "listPantryBatches",
+      "path": "/pantry/batches",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "createPantryBatch",
+      "path": "/pantry/batches",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "getPantryBatch",
+      "path": "/pantry/batches/{batchId}",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "updatePantryBatch",
+      "path": "/pantry/batches/{batchId}",
+      "method": "PATCH",
+      "effect": "write"
+    },
+    {
+      "id": "discardPantryBatch",
+      "path": "/pantry/batches/{batchId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "exportPantryBatchesBulk",
+      "path": "/pantry/batches/bulk",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "applyPantryBatchAction",
+      "path": "/pantry/batches/{batchId}/actions",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "listPantryEvents",
+      "path": "/pantry/events",
+      "method": "GET",
+      "effect": "read"
+    },
+    {
+      "id": "setRecipeIngredientPantryMapping",
+      "path": "/pantry/mappings/{ingredientId}",
+      "method": "PUT",
+      "effect": "write"
+    },
+    {
+      "id": "removeRecipeIngredientPantryMapping",
+      "path": "/pantry/mappings/{ingredientId}",
+      "method": "DELETE",
+      "effect": "write"
+    },
+    {
+      "id": "refreshPlannedRecipe",
+      "path": "/meal-plan/{entryId}/refresh-recipe",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "createMealPlanBatch",
+      "path": "/meal-plan/batch",
+      "method": "POST",
+      "effect": "write"
+    },
+    {
+      "id": "setRecipeFavorite",
+      "path": "/recipes/{recipeId}/favorite",
+      "method": "PUT",
+      "effect": "write"
+    }
+  ]
+}

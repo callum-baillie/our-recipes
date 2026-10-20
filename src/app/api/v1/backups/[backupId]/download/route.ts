@@ -1,25 +1,19 @@
-import { cookies } from 'next/headers';
+import { adminRequestError } from '@/lib/services/admin-request-service';
 import { NextResponse } from 'next/server';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { jsonError } from '@/lib/http';
 import { BackupNotFoundError, getBackupArchivePath } from '@/lib/services/backup-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_request: Request, context: { params: Promise<{ backupId: string }> }) {
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  if (!actor.profileId) {
-    return jsonError(
-      409,
-      'profile_selection_required',
-      'Choose a household profile before downloading a backup.',
-    );
-  }
+export async function GET(request: Request, context: { params: Promise<{ backupId: string }> }) {
+  const accessError = await adminRequestError(request);
+  if (accessError) return accessError;
+
   try {
     const id = (await context.params).backupId;
     const filePath = await getBackupArchivePath(id);

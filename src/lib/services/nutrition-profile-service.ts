@@ -45,6 +45,7 @@ type PrincipalPublic = Omit<typeof nutritionPrincipals.$inferSelect, 'credential
 export type AccessibleNutritionProfile = Pick<
   ProfileRecord,
   | 'id'
+  | 'linkedHouseholdProfileId'
   | 'displayName'
   | 'avatarUrl'
   | 'profileType'
@@ -688,6 +689,7 @@ export function listAccessibleNutritionProfiles(
       return [
         {
           id: profile.id,
+          linkedHouseholdProfileId: profile.linkedHouseholdProfileId,
           displayName: profile.displayName,
           avatarUrl: profile.avatarUrl,
           profileType: profile.profileType,

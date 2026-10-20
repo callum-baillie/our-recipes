@@ -93,8 +93,12 @@ function IngredientGroupEditor({
   isFirst,
   isLast,
   linkedFoods = {},
+  acknowledgedLinks,
+  acknowledgeLink,
 }: {
   linkedFoods?: Record<string, string>;
+  acknowledgedLinks: Array<{ pantryProductId: string; item: string }>;
+  acknowledgeLink: (pantryProductId: string, item: string) => void;
   form: UseFormReturn<FormValues>;
   groupIndex: number;
   onMove: (from: number, to: number) => void;
@@ -110,8 +114,6 @@ function IngredientGroupEditor({
     control: form.control,
     name: `ingredientGroups.${groupIndex}.ingredients` as const,
   });
-  const identities = useRef<Record<string, string>>({});
-  const [reviewLinks, setReviewLinks] = useState<Record<string, boolean>>({});
   const [linkedNames, setLinkedNames] = useState<Record<string, string>>({});
   return (
     <fieldset className="editor-group">
@@ -188,27 +190,9 @@ function IngredientGroupEditor({
           <input
             aria-label={`Ingredient ${groupIndex + 1}-${ingredientIndex + 1} item`}
             placeholder="Ingredient"
-            onFocus={(event) => {
-              identities.current[field.id] = event.currentTarget.value;
-            }}
             {...form.register(
               `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
             )}
-            onBlur={(event) => {
-              void form
-                .register(`ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item`)
-                .onBlur(event);
-              if (
-                form.getValues(
-                  `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId`,
-                ) &&
-                ingredientIdentityChanged(
-                  identities.current[field.id] ?? event.target.value,
-                  event.target.value,
-                )
-              )
-                setReviewLinks((current) => ({ ...current, [field.id]: true }));
-            }}
           />
           <details className="ingredient-row-details">
             <summary>
@@ -257,7 +241,7 @@ function IngredientGroupEditor({
             launchLabel="Find food data"
             defaultQuery={rows?.[ingredientIndex]?.item ?? ''}
             onImported={(product) => {
-              setReviewLinks((current) => ({ ...current, [field.id]: false }));
+              acknowledgeLink(product.id, product.displayName);
               setLinkedNames((names) => ({ ...names, [product.id]: product.displayName }));
               form.setValue(
                 `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item` as const,
@@ -271,34 +255,44 @@ function IngredientGroupEditor({
               );
             }}
           />
-          {reviewLinks[field.id] && rows?.[ingredientIndex]?.pantryProductId && (
-            <aside className="ingredient-food-link" data-link-review role="alert">
-              <strong>
-                Ingredient identity changed. Keep this food link or clear it and find another food.
-              </strong>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => setReviewLinks((current) => ({ ...current, [field.id]: false }))}
-              >
-                Keep food link
-              </button>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => {
-                  form.setValue(
-                    `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId`,
-                    '',
-                    { shouldDirty: true },
-                  );
-                  setReviewLinks((current) => ({ ...current, [field.id]: false }));
-                }}
-              >
-                Clear and relink
-              </button>
-            </aside>
-          )}
+          {rows?.[ingredientIndex]?.pantryProductId &&
+            !acknowledgedLinks.some(
+              (link) =>
+                link.pantryProductId === rows[ingredientIndex].pantryProductId &&
+                !ingredientIdentityChanged(link.item, rows[ingredientIndex].item),
+            ) && (
+              <aside className="ingredient-food-link" data-link-review role="alert">
+                <strong>
+                  Ingredient identity changed. Keep this food link or clear it and find another
+                  food.
+                </strong>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() =>
+                    acknowledgeLink(
+                      rows[ingredientIndex].pantryProductId!,
+                      rows[ingredientIndex].item,
+                    )
+                  }
+                >
+                  Keep food link
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    form.setValue(
+                      `ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.pantryProductId`,
+                      '',
+                      { shouldDirty: true },
+                    );
+                  }}
+                >
+                  Clear and relink
+                </button>
+              </aside>
+            )}
           {ingredients.fields.length > 1 && (
             <div className="reorder-actions compact-actions">
               <button
@@ -574,6 +568,16 @@ export function RecipeForm({
       }) as FormValues,
     [initial],
   );
+  const [acknowledgedLinks, setAcknowledgedLinks] = useState(() =>
+    defaults.ingredientGroups.flatMap((group) =>
+      group.ingredients.flatMap((row) =>
+        row.pantryProductId ? [{ pantryProductId: row.pantryProductId, item: row.item }] : [],
+      ),
+    ),
+  );
+  function acknowledgeLink(pantryProductId: string, item: string) {
+    setAcknowledgedLinks((current) => [...current, { pantryProductId, item }]);
+  }
   const form = useForm<FormValues>({
     resolver: zodResolver(recipeFormSchema) as never,
     defaultValues: defaults,
@@ -702,6 +706,26 @@ export function RecipeForm({
 
   async function submit(values: FormValues) {
     setServerError(null);
+    const changedLinks = values.ingredientGroups.flatMap((group, groupIndex) =>
+      group.ingredients.flatMap((row, ingredientIndex) =>
+        row.pantryProductId &&
+        !acknowledgedLinks.some(
+          (link) =>
+            link.pantryProductId === row.pantryProductId &&
+            !ingredientIdentityChanged(link.item, row.item),
+        )
+          ? [`ingredientGroups.${groupIndex}.ingredients.${ingredientIndex}.item`]
+          : [],
+      ),
+    );
+    if (changedLinks.length) {
+      setInvalidFields(changedLinks);
+      setServerError(
+        'Review the changed ingredient food links before saving. Keep each link deliberately or clear it.',
+      );
+      revealField(changedLinks[0]);
+      return;
+    }
     setInvalidFields([]);
     try {
       const basePayload = recipePayloadFromForm(values);
@@ -794,16 +818,7 @@ export function RecipeForm({
     <form
       className={`recipe-form${intro ? ' editor-form-layout' : ''}`}
       ref={formRef}
-      onSubmit={(event) => {
-        const review = formRef.current?.querySelector<HTMLElement>('[data-link-review]');
-        if (review) {
-          event.preventDefault();
-          review.querySelector<HTMLElement>('button')?.focus();
-          review.scrollIntoView({ block: 'center' });
-          return;
-        }
-        void form.handleSubmit(submit, invalid)(event);
-      }}
+      onSubmit={(event) => void form.handleSubmit(submit, invalid)(event)}
       noValidate
     >
       {intro ? <div className="editor-intro">{intro}</div> : null}
@@ -994,6 +1009,8 @@ export function RecipeForm({
             key={field.id}
             form={form}
             linkedFoods={linkedFoods}
+            acknowledgedLinks={acknowledgedLinks}
+            acknowledgeLink={acknowledgeLink}
             groupIndex={index}
             onMove={ingredientGroups.move}
             onRemove={() => ingredientGroups.remove(index)}

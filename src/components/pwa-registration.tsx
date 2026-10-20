@@ -129,14 +129,21 @@ export function PwaRegistration() {
     }
     function watch(item: ServiceWorkerRegistration) {
       registration.current = item;
-      if (item.waiting) ready();
+      if (item.waiting && item.active) ready();
       item.addEventListener('updatefound', found);
     }
     function found() {
       const installing = registration.current?.installing;
       if (!installing) return;
       installing.addEventListener('statechange', () => {
-        if (installing.state === 'installed' && registration.current?.waiting) ready();
+        // A first installation can briefly be waiting before it takes control.
+        // Only a replacement for an active worker represents an available update.
+        if (
+          installing.state === 'installed' &&
+          registration.current?.waiting &&
+          registration.current.active
+        )
+          ready();
       });
     }
     navigator.serviceWorker.addEventListener('controllerchange', controllerChanged);

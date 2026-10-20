@@ -1,0 +1,12 @@
+{
+  "baseCommit": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
+  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md",
+  "capturedAt": "2026-10-20T15:59:57.628554+00:00",
+  "spec": "tests/e2e/offline-update-refinement.spec.ts",
+  "scope": "Controlled client service-worker notifications/controller changes and health/destination responses. No real deployed worker update or offline write replay.",
+  "captures": [
+    "online-server-unavailable-390.png",
+    "update-dirty-1440.png",
+    "update-dirty-390x500.png"
+  ]
+}

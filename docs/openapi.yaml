@@ -295,6 +295,30 @@ paths:
         '409': { description: Selected revision changed; review required }
         '503':
           description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+  /food-data/catalog/chains:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
+      operationId: listCatalogChains
+      summary: Read available chain names with bounded pagination
+      description: Read-only lookup. No household store or route changes. Counts describe catalog observations rather than verified operating locations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                country: { type: string, minLength: 2, maxLength: 2, default: US }
+                cursor: { type: string, minLength: 1, maxLength: 2048 }
+      responses:
+        '200':
+          { description: 'Chain names, catalog generation and nextCursor; at most 50 per page' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: Sign in or provide a permitted API key }
+        '403': { description: Catalog read permission is denied }
+        '503': { description: 'Catalog directory is unavailable, disabled or not configured' }
   /food-data/catalog/stores:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -309,11 +333,14 @@ paths:
               {
                 type: object,
                 additionalProperties: false,
-                required: [query],
                 properties:
                   {
                     query: { type: string, minLength: 2, maxLength: 200 },
                     state: { type: string, minLength: 2, maxLength: 2 },
+                    chainId: { type: string, minLength: 1, maxLength: 160 },
+                    latitude: { type: number, minimum: -90, maximum: 90 },
+                    longitude: { type: number, minimum: -180, maximum: 180 },
+                    radiusKm: { type: number, minimum: 0.1, maximum: 100, default: 10 },
                     cursor: { type: string, maxLength: 2048 },
                   },
               }
@@ -323,6 +350,64 @@ paths:
         '409': { description: Selected revision changed; review required }
         '503':
           description: 'Catalog unavailable, initializing or disabled; manual stores remain usable'
+  /food-data/catalog/measures:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
+      operationId: readCatalogMeasures
+      summary: Read measures for an exact reviewed source revision
+      description: Read-only POST. No product, stock, shopping state, purchase or intake is written. Provider credentials remain server-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CatalogMeasuresInput' }
+      responses:
+        '200': { description: 'Revision-bound source measures; no density is inferred' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Exact source revision expired; review again }
+        '503': { description: 'Source pack disabled, unavailable or still initializing' }
+        '504': { description: Bounded provider request timed out }
+  /food-data/catalog/storage-guidance:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:read']
+      operationId: searchStorageGuidance
+      summary: Read attributed storage ranges from available source packs
+      description: Read-only POST. No product, stock, shopping state, purchase or intake is written. Provider credentials remain server-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StorageGuidanceInput' }
+      responses:
+        '200': { description: 'Guidance, source conditions, generation and bounded nextCursor' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Exact source revision expired; review again }
+        '503': { description: 'Source pack disabled, unavailable or still initializing' }
+        '504': { description: Bounded provider request timed out }
+  /food-data/catalog/enrichment:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:read']
+      operationId: enrichCatalogProducts
+      summary: Read retail context for identified products without importing or adding to cart
+      description: Read-only POST. No product, stock, shopping state, purchase or intake is written. Provider credentials remain server-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CatalogEnrichmentInput' }
+      responses:
+        '200':
+          { description: 'One result per requested line; unknown availability remains unknown' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: Exact source revision expired; review again }
+        '503': { description: 'Source pack disabled, unavailable or still initializing' }
+        '504': { description: Bounded provider request timed out }
   /food-data/catalog/retail-evidence:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -491,12 +576,54 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Provider record not found }
         '409': { description: Active profile selection required }
+  /shopping-lists/{listId}/catalog-items:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['shoppingLists:create', 'shoppingLists:update', 'pantry:create']
+      operationId: confirmCatalogShoppingItem
+      summary: Confirm an exact catalog food and shopping cart match atomically
+      description: Creates or reuses the reviewed local product and immutable source snapshot, then matches a current list item or creates an in-cart item. It never records a purchase or adds stock. operationId is durable and bound to the authenticated account, active actor, list and command. Retry the identical command after a lost response; acknowledged replay succeeds during catalog outage. Changed scope requires a new review. Existing item matching requires expectedUpdatedAt; source changes require renewed review.
+      parameters:
+        - { name: listId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CatalogShoppingInput' }
+      responses:
+        '201':
+          description: Acknowledged product and shopping item; replayed identifies an existing outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [productId, itemId, listId, batchIds, reusedProduct, replayed]
+                properties:
+                  productId: { type: string, format: uuid }
+                  itemId: { type: string, format: uuid }
+                  listId: { type: string, format: uuid }
+                  batchIds: { type: array, maxItems: 0, items: { type: string } }
+                  reusedProduct: { type: boolean }
+                  replayed: { type: boolean }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '409': { description: 'List, item version, source revision or operation identity changed' }
+        '503':
+          {
+            description: Provider unavailable for a new confirmation; completed replay remains available,
+          }
   /food-data/imports:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
       x-api-permissions: ['pantry:create']
       operationId: importReviewedFoodData
       summary: Create or reuse a catalog product from a reviewed provider record without stock or intake
+      description: The exact reviewed revision is fetched before a new write. Completed operationId replay is account/actor/intent scoped and does not contact the provider. Reuse the operationId for an uncertain exact retry; never change its body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CatalogImportInput' }
       responses:
         '201':
           {
@@ -673,16 +800,24 @@ paths:
         schema: { type: string, format: uuid }
     patch:
       operationId: updateProfile
-      summary: Update a household profile’s preferences
+      summary: Update household identity or the signed-in account’s personal preferences
+      description: Identity changes use scope identity and cannot include regional or cooking preferences. The legacy full ProfileInput is accepted only for the signed-in account’s linked profile; otherwise personal_profile_scope (403) is returned. Both variants require an authenticated administrator in their own active profile. The direct handler enforces this boundary; a signed active-profile cookie is not authentication.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ProfileInput' }
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/ProfileIdentityUpdate' }
+                - { $ref: '#/components/schemas/ProfileInput' }
       responses:
         '200': { description: Profile updated }
         '400': { $ref: '#/components/responses/InvalidRequest' }
-        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '401': { description: An authenticated browser session is required }
+        '403':
+          {
+            description: 'Untrusted origin, administrator rights required, or wrong personal owner',
+          }
         '404': { description: Profile not found }
     post:
       operationId: setProfileArchiveState
@@ -695,7 +830,11 @@ paths:
       responses:
         '200': { description: Profile archive state updated }
         '400': { $ref: '#/components/responses/InvalidRequest' }
-        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '401': { description: An authenticated browser session is required }
+        '403':
+          {
+            description: 'Untrusted origin, administrator rights required, or wrong personal owner',
+          }
         '404': { description: Profile not found }
         '409': { description: Profile archive is unsafe or active }
   /tags:
@@ -1348,6 +1487,62 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Recipe photo not found }
         '409': { description: Profile selection required }
+  /recipes/{recipeId}/image-candidates/{candidateId}:
+    parameters:
+      - { name: recipeId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: candidateId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
+      operationId: getRecipeImageCandidate
+      summary: Check an owned image request without starting provider work
+      responses:
+        '200':
+          {
+            description: 'Candidate state including requested, ready, failed, discarded or accepted',
+          }
+        '404': { description: 'Request is unavailable to this account, active profile or recipe' }
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:update']
+      operationId: acceptRecipeImageCandidate
+      summary: Add the reviewed photo if its recipe revision is still current
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: { type: string, enum: [accept] }
+      responses:
+        '200':
+          {
+            description: Accepted candidate and saved image ID; exact acceptance replays this result,
+          }
+        '409': { description: Recipe changed or image is not ready }
+    delete:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:delete']
+      operationId: discardRecipeImageCandidate
+      summary: Discard an owned preview; provider work or billing may already have occurred
+      responses:
+        '200': { description: Discarded request retained for safe outcome reconciliation }
+        '409': { description: Image already saved; use the saved photo removal operation }
+  /recipes/{recipeId}/image-candidates/{candidateId}/file:
+    parameters:
+      - { name: recipeId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: candidateId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['recipes:read']
+      operationId: getRecipeImageCandidateFile
+      summary: Read an owned cleaned WebP preview
+      responses:
+        '200': { description: Private WebP image; no shared caching }
+        '404': { description: No image available for this request }
   /recipes/{recipeId}/images/generate:
     parameters:
       - name: recipeId
@@ -1358,14 +1553,42 @@ paths:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
       x-api-permissions: ['recipes:update']
       operationId: generateRecipeImage
-      summary: Explicitly generate and locally store one recipe serving image
+      summary: Generate a reviewed image preview or use the legacy direct-save contract
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/AiImageGenerationRequest' }
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/AiImageGenerationRequest' }
+                - type: object
+                  additionalProperties: false
+                  required: [confirm, preview, operationId, expectedRevision]
+                  properties:
+                    confirm: { type: boolean, const: true }
+                    preview: { type: boolean, const: true }
+                    operationId:
+                      {
+                        type: string,
+                        format: uuid,
+                        description: Reuse unchanged after an uncertain response; never generates twice,
+                      }
+                    expectedRevision: { type: integer, minimum: 1 }
+                    quality:
+                      {
+                        type: string,
+                        enum: [low, medium, high],
+                        description: Optional only when administrator permits overrides,
+                      }
+                    size: { type: string, enum: [1024x1024, 1536x1024, 1024x1536] }
       responses:
-        '201': { description: Local generated image ID and content-free audit summary }
+        '200':
+          { description: Prepared candidate or exact replay; not added to recipe until acceptance }
+        '202':
+          {
+            description: Prior request still pending; check existing candidate without regenerating,
+          }
+        '201': { description: Legacy direct-save image ID and content-free audit summary }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '404': { description: Recipe not found }
@@ -3270,6 +3493,330 @@ paths:
           description: Resource not found
         '409':
           description: The requested change conflicts with current state
+  /ai/prompts:
+    get:
+      operationId: listAiPromptGuidance
+      summary: Inspect installation task guidance and version history
+      description: Administrator session only. Default returns seven effective templates and up to ten revisions each. Use workload and before for older pages. Preview never includes private records or invokes a provider.
+      parameters:
+        - {
+            in: query,
+            name: workload,
+            schema:
+              {
+                type: string,
+                enum:
+                  [
+                    chat,
+                    recipe_review,
+                    recipe_generation,
+                    meal_plan_generation,
+                    nutrition_estimation,
+                    nutrition_summary,
+                    image_generation,
+                  ],
+              },
+          }
+        - { in: query, name: before, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          {
+            description: Effective guidance or a bounded history page,
+            content: { application/json: { schema: { type: object } } },
+          }
+        '401': { description: Signed out }
+        '403': { description: Installation administrator required }
+    put:
+      operationId: saveAiPromptGuidance
+      summary: Activate a validated new task-guidance version
+      description: Administrator session and exact trusted origin required. A rollback copies older guidance into a new version; expectedVersion prevents overwriting a competing edit. Immutable authorization and output schemas cannot be changed here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [workload, expectedVersion, template, changeNote]
+              properties:
+                workload:
+                  {
+                    type: string,
+                    enum:
+                      [
+                        chat,
+                        recipe_review,
+                        recipe_generation,
+                        meal_plan_generation,
+                        nutrition_estimation,
+                        nutrition_summary,
+                        image_generation,
+                      ],
+                  }
+                expectedVersion: { type: integer, minimum: 0 }
+                template:
+                  {
+                    type: string,
+                    minLength: 20,
+                    maxLength: 6000,
+                    description: 'Must contain {{task}} and no unsupported variables.',
+                  }
+                changeNote: { type: string, minLength: 3, maxLength: 400 }
+      responses:
+        '200':
+          {
+            description: New authoritative prompt version,
+            content: { application/json: { schema: { type: object } } },
+          }
+        '400': { description: Invalid template variables or fields }
+        '401': { description: Signed out }
+        '403': { description: Administrator or trusted origin required }
+        '409': { description: Version changed; retain draft and compare current guidance }
+  /ai/chat/threads:
+    get:
+      operationId: listMyAiConversations
+      summary: List account-owned conversations
+      description: Session only. The linked account owns this private workspace; viewing another household person does not grant access to their conversations.
+      responses:
+        '200':
+          {
+            description: Recent conversation identities,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            threads:
+                              {
+                                type: array,
+                                items:
+                                  {
+                                    type: object,
+                                    properties:
+                                      {
+                                        id: { type: string, format: uuid },
+                                        title: { type: string },
+                                      },
+                                  },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
+        '401': { description: Signed out }
+        '403': { description: Switch to your own account profile }
+    post:
+      operationId: createMyAiConversation
+      summary: Start an account-owned conversation without making a provider request
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    additionalProperties: false,
+                    properties: { title: { type: string, minLength: 1, maxLength: 80 } },
+                  },
+              },
+          }
+      responses:
+        '201':
+          {
+            description: Conversation created,
+            content: { application/json: { schema: { type: object } } },
+          }
+        '400': { description: Invalid title }
+        '401': { description: Signed out }
+        '403': { description: 'Account scope, AI policy or trusted origin denied' }
+  /ai/chat/threads/{threadId}:
+    parameters:
+      - { in: path, name: threadId, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: readMyAiConversation
+      summary: Reconcile saved messages, previews, jobs and request outcomes
+      description: Session only; only the linked account's own thread. Turn receipts expose id, status, createdAt and updatedAt, never intent hashes or stored result payloads. A running receipt may require outcome reconciliation; it does not establish failure.
+      responses:
+        '200':
+          {
+            description: Authoritative saved conversation and up to thirty request receipts,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            messages: { type: array, items: { type: object } },
+                            actions: { type: array, items: { type: object } },
+                            jobs: { type: array, items: { type: object } },
+                            turns:
+                              {
+                                type: array,
+                                maxItems: 30,
+                                items:
+                                  {
+                                    type: object,
+                                    properties:
+                                      {
+                                        id: { type: string, format: uuid },
+                                        status:
+                                          {
+                                            type: string,
+                                            enum: [running, completed, failed, cancelled],
+                                          },
+                                        createdAt: { type: string, format: date-time },
+                                        updatedAt: { type: string, format: date-time },
+                                      },
+                                  },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
+        '401': { description: Signed out }
+        '403': { description: Account does not own this private workspace }
+        '404': { description: Conversation not found }
+    delete:
+      operationId: deleteMyAiConversation
+      summary: Delete an account-owned conversation
+      responses:
+        '204': { description: Conversation deleted }
+        '401': { description: Signed out }
+        '403': { description: Account or trusted origin denied }
+        '404': { description: Conversation not found }
+  /ai/chat/threads/{threadId}/messages:
+    parameters:
+      - { in: path, name: threadId, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: streamMyAiConversationTurn
+      summary: Stream a bounded provider turn with a durable exact request identity
+      description: >-
+        Session and trusted origin required. Send one operationId for the normalized message, attachments and tool consent; reuse that same intent after a lost response. A completed operation replays its saved result before contacting the provider. Running, failed or cancelled attempts require conversation reconciliation and never automatically repeat provider work.
+        Events have increasing sequence numbers and types status, text_reset, text, action, job, suggestion, app_action, error and done. Text deltas arrive while the provider is working; done contains canonical saved content. A stream ending without done is incomplete. Closing or stopping never undoes an acknowledged job or proposal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                operationId: { type: string, format: uuid }
+                message: { type: string, maxLength: 8000 }
+                allowPaidTools: { type: boolean, default: false }
+                attachments: { type: array, maxItems: 20, items: { type: object } }
+      responses:
+        '200':
+          {
+            description: Incremental UTF-8 NDJSON; an error event is not completion,
+            content: { application/x-ndjson: { schema: { type: string } } },
+          }
+        '400': { description: Invalid bounded message or attachment }
+        '401': { description: Signed out }
+        '403': { description: 'Session, account, sharing or AI policy denied' }
+        '404': { description: Conversation not found }
+        '429': { description: Account request budget reached }
+  /ai/app-actions:
+    get:
+      operationId: listMyReviewedAiActions
+      summary: Reconcile account-owned proposals and per-step outcomes
+      parameters:
+        - { in: query, name: threadId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          {
+            description: Pending and handled proposals with results,
+            content: { application/json: { schema: { type: object } } },
+          }
+        '401': { description: Signed out }
+        '403': { description: AI access denied }
+    post:
+      operationId: confirmMyReviewedAiActions
+      summary: Apply or dismiss the exact reviewed proposal
+      description: >-
+        Revalidates actor, permissions, sharing, source versions and dependency contracts before execution. Steps execute in order using server-bound output IDs. A failure stops later steps; only acknowledged steps are completed. Lost mutation outcomes are reported as outcome-unknown and are not automatically retried. Repeating an acknowledged confirmation returns stored results without repeating writes. Image groups require explicit paid confirmation and are queued separately.
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    additionalProperties: false,
+                    required: [id, version, decision],
+                    properties:
+                      {
+                        id: { type: string, format: uuid },
+                        version: { type: integer, minimum: 1 },
+                        decision: { type: string, enum: [apply, dismiss] },
+                      },
+                  },
+              },
+          }
+      responses:
+        '200':
+          {
+            description: 'Applied, partial, queued or dismissed with per-step outcomes',
+            content: { application/json: { schema: { type: object } } },
+          }
+        '400': { description: Invalid reviewed command }
+        '401': { description: Signed out }
+        '403': { description: Authority or sharing changed }
+        '409': { description: 'Proposal expired, superseded, busy or source changed' }
+    put:
+      operationId: reviseMyReviewedAiActions
+      summary: Prepare edited values as a new proposal and supersede the previous review
+      description: No domain mutation occurs. Existing operation IDs, targets and dependency bindings are retained. Inputs and current source snapshots are revalidated. Applying the superseded review is rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, version, title, bodyEdits]
+              properties:
+                id: { type: string, format: uuid }
+                version: { type: integer, minimum: 1 }
+                title: { type: string, minLength: 1, maxLength: 160 }
+                bodyEdits:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    {
+                      type: object,
+                      additionalProperties: false,
+                      required: [step, bodyJson],
+                      properties:
+                        {
+                          step: { type: integer, minimum: 0, maximum: 19 },
+                          bodyJson: { type: string, minLength: 2, maxLength: 60000 },
+                        },
+                    }
+      responses:
+        '200':
+          {
+            description: Fresh review; previous proposal is inactive,
+            content: { application/json: { schema: { type: object } } },
+          }
+        '400': { description: Invalid replacement values }
+        '401': { description: Signed out }
+        '403': { description: Authority or sharing changed }
+        '409': { description: Proposal version changed or was handled }
 components:
   securitySchemes:
     SessionCookie:
@@ -3309,6 +3856,81 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    CatalogMeasuresInput:
+      type: object
+      additionalProperties: false
+      required: [reference]
+      properties:
+        reference: { $ref: '#/components/schemas/CatalogReference' }
+        form: { type: string, minLength: 1, maxLength: 80 }
+        basis: { type: string, minLength: 1, maxLength: 80 }
+    StorageGuidanceInput:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query: { type: string, minLength: 2, maxLength: 200 }
+        form: { type: string, minLength: 1, maxLength: 80 }
+        storageState: { type: string, minLength: 1, maxLength: 80 }
+        cursor: { type: string, minLength: 1, maxLength: 2048 }
+    CatalogEnrichmentInput:
+      type: object
+      additionalProperties: false
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [lineId, productId]
+            properties:
+              lineId: { type: string, minLength: 1, maxLength: 160 }
+              productId: { type: string, minLength: 1, maxLength: 160 }
+              storeId: { type: string, minLength: 1, maxLength: 160 }
+    CatalogImportInput:
+      type: object
+      required: [operationId, selection, product]
+      properties:
+        operationId: { type: string, format: uuid }
+        selection:
+          type: object
+          required: [provider, recordId]
+          properties:
+            provider: { type: string, enum: [usda_fdc, open_food_facts] }
+            recordId: { type: string, minLength: 1, maxLength: 160 }
+            expectedCanonicalGtin:
+              { type: [string, 'null'], minLength: 14, maxLength: 14, default: null }
+            catalogRef: { $ref: '#/components/schemas/CatalogReference' }
+        product:
+          type: object
+          additionalProperties: false
+          required: [displayName]
+          properties:
+            displayName: { type: string, minLength: 1, maxLength: 160 }
+            brand: { type: string, maxLength: 120, default: '' }
+            variant: { type: string, maxLength: 120, default: '' }
+            category: { type: string, maxLength: 80, default: '' }
+            defaultInventoryUnit: { type: string, minLength: 1, maxLength: 30, default: each }
+            defaultPackageAmount:
+              { type: [number, 'null'], exclusiveMinimum: 0, maximum: 1000000, default: null }
+            defaultPackageUnit: { type: string, maxLength: 30, default: '' }
+            allergens:
+              { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 } }
+            dietaryTags:
+              { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 } }
+    CatalogShoppingInput:
+      allOf:
+        - { $ref: '#/components/schemas/CatalogImportInput' }
+        - type: object
+          required: [cartQuantity, cartUnit]
+          properties:
+            itemId: { type: string, format: uuid }
+            expectedUpdatedAt: { type: string, format: date-time }
+            cartQuantity: { type: number, exclusiveMinimum: 0, maximum: 10000 }
+            cartUnit: { type: string, minLength: 1, maxLength: 30 }
     CatalogReference:
       type: object
       additionalProperties: false
@@ -3503,6 +4125,20 @@ components:
         name: { type: string }
         quantity: { type: string }
         category: { type: string }
+    ProfileIdentityUpdate:
+      type: object
+      additionalProperties: false
+      required: [scope, displayName, color]
+      properties:
+        scope: { type: string, enum: [identity] }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        color: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+        avatarUrl:
+          {
+            type: string,
+            maxLength: 2048,
+            description: An absolute avatar URL or empty string to clear it.,
+          }
     ProfileInput:
       type: object
       required: [displayName, color, units, temperatureUnit, locale, timezone]

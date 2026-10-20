@@ -221,3 +221,15 @@
   flex-basis: 100%;
   font-weight: 400;
 }
+
+.qualifications {
+  border-left: 2px solid var(--line);
+  padding-left: 0.75rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.qualifications ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}

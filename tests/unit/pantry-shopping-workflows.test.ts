@@ -503,6 +503,38 @@ describe('whole-trip review and item editing', () => {
     await act(async () => window.dispatchEvent(new Event('focus')));
     expect(screen.queryByRole('button', { name: 'Edit Potatoes' })).toBeNull();
   });
+  it('shows recorded recipe demand without filling an unknown purchase quantity', async () => {
+    const generatedList = {
+      ...list,
+      items: [
+        {
+          ...list.items[0]!,
+          pantry: {
+            demandState: 'uncertain',
+            formulaInputs: JSON.stringify({ recipeRequirement: 333, unit: 'g' }),
+            generatedUnit: 'g',
+            provenance: 'recipe',
+            manualQuantityOverride: false,
+          },
+        },
+      ],
+    } as unknown as ShoppingListDetail;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ list: generatedList })),
+    );
+    wrap(
+      createElement(ShoppingListEditor, {
+        list: generatedList,
+        initialPantryOptions: { products: [], locations: [] },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Manage list' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Edit Potatoes' })));
+    const dialog = screen.getByRole('dialog', { name: 'Edit item' });
+    expect(within(dialog).getByText(/Planned recipe demand: 333 g/)).toBeTruthy();
+    expect((within(dialog).getByLabelText('To buy quantity') as HTMLInputElement).value).toBe('');
+  });
   it('uses a labelled editor and keeps invalid quantity input for correction', async () => {
     const fetchMock = vi.fn(async () => Response.json({ list }));
     vi.stubGlobal('fetch', fetchMock);

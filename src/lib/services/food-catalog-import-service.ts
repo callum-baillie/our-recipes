@@ -13,12 +13,18 @@ import {
   pantryProductIdentifiers,
   pantryProductProviderLinks,
   pantryProducts,
+  shoppingListItems,
 } from '@/lib/db/schema';
 import {
   FoodDataError,
+  foodCatalogShoppingInputSchema,
   type FoodCatalogImportInput,
   type FoodRecord,
 } from '@/lib/domain/food-data';
+import { getFoodDetails } from './food-data-service';
+import { isNativeCatalogEnabled, directFoodFallbackAllowed } from './bord-catalog-service';
+import { addShoppingListItem, getShoppingList, updateShoppingListItem } from './planning-service';
+import { matchShoppingItemToPantryProduct } from './pantry-grocery-cooking-service';
 import { normalizePantryName, pantryBatchInputSchema } from '@/lib/domain/pantry';
 import { normalizeInventoryUnit } from '@/lib/domain/inventory-units';
 import {
@@ -135,6 +141,8 @@ export function importFoodCatalogRecord(args: {
   input: FoodCatalogImportInput;
   record: FoodRecord;
   actorProfileId: string;
+  /** Authenticated account identity for HTTP/assistant calls, independent of viewed profile. */
+  actorUserId?: string;
   destination: 'catalog' | 'pantry';
   batches?: unknown[];
 }) {
@@ -158,7 +166,12 @@ export function importFoodCatalogRecord(args: {
       'REVISION_EXPIRED',
       'The reviewed food revision changed. Review it again.',
     );
-  const requestDigest = digest({ input, destination, batches: args.batches ?? [] });
+  const requestDigest = digest({
+    input,
+    destination,
+    batches: args.batches ?? [],
+    ...(args.actorUserId ? { actorUserId: args.actorUserId } : {}),
+  });
   const database = getDatabase();
   const existingOperation = database
     .select()
@@ -166,7 +179,12 @@ export function importFoodCatalogRecord(args: {
     .where(eq(foodCatalogImportOperations.id, input.operationId))
     .get();
   if (existingOperation) {
-    if (existingOperation.requestDigest !== requestDigest)
+    if (
+      existingOperation.actorProfileId !== actorProfileId ||
+      ![requestDigest, digest({ input, destination, batches: args.batches ?? [] })].includes(
+        existingOperation.requestDigest,
+      )
+    )
       throw new PantryConflictError(
         'That import operation ID was already used for different data.',
       );
@@ -390,7 +408,9 @@ export function importFoodCatalogRecord(args: {
 export function replayFoodCatalogImport(
   input: FoodCatalogImportInput,
   destination: 'catalog' | 'pantry',
+  actorProfileId: string,
   batches: unknown[] = [],
+  actorUserId?: string,
 ) {
   ensureDatabase();
   const operation = getDatabase()
@@ -399,11 +419,162 @@ export function replayFoodCatalogImport(
     .where(eq(foodCatalogImportOperations.id, input.operationId))
     .get();
   if (!operation) return null;
-  if (operation.requestDigest !== digest({ input, destination, batches }))
+  // Validate the same actor and normalized command before returning an acknowledged result.
+  // Older receipts predate account binding; their original profile+intent binding still applies.
+  // New account-bound receipts cannot match the legacy digest.
+  if (
+    operation.actorProfileId !== actorProfileId ||
+    ![
+      digest({ input, destination, batches, ...(actorUserId ? { actorUserId } : {}) }),
+      digest({ input, destination, batches }),
+    ].includes(operation.requestDigest)
+  )
     throw new PantryConflictError('That import operation ID was already used for different data.');
   return JSON.parse(operation.result) as {
     productId: string;
     batchIds: string[];
     reusedProduct: boolean;
   };
+}
+
+/** Confirm a reviewed catalog identity and a shopping match in one durable local transaction. */
+export async function confirmCatalogShoppingItem(args: {
+  input: unknown;
+  listId: string;
+  actorProfileId: string;
+  actorUserId: string;
+}) {
+  const input = foodCatalogShoppingInputSchema.parse(args.input);
+  const { itemId, expectedUpdatedAt, cartQuantity, cartUnit, ...catalogInput } = input;
+  ensureDatabase();
+  const database = getDatabase();
+  const requestDigest = digest({
+    input,
+    listId: args.listId,
+    actorUserId: args.actorUserId,
+    operation: 'catalog-shopping-item',
+  });
+  const replay = () => {
+    const operation = database
+      .select()
+      .from(foodCatalogImportOperations)
+      .where(eq(foodCatalogImportOperations.id, input.operationId))
+      .get();
+    if (!operation) return null;
+    if (
+      operation.actorProfileId !== args.actorProfileId ||
+      operation.requestDigest !== requestDigest
+    )
+      throw new PantryConflictError(
+        'That confirmation belongs to a different person or shopping selection.',
+      );
+    return JSON.parse(operation.result) as {
+      productId: string;
+      itemId: string;
+      listId: string;
+      batchIds: string[];
+      reusedProduct: boolean;
+    };
+  };
+  // Authorization is performed by the caller before this scope-bound replay. No provider is needed.
+  const acknowledged = replay();
+  if (acknowledged) return { ...acknowledged, replayed: true };
+  const list = getShoppingList(args.listId);
+  if (!list || list.archivedAt) throw new PantryConflictError('Choose an available shopping list.');
+  if (
+    isNativeCatalogEnabled() &&
+    !directFoodFallbackAllowed() &&
+    !catalogInput.selection.catalogRef
+  )
+    throw new FoodDataError(
+      'REVISION_EXPIRED',
+      'Review this food through the catalog before saving.',
+    );
+  const { record } = await getFoodDetails(
+    catalogInput.selection.provider,
+    catalogInput.selection.recordId,
+    'en',
+    catalogInput.selection.catalogRef,
+    true,
+  );
+  return database.transaction(() => {
+    const currentReplay = replay();
+    if (currentReplay) return { ...currentReplay, replayed: true };
+    const currentList = getShoppingList(args.listId);
+    if (!currentList || currentList.archivedAt)
+      throw new PantryConflictError('The shopping list changed. Review it again.');
+    const existing = itemId
+      ? database
+          .select()
+          .from(shoppingListItems)
+          .where(and(eq(shoppingListItems.listId, args.listId), eq(shoppingListItems.id, itemId)))
+          .get()
+      : null;
+    if (itemId && (!existing || existing.updatedAt.toISOString() !== expectedUpdatedAt))
+      throw new PantryConflictError(
+        'The shopping item changed. Refresh and review the match again.',
+      );
+    const imported = importFoodCatalogRecord({
+      input: catalogInput,
+      record,
+      actorProfileId: args.actorProfileId,
+      actorUserId: args.actorUserId,
+      destination: 'catalog',
+    });
+    let savedItemId: string;
+    if (existing) {
+      savedItemId = existing.id;
+      matchShoppingItemToPantryProduct(
+        args.listId,
+        savedItemId,
+        { productId: imported.productId, matchType: 'manual' },
+        args.actorProfileId,
+      );
+      updateShoppingListItem(
+        args.listId,
+        savedItemId,
+        {
+          item: existing.item,
+          quantity: existing.quantity ?? '',
+          unit: existing.unit,
+          note: existing.note,
+          aisleId: existing.aisleId ?? '',
+          checked: false,
+          shoppingState: 'in_cart',
+          cartQuantity,
+          cartLabel: `${cartQuantity} ${cartUnit} · ${record.displayName}`.slice(0, 160),
+        },
+        args.actorProfileId,
+      );
+    } else {
+      savedItemId = addShoppingListItem(
+        args.listId,
+        {
+          item: catalogInput.product.displayName,
+          quantity: '',
+          unit: '',
+          note: '',
+          checked: false,
+          shoppingState: 'in_cart',
+          cartQuantity,
+          cartLabel: `${cartQuantity} ${cartUnit} · ${record.displayName}`.slice(0, 160),
+          productId: imported.productId,
+        },
+        args.actorProfileId,
+      ).id;
+    }
+    const result = {
+      productId: imported.productId,
+      batchIds: [],
+      reusedProduct: imported.reusedProduct,
+      itemId: savedItemId,
+      listId: args.listId,
+    };
+    database
+      .update(foodCatalogImportOperations)
+      .set({ requestDigest, result: JSON.stringify(result) })
+      .where(eq(foodCatalogImportOperations.id, input.operationId))
+      .run();
+    return { ...result, replayed: false };
+  });
 }

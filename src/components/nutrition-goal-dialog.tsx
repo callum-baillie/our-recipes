@@ -103,7 +103,7 @@ export function NutritionGoalDialog({
       draft.nutrientCode === 'energy_kcal' &&
       draft.kind === 'target');
   function change(patch: Partial<typeof draft>) {
-    update({ ...patch, operationId: '', origin: 'manual' });
+    update({ ...patch, operationId: '' });
   }
   function selectGoal(id: string) {
     const goal = goals.find((item) => item.id === id);
@@ -111,6 +111,7 @@ export function NutritionGoalDialog({
       goal
         ? {
             editingId: id,
+            origin: 'manual',
             nutrientCode: goal.nutrientCode,
             kind: goal.kind,
             value: goal.value?.toString() ?? '',
@@ -122,6 +123,7 @@ export function NutritionGoalDialog({
           }
         : {
             editingId: '',
+            origin: 'manual',
             value: '',
             minimum: '',
             maximum: '',
@@ -317,6 +319,18 @@ export function NutritionGoalDialog({
                 ? `Editing this exact saved version creates its next revision and preserves history.`
                 : 'Adding creates a new goal series. Choose an existing goal above to edit it instead.'}
             </p>
+            {draft.origin === 'estimate' && (
+              <div className={styles.feedback} role="status">
+                <p>
+                  {validEstimatedDraft
+                    ? 'This draft uses the reviewed estimate and saved profile version.'
+                    : 'The estimate basis or value changed. Recalculate and use the reviewed draft, or deliberately convert these values to a manual goal.'}
+                </p>
+                <button type="button" onClick={() => change({ origin: 'manual' })}>
+                  Convert this draft to a manual goal
+                </button>
+              </div>
+            )}
             <div className={styles.formGrid}>
               <label>
                 Nutrient
@@ -453,6 +467,7 @@ export function NutritionGoalDialog({
                           (!goal.endsOn || goal.endsOn >= draft.startsOn),
                       );
                       change({
+                        origin: 'manual',
                         nutrientCode: 'energy_kcal',
                         kind: 'target',
                         value: String(value),

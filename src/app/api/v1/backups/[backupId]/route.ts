@@ -1,3 +1,4 @@
+import { adminRequestError } from '@/lib/services/admin-request-service';
 import { NextResponse } from 'next/server';
 
 import { jsonError } from '@/lib/http';
@@ -10,7 +11,9 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_request: Request, context: { params: Promise<{ backupId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ backupId: string }> }) {
+  const accessError = await adminRequestError(request);
+  if (accessError) return accessError;
   try {
     return NextResponse.json({ backup: await previewBackup((await context.params).backupId) });
   } catch (error) {

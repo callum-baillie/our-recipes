@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { requireAdminSession, listProfileAccessAccounts } from '@/lib/services/auth-service';
+import {
+  getAuthenticatedSessionPrincipal,
+  requireAdminSession,
+  listProfileAccessAccounts,
+} from '@/lib/services/auth-service';
 import { adminAuthError } from '@/app/api/v1/admin/api-keys/_shared';
 import { listHouseholdGuardianAssignments } from '@/lib/services/nutrition-profile-service';
 import { profileInputSchema } from '@/lib/domain/setup';
@@ -32,13 +36,48 @@ export async function GET(request: Request) {
     }
   }
 
+  const principal = await getAuthenticatedSessionPrincipal(request);
+  if (!principal)
+    return jsonError(401, 'authentication_required', 'Sign in to view household profiles.');
   const includeArchived = new URL(request.url).searchParams.get('includeArchived') === 'true';
-  return NextResponse.json(getHouseholdState(includeArchived).profiles);
+  return NextResponse.json(
+    getHouseholdState(includeArchived).profiles.map(
+      ({
+        id,
+        displayName,
+        color,
+        avatarUrl,
+        archivedAt,
+        units,
+        temperatureUnit,
+        locale,
+        timezone,
+      }) => ({
+        id,
+        displayName,
+        color,
+        avatarUrl,
+        archivedAt,
+        units,
+        temperatureUnit,
+        locale,
+        timezone,
+      }),
+    ),
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  );
 }
 
 export async function POST(request: Request) {
   if (!hasTrustedMutationOrigin(request)) {
     return jsonError(403, 'untrusted_origin', 'This change must come from a trusted app origin.');
+  }
+  try {
+    await requireAdminSession(request, { fresh: false });
+  } catch (error) {
+    const response = adminAuthError(error);
+    if (response) return response;
+    throw error;
   }
   const parsed = profileInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, 'invalid_request', 'Check the profile details.');

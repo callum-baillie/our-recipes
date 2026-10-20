@@ -84,6 +84,7 @@ type RecordContext = {
   today: string;
   definitions: NutrientDefinition[];
   workspace: NutritionDataWorkspaceData;
+  onNavigate?: () => void;
   onSaved?: (message: string, date: string) => void;
   onBusy?: (busy: boolean) => void;
   onDirty?: (dirty: boolean) => void;
@@ -211,6 +212,7 @@ export function NutritionRecordingDialog({
           key={`${context.profile.id}:${mode}:${context.date}`}
           {...context}
           mode={mode}
+          onNavigate={onClose}
           onMode={changeMode}
           onBusy={setBusy}
           onDirty={setDirty}
@@ -229,6 +231,7 @@ export function NutritionRecordForm({
   definitions,
   workspace,
   onSaved,
+  onNavigate,
   onBusy,
   onDirty,
   onMode,
@@ -281,6 +284,10 @@ export function NutritionRecordForm({
     onDirty?.(dirty);
   }, [dirty, onDirty]);
   const [search, setSearch] = useState('');
+  const [measurementError, setMeasurementError] = useState<{
+    name: string;
+    message: string;
+  } | null>(null);
   const [savedDestination, setSavedDestination] = useState<{
     date: string;
     profileId: string;
@@ -322,10 +329,22 @@ export function NutritionRecordForm({
         {label}
         <input
           name={name}
+          aria-invalid={measurementError?.name === name || undefined}
+          aria-describedby={
+            measurementError?.name === name ? `measurement-error-${name}` : undefined
+          }
           value={draft[name] ?? ''}
-          onChange={(event) => change({ [name]: event.target.value })}
+          onChange={(event) => {
+            if (measurementError?.name === name) setMeasurementError(null);
+            change({ [name]: event.target.value });
+          }}
           {...options}
         />
+        {measurementError?.name === name && (
+          <span id={`measurement-error-${name}`} className="form-error">
+            {measurementError.message}
+          </span>
+        )}
       </label>
     );
   }
@@ -347,6 +366,7 @@ export function NutritionRecordForm({
   }
   function invalidateMeasurement(name: string, message: string) {
     setAdvancedOpen(true);
+    setMeasurementError({ name, message });
     request.message(task, 'error', message);
     window.requestAnimationFrame(() => {
       const input = formRef.current?.elements.namedItem(name);
@@ -1003,14 +1023,36 @@ export function NutritionRecordForm({
               </Link>
             )}
         </NutritionFeedback>
-        {savedDestination && savedDestination.profileId !== profile.id && (
-          <p className={styles.helper}>
-            To view the destination diary, switch to{' '}
-            {profiles.find((item) => item.id === savedDestination.profileId)?.displayName ??
-              'that person'}{' '}
-            in the app header, then open {savedDestination.date} in Food diary.
-          </p>
-        )}
+        {savedDestination &&
+          savedDestination.profileId !== profile.id &&
+          (() => {
+            const recipient = profiles.find((item) => item.id === savedDestination.profileId);
+            return recipient?.linkedHouseholdProfileId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate?.();
+                  window.requestAnimationFrame(() =>
+                    window.dispatchEvent(
+                      new CustomEvent('bord:open-profile-diary', {
+                        detail: {
+                          householdProfileId: recipient.linkedHouseholdProfileId,
+                          date: savedDestination.date,
+                        },
+                      }),
+                    ),
+                  );
+                }}
+              >
+                Open {recipient.displayName}’s diary for {savedDestination.date} · verify profile
+              </button>
+            ) : (
+              <p className={styles.helper}>
+                This destination has no linked household sign-in. Use its authorised Nutrition
+                access to review {savedDestination.date}.
+              </p>
+            );
+          })()}
         {draft.uncertain && (
           <>
             <Link className="inline-link" href="/nutrition?view=diary" target="_blank">

@@ -40,14 +40,18 @@ export async function boundedDecisionJson(request: Request, maximum = 16_384) {
 }
 export function decisionErrorResponse(error: unknown) {
   const status =
-    error instanceof DecisionError ? error.status : error instanceof z.ZodError ? 400 : 500;
+    error instanceof DecisionError
+      ? error.status
+      : error instanceof z.ZodError || error instanceof SyntaxError
+        ? 400
+        : 500;
   return Response.json(
     {
       error: {
         message:
           error instanceof DecisionError
             ? error.message
-            : error instanceof z.ZodError
+            : error instanceof z.ZodError || error instanceof SyntaxError
               ? 'Check the selection and request fields.'
               : 'Unable to prepare suggestions. Please try again.',
       },

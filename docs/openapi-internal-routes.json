@@ -1,11 +1,6 @@
 [
   {
     "method": "DELETE",
-    "path": "/ai/chat/threads/{threadId}",
-    "reason": "First-party assistant UI storage command; no external compatibility contract."
-  },
-  {
-    "method": "DELETE",
     "path": "/nutrition/profiles/{profileId}/data",
     "reason": "Destructive first-party Nutrition maintenance command."
   },
@@ -33,16 +28,6 @@
     "method": "GET",
     "path": "/ai/actions/{actionId}/image",
     "reason": "Ephemeral first-party assistant preview asset."
-  },
-  {
-    "method": "GET",
-    "path": "/ai/chat/threads",
-    "reason": "First-party assistant UI storage query."
-  },
-  {
-    "method": "GET",
-    "path": "/ai/chat/threads/{threadId}",
-    "reason": "First-party assistant UI storage query."
   },
   {
     "method": "GET",
@@ -128,16 +113,6 @@
     "method": "PATCH",
     "path": "/nutrition/profiles/{profileId}",
     "reason": "First-party linked Nutrition profile command."
-  },
-  {
-    "method": "POST",
-    "path": "/ai/chat/threads",
-    "reason": "First-party assistant UI storage command."
-  },
-  {
-    "method": "POST",
-    "path": "/ai/chat/threads/{threadId}/messages",
-    "reason": "First-party assistant command with review-gated actions."
   },
   {
     "method": "POST",
@@ -328,16 +303,6 @@
     "method": "PATCH",
     "path": "/ai/store-map",
     "reason": "Session-only AI assistance with explicit paid-call consent, scoped evidence cache and user correction history."
-  },
-  {
-    "method": "GET",
-    "path": "/ai/app-actions",
-    "reason": "Session-only, account-owned chat proposals. Mutations require explicit review, trusted origins and existing core API authorization."
-  },
-  {
-    "method": "POST",
-    "path": "/ai/app-actions",
-    "reason": "Session-only, account-owned chat proposals. Mutations require explicit review, trusted origins and existing core API authorization."
   },
   {
     "method": "PATCH",

@@ -73,25 +73,25 @@ test('recipe toolbar and reviewed AI enhancements work across mobile and desktop
       if (width < 650) {
         expect(controlBox.width).toBeGreaterThanOrEqual(44);
         expect(controlBox.y).toBeCloseTo((await controls[0].boundingBox())!.y, 1);
-        await expect(control.locator('.recipe-toolbar-label')).toBeHidden();
+        await expect(control.locator('.recipe-toolbar-label')).toBeVisible();
       } else await expect(control.locator('.recipe-toolbar-label')).toBeVisible();
     }
     expect(box!.y).toBeGreaterThan((await page.locator('h1').boundingBox())!.y);
     await page.screenshot({ path: `/tmp/bord-recipe-toolbar-${width}.png` });
   }
-  await toolbar.getByRole('button', { name: 'Like this recipe' }).click();
-  await expect(toolbar.getByRole('button', { name: 'Remove favorite' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await toolbar.getByRole('button', { name: 'Like this recipe', exact: true }).click();
+  await expect(
+    toolbar.getByRole('button', { name: 'Clear positive reaction', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await page.reload();
-  await expect(toolbar.getByRole('button', { name: 'Remove favorite' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(
+    toolbar.getByRole('button', { name: 'Clear positive reaction', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await toolbar.getByRole('link', { name: 'Cook this recipe' }).focus();
   await page.keyboard.press('ArrowRight');
-  await expect(toolbar.getByRole('button', { name: 'Remove favorite' })).toBeFocused();
+  await expect(
+    toolbar.getByRole('button', { name: 'Clear positive reaction', exact: true }),
+  ).toBeFocused();
 
   let generations = 0;
   let release!: () => void;

@@ -15,6 +15,14 @@ import {
 import { normalizeAiRecipeCandidate } from '@/lib/domain/ai-candidate-normalization';
 import type { RecipePayload } from '@/lib/domain/recipe';
 import type { AiReasoningEffort } from '@/lib/domain/ai-assistant';
+import {
+  recipeImagePrompt,
+  type AiImageGenerationInput,
+  type RecipeImageQuality,
+  type RecipeImageSize,
+} from '@/lib/domain/recipe-image-generation';
+export { recipeImagePrompt } from '@/lib/domain/recipe-image-generation';
+export type { AiImageGenerationInput } from '@/lib/domain/recipe-image-generation';
 
 export const OPENAI_REVIEW_MODEL = 'gpt-6-luna';
 export const OPENAI_IMAGE_MODEL = 'gpt-image-2';
@@ -34,12 +42,6 @@ export type AiVisionReviewInput = AiReviewRequest & {
 export type AiRecipeImprovementInput = {
   recipe: RecipePayload;
   mode?: 'enhance';
-};
-
-export type AiImageGenerationInput = {
-  recipeTitle: string;
-  recipeSummary: string;
-  ingredientNames: string[];
 };
 
 export type AiNutritionEstimationInput = {
@@ -63,28 +65,29 @@ export type AiGeneratedImage = {
   altText: string;
 };
 
-export type AiProviderOptions = { model?: string; reasoningEffort?: AiReasoningEffort | null };
+export type AiProviderOptions = {
+  model?: string;
+  reasoningEffort?: AiReasoningEffort | null;
+  promptGuidance?: string;
+  promptVersion?: string;
+  maxOutputTokens?: number;
+  requestTimeoutSeconds?: number;
+  imageQuality?: RecipeImageQuality;
+  imageSize?: RecipeImageSize;
+  signal?: AbortSignal;
+};
 
-export function recipeImagePrompt(input: AiImageGenerationInput): string {
-  const title = input.recipeTitle
-    .replace(/[\r\n]+/gu, ' ')
-    .trim()
-    .slice(0, 160);
-  const summary = input.recipeSummary
-    .replace(/[\r\n]+/gu, ' ')
-    .trim()
-    .slice(0, 800);
-  const ingredients = input.ingredientNames
-    .map((ingredient) =>
-      ingredient
-        .replace(/[\r\n]+/gu, ' ')
-        .trim()
-        .slice(0, 80),
-    )
-    .filter(Boolean)
-    .slice(0, 24)
-    .join(', ');
-  return `Create an appetizing editorial food photograph for the household recipe "${title}". ${summary ? `Recipe note: ${summary}. ` : ''}Key ingredients: ${ingredients || 'not specified'}. Show the finished dish only, with no text, logos, labels, watermarks, or people.`;
+function withGuidance(instructions: string, options?: AiProviderOptions): string {
+  return options?.promptGuidance
+    ? `${instructions}\nThese immutable safety and output rules take precedence over the following administrator task guidance:\n${options.promptGuidance.slice(0, 12000)}`
+    : instructions;
+}
+function requestOptions(options?: AiProviderOptions) {
+  return {
+    signal: options?.signal,
+    timeout: Math.min(600, Math.max(10, options?.requestTimeoutSeconds ?? 180)) * 1000,
+    maxRetries: 0,
+  };
 }
 
 export interface AiProvider {
@@ -122,10 +125,13 @@ export class AiProviderRequestError extends Error {
 
 type OpenAiClient = {
   responses: {
-    parse: (request: unknown) => Promise<{ output_parsed: unknown }>;
+    parse: (request: unknown, options?: unknown) => Promise<{ output_parsed: unknown }>;
   };
   images: {
-    generate: (request: unknown) => Promise<{ data?: Array<{ b64_json?: string }> }>;
+    generate: (
+      request: unknown,
+      options?: unknown,
+    ) => Promise<{ data?: Array<{ b64_json?: string }> }>;
   };
 };
 
@@ -272,21 +278,25 @@ export class OpenAiProvider implements AiProvider {
     options?: AiProviderOptions,
   ): Promise<AiNutritionEstimate> {
     try {
-      const response = await this.client.responses.parse({
-        model: options?.model ?? OPENAI_REVIEW_MODEL,
-        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
-        store: false,
-        instructions: nutritionInstructions,
-        input: [
-          {
-            role: 'user',
-            content: `Untrusted saved recipe data follows:\n${JSON.stringify(input)}`,
+      const response = await this.client.responses.parse(
+        {
+          model: options?.model ?? OPENAI_REVIEW_MODEL,
+          ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+          store: false,
+          ...(options?.maxOutputTokens ? { max_output_tokens: options.maxOutputTokens } : {}),
+          instructions: withGuidance(nutritionInstructions, options),
+          input: [
+            {
+              role: 'user',
+              content: `Untrusted saved recipe data follows:\n${JSON.stringify(input)}`,
+            },
+          ],
+          text: {
+            format: zodTextFormat(aiNutritionEstimateSchema, 'recipe_nutrition_estimate'),
           },
-        ],
-        text: {
-          format: zodTextFormat(aiNutritionEstimateSchema, 'recipe_nutrition_estimate'),
         },
-      });
+        requestOptions(options),
+      );
       const parsed = aiNutritionEstimateSchema.safeParse(response.output_parsed);
       if (!parsed.success) {
         throw new AiProviderRequestError('OpenAI did not return a valid nutrition estimate.');
@@ -303,21 +313,28 @@ export class OpenAiProvider implements AiProvider {
     options?: AiProviderOptions,
   ): Promise<AiRecipeCandidate> {
     try {
-      const response = await this.client.responses.parse({
-        model: options?.model ?? OPENAI_REVIEW_MODEL,
-        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
-        store: false,
-        instructions: reviewPrompt(input.improve),
-        input: [
-          {
-            role: 'user',
-            content: `Source label: ${safeSourceLabel(input.sourceLabel)}\n\nUntrusted recipe text follows:\n${input.sourceText}`,
+      const response = await this.client.responses.parse(
+        {
+          model: options?.model ?? OPENAI_REVIEW_MODEL,
+          ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+          store: false,
+          ...(options?.maxOutputTokens ? { max_output_tokens: options.maxOutputTokens } : {}),
+          instructions: withGuidance(reviewPrompt(input.improve), options),
+          input: [
+            {
+              role: 'user',
+              content: `Source label: ${safeSourceLabel(input.sourceLabel)}\n\nUntrusted recipe text follows:\n${input.sourceText}`,
+            },
+          ],
+          text: {
+            format: zodTextFormat(
+              aiRecipeCandidateStructuredOutputSchema,
+              'recipe_review_candidate',
+            ),
           },
-        ],
-        text: {
-          format: zodTextFormat(aiRecipeCandidateStructuredOutputSchema, 'recipe_review_candidate'),
         },
-      });
+        requestOptions(options),
+      );
       return parseCandidate(response.output_parsed);
     } catch (error) {
       if (error instanceof AiProviderRequestError) throw error;
@@ -330,31 +347,38 @@ export class OpenAiProvider implements AiProvider {
     options?: AiProviderOptions,
   ): Promise<AiRecipeCandidate> {
     try {
-      const response = await this.client.responses.parse({
-        model: options?.model ?? OPENAI_REVIEW_MODEL,
-        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
-        store: false,
-        instructions: reviewPrompt(input.improve),
-        input: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: `Read the attached normalized recipe scans. Source label: ${safeSourceLabel(input.sourceLabel)}.`,
-              },
-              ...input.imageDataUrls.map((imageUrl) => ({
-                type: 'input_image' as const,
-                image_url: imageUrl,
-                detail: 'low' as const,
-              })),
-            ],
+      const response = await this.client.responses.parse(
+        {
+          model: options?.model ?? OPENAI_REVIEW_MODEL,
+          ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+          store: false,
+          ...(options?.maxOutputTokens ? { max_output_tokens: options.maxOutputTokens } : {}),
+          instructions: withGuidance(reviewPrompt(input.improve), options),
+          input: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: `Read the attached normalized recipe scans. Source label: ${safeSourceLabel(input.sourceLabel)}.`,
+                },
+                ...input.imageDataUrls.map((imageUrl) => ({
+                  type: 'input_image' as const,
+                  image_url: imageUrl,
+                  detail: 'low' as const,
+                })),
+              ],
+            },
+          ],
+          text: {
+            format: zodTextFormat(
+              aiRecipeCandidateStructuredOutputSchema,
+              'recipe_review_candidate',
+            ),
           },
-        ],
-        text: {
-          format: zodTextFormat(aiRecipeCandidateStructuredOutputSchema, 'recipe_review_candidate'),
         },
-      });
+        requestOptions(options),
+      );
       return parseCandidate(response.output_parsed);
     } catch (error) {
       if (error instanceof AiProviderRequestError) throw error;
@@ -367,28 +391,35 @@ export class OpenAiProvider implements AiProvider {
     options?: AiProviderOptions,
   ): Promise<AiRecipeCandidate> {
     try {
-      const response = await this.client.responses.parse({
-        model: options?.model ?? OPENAI_REVIEW_MODEL,
-        ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
-        store: false,
-        instructions: [
-          reviewInstructions,
-          input.mode === 'enhance' ? enhancementInstructions : improvementInstructions,
-          'Return the complete improved recipe as a review candidate. A person must save it as a new revision.',
-        ].join(' '),
-        input: [
-          {
-            role: 'user',
-            content: `Untrusted saved recipe data follows:\n${JSON.stringify(input.recipe)}`,
-          },
-        ],
-        text: {
-          format: zodTextFormat(
-            aiRecipeCandidateStructuredOutputSchema,
-            'recipe_improvement_candidate',
+      const response = await this.client.responses.parse(
+        {
+          model: options?.model ?? OPENAI_REVIEW_MODEL,
+          ...(options?.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+          store: false,
+          ...(options?.maxOutputTokens ? { max_output_tokens: options.maxOutputTokens } : {}),
+          instructions: withGuidance(
+            [
+              reviewInstructions,
+              input.mode === 'enhance' ? enhancementInstructions : improvementInstructions,
+              'Return the complete improved recipe as a review candidate. A person must save it as a new revision.',
+            ].join(' '),
+            options,
           ),
+          input: [
+            {
+              role: 'user',
+              content: `Untrusted saved recipe data follows:\n${JSON.stringify(input.recipe)}`,
+            },
+          ],
+          text: {
+            format: zodTextFormat(
+              aiRecipeCandidateStructuredOutputSchema,
+              'recipe_improvement_candidate',
+            ),
+          },
         },
-      });
+        requestOptions(options),
+      );
       return parseCandidate(response.output_parsed);
     } catch (error) {
       if (error instanceof AiProviderRequestError) throw error;
@@ -405,13 +436,16 @@ export class OpenAiProvider implements AiProvider {
       .trim()
       .slice(0, 160);
     try {
-      const response = await this.client.images.generate({
-        model: options?.model ?? OPENAI_IMAGE_MODEL,
-        prompt: recipeImagePrompt(input),
-        size: '1024x1024',
-        quality: 'low',
-        output_format: 'webp',
-      });
+      const response = await this.client.images.generate(
+        {
+          model: options?.model ?? OPENAI_IMAGE_MODEL,
+          prompt: recipeImagePrompt(input, options?.promptGuidance),
+          size: options?.imageSize ?? '1024x1024',
+          quality: options?.imageQuality ?? 'low',
+          output_format: 'webp',
+        },
+        requestOptions(options),
+      );
       const base64 = response.data?.[0]?.b64_json;
       const bytes = base64 ? Buffer.from(base64, 'base64') : Buffer.alloc(0);
       if (bytes.byteLength === 0 || bytes.byteLength > 15 * 1024 * 1024) {

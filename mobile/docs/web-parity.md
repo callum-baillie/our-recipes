@@ -53,4 +53,12 @@ Contract tests exercise actual web schemas against mobile planner and nutrient h
 
 No live AI/provider call is part of this validation. Native exports verify bundling, not camera, print/share dialogs, system permissions, keyboard behavior, accessibility, account switching or connected-scale operation. Those require signed-in device acceptance tests with a compatible server. No connected Android device or iOS simulator was available in this environment.
 
-The repository-wide API coverage check currently reports unrelated uncovered handlers: `GET /account/automation`, `PATCH /account/automation`, and `GET /ai/actions/{actionId}`. The mobile additions are declared in the internal-route registry; the unrelated handlers were not changed for this work.
+## Catalog, streaming and account contract refinement
+
+- Reviewed barcode/source identity travels through explicit Pantry or shopping confirmation; source alternatives, quantities, revision-aware measures and attributed guidance remain distinct.
+- Application catalog reads are also available to curated assistant tools, while imports/linking use reviewed writes. Free-text provider enrichment is not advertised because the inspected handler supports identified products only.
+- Native chat consumes real progressive events and reloads durable turn/proposal state. Stop/close does not claim to undo committed work. Drafts stay in memory per instance/account/conversation and no longer overwrite a newer composer draft after a slow response.
+- Household profile roster consumes only minimal identity fields; destination-password switching preserves the signed-in account boundary.
+- Platform-specific administration and protected credential/recovery functions remain explicit web handoffs. Native device validation is still required; export/type checks do not establish runtime accessibility or camera behavior.
+
+See the [current catalog/native evidence](../../docs/refinement/catalog-native.md). Earlier route coverage gaps in this document are historical; use the checked-in OpenAPI coverage gate for the current route inventory.

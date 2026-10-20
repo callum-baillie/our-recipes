@@ -511,17 +511,27 @@ export function OnboardingWizard({
     onDismissStateChange?.({
       dirty:
         stepIndex > 0 ||
-        profileDrafts.some((draft) =>
-          Boolean(
-            draft.profile.displayName.trim() ||
-            draft.credentials.email ||
-            draft.credentials.passphrase,
-          ),
+        kitchenName !== DEFAULT_KITCHEN_NAME ||
+        brandIcon !== parseBrandIcon(null) ||
+        profileDrafts.length > 1 ||
+        profileDrafts.some(
+          (draft, index) =>
+            JSON.stringify(draft) !==
+            JSON.stringify(createProfileDraft(draft.localId, regionalDefaults, index)),
         ),
       pending: submitting,
       completion: Boolean(securityCompletion),
     });
-  }, [onDismissStateChange, stepIndex, profileDrafts, submitting, securityCompletion]);
+  }, [
+    onDismissStateChange,
+    stepIndex,
+    profileDrafts,
+    submitting,
+    securityCompletion,
+    kitchenName,
+    brandIcon,
+    regionalDefaults,
+  ]);
   useEffect(() => {
     stepSurface.current?.focus();
     stepSurface.current?.scrollIntoView({ block: 'start' });
@@ -622,9 +632,19 @@ export function OnboardingWizard({
     if (message) {
       setError(message);
       const surface = stepSurface.current;
-      const invalid = surface?.querySelector<HTMLInputElement>(
-        'input:invalid, select:invalid, textarea:invalid',
-      );
+      const fieldName =
+        currentStep === 'app' && !kitchenName.trim()
+          ? 'kitchenName'
+          : currentStep === 'profile' && !profile.displayName.trim()
+            ? 'displayName'
+            : currentStep === 'profile'
+              ? profileCredentialsSchema.safeParse(credentials).error?.issues[0]?.path[0]
+              : undefined;
+      const invalid =
+        (fieldName
+          ? surface?.querySelector<HTMLInputElement>(`[name="${String(fieldName)}"]`)
+          : null) ??
+        surface?.querySelector<HTMLInputElement>('input:invalid, select:invalid, textarea:invalid');
       if (invalid) {
         invalid.setAttribute('aria-describedby', 'onboarding-error');
         invalid.setAttribute('aria-invalid', 'true');
@@ -925,6 +945,7 @@ export function OnboardingWizard({
                 <label className="full-width-field">
                   <span>Kitchen name</span>
                   <input
+                    name="kitchenName"
                     value={kitchenName}
                     maxLength={80}
                     onChange={(event) => setKitchenName(event.target.value)}
@@ -1020,6 +1041,7 @@ export function OnboardingWizard({
                       required
                       maxLength={80}
                       autoComplete="name"
+                      name="displayName"
                       value={profile.displayName}
                       onChange={(event) =>
                         setProfile({ ...profile, displayName: event.target.value })
@@ -1033,6 +1055,7 @@ export function OnboardingWizard({
                       type="email"
                       required
                       autoComplete="email"
+                      name="email"
                       inputMode="email"
                       value={credentials.email}
                       onChange={(event) =>
@@ -1047,6 +1070,7 @@ export function OnboardingWizard({
                       type="password"
                       required
                       autoComplete="new-password"
+                      name="passphrase"
                       minLength={8}
                       maxLength={128}
                       value={credentials.passphrase}

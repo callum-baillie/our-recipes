@@ -28,7 +28,13 @@ export async function POST(request: Request) {
   try {
     const input = inputSchema.parse(await readFoodDataJson(request));
     const { batches, ...catalogInput } = input;
-    const replay = replayFoodCatalogImport(catalogInput, 'pantry', input.batches);
+    const replay = replayFoodCatalogImport(
+      catalogInput,
+      'pantry',
+      actor.profileId,
+      input.batches,
+      access.principal.userId,
+    );
     if (replay) return withApiRequestId(foodDataJson(replay, { status: 201 }), access.requestId);
     if (isNativeCatalogEnabled() && !directFoodFallbackAllowed() && !input.selection.catalogRef)
       throw new FoodDataError(
@@ -48,6 +54,7 @@ export async function POST(request: Request) {
           input: catalogInput,
           record,
           actorProfileId: actor.profileId,
+          actorUserId: access.principal.userId,
           destination: 'pantry',
           batches,
         }),

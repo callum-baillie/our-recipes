@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
-import { idempotentJsonResponse, prepareIdempotentMutation } from '@/lib/api-idempotency';
+import { executeIdempotentMutation, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { pantryProductInputSchema } from '@/lib/domain/pantry';
 import { jsonError } from '@/lib/http';
 import { createPantryProduct, listPantryProducts } from '@/lib/services/pantry-service';
@@ -45,12 +45,12 @@ export async function POST(request: Request) {
       'Check the product name, units, and stock targets.',
     );
   try {
-    const product = createPantryProduct(parsed.data, authorization.principal.profileId);
-    reconcileAutomaticRestockPolicies(authorization.principal.profileId);
-    return idempotentJsonResponse(
+    return executeIdempotentMutation(
       idempotency.context,
-      {
-        product,
+      () => {
+        const product = createPantryProduct(parsed.data, authorization.principal.profileId);
+        reconcileAutomaticRestockPolicies(authorization.principal.profileId);
+        return { product };
       },
       authorization.requestId,
       201,

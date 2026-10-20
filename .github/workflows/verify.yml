@@ -26,3 +26,22 @@ jobs:
       - run: pnpm build:release
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:v1-release
+
+  native:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx expo export --platform ios --platform android --output-dir /tmp/bord-native-export

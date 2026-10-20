@@ -177,7 +177,10 @@ export function convertInventoryQuantity(quantity: number, from: string, to: str
   if (source.dimension !== target.dimension || source.family !== target.family) {
     throw new Error(`Cannot convert ${from} to incompatible unit ${to}.`);
   }
-  return Number(((quantity * source.baseFactor) / target.baseFactor).toFixed(6));
+  // Conversion is domain arithmetic, not display formatting. An absolute
+  // six-decimal rounding turned small recorded quantities into known zero.
+  if (source.key === target.key) return quantity;
+  return Number(((quantity * source.baseFactor) / target.baseFactor).toPrecision(15));
 }
 
 export function inventoryBaseQuantity(

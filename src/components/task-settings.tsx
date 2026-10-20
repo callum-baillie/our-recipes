@@ -54,6 +54,7 @@ export function TaskSettings({
     id: string;
     decision: 'confirm' | 'cancel';
   } | null>(null);
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
   const [actions, setActions] = useState<AiDrawerAction[]>([]);
   const reviewSurface = useRef<HTMLDivElement>(null);
   const lock = useRef(false);
@@ -187,8 +188,7 @@ export function TaskSettings({
   ) {
     if (lock.current) return;
     lock.current = true;
-    setErrorJobId(id);
-    setJobError('');
+    setReviewErrors((current) => ({ ...current, [id]: '' }));
     setBusy(true);
     setPendingDecision({ id, decision });
     try {
@@ -201,7 +201,10 @@ export function TaskSettings({
       if (!response.ok) throw new Error(body.error?.message ?? 'Draft could not be updated.');
       setActions((current) => current.map((action) => (action.id === id ? body.action : action)));
     } catch (error) {
-      setJobError(error instanceof Error ? error.message : 'Draft update failed.');
+      setReviewErrors((current) => ({
+        ...current,
+        [id]: error instanceof Error ? error.message : 'Draft update failed.',
+      }));
     } finally {
       lock.current = false;
       setBusy(false);
@@ -583,13 +586,19 @@ export function TaskSettings({
         aria-label="Generated draft review"
       >
         {actions.map((action) => (
-          <AiActionCard
-            key={action.id}
-            action={action}
-            busy={busy}
-            pendingDecision={pendingDecision?.id === action.id ? pendingDecision.decision : null}
-            onDecide={(...args) => void decide(...args)}
-          />
+          <div key={action.id}>
+            <AiActionCard
+              action={action}
+              busy={busy}
+              pendingDecision={pendingDecision?.id === action.id ? pendingDecision.decision : null}
+              onDecide={(...args) => void decide(...args)}
+            />
+            {reviewErrors[action.id] && (
+              <p role="alert" className="form-error">
+                {reviewErrors[action.id]}
+              </p>
+            )}
+          </div>
         ))}
       </div>
       <dialog

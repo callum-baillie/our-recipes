@@ -1,16 +1,21 @@
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 
 import {
   NutritionProfileSettings,
   type NutritionProfileSettingsValue,
 } from '@/components/nutrition-profile-settings';
 import { SettingsPageHeader } from '@/components/settings-page-header';
-import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
 import { validTimeZone } from '@/lib/domain/regional';
 import { nutritionLocalDateKey } from '@/lib/domain/nutrition-view';
 import { listNutrientDefinitions } from '@/lib/services/nutrition-foundation-service';
 import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
-import { getPrivateNutritionProfile } from '@/lib/services/nutrition-profile-service';
+import {
+  getPrivateNutritionProfile,
+  listAccessibleNutritionProfiles,
+} from '@/lib/services/nutrition-profile-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,12 +66,32 @@ function settingsValue(
 }
 
 export default async function NutritionSettingsPage() {
-  const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  const household = resolveNutritionHouseholdContext(actor);
-  const profile = getPrivateNutritionProfile(
-    household.activeNutritionProfile.id,
-    household.compatibilityPrincipalId,
+  const session = await getAuthenticatedSessionPrincipal(
+    new Request('http://localhost/account/nutrition', { headers: await headers() }),
   );
+  if (!session) redirect('/sign-in');
+  const household = resolveNutritionHouseholdContext({
+    profileId: session.linkedProfileId,
+    source: 'auth-session',
+  });
+  const selected = listAccessibleNutritionProfiles(household.compatibilityPrincipalId).find(
+    (profile) => profile.linkedHouseholdProfileId === session.profileId,
+  );
+  if (
+    !selected?.canManageProfile ||
+    (session.accountRole === 'child' && session.profileId !== session.linkedProfileId)
+  )
+    return (
+      <main className="recipe-page settings-hub">
+        <SettingsPageHeader
+          eyebrow="NUTRITION SETTINGS"
+          title="Nutrition preferences are read only"
+          description="Your signed-in account cannot change this person’s preferences. Switch to your own profile or a child you have permission to manage."
+        />
+        <Link href="/nutrition">Return to Nutrition</Link>
+      </main>
+    );
+  const profile = getPrivateNutritionProfile(selected.id, household.compatibilityPrincipalId);
   const definitions = listNutrientDefinitions().map((item) => ({
     code: item.code,
     displayName: item.displayName,
@@ -78,7 +103,7 @@ export default async function NutritionSettingsPage() {
     <main className="recipe-page settings-hub">
       <SettingsPageHeader
         eyebrow="NUTRITION SETTINGS"
-        title={`${household.activeNutritionProfile.displayName}'s Nutrition`}
+        title={`${selected.displayName}'s Nutrition`}
         description={
           <>
             These preferences follow the active household Nutrition profile. Access to another
@@ -88,7 +113,7 @@ export default async function NutritionSettingsPage() {
       />
       <NutritionProfileSettings
         key={profile.id}
-        personName={household.activeNutritionProfile.displayName}
+        personName={selected.displayName}
         profile={settingsValue(profile)}
         effectiveOn={nutritionLocalDateKey(
           new Date(),

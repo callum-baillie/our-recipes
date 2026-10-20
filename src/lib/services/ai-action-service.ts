@@ -1,3 +1,7 @@
+import {
+  recipeImageInput,
+  type AiImageGenerationInput,
+} from '@/lib/domain/recipe-image-generation';
 import 'server-only';
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -194,12 +198,7 @@ function commitGeneratedPlan(
     recipeIds: [] as string[],
     mealIds: [] as string[],
     leftoverLinkIds: [] as string[],
-    imageInputs: [] as Array<{
-      recipeId: string;
-      recipeTitle: string;
-      recipeSummary: string;
-      ingredientNames: string[];
-    }>,
+    imageInputs: [] as Array<AiImageGenerationInput & { recipeId: string }>,
   };
   database.transaction((transaction) => {
     const targetSlots = new Set(
@@ -287,11 +286,7 @@ function commitGeneratedPlan(
       result.recipeIds.push(recipeId);
       result.imageInputs.push({
         recipeId,
-        recipeTitle: generated.recipe.title,
-        recipeSummary: generated.recipe.summary,
-        ingredientNames: generated.recipe.ingredientGroups.flatMap((group) =>
-          group.ingredients.map((ingredient) => ingredient.item),
-        ),
+        ...recipeImageInput(recipeInputSchema.parse(generated.recipe)),
       });
     }
     if (occupiedSlotMode === 'replace' || occupiedSlotMode === 'review') {
@@ -488,11 +483,7 @@ function execute(
         imageInputs: parsed.generateRecipeImages
           ? parsed.recipes.map((recipe, index) => ({
               recipeId: recipeIds[index]!,
-              recipeTitle: recipe.title,
-              recipeSummary: recipe.summary,
-              ingredientNames: recipe.ingredientGroups.flatMap((group) =>
-                group.ingredients.map((ingredient) => ingredient.item),
-              ),
+              ...recipeImageInput(recipeInputSchema.parse(recipe)),
             }))
           : [],
       };
@@ -659,12 +650,7 @@ export async function decideAiAction(
         recipeIds: string[];
         mealIds: string[];
         leftoverLinkIds: string[];
-        imageInputs: Array<{
-          recipeId: string;
-          recipeTitle: string;
-          recipeSummary: string;
-          ingredientNames: string[];
-        }>;
+        imageInputs: Array<AiImageGenerationInput & { recipeId: string }>;
       };
       const { imageInputs, ...persistedPlanResult } = planResult;
       let imageJobId: string | null = null;
@@ -687,12 +673,7 @@ export async function decideAiAction(
     if (row.kind === 'recipe_batch_create') {
       const batchResult = result as {
         recipeIds: string[];
-        imageInputs: Array<{
-          recipeId: string;
-          recipeTitle: string;
-          recipeSummary: string;
-          ingredientNames: string[];
-        }>;
+        imageInputs: Array<AiImageGenerationInput & { recipeId: string }>;
       };
       const { imageInputs, ...persistedBatchResult } = batchResult;
       let imageJobId: string | null = null;

@@ -1,6 +1,22 @@
-import { readFileSync } from 'node:fs';
+// @vitest-environment jsdom
+import { createElement } from 'react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { FreshInstallPanel } from '@/components/fresh-install-panel';
+import { SettingsNav } from '@/components/settings-nav';
+import { AccountNav } from '@/components/account-nav';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('next/navigation', () => ({ usePathname: () => '/settings/profiles' }));
+vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+  };
+});
+afterEach(cleanup);
 
 import {
   DEFAULT_MEAL_PLAN_PREFERENCES,
@@ -67,27 +83,44 @@ describe('app preference contracts', () => {
     expect(
       freshInstallConfirmationSchema.safeParse({ confirmation: 'fresh install' }).success,
     ).toBe(false);
-    const source = readFileSync('src/components/fresh-install-panel.tsx', 'utf8');
-    expect(source).toContain('<dialog');
-    expect(source).toContain('dialogRef.current?.showModal()');
-    expect(source).toContain('Need a fresh start?');
-    expect(source).toContain("window.location.replace('/')");
+    render(createElement(FreshInstallPanel));
+    fireEvent.click(screen.getByRole('button', { name: 'Erase app data' }));
+    const dialog = screen.getByRole('dialog', { name: 'Erase app data and start over' });
+    const confirmation = within(dialog).getByLabelText(/^Confirmation/);
+    const submit = within(dialog).getByRole('button', {
+      name: 'Erase app data and start fresh',
+    }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(confirmation, { target: { value: 'fresh install' } });
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(confirmation, { target: { value: 'FRESH INSTALL' } });
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect((dialog as HTMLDialogElement).open).toBe(false);
   });
 
   it('exposes shared settings in the hub and personal settings in the account navigation', () => {
-    const source = readFileSync('src/app/settings/page.tsx', 'utf8');
-    for (const label of [
-      'SYSTEM SETTINGS',
-      'PROFILE SETTINGS',
-      'RECIPE SETTINGS',
-      'MEAL PLAN SETTINGS',
-      'LIST SETTINGS',
-      'PANTRY SETTINGS',
+    const household = render(createElement(SettingsNav));
+    for (const path of [
+      '/settings/profiles',
+      '/settings/recipes',
+      '/settings/meal-plan',
+      '/settings/lists',
+      '/settings/pantry',
+      '/settings/ai',
+      '/settings/automation',
+      '/settings/system',
+      '/settings/api',
     ]) {
-      expect(source).toContain(label);
+      expect(household.container.querySelector(`a[href="${path}"]`)).not.toBeNull();
     }
-    const accountNav = readFileSync('src/components/account-nav.tsx', 'utf8');
-    for (const path of ['/account/nutrition', '/account/ai', '/account/integrations'])
-      expect(accountNav).toContain(path);
+    expect(household.container.querySelector('a[aria-current="page"]')?.getAttribute('href')).toBe(
+      '/settings/profiles',
+    );
+    household.unmount();
+    const account = render(createElement(AccountNav));
+    for (const path of ['/account/nutrition', '/account/ai', '/account/integrations']) {
+      expect(account.container.querySelector(`a[href="${path}"]`)).not.toBeNull();
+    }
   });
 });
