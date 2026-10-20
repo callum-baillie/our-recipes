@@ -8,5 +8,6 @@
     "online-server-unavailable-390.png",
     "update-dirty-1440.png",
     "update-dirty-390x500.png"
-  ]
+  ],
+  "testedImplementationCommit": "3cb08576150147a600f757951c0cbe66af8010de"
 }

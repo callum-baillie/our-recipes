@@ -34,5 +34,6 @@
       "file": "screenshots/full-refinement/documents/shopping-letter.pdf",
       "info": ["Pages:           1", "Page size:       612 x 792 pts (letter)"]
     }
-  ]
+  ],
+  "testedImplementationCommit": "3cb08576150147a600f757951c0cbe66af8010de"
 }

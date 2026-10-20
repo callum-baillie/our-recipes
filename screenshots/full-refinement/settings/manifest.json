@@ -3,5 +3,6 @@
   "changes": "Working refinement branch; current idle and interaction states, not historical before-implementation captures.",
   "capturedAt": "2026-10-20T16:00:53.795Z",
   "viewportStates": ["1440x1000", "390x844", "320x844", "390x560", "850x1000"],
-  "fixture": "Synthetic workflow fixture; no provider calls or measurement writes."
+  "fixture": "Synthetic workflow fixture; no provider calls or measurement writes.",
+  "testedImplementationCommit": "3cb08576150147a600f757951c0cbe66af8010de"
 }

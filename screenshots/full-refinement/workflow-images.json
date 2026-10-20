@@ -174,5 +174,6 @@
     }
   ],
   "capturedAt": "2026-10-20T15:59:57.627246+00:00",
-  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md"
+  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md",
+  "testedImplementationCommit": "3cb08576150147a600f757951c0cbe66af8010de"
 }

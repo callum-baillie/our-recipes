@@ -18,9 +18,9 @@ Starting revision: `a278f81a272472b9ee2da6ff7c55788285c6fb4c`; branch `refinemen
 | PDF visual inspection                                                         | All38 rendered pages inspected with Poppler. Long recipes, dense/custom/adapted meal sections across a year boundary, partial section, Pantry batch/date/quantity states, shopping completion/cart/cannot-find/unknown amount and footers remain readable. This is actual document evidence, separate from embedded viewer screenshots |
 | `pnpm verify` (clean root install)                                            | Passed formatting, lint, types, unit/integration, OpenAPI, production build, artifact and whitespace gates                                                                                                                                                                                                                             |
 | Production release artifact                                                   | Clean; 3568 files inspected                                                                                                                                                                                                                                                                                                            |
-| `pnpm test:v1-release` production browser/performance oracle                  | 19 Chromium release journey tests across 15 specs and3 performance tests passed; final full rerun is recorded below before publication                                                                                                                                                                                                 |
+| `pnpm test:v1-release` production browser/performance oracle                  | 19 Chromium release journey tests across 15 specs and 3 performance tests passed on the final rebuilt implementation                                                                                                                                                                                                                   |
 
-The final shared-dialog and first-install update corrections were rebuilt before the 14-case focused browser rerun. All14 passed. The complete release browser oracle then passed on the same production artifact.
+The final shared-dialog and first-install update corrections were rebuilt before the 14-case focused browser rerun. All 14 passed. The complete release browser oracle then passed on the same production artifact.
 
 The9 integration skips require optional externally supplied legacy/incident database archives (`migration-lineage-recovery.test.ts`). Synthetic clean installation, representative upgrade, lineage rejection and recovery fixtures executed successfully; missing external archives are not counted as passes.
 
@@ -94,3 +94,9 @@ Local logs are retained under `/tmp/bord-full-refinement`; committed capture man
 | Visual evidence                      | Fresh baseline/current full pages, current interaction manifests and separately inspected generated PDFs; device and live-provider limits remain explicit                                                               |
 
 Prompt, model and image quality were evaluated deterministically for contracts. Only a separately permitted live evaluation can establish real provider quality or photographic realism.
+
+## Implementation and publication receipt
+
+Tested implementation and captured-evidence commit: [`3cb08576150147a600f757951c0cbe66af8010de`](https://github.com/callum-baillie/our-recipes/commit/3cb08576150147a600f757951c0cbe66af8010de). The following receipt commit changes documentation and evidence labels only.
+
+GitHub publication target: [`refinement/full-project-completion`](https://github.com/callum-baillie/our-recipes/tree/refinement/full-project-completion). The branch contains the three additive migrations and all reported implementation/tests/captures. No merge, release tag, production migration or deployment was performed. Remote CI status is reported separately from these executed local gates.
