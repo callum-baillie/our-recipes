@@ -129,6 +129,151 @@ describe('AI assistant drawer', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    ['wheel', false],
+    ['wheel', true],
+    ['touch', false],
+    ['keyboard', false],
+    ['scrollbar', false],
+  ] as const)(
+    'keeps %s reading intent during a viewport adjustment (layout frame already ran: %s)',
+    async (gesture, afterLayout) => {
+      const viewport = Object.assign(new EventTarget(), { height: 844, offsetTop: 0, scale: 1 });
+      vi.stubGlobal('visualViewport', viewport);
+      const frames = new Map<number, FrameRequestCallback>();
+      let nextFrame = 0;
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        frames.set(++nextFrame, callback);
+        return nextFrame;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+      const flushFrame = () => {
+        const callbacks = [...frames.values()];
+        frames.clear();
+        callbacks.forEach((callback) => callback(0));
+      };
+      let stream!: ReadableStreamDefaultController<Uint8Array>;
+      const emit = (event: object) =>
+        stream.enqueue(new TextEncoder().encode(`${JSON.stringify(event)}\n`));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input);
+          if (url.endsWith('/messages') && init?.method === 'POST') {
+            return new Response(
+              new ReadableStream<Uint8Array>({
+                start(controller) {
+                  stream = controller;
+                  emit({ type: 'text', delta: 'Current streamed response.' });
+                },
+              }),
+            );
+          }
+          if (url.endsWith('/threads')) return Response.json({ threads: [{ id: 'history' }] });
+          if (url.includes('app-actions')) return Response.json({ proposals: [] });
+          return Response.json({
+            messages: [{ id: 'earlier', role: 'assistant', content: 'Earlier conversation' }],
+            actions: [],
+            jobs: [],
+          });
+        }),
+      );
+      render(createElement(AiAssistantDrawer, { open: true, onClose: vi.fn() }));
+      await screen.findByText('Earlier conversation');
+      const list = screen.getByRole('log', { name: 'Conversation' });
+      let scrollTop = 900;
+      Object.defineProperties(list, {
+        scrollHeight: { configurable: true, value: 1200 },
+        clientHeight: { configurable: true, value: 300 },
+        clientWidth: { configurable: true, value: 300 },
+        offsetWidth: { configurable: true, value: 315 },
+        scrollTop: {
+          configurable: true,
+          get: () => scrollTop,
+          set: (value: number) => {
+            scrollTop = Math.max(0, Math.min(900, value));
+          },
+        },
+        scrollTo: {
+          configurable: true,
+          value: ({ top }: ScrollToOptions) => {
+            list.scrollTop = top ?? 0;
+          },
+        },
+      });
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        right: 315,
+        top: 0,
+        bottom: 300,
+        width: 315,
+        height: 300,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      });
+      const composer = screen.getByLabelText('Message the AI assistant');
+      fireEvent.change(composer, { target: { value: 'Continue' } });
+      fireEvent.submit(composer.closest('form')!);
+      await screen.findByText('Current streamed response.');
+      act(() => {
+        flushFrame();
+        flushFrame();
+      });
+      expect(list.scrollTop).toBe(900);
+      // A downward gesture at the bottom, or a click on content, does not stop following.
+      fireEvent.wheel(list, { deltaY: 100 });
+      fireEvent.touchStart(list, { touches: [{ clientY: 200 }] });
+      fireEvent.touchMove(list, { touches: [{ clientY: 100 }] });
+      fireEvent.keyDown(list, { key: 'End' });
+      fireEvent.pointerDown(screen.getByText('Earlier conversation'));
+      fireEvent(list, new MouseEvent('pointerdown', { bubbles: true, clientX: 310 }));
+      fireEvent.pointerUp(list);
+      await act(async () => {
+        emit({ type: 'text', delta: ' Still following.' });
+      });
+      expect(screen.queryByRole('button', { name: 'Jump to latest response' })).toBeNull();
+
+      act(() => {
+        viewport.height = 500;
+        viewport.dispatchEvent(new Event('resize'));
+        if (afterLayout) flushFrame();
+      });
+      // Deliberate input happens while the viewport guard is active, without waiting two frames.
+      if (gesture === 'wheel') fireEvent.wheel(list, { deltaY: -200 });
+      else if (gesture === 'touch') {
+        fireEvent.touchStart(list, { touches: [{ clientY: 100 }] });
+        fireEvent.touchMove(list, { touches: [{ clientY: 200 }] });
+      } else if (gesture === 'keyboard') fireEvent.keyDown(list, { key: 'Home' });
+      else fireEvent(list, new MouseEvent('pointerdown', { bubbles: true, clientX: 310 }));
+      list.scrollTop = 200;
+      fireEvent.scroll(list);
+      await act(async () => {
+        emit({ type: 'text', delta: ' New text while reading.' });
+      });
+      const jump = await screen.findByRole('button', { name: 'Jump to latest response' });
+      act(() => {
+        flushFrame();
+        flushFrame();
+      });
+      expect(list.scrollTop).toBe(200);
+
+      if (gesture === 'wheel' && afterLayout) {
+        fireEvent.wheel(list, { deltaY: 900 });
+        list.scrollTop = 900;
+        fireEvent.scroll(list);
+      } else fireEvent.click(jump);
+      expect(list.scrollTop).toBe(900);
+      expect(screen.queryByRole('button', { name: 'Jump to latest response' })).toBeNull();
+      await act(async () => {
+        emit({ type: 'text', delta: ' Following resumed.' });
+        emit({ type: 'done', messageId: 'complete' });
+        stream.close();
+      });
+      expect(screen.queryByRole('button', { name: 'Jump to latest response' })).toBeNull();
+    },
+  );
+
   it('compacts proposals, sends desktop Enter, and keeps mobile Enter for new lines', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

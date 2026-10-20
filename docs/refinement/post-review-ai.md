@@ -32,6 +32,14 @@ Browser evidence: [image workflow index](../../screenshots/post-review/images/ev
 
 ## Final acceptance cross-check
 
+### F14/G08 reading during viewport changes — targeted fix verified; production rerun pending
+
+The later production browser run passed 20 scenarios and failed its chat Jump-to-latest check. That fixture changed `scrollTop` and dispatched a scroll immediately after resize, while the drawer deliberately ignored layout-driven scroll events for two animation frames. Inspection identified a real adjacent race: deliberate wheel, touch, keyboard or scrollbar reading in the same interval could also be ignored, allowing a queued viewport callback or streamed fragment to restore the bottom.
+
+The drawer now records deliberate scrolling intent before native movement. Viewport adjustments retain that intent, new fragments preserve the reading position and expose Jump to latest, and an actual return to the bottom or Jump restores following. Downward gestures at an already-bottom conversation and clicks inside message content do not pause following. The production fixture now uses real wheel and Home input, asserts the reading position after a fragment, then checks that Jump exposes the latest text; it no longer treats a synthetic scroll event as evidence of user input.
+
+`pnpm exec vitest run --project unit tests/unit/ai-assistant-drawer.test.ts` — **7 passed** (`/tmp/bord-chat-reading-after.log`). The five added cases failed on the prior implementation (`/tmp/bord-chat-reading-before.log`) and now cover wheel input before/between viewport frames, touch, keyboard and scrollbar intent, streamed output, and resumed following. This controlled DOM check does not establish physical virtual-keyboard/touch behavior. The final production rerun of the changed browser fixture remains pending; the earlier 20/1 invocation remains failed.
+
 ### G05 product-intake review binding — verified
 
 New `logProductNutrition` proposals server-normalize `expectedFoodNutritionRecordId` into the reviewed body and intent hash. The source/revision/basis appears in the change label. A normal entry pins the authoritative preferred record; a correction pins its original intake record after the existing authorization and source checks. An explicitly mismatched model-supplied pin is rejected rather than silently replaced. At execution the shared food-diary transaction enforces the pin, so a newly preferred record requires a fresh review and cannot alter the reviewed nutrition silently.

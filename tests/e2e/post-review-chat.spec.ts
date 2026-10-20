@@ -137,10 +137,21 @@ test('text commands and interruption recovery stay readable in constrained chat 
   await dialog.getByRole('button', { name: 'Send message' }).click();
   await expect(stop).toBeVisible();
   await page.setViewportSize({ width: 320, height: 568 });
-  await dialog.locator('[data-chat-messages]').evaluate((element) => {
-    element.scrollTop = 0;
-    element.dispatchEvent(new Event('scroll'));
-  });
+  const conversation = dialog.getByRole('log', { name: 'Conversation' });
+  // Use actual reading input after resize. A synthetic scroll event cannot identify intent
+  // while the viewport is making its own programmatic adjustment.
+  await conversation.hover();
+  await page.mouse.wheel(0, -1200);
+  await expect
+    .poll(() =>
+      conversation.evaluate(
+        (element) => element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(100);
+  await conversation.focus();
+  await conversation.press('Home');
+  await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
   await page.evaluate(() => {
     (window as unknown as { chatLayout: { emit: (event: object) => void } }).chatLayout.emit({
       type: 'text',
@@ -149,6 +160,7 @@ test('text commands and interruption recovery stay readable in constrained chat 
   });
   const jump = dialog.getByRole('button', { name: 'Jump to latest response', exact: true });
   await expect(jump).toBeVisible();
+  await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
   await jump.focus();
   await expect(jump).toBeInViewport();
   expect(await jump.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
@@ -157,6 +169,9 @@ test('text commands and interruption recovery stay readable in constrained chat 
   await page.screenshot({ path: `${directory}/jump-to-latest-320.png` });
   await jump.click();
   await expect(jump).toHaveCount(0);
+  await expect(
+    dialog.getByText(/More current output while you read earlier messages/),
+  ).toBeInViewport();
   await page.evaluate(() => {
     (
       window as unknown as { chatLayout: { emit: (event: object, close?: boolean) => void } }

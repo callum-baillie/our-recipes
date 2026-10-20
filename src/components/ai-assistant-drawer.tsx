@@ -110,6 +110,8 @@ export function AiAssistantDrawer({
   const messagesRef = useRef<HTMLDivElement>(null);
   const messageContentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const readingScroll = useRef<{ lastTop: number } | null>(null);
+  const touchY = useRef<number | null>(null);
   const [draft, setDraft] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attaching, setAttaching] = useState(false);
@@ -128,6 +130,15 @@ export function AiAssistantDrawer({
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const adjustingViewport = useRef(false);
+
+  function pauseFollowing(list: HTMLDivElement, towardLatest = false) {
+    const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+    if (list.scrollHeight <= list.clientHeight || (towardLatest && remaining <= 1)) return;
+    // Record intent before native scrolling, even between viewport-adjustment frames.
+    // A queued resize or stream fragment must not move someone back to the latest reply.
+    readingScroll.current = { lastTop: list.scrollTop };
+    stickToBottom.current = false;
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -188,6 +199,7 @@ export function AiAssistantDrawer({
       if (!response.ok) throw new Error(await errorMessage(response));
       const body = (await response.json()) as { thread: { id: string } };
       stickToBottom.current = true;
+      readingScroll.current = null;
       setThreadId(body.thread.id);
       setRecoveryRequired(false);
       setUnreviewedTurns([]);
@@ -538,6 +550,7 @@ export function AiAssistantDrawer({
       ]);
     }
     stickToBottom.current = true;
+    readingScroll.current = null;
     setStatusError(false);
     turnInFlight.current = true;
     setBusy(true);
@@ -799,10 +812,65 @@ export function AiAssistantDrawer({
           </div>
           <div
             ref={messagesRef}
+            onWheel={(event) => {
+              if (event.deltaY) pauseFollowing(event.currentTarget, event.deltaY > 0);
+            }}
+            onTouchStart={(event) => {
+              touchY.current = event.touches[0]?.clientY ?? null;
+            }}
+            onTouchMove={(event) => {
+              const nextY = event.touches[0]?.clientY;
+              if (nextY !== undefined && touchY.current !== null && nextY !== touchY.current)
+                pauseFollowing(event.currentTarget, nextY < touchY.current);
+              touchY.current = nextY ?? null;
+            }}
+            onTouchEnd={() => {
+              touchY.current = null;
+            }}
+            onTouchCancel={() => {
+              touchY.current = null;
+            }}
+            onKeyDown={(event) => {
+              // Keys inside message controls still belong to those controls.
+              if (event.target !== event.currentTarget) return;
+              if (['ArrowUp', 'PageUp', 'Home'].includes(event.key))
+                pauseFollowing(event.currentTarget);
+              else if (['ArrowDown', 'PageDown', 'End', ' '].includes(event.key))
+                pauseFollowing(event.currentTarget, !(event.key === ' ' && event.shiftKey));
+            }}
+            onPointerDown={(event) => {
+              const list = event.currentTarget;
+              if (event.target !== list || list.offsetWidth <= list.clientWidth) return;
+              const left = list.getBoundingClientRect().left + list.clientLeft;
+              if (event.clientX < left || event.clientX >= left + list.clientWidth)
+                pauseFollowing(list);
+            }}
+            onPointerUp={(event) => {
+              const list = event.currentTarget;
+              if (
+                readingScroll.current &&
+                list.scrollHeight - list.scrollTop - list.clientHeight <= 1
+              ) {
+                readingScroll.current = null;
+                stickToBottom.current = true;
+                setNewResponse(false);
+              }
+            }}
             onScroll={(event) => {
-              if (adjustingViewport.current) return;
               const el = event.currentTarget;
-              stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 72;
+              const reading = readingScroll.current;
+              if (adjustingViewport.current && !reading) return;
+              const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+              if (reading) {
+                // A programmatic event at the old bottom cannot erase fresh reading intent.
+                const returnedToLatest = el.scrollTop > reading.lastTop && remaining <= 1;
+                reading.lastTop = el.scrollTop;
+                stickToBottom.current = returnedToLatest;
+                if (returnedToLatest) {
+                  readingScroll.current = null;
+                  setNewResponse(false);
+                }
+              } else stickToBottom.current = remaining < 72;
             }}
             className={styles.messages}
             data-chat-messages
@@ -1141,6 +1209,7 @@ export function AiAssistantDrawer({
                   type="button"
                   onClick={() => {
                     stickToBottom.current = true;
+                    readingScroll.current = null;
                     setNewResponse(false);
                     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
                   }}
