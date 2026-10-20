@@ -10,10 +10,9 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   await page.waitForLoadState('networkidle');
   await expect(page).toHaveTitle(/\S/u);
   // Playwright text matching skips head nodes; inspect the actual DOM property.
-  await expect(page.locator('head > title')).toHaveJSProperty(
-    'textContent',
-    expect.stringMatching(/\S/u),
-  );
+  await expect
+    .poll(() => page.evaluate(() => document.head.querySelector('title')?.textContent ?? ''))
+    .toMatch(/\S/u);
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, fullPage: true, caret: 'initial' });
   await testInfo.attach(name, { path, contentType: 'image/png' });
