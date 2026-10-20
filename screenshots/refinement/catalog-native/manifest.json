@@ -1,7 +1,7 @@
 {
-  "baseCommit": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
-  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md",
-  "capturedAt": "2026-10-20T15:59:57.628838+00:00",
+  "baseCommit": "5ae8751b84290cb2a72d689dead9e2c8db443f9b",
+  "sourceState": "CI font-layout correction working tree; source content hashes identify the exact tested CSS",
+  "capturedAt": "2026-10-20T16:32:12.503240+00:00",
   "spec": "tests/e2e/catalog-native-refinement.spec.ts",
   "scope": "Synthetic bounded source data and intercepted confirmation/replay. Browser coordinates are synthetic; no real provider or stock mutation.",
   "captures": [
@@ -15,5 +15,8 @@
     "store-filters-390.png",
     "uncertain-confirmation-320.png"
   ],
-  "testedImplementationCommit": "3cb08576150147a600f757951c0cbe66af8010de"
+  "sourceSHA256": {
+    "src/app/globals.css": "7bf10286b9b5ace0c0b2a96031b40ecdb51271685a4cffa158ee910d376f5bdd",
+    "src/components/food-catalog-picker.module.css": "843eedb1743162dc1f70a3402572b94ec6479f031a7cd0c7801e172bcb20f4ae"
+  }
 }

@@ -313,6 +313,8 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     'display',
     'grid',
   );
+  await page.locator('.ingredient-row').first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('ingredient-controls-desktop.png') });
   const editorDesktop = await page.locator('.editor-form-layout').evaluate((form) => {
     const intro = form.querySelector(':scope > .editor-intro');
     const card = form.querySelector(':scope > .editor-card-column');
@@ -338,6 +340,24 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   expect(
     Math.abs(editorDesktop.ingredientInputHeight - editorDesktop.ingredientButtonHeight),
   ).toBeLessThan(1);
+
+  // A wider fallback font must not squeeze the food lookup into the two short
+  // quantity columns and turn it into a taller, wrapped control.
+  const fallbackFont = await page.addStyleTag({
+    content: '.ingredient-row { font-family: monospace; font-size: 1rem; }',
+  });
+  const fallbackHeights = await page
+    .locator('.ingredient-row')
+    .first()
+    .evaluate((row) => ({
+      input: row.querySelector('input')!.getBoundingClientRect().height,
+      button: row.querySelector('button')!.getBoundingClientRect().height,
+    }));
+  await page.screenshot({ path: testInfo.outputPath('ingredient-controls-fallback-font.png') });
+  expect(Math.abs(fallbackHeights.input - fallbackHeights.button)).toBeLessThan(1);
+  await fallbackFont.evaluate((element) => {
+    element.parentNode?.removeChild(element);
+  });
 
   await page.setViewportSize(surfaces[2].viewport);
   await page.reload();

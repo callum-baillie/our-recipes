@@ -18,7 +18,7 @@ Starting revision: `a278f81a272472b9ee2da6ff7c55788285c6fb4c`; branch `refinemen
 | PDF visual inspection                                                         | All38 rendered pages inspected with Poppler. Long recipes, dense/custom/adapted meal sections across a year boundary, partial section, Pantry batch/date/quantity states, shopping completion/cart/cannot-find/unknown amount and footers remain readable. This is actual document evidence, separate from embedded viewer screenshots |
 | `pnpm verify` (clean root install)                                            | Passed formatting, lint, types, unit/integration, OpenAPI, production build, artifact and whitespace gates                                                                                                                                                                                                                             |
 | Production release artifact                                                   | Clean; 3568 files inspected                                                                                                                                                                                                                                                                                                            |
-| `pnpm test:v1-release` production browser/performance oracle                  | 19 Chromium release journey tests across 15 specs and 3 performance tests passed on the final rebuilt implementation                                                                                                                                                                                                                   |
+| `pnpm test:v1-release` production browser/performance oracle                  | 19 Chromium release journey tests across 15 specs and 3 performance tests passed locally; clean-runner follow-ups are recorded below                                                                                                                                                                                                   |
 
 The final shared-dialog and first-install update corrections were rebuilt before the 14-case focused browser rerun. All 14 passed. The complete release browser oracle then passed on the same production artifact.
 
@@ -97,10 +97,16 @@ Prompt, model and image quality were evaluated deterministically for contracts. 
 
 ## Implementation and publication receipt
 
-Tested implementation and captured-evidence commit: [`3cb08576150147a600f757951c0cbe66af8010de`](https://github.com/callum-baillie/our-recipes/commit/3cb08576150147a600f757951c0cbe66af8010de). The following receipt commit changes documentation and evidence labels only.
+Initial implementation and original captured-evidence commit: [`3cb08576150147a600f757951c0cbe66af8010de`](https://github.com/callum-baillie/our-recipes/commit/3cb08576150147a600f757951c0cbe66af8010de). The following receipt commit changes documentation and evidence labels only.
 
 GitHub publication target: [`refinement/full-project-completion`](https://github.com/callum-baillie/our-recipes/tree/refinement/full-project-completion). The branch contains the three additive migrations and all reported implementation/tests/captures. No merge, release tag, production migration or deployment was performed. Remote CI status is reported separately from these executed local gates.
 
 ### Clean GitHub runner correction
 
 The [first published verification run](https://github.com/callum-baillie/our-recipes/actions/runs/39454717753) passed the native job and root formatting/lint/types/unit gates, then failed five PDF tests because `pdftotext` was absent (`ENOENT`). CI now explicitly installs `poppler-utils`; local PDF assertions remain unchanged and are rerun. This follow-up changes CI prerequisites and documentation only. The final GitHub run remains separate execution evidence from the local pass.
+
+### Font-dependent clean-runner correction
+
+The [next clean run](https://github.com/callum-baillie/our-recipes/actions/runs/39455482691) passed native, unit/integration, API and build gates, then found a 24px ingredient-control height difference. A wider-font local fixture reproduced it against the previously built implementation. The owner grid/minimum-height correction retains the strict browser assertion for both fonts. The oracle no longer repeats onboarding against a household left by an earlier failed attempt; fresh-data preparation remains mandatory. The latest workflow retains synthetic failure PNGs without uploading traces/session data.
+
+The font correction passed local lint/types, all607 unit tests, the clean3568-file rebuilt artifact, the full release-quality flow with default/wider-font assertions, both workflow cases and both catalog cases. [Before/after and exact CSS fingerprints](../../screenshots/full-refinement/font-layout/manifest.json) identify this later working-tree state separately from the original3cb0857 captures. The required complete GitHub workflow runs on publication; its result is separate from the earlier local oracle pass.

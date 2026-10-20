@@ -31,7 +31,7 @@ for (const spec of specs) {
 
   const result = spawnSync(
     process.execPath,
-    [playwrightCli, 'test', spec, '--workers=1', '--max-failures=1'],
+    [playwrightCli, 'test', spec, '--workers=1', '--retries=0', '--max-failures=1'],
     {
       cwd: process.cwd(),
       encoding: 'utf8',

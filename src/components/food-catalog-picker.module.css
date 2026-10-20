@@ -1,5 +1,6 @@
 .launchButton {
   display: inline-flex;
+  min-height: 2.9rem;
   align-items: center;
   gap: 0.45rem;
   border: 1px solid var(--line);

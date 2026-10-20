@@ -1,0 +1,14 @@
+{
+  "baseCommit": "5ae8751b84290cb2a72d689dead9e2c8db443f9b",
+  "sourceState": "CI font-layout correction working tree; source content hashes identify the exact tested CSS",
+  "sourceSHA256": {
+    "src/app/globals.css": "7bf10286b9b5ace0c0b2a96031b40ecdb51271685a4cffa158ee910d376f5bdd",
+    "src/components/food-catalog-picker.module.css": "843eedb1743162dc1f70a3402572b94ec6479f031a7cd0c7801e172bcb20f4ae"
+  },
+  "viewport": "1440x900",
+  "fixture": "Synthetic empty recipe editor. Wider-font images deliberately set only the ingredient row to monospace at 1rem; no production font change. Before uses the original 3cb0857 production artifact; after uses the rebuilt correction.",
+  "beforeResult": "24px input/action height mismatch",
+  "afterResult": "Default and wider-font strict alignment assertions pass; complete release-quality flow passes",
+  "capturedAt": "2026-10-20T16:32:12.503240+00:00",
+  "files": ["before-wider-font.png", "after-wider-font.png", "after-default-font.png"]
+}

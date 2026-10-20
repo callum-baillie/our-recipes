@@ -27,3 +27,7 @@ Desktop viewports are1440×1000; phone viewports are390×844. Images are full-pa
 - [Actual PDF documents](documents/manifest.json):8 A4/Letter files,38 inspected pages. These are generated documents, separate from workspace screenshots; no physical printer result is claimed.
 
 The executable Playwright scenarios are under `tests/e2e/*refinement*`, `workflow-backlog`, `settings-nutrition-completion`, `recipe-image-review`, `ai-completion` and `pantry-add-recovery`. Each fixture states its own interception and viewport scope. Scoped axe and keyboard checks are not blanket WCAG conformance or native screen-reader approval.
+
+## Clean-runner font correction
+
+[Before/after and exact tested CSS hashes](font-layout/manifest.json) cover the 24px desktop lookup mismatch. The wider font is a controlled test override, not a new application font. The default-font capture shows the ordinary interface.
