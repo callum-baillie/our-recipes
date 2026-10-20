@@ -133,6 +133,21 @@ async function runContainer() {
   await waitForHealth();
 }
 
+async function stopContainer() {
+  await docker('stop', container);
+  // --rm cleanup can outlive `docker stop`; don't race reuse of this owned name.
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      await docker('container', 'inspect', '--format', '{{.Id}}', container);
+    } catch (error) {
+      if (/No such (?:container|object)/iu.test(error.stderr ?? '')) return;
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error('The disposable smoke container was not removed within 10 seconds.');
+}
+
 try {
   if (process.env.DOCKER_SKIP_BUILD !== 'true') await docker('build', '-t', image, '.');
   await runContainer();
@@ -190,7 +205,7 @@ try {
   await request(`/api/v1/recipes/${removedRecipe.id}`, { expected: 404 });
   const history = await (await request('/api/v1/backups')).json();
   assert.ok(history.backups.length >= 2, 'Restore did not retain a safety backup.');
-  await docker('stop', container);
+  await stopContainer();
   await runContainer();
   const health = await assertHealth(true);
   await signIn();
@@ -207,7 +222,7 @@ try {
   );
   const blocked = await request('/api/v1/health', { authenticated: false, expected: 503 });
   assert.equal((await blocked.json()).status, 'recovery_required');
-  await docker('stop', container);
+  await stopContainer();
   await assert.rejects(
     docker(
       'run',

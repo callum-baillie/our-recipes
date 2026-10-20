@@ -9,7 +9,10 @@ import {
   appendManualConsumption,
   deleteNutritionIntake,
 } from '@/lib/services/nutrition-food-diary-service';
-import { appendManualProductNutritionRecord } from '@/lib/services/nutrition-recipe-calculation-service';
+import {
+  appendManualProductNutritionRecord,
+  getProductNutritionRecordContext,
+} from '@/lib/services/nutrition-recipe-calculation-service';
 import { listNutritionIntakeRevisions } from '@/lib/services/nutrition-intake-service';
 import { createNutritionIdentity } from './nutrition-household-fixture';
 
@@ -147,5 +150,66 @@ describe('Food Diary product, manual, correction, and deletion service', () => {
     const history = listNutritionIntakeRevisions(identity.profile.id, identity.principal.id);
     expect(history.find((entry) => entry.id === manual.id)?.values[0]?.amount).toBe(320);
     expect(history.find((entry) => entry.id === correctedManual.id)?.values[0]?.amount).toBe(480);
+  });
+
+  it('pins reviewed product records and preserves the original source for corrections', () => {
+    const firstRecord = appendManualProductNutritionRecord(productId, {
+      basisType: 'per_100g',
+      basisAmount: 100,
+      basisUnit: 'g',
+      confidence: 1,
+      completeness: 1,
+      values: [{ nutrientCode: 'energy_kcal', amount: 100 }],
+    });
+    const identity = createNutritionIdentity('correct horse battery staple', {
+      displayName: 'Portion review',
+    });
+    const context = getProductNutritionRecordContext(productId);
+    expect(context.preferredRecord).toMatchObject({ id: firstRecord.id, catalogRef: null });
+    expect(context.preferredRecord?.supportedUnits).toContain('g');
+    expect(context.preferredRecord?.supportedUnits).not.toContain('cup');
+    const request = {
+      productId,
+      expectedFoodNutritionRecordId: firstRecord.id,
+      quantity: 50,
+      unit: 'g',
+      occurredAt: '2026-07-19T18:00:00Z',
+      mealSlot: 'dinner' as const,
+    };
+    const first = appendConfirmedProductConsumption(
+      identity.profile.id,
+      identity.principal.id,
+      request,
+    );
+    const newer = appendManualProductNutritionRecord(productId, {
+      basisType: 'per_100g',
+      basisAmount: 100,
+      basisUnit: 'g',
+      confidence: 1,
+      completeness: 1,
+      supersedesRecordId: firstRecord.id,
+      values: [{ nutrientCode: 'energy_kcal', amount: 200 }],
+    });
+    expect(getProductNutritionRecordContext(productId).preferredRecord?.id).toBe(newer.id);
+    expect(() =>
+      appendConfirmedProductConsumption(identity.profile.id, identity.principal.id, request),
+    ).toThrow(/record changed/);
+    expect(listNutritionIntakeRevisions(identity.profile.id, identity.principal.id)).toHaveLength(
+      1,
+    );
+    const correction = appendConfirmedProductConsumption(
+      identity.profile.id,
+      identity.principal.id,
+      {
+        ...request,
+        quantity: 100,
+        supersedesIntakeRevisionId: first.id,
+        revisionReason: 'Reviewed original record portion',
+      },
+    );
+    expect(correction.foodNutritionRecordId).toBe(firstRecord.id);
+    expect(correction.values.find((value) => value.nutrientCode === 'energy_kcal')?.amount).toBe(
+      100,
+    );
   });
 });

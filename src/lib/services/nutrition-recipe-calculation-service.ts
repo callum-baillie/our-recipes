@@ -30,6 +30,7 @@ import {
   type RecipeConsumptionRequest,
 } from '@/lib/domain/nutrition-recipe-calculation';
 import { presentRecipeNutrition } from '@/lib/domain/nutrition-recipe-presentation';
+import { supportedFoodUnits } from '@/lib/domain/nutrition-ui';
 import type { NutritionMutationActorInput } from '@/lib/domain/nutrition-household';
 import {
   DEFAULT_DASHBOARD_NUTRIENTS,
@@ -666,7 +667,7 @@ export function buildConfirmedRecipeConsumptionInput(
   };
 }
 
-export function getNutritionDataWorkspace() {
+function frozenNutritionCatalogReferences(productId?: string) {
   const database = db();
   // Match the selected nutrition record to its frozen provider snapshot, not a newer product link.
   const catalogReferences = new Map<string, CatalogReference>();
@@ -686,6 +687,7 @@ export function getNutritionDataWorkspace() {
       foodProviderSnapshots,
       eq(pantryProductProviderLinks.snapshotId, foodProviderSnapshots.id),
     )
+    .where(productId ? eq(pantryProductProviderLinks.productId, productId) : undefined)
     .all()) {
     const ref = catalogReferenceSchema.safeParse({
       transport_id: row.transportId,
@@ -701,6 +703,28 @@ export function getNutritionDataWorkspace() {
         ref.data,
       );
   }
+  return catalogReferences;
+}
+
+/** Same immutable source mapping and conversion rules used by the web logger. */
+export function getProductNutritionRecordContext(productId: string) {
+  const id = z.string().uuid().parse(productId);
+  const catalogReferences = frozenNutritionCatalogReferences(id);
+  const records = listProductNutritionRecordHistory(id).map((record) => ({
+    ...record,
+    catalogRef: catalogReferences.get(`${id}:${record.sourceRecordKey}`) ?? null,
+    supportedUnits: supportedFoodUnits(record),
+  }));
+  const preferred = selectPreferredFoodNutritionRecord(id);
+  return {
+    records,
+    preferredRecord: records.find((record) => record.id === preferred?.id) ?? null,
+  };
+}
+
+export function getNutritionDataWorkspace() {
+  const database = db();
+  const catalogReferences = frozenNutritionCatalogReferences();
   const products = database
     .select({ id: pantryProducts.id, displayName: pantryProducts.displayName })
     .from(pantryProducts)

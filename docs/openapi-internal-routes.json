@@ -166,11 +166,6 @@
   },
   {
     "method": "POST",
-    "path": "/nutrition/profiles/{profileId}/intake/product",
-    "reason": "First-party confirmed product diary command."
-  },
-  {
-    "method": "POST",
     "path": "/nutrition/profiles/{profileId}/intake/recipe",
     "reason": "First-party confirmed recipe diary command."
   },

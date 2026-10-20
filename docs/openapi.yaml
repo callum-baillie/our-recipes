@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.10
+  version: 1.0.0-rc.18
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
@@ -16,6 +16,42 @@ servers:
 security:
   - SessionCookie: []
 paths:
+  /nutrition/profiles/{profileId}/intake/product:
+    post:
+      operationId: recordProductConsumption
+      security: [{ SessionCookie: [] }]
+      summary: Record a reviewed saved-food portion for an authorized person
+      description: >-
+        Session-only first-party command; API keys are not accepted. Requires the existing
+        per-person manage-profile permission and exact trusted browser origin. No stock is consumed.
+        expectedFoodNutritionRecordId pins a reviewed source. A changed preferred record returns409;
+        corrections keep their original record. Transport failure is an unknown outcome: inspect
+        the diary before another command, because this endpoint does not promise durable replay.
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductConsumptionRequest' }
+      responses:
+        '201':
+          description: Saved intake revision with immutable food-record provenance
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision]
+                properties:
+                  revision: { type: object, additionalProperties: true }
+        '400': { description: Invalid portion or unsupported conversion }
+        '401': { description: Sign in required }
+        '403': { description: Person permission denied or untrusted origin }
+        '404': { description: Record or person not found }
+        '409': { description: Reviewed food record or correction changed; review again }
   /pantry/export/pdf:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -3476,7 +3512,12 @@ paths:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
       x-api-permissions: ['pantry:read']
       operationId: getProductNutritionRecords
-      summary: Read shared product nutrition history
+      summary: Read shared product nutrition history and authoritative portion context
+      description: >-
+        Returns immutable history plus preferredRecord selected by source priority and revision.
+        Each record includes its exact frozen catalogRef when retained, and supportedUnits from
+        existing conversion rules. Null reference means unavailable evidence; do not infer a
+        newer provider identity. This read does not contact a provider or import food.
       parameters:
         - name: productId
           in: path
@@ -3493,12 +3534,15 @@ paths:
                 type: object
                 required:
                   - records
+                  - preferredRecord
                 properties:
                   records:
                     type: array
-                    items:
-                      type: object
-                      additionalProperties: true
+                    items: { $ref: '#/components/schemas/FoodNutritionRecordContext' }
+                  preferredRecord:
+                    anyOf:
+                      - { $ref: '#/components/schemas/FoodNutritionRecordContext' }
+                      - { type: 'null' }
         '400':
           description: Invalid input
         '401':
@@ -3989,6 +4033,43 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    ProductConsumptionRequest:
+      type: object
+      additionalProperties: false
+      required: [productId, quantity, unit, occurredAt, mealSlot]
+      properties:
+        productId: { type: string, format: uuid }
+        expectedFoodNutritionRecordId: { type: string, format: uuid }
+        quantity: { type: number, exclusiveMinimum: 0, maximum: 1000000 }
+        unit: { type: string, minLength: 1, maxLength: 30 }
+        occurredAt: { type: string, format: date-time }
+        mealSlot: { type: string, enum: [breakfast, lunch, dinner, snack, other] }
+        supersedesIntakeRevisionId: { type: [string, 'null'], format: uuid, default: null }
+        revisionReason: { type: string, maxLength: 500, default: '' }
+    FoodNutritionRecordContext:
+      type: object
+      additionalProperties: true
+      required:
+        [id, productId, revision, basisType, basisAmount, basisUnit, catalogRef, supportedUnits]
+      description: Immutable shared food record; existing nutrient/source fields remain present.
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        revision: { type: integer, minimum: 1 }
+        basisType: { type: string, enum: [per_100g, per_100ml, per_serving, per_unit] }
+        basisAmount: { type: number }
+        basisUnit: { type: string }
+        servingWeightGrams: { type: [number, 'null'] }
+        densityGramsPerMilliliter: { type: [number, 'null'] }
+        pieceWeightGrams: { type: [number, 'null'] }
+        sourceRecordKey: { type: string }
+        supportedUnits:
+          type: array
+          items: { type: string }
+        catalogRef:
+          anyOf:
+            - { $ref: '#/components/schemas/CatalogReference' }
+            - { type: 'null' }
     CatalogMeasuresInput:
       type: object
       additionalProperties: false

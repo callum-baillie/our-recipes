@@ -6,7 +6,7 @@ import { nutritionApiError, readJson } from '@/app/api/v1/nutrition/_shared';
 import { manualFoodNutritionRecordSchema } from '@/lib/domain/nutrition-recipe-calculation';
 import {
   appendManualProductNutritionRecord,
-  listProductNutritionRecordHistory,
+  getProductNutritionRecordContext,
 } from '@/lib/services/nutrition-recipe-calculation-service';
 
 type Context = { params: Promise<{ productId: string }> };
@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: Context) {
       .uuid()
       .parse((await context.params).productId);
     return withApiRequestId(
-      NextResponse.json({ records: listProductNutritionRecordHistory(productId) }),
+      NextResponse.json(getProductNutritionRecordContext(productId)),
       access.requestId,
     );
   } catch (error) {

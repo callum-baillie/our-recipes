@@ -415,6 +415,7 @@ export function NutritionRecordForm({
           body = {
             ...common,
             productId: selectedProduct.id,
+            expectedFoodNutritionRecordId: selectedProduct.record?.id,
             quantity: Number(draft.quantity),
             unit: draft.unit,
           };

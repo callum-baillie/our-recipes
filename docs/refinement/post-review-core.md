@@ -14,6 +14,14 @@ In-flight library handlers/API calls and verification issuance share a process-g
 
 `restore-interruption.test.ts` terminates separate real Node processes immediately before and after invalidation inside the swap verification callback. Both leave the durable marker; runtime database access and container startup migration refuse access after restart, and health returns503. This crash fixture exercises the swap/database boundary, not an HTTP process kill during archive validation. Existing mounted-root, rollback/sidecar and cross-bundle reopening fixtures remain required. No production data or operator volume was restored.
 
+## G08 SQLite authentication transactions
+
+The localhost Chromium virtual-authenticator flow exposed a real registration failure: Better Auth 1.6.25 passed an asynchronous verification-consumption transaction to Drizzle's synchronous `better-sqlite3` driver, producing `Transaction function cannot return a promise` and HTTP 500. A focused real-handler regression also reproduced the same failure for password reset; both concurrent reset attempts returned 500.
+
+The auth Drizzle adapter now uses its supported default `transaction: false` mode. This does not make a library request a multi-statement SQLite transaction. Single-use verification claims remain an atomic SQLite `DELETE ... RETURNING`, backed by the library's identifier consume lock and stale-row cleanup. Public sign-up and social enrollment are disabled/unconfigured; household enrollment and restore invalidation retain their own synchronous application transactions. No trusted-origin setting changes.
+
+`tests/integration/auth-sqlite-verification.test.ts` exercises the real auth handler and SQLite with only email delivery mocked. Concurrent attempts to use an authentication challenge for registration must reject the wrong ceremony without issuing a credential/session, and consume the challenge. Concurrent password resets must yield exactly one success, reject replay and the old passphrase, revoke previous sessions and permit sign-in with the replacement passphrase. Complete passkey enrollment/sign-in/removal remains the separate Chromium virtual-authenticator browser check; neither fixture establishes physical-authenticator compatibility.
+
 ## F05/F06 purchase amounts
 
 Migration0073 adds nullable `shopping_list_items.cart_unit`. Demand (`quantity`,`unit`) remains separate from purchase (`cartQuantity`,`cartUnit`). Legacy null units are unreviewed: no parser guesses from labels or demand. Unpack starts blank for those amounts and the editor requests unit review. New manual purchases explicitly set their displayed unit. Compatible g/kg coverage converts through shared inventory rules; incompatible dimensions and unknown demand have no numeric remaining claim. True zero is preserved.

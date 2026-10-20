@@ -21,7 +21,6 @@ const config = getRuntimeConfig();
 const authUrl = new URL(config.auth.baseUrl);
 // Backup restoration closes/reopens SQLite. Resolve root Drizzle methods at
 // operation time so the auth adapter never retains a closed database handle.
-// A transaction still uses the concrete transaction object provided by Drizzle.
 const authDatabase = new Proxy({} as ReturnType<typeof getDatabase>, {
   get(_target, property) {
     const database = getDatabase();
@@ -43,7 +42,10 @@ const authentication = betterAuth({
   database: drizzleAdapter(authDatabase, {
     provider: 'sqlite',
     schema,
-    transaction: true,
+    // Better Auth's transaction callbacks are async; better-sqlite3 requires
+    // synchronous callbacks. Its supported sequential mode still claims a
+    // verification row atomically with SQLite DELETE ... RETURNING.
+    transaction: false,
   }),
   advanced: {
     database: {

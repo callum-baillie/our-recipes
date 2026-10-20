@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { emptyRecipeInput } from '../../src/lib/domain/recipe';
 import { completeInitialOnboarding, TEST_PASSPHRASE } from './helpers/onboarding';
 import { appAxe } from './helpers/accessibility';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 async function post(page: Page, path: string, data: unknown) {
   const response = await page.request.post(path, {
@@ -16,8 +17,10 @@ async function post(page: Page, path: string, data: unknown) {
 /** Run against the isolated e2e database; AI, camera and uncertain writes are intercepted. */
 test('refinement workflows preserve draft identity, request scope and recovery at short mobile sizes', async ({
   page,
-}, testInfo) => {
+}) => {
   test.setTimeout(240_000);
+  const evidenceDirectory = 'screenshots/post-review/retained';
+  mkdirSync(evidenceDirectory, { recursive: true });
   await page.goto('/');
   if (new URL(page.url()).pathname === '/sign-in') {
     await page
@@ -155,7 +158,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
     await page.keyboard.press('Shift+Tab');
     await expect(review.getByRole('button', { name: 'Keep current edits' })).toBeFocused();
     await page.screenshot({
-      path: testInfo.outputPath(`ai-review-${viewport.width}x${viewport.height}.png`),
+      path: `${evidenceDirectory}/ai-review-${viewport.width}x${viewport.height}.png`,
     });
   }
   expect((await appAxe(page).include('dialog').analyze()).violations).toEqual([]);
@@ -191,7 +194,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await expect(page.getByLabel('Temperature to convert')).toBeVisible();
   await expect(page.getByLabel('From unit')).toBeVisible();
   await page.screenshot({
-    path: testInfo.outputPath('cooking-count-and-converter.png'),
+    path: `${evidenceDirectory}/cooking-count-and-converter.png`,
     fullPage: true,
   });
 
@@ -223,7 +226,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await expect(page.getByText(/The stock change was saved/)).toBeVisible();
   await expect(essential.getByRole('button', { name: 'Save policy' })).toBeDisabled();
   await page.screenshot({
-    path: testInfo.outputPath('pantry-acknowledged-refresh-failure.png'),
+    path: `${evidenceDirectory}/pantry-acknowledged-refresh-failure.png`,
     fullPage: true,
   });
   summaryReadsFail = false;
@@ -261,7 +264,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   finishRename();
   await expect(page.getByText('Controlled list conflict', { exact: true })).toBeVisible();
   await expect(listName).toHaveValue('Weekend draft');
-  await page.screenshot({ path: testInfo.outputPath('mobile-list-name-error.png') });
+  await page.screenshot({ path: `${evidenceDirectory}/mobile-list-name-error.png` });
 
   await page.goto('/planner?view=day&date=2026-10-19');
   await page
@@ -284,7 +287,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await picker.getByRole('button', { name: new RegExp(`${input.title}.*Select`) }).click();
   await expect(picker.getByRole('button', { name: 'Add 1 meal' })).toBeDisabled();
   expect(additions).toBe(1);
-  await page.screenshot({ path: testInfo.outputPath('uncertain-meal-selection-retained.png') });
+  await page.screenshot({ path: `${evidenceDirectory}/uncertain-meal-selection-retained.png` });
   await page.goto(`/recipes/${recipe.id}`);
   await page.locator('summary').filter({ hasText: 'Recipe-source nutrition' }).click();
   await expect(
@@ -295,7 +298,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await page
     .getByRole('button', { name: 'Estimate replacement nutrition', exact: true })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('source-nutrition-neutral-action.png') });
+  await page.screenshot({ path: `${evidenceDirectory}/source-nutrition-neutral-action.png` });
   await page.route('**/api/v1/meal-plan/export/pdf', (route) =>
     route.fulfill({
       status: 503,
@@ -309,10 +312,24 @@ test('refinement workflows preserve draft identity, request scope and recovery a
     page.getByText(/Cards use each meal’s planned recipe version, adaptations and servings/),
   ).toBeVisible();
   await page.getByLabel('Append recipe cards to the schedule').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('meal-plan-print-card-scope-390.png') });
+  await page.screenshot({ path: `${evidenceDirectory}/meal-plan-print-card-scope-390.png` });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByLabel('Append recipe cards to the schedule').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('meal-plan-print-card-scope-1440.png') });
+  await page.screenshot({ path: `${evidenceDirectory}/meal-plan-print-card-scope-1440.png` });
+  writeFileSync(
+    `${evidenceDirectory}/manifest.json`,
+    JSON.stringify(
+      {
+        revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+        capturedAt: new Date().toISOString(),
+        state:
+          'Synthetic household; real Chromium with controlled AI, uncertain-write and export responses. No paid or live camera calls.',
+        viewports: ['1440x1000', '390x500', '320x500', '390x844'],
+      },
+      null,
+      2,
+    ),
+  );
 });
 
 test('unknown buy quantity retains separate recipe demand in the populated editor', async ({

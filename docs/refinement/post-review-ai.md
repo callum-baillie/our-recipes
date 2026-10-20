@@ -32,6 +32,16 @@ Browser evidence: [image workflow index](../../screenshots/post-review/images/ev
 
 ## Final acceptance cross-check
 
+### G05 product-intake review binding — verified
+
+New `logProductNutrition` proposals server-normalize `expectedFoodNutritionRecordId` into the reviewed body and intent hash. The source/revision/basis appears in the change label. A normal entry pins the authoritative preferred record; a correction pins its original intake record after the existing authorization and source checks. An explicitly mismatched model-supplied pin is rejected rather than silently replaced. At execution the shared food-diary transaction enforces the pin, so a newly preferred record requires a fresh review and cannot alter the reviewed nutrition silently.
+
+The optional field remains compatible for direct legacy API callers. Older _AI proposals_ without a reviewed pin require fresh review before execution. Already acknowledged AI results replay before stale-data checks and do not append another entry. No new read permission or identity boundary was introduced.
+
+`pnpm exec vitest run --project integration tests/integration/ai-operation-contracts.test.ts` — **14 passed** after this change. The added actual-handler case asserts: omitted model pin is server-populated; stale explicit pin is rejected; changed preferred record fails with no intake; refreshed review applies; later record changes do not break acknowledged replay; a correction retains the original food record; and an unpinned legacy proposal cannot execute. Root owns the shared food-diary/schema/API changes and their direct-client coverage.
+
+### Existing cross-checks
+
 - All five result bindings execute against real application handlers: `list.id` creates then fills a list; `recipe.id` links a new recipe to a collection and meal; `collection.id` addresses its membership; `product.id` updates the created product; `meal.id` updates the newly created meal. Tests inspect persisted records/revision and acknowledged replay. A deprecated `entry.id` receipt is rejected without writes.
 - The reviewed dinner → Pantry-aware shopping → meal move/servings test checks actual shortages and preserved recipe revision. Recipe adaptation/stale version and unknown committed-step recovery are covered by the assistant/operation suites. Catalog scanned-food confirmation belongs to the catalog/native suite; it is not inferred from these AI tests.
 - Cancellation tests inspect the nested provider's actual signal, return a late result and assert no proposal/image side effect. Current 512-token/deadline controls are asserted on actual nested inputs and Batch JSON, not merely settings labels. Queued privacy tests revoke captured consent after enqueue, then invoke the worker and assert zero provider calls/traces.

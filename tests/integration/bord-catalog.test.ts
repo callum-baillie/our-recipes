@@ -18,7 +18,10 @@ import {
   shoppingListItems,
 } from '@/lib/db/schema';
 import { foodCatalogImportInputSchema } from '@/lib/domain/food-data';
-import { getNutritionDataWorkspace } from '@/lib/services/nutrition-recipe-calculation-service';
+import {
+  getNutritionDataWorkspace,
+  getProductNutritionRecordContext,
+} from '@/lib/services/nutrition-recipe-calculation-service';
 import { BordCatalogClient } from '@/lib/providers/bord-catalog-client';
 import { getRuntimeConfig } from '@/lib/config';
 import { completeSetup } from '@/lib/services/household-service';
@@ -216,6 +219,16 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     });
     expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
     const snapshot = getDatabase().select().from(foodProviderSnapshots).get()!;
+    const savedProduct = getNutritionDataWorkspace().products.find(
+      (product) => product.displayName === 'Reviewed household oats',
+    )!;
+    expect(getProductNutritionRecordContext(savedProduct.id).preferredRecord).toMatchObject({
+      id: savedProduct.record!.id,
+      catalogRef: record.catalogRef,
+    });
+    expect(
+      getProductNutritionRecordContext(savedProduct.id).preferredRecord?.supportedUnits,
+    ).toContain('g');
     expect(
       getNutritionDataWorkspace().products.find(
         (product) => product.displayName === 'Reviewed household oats',

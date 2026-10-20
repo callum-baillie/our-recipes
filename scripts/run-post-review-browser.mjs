@@ -19,7 +19,6 @@ run(
     'tests/e2e/workflow-backlog.spec.ts',
     'tests/e2e/ai-completion.spec.ts',
     'tests/e2e/post-review-chat.spec.ts',
-    'tests/e2e/post-review-auth.spec.ts',
     'tests/e2e/post-review-core.spec.ts',
     'tests/e2e/post-review-images.spec.ts',
     'tests/e2e/post-review-settings.spec.ts',
@@ -32,3 +31,9 @@ run(
   ],
   { V1_RELEASE_ORACLE: 'true' },
 );
+// WebAuthn RP IDs must be domains, not the primary oracle's raw IPv4 host.
+// Use the real supported localhost exception without changing origin checks.
+run([playwright, 'test', 'tests/e2e/post-review-auth.spec.ts', '--workers=1', '--retries=0'], {
+  V1_RELEASE_ORACLE: 'true',
+  BORD_E2E_ORIGIN: 'http://localhost:3100',
+});

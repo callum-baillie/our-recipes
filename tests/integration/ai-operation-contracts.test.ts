@@ -310,6 +310,143 @@ describe('authorized AI operations and prompt contracts', () => {
     expect(replay.replayed).toBe(true);
     expect(recipeService.listRecipes('Dependency soup')).toHaveLength(1);
   });
+  it('pins AI product intake to reviewed nutrition and preserves corrections and acknowledged replay', async () => {
+    setSharing({ shareRawDiary: true });
+    const pantry = await import('@/lib/services/pantry-service');
+    const pantrySchemas = await import('@/lib/domain/pantry');
+    const nutrition = await import('@/lib/services/nutrition-recipe-calculation-service');
+    const intake = await import('@/lib/services/nutrition-intake-service');
+    const { resolveNutritionHouseholdContext } =
+      await import('@/lib/services/nutrition-household-profile-service');
+    const household = resolveNutritionHouseholdContext({
+      profileId: principal.linkedProfileId,
+      source: 'auth-session',
+    });
+    const profileId = household.activeNutritionProfile.id;
+    const product = pantry.createPantryProduct(
+      pantrySchemas.pantryProductInputSchema.parse({
+        displayName: 'AI pinned lentils',
+        defaultInventoryUnit: 'g',
+      }),
+      principal.profileId,
+    );
+    const record = (amount: number, supersedesRecordId?: string) =>
+      nutrition.appendManualProductNutritionRecord(product.id, {
+        basisType: 'per_100g',
+        basisAmount: 100,
+        basisUnit: 'g',
+        confidence: 1,
+        completeness: 1,
+        ...(supersedesRecordId ? { supersedesRecordId } : {}),
+        values: [{ nutrientCode: 'energy_kcal', amount }],
+      });
+    const first = record(100);
+    const body = {
+      productId: product.id,
+      quantity: 50,
+      unit: 'g',
+      occurredAt: '2026-10-20T18:00:00Z',
+      mealSlot: 'dinner',
+    };
+    const prepare = (extra: Record<string, unknown> = {}) =>
+      actions.prepareAppActions(principal, request('/ai/app-actions'), threadId, {
+        title: 'Review lentil intake',
+        actions: [
+          {
+            operationId: 'logProductNutrition',
+            parametersJson: JSON.stringify({ profileId }),
+            bodyJson: JSON.stringify({ ...body, ...extra }),
+          },
+        ],
+      });
+    const reviewed = (await prepare()).appAction;
+    expect(reviewed.actions[0].body).toMatchObject({ expectedFoodNutritionRecordId: first.id });
+    expect(reviewed.actions[0].changeLabel).toContain('basis 100 g');
+    const second = record(200, first.id);
+    await expect(prepare({ expectedFoodNutritionRecordId: first.id })).rejects.toThrow(
+      /record is unavailable or changed/,
+    );
+    const changed = await actions.confirmAppActions(principal, request('/ai/app-actions'), {
+      id: reviewed.id,
+      version: reviewed.version,
+      decision: 'apply',
+    });
+    expect(changed).toMatchObject({
+      status: 'partial',
+      results: [{ ok: false, state: 'failed', message: expect.stringMatching(/record changed/) }],
+    });
+    expect(
+      intake.listNutritionIntakeRevisions(profileId, household.compatibilityPrincipalId),
+    ).toHaveLength(0);
+    const refreshed = (await prepare()).appAction;
+    expect(refreshed.actions[0].body).toMatchObject({ expectedFoodNutritionRecordId: second.id });
+    const applied = await actions.confirmAppActions(principal, request('/ai/app-actions'), {
+      id: refreshed.id,
+      version: refreshed.version,
+      decision: 'apply',
+    });
+    expect(applied.status).toBe('applied');
+    const saved = intake.listNutritionIntakeRevisions(
+      profileId,
+      household.compatibilityPrincipalId,
+    )[0]!;
+    expect(saved.foodNutritionRecordId).toBe(second.id);
+    record(300, second.id);
+    const replay = await actions.confirmAppActions(principal, request('/ai/app-actions'), {
+      id: refreshed.id,
+      version: refreshed.version,
+      decision: 'apply',
+    });
+    expect(replay.replayed).toBe(true);
+    expect(
+      intake.listNutritionIntakeRevisions(profileId, household.compatibilityPrincipalId),
+    ).toHaveLength(1);
+    const correction = (
+      await prepare({
+        supersedesIntakeRevisionId: saved.id,
+        revisionReason: 'Reviewed changed amount',
+        quantity: 100,
+      })
+    ).appAction;
+    expect(correction.actions[0].body).toMatchObject({ expectedFoodNutritionRecordId: second.id });
+    const corrected = await actions.confirmAppActions(principal, request('/ai/app-actions'), {
+      id: correction.id,
+      version: correction.version,
+      decision: 'apply',
+    });
+    expect(corrected.status).toBe('applied');
+    expect(
+      intake
+        .listNutritionIntakeRevisions(profileId, household.compatibilityPrincipalId)
+        .find((entry) => entry.state === 'corrected')?.foodNutritionRecordId,
+    ).toBe(second.id);
+    const legacy = (await prepare()).appAction;
+    const row = db
+      .getDatabase()
+      .select()
+      .from(schema.aiDecisionRecords)
+      .where(eq(schema.aiDecisionRecords.id, legacy.id))
+      .get()!;
+    const legacyPayload = JSON.parse(row.resultJson);
+    const legacyBody = JSON.parse(legacyPayload.actions[0].bodyJson);
+    delete legacyBody.expectedFoodNutritionRecordId;
+    legacyPayload.actions[0].bodyJson = JSON.stringify(legacyBody);
+    db.getDatabase()
+      .update(schema.aiDecisionRecords)
+      .set({ resultJson: JSON.stringify(legacyPayload) })
+      .where(eq(schema.aiDecisionRecords.id, legacy.id))
+      .run();
+    await expect(
+      actions.confirmAppActions(principal, request('/ai/app-actions'), {
+        id: legacy.id,
+        version: legacy.version,
+        decision: 'apply',
+      }),
+    ).rejects.toThrow(/older intake proposal/);
+    expect(
+      intake.listNutritionIntakeRevisions(profileId, household.compatibilityPrincipalId),
+    ).toHaveLength(2);
+  });
   it('requires fresh review for persisted legacy entry.id dependencies without applying a step', async () => {
     setSharing({ shareMealPlans: true });
     const source = request('/ai/app-actions');

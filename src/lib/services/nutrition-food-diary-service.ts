@@ -21,6 +21,7 @@ import {
 } from '@/lib/services/nutrition-foundation-service';
 import {
   NutritionIntakeIntegrityError,
+  NutritionIntakeConflictError,
   appendNutritionIntakeRevision,
   getNutritionIntakeRevisionForUpdate,
 } from '@/lib/services/nutrition-intake-service';
@@ -96,79 +97,86 @@ export function appendConfirmedProductConsumption(
     );
   }
   const database = db();
-  const product = database
-    .select()
-    .from(pantryProducts)
-    .where(eq(pantryProducts.id, input.productId))
-    .get();
-  if (!product) throw new NutritionIntakeIntegrityError('Pantry product was not found.');
-  const record = previous?.foodNutritionRecordId
-    ? getFoodNutritionRecord(previous.foodNutritionRecordId)
-    : selectPreferredFoodNutritionRecord(input.productId);
-  if (!record) {
-    throw new NutritionIntakeIntegrityError('This product has no Nutrition record to snapshot.');
-  }
-  const conversion = ingredientFoodRecordMultiplier(input.quantity, input.unit, record);
-  if (!conversion.supported) throw new NutritionIntakeIntegrityError(conversion.missingReason);
-  const estimated = record.confidence < 1 || record.completeness < 1;
-  return appendNutritionIntakeRevision(profileId, actor, {
-    supersedesIntakeRevisionId: previous?.id ?? null,
-    occurredAt: input.occurredAt,
-    mealSlot: input.mealSlot,
-    state: previous ? 'corrected' : 'eaten',
-    sourceType: 'product',
-    sourceNameSnapshot: product.displayName,
-    recipeId: null,
-    productId: product.id,
-    recipeCalculationId: null,
-    foodNutritionRecordId: record.id,
-    quantity: input.quantity,
-    unit: input.unit,
-    servingCount: null,
-    portionWeightGrams: null,
-    provenance: {
-      sourceIds: [record.source.id],
-      sourceDetails: [
-        {
-          id: record.source.id,
-          name: record.source.name,
-          provider: record.source.provider,
-          version: record.source.version,
-          sourceRecordKey: record.sourceRecordKey,
-        },
-      ],
-      calculationVersionId: null,
-      sourceDigest: digest({
-        recordId: record.id,
-        recordRevision: record.revision,
-        quantity: input.quantity,
-        unit: input.unit,
-        multiplier: conversion.multiplier,
-        method: conversion.method,
-      }),
-      basisType:
-        record.basisType === 'per_100g'
-          ? 'per_100g'
-          : record.basisType === 'per_100ml'
-            ? 'per_100ml'
-            : record.basisType === 'per_serving'
-              ? 'food_serving'
-              : 'food_unit',
-      basisAmount: record.basisAmount,
-      basisUnit: record.basisUnit,
-      confidence: record.confidence,
-      completeness: record.completeness,
-      estimated,
-    },
-    revisionReason: input.revisionReason,
-    values: record.values.map((value) => ({
-      nutrientCode: value.nutrientCode as NutrientCode,
-      amount: value.amount * conversion.multiplier,
-      sourceIds: [record.source.id],
-      confidence: value.confidence ?? record.confidence,
-      completeness: record.completeness,
-      estimated,
-    })),
+  return database.transaction(() => {
+    const product = database
+      .select()
+      .from(pantryProducts)
+      .where(eq(pantryProducts.id, input.productId))
+      .get();
+    if (!product) throw new NutritionIntakeIntegrityError('Pantry product was not found.');
+    const record = previous?.foodNutritionRecordId
+      ? getFoodNutritionRecord(previous.foodNutritionRecordId)
+      : selectPreferredFoodNutritionRecord(input.productId);
+    if (!record) {
+      throw new NutritionIntakeIntegrityError('This product has no Nutrition record to snapshot.');
+    }
+    if (input.expectedFoodNutritionRecordId && input.expectedFoodNutritionRecordId !== record.id) {
+      throw new NutritionIntakeConflictError(
+        'The saved food nutrition record changed. Review its current basis and portion before recording.',
+      );
+    }
+    const conversion = ingredientFoodRecordMultiplier(input.quantity, input.unit, record);
+    if (!conversion.supported) throw new NutritionIntakeIntegrityError(conversion.missingReason);
+    const estimated = record.confidence < 1 || record.completeness < 1;
+    return appendNutritionIntakeRevision(profileId, actor, {
+      supersedesIntakeRevisionId: previous?.id ?? null,
+      occurredAt: input.occurredAt,
+      mealSlot: input.mealSlot,
+      state: previous ? 'corrected' : 'eaten',
+      sourceType: 'product',
+      sourceNameSnapshot: product.displayName,
+      recipeId: null,
+      productId: product.id,
+      recipeCalculationId: null,
+      foodNutritionRecordId: record.id,
+      quantity: input.quantity,
+      unit: input.unit,
+      servingCount: null,
+      portionWeightGrams: null,
+      provenance: {
+        sourceIds: [record.source.id],
+        sourceDetails: [
+          {
+            id: record.source.id,
+            name: record.source.name,
+            provider: record.source.provider,
+            version: record.source.version,
+            sourceRecordKey: record.sourceRecordKey,
+          },
+        ],
+        calculationVersionId: null,
+        sourceDigest: digest({
+          recordId: record.id,
+          recordRevision: record.revision,
+          quantity: input.quantity,
+          unit: input.unit,
+          multiplier: conversion.multiplier,
+          method: conversion.method,
+        }),
+        basisType:
+          record.basisType === 'per_100g'
+            ? 'per_100g'
+            : record.basisType === 'per_100ml'
+              ? 'per_100ml'
+              : record.basisType === 'per_serving'
+                ? 'food_serving'
+                : 'food_unit',
+        basisAmount: record.basisAmount,
+        basisUnit: record.basisUnit,
+        confidence: record.confidence,
+        completeness: record.completeness,
+        estimated,
+      },
+      revisionReason: input.revisionReason,
+      values: record.values.map((value) => ({
+        nutrientCode: value.nutrientCode as NutrientCode,
+        amount: value.amount * conversion.multiplier,
+        sourceIds: [record.source.id],
+        confidence: value.confidence ?? record.confidence,
+        completeness: record.completeness,
+        estimated,
+      })),
+    });
   });
 }
 

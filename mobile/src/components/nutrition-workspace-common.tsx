@@ -32,6 +32,7 @@ export function IntakeTiming({
   setDate,
   setTime,
   setMeal,
+  disabled = false,
 }: {
   date: string;
   time: string;
@@ -39,13 +40,25 @@ export function IntakeTiming({
   setDate: (value: string) => void;
   setTime: (value: string) => void;
   setMeal: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <>
-      <FormField label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
-      <FormField label="Time on this device (HH:MM)" value={time} onChangeText={setTime} />
+      <FormField
+        label="Date (YYYY-MM-DD)"
+        value={date}
+        onChangeText={setDate}
+        editable={!disabled}
+      />
+      <FormField
+        label="Time on this device (HH:MM)"
+        value={time}
+        onChangeText={setTime}
+        editable={!disabled}
+      />
       <ChoiceField
         label="Meal"
+        disabled={disabled}
         value={meal}
         onChange={setMeal}
         choices={['breakfast', 'lunch', 'dinner', 'snack', 'other'].map((value) => ({

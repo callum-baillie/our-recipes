@@ -213,7 +213,7 @@ export const APP_OPERATIONS: AppOperation[] = [
     method: 'POST',
     effect: 'write',
     summary:
-      'Log a reviewed saved product quantity using supported frozen conversions. Does not consume Pantry stock.',
+      'Log a reviewed saved product quantity pinned to its nutrition record and supported conversions. Corrections retain the original record. Does not consume Pantry stock.',
     parameters: [],
     body: null,
     validator: productConsumptionRequestSchema,

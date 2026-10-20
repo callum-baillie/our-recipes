@@ -28,6 +28,13 @@ import { enqueueRecipeImageJob, getAiJob } from './ai-job-service';
 import { getAiReadiness } from './ai-readiness-service';
 import { getAiWorkloadSetting } from './ai-settings-service';
 import { appRoleCan } from '@/lib/domain/permissions';
+import { productConsumptionRequestSchema } from '@/lib/domain/nutrition-food-diary';
+import {
+  getFoodNutritionRecord,
+  selectPreferredFoodNutritionRecord,
+} from './nutrition-foundation-service';
+import { getNutritionIntakeRevisionForUpdate } from './nutrition-intake-service';
+import { resolveNutritionHouseholdContext } from './nutrition-household-profile-service';
 
 const actionSchema = z
   .object({
@@ -451,6 +458,46 @@ export async function prepareAppActions(
       403,
     );
   const parsed = appActionRequestSchema.parse(input);
+  const nutritionLabels = new Map<number, string>();
+  for (const [index, action] of parsed.actions.entries()) {
+    if (action.operationId !== 'logProductNutrition') continue;
+    const { parameters, body } = parseAction(p, bindAction(parsed.actions, index));
+    if (action.bindings.some((binding) => binding.target === 'body.productId'))
+      throw new DecisionError(
+        'Review the saved product and its nutrition record before preparing food intake.',
+        409,
+      );
+    const intake = productConsumptionRequestSchema.parse(body);
+    const previous = intake.supersedesIntakeRevisionId
+      ? getNutritionIntakeRevisionForUpdate(
+          parameters.profileId,
+          resolveNutritionHouseholdContext({ profileId: p.linkedProfileId, source: 'auth-session' })
+            .compatibilityPrincipalId,
+          intake.supersedesIntakeRevisionId,
+        )
+      : null;
+    if (previous && (previous.sourceType !== 'product' || previous.productId !== intake.productId))
+      throw new DecisionError(
+        'A product correction must preserve its original product source.',
+        409,
+      );
+    const record = previous?.foodNutritionRecordId
+      ? getFoodNutritionRecord(previous.foodNutritionRecordId)
+      : selectPreferredFoodNutritionRecord(intake.productId);
+    if (
+      !record ||
+      (intake.expectedFoodNutritionRecordId && intake.expectedFoodNutritionRecordId !== record.id)
+    )
+      throw new DecisionError(
+        'The product nutrition record is unavailable or changed. Review the current record before preparing intake.',
+        409,
+      );
+    action.bodyJson = JSON.stringify({ ...intake, expectedFoodNutritionRecordId: record.id });
+    nutritionLabels.set(
+      index,
+      `${record.source.name} · nutrition revision ${record.revision} · basis ${record.basisAmount} ${record.basisUnit}`,
+    );
+  }
   if (
     parsed.actions.some((action) => action.operationId === 'generateRecipeImage') &&
     !parsed.actions.every((action) => action.operationId === 'generateRecipeImage')
@@ -475,7 +522,7 @@ export async function prepareAppActions(
           ? recipe?.images.length
             ? 'Replace cover image'
             : 'Create image'
-          : undefined,
+          : nutritionLabels.get(index),
     };
   });
   const snapshots: Snapshot[] = [];
@@ -609,6 +656,19 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
       409,
     );
   value.actions = compatible.data;
+  if (
+    decision === 'apply' &&
+    value.actions.some(
+      (action) =>
+        action.operationId === 'logProductNutrition' &&
+        !productConsumptionRequestSchema.parse(JSON.parse(action.bodyJson))
+          .expectedFoodNutritionRecordId,
+    )
+  )
+    throw new DecisionError(
+      'This older intake proposal does not identify its reviewed nutrition record. Prepare a fresh review before logging food.',
+      409,
+    );
   if (decision === 'apply')
     for (const saved of value.snapshots ?? []) {
       const op = operation(p, saved.operationId);

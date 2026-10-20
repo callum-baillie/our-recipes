@@ -18,6 +18,7 @@ export const productConsumptionRequestSchema = z
     ...timing,
     ...correction,
     productId: uuid,
+    expectedFoodNutritionRecordId: uuid.optional(),
     quantity: positive,
     unit: z.string().trim().min(1).max(30),
   })

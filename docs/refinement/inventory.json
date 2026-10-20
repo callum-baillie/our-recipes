@@ -43,7 +43,7 @@
     "nativeLayouts": 9,
     "nativeScreenRoutes": 58,
     "nativeScreenSources": 22,
-    "sharedNativeDomains": 13,
+    "sharedNativeDomains": 14,
     "serverActionModules": 0,
     "directAssistantTools": 21,
     "curatedOperations": 112,
@@ -1467,6 +1467,7 @@
     "shared/mobile-domain/ndjson.ts",
     "shared/mobile-domain/nutrient-catalog.ts",
     "shared/mobile-domain/nutrition-commands.ts",
+    "shared/mobile-domain/nutrition-source-portions.ts",
     "shared/mobile-domain/proposal-review.ts",
     "shared/mobile-domain/scanner-recovery.ts",
     "shared/mobile-domain/shopping-amounts.ts"
@@ -3032,5 +3033,6 @@
     "catalogNative": "docs/refinement/post-review-catalog.md",
     "previousRelease": "docs/refinement/release-evidence.md",
     "note": "Commands/results and final committed revision belong to the current completion receipt. No testedImplementationCommit is asserted for uncommitted code."
-  }
+  },
+  "sharedNativeDomainsUpdatedAt": "2026-10-20T20:57:58.714461+00:00"
 }

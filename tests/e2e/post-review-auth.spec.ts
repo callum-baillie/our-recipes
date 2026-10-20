@@ -1,13 +1,19 @@
 import { expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { signInWorkflowFixture } from './helpers/onboarding';
+import { TEST_PASSPHRASE } from './helpers/onboarding';
 
 test('virtual passkey enrollment, sign-in, removal and session revocation use real auth handlers', async ({
   page,
+  baseURL,
 }) => {
   test.setTimeout(90_000);
-  await signInWorkflowFixture(page);
+  expect(baseURL).toBe('http://localhost:3100');
+  const signedIn = await page.request.post('/api/auth/sign-in/email', {
+    headers: { Origin: baseURL! },
+    data: { email: 'workflow-refinement-fixture-maya@example.test', password: TEST_PASSPHRASE },
+  });
+  expect(signedIn.ok()).toBe(true);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('WebAuthn.enable');
   const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
@@ -27,7 +33,7 @@ test('virtual passkey enrollment, sign-in, removal and session revocation use re
       .map(({ name, value }) => `${name}=${value}`)
       .join('; ');
     const result = await page.request.post('/api/auth/sign-out', {
-      headers: { Origin: 'http://127.0.0.1:3100' },
+      headers: { Origin: baseURL! },
       data: {},
     });
     expect(result.ok()).toBe(true);
@@ -68,6 +74,15 @@ test('virtual passkey enrollment, sign-in, removal and session revocation use re
     await expect(page.getByRole('button', { name: 'Use a passkey', exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
     await page.screenshot({ path: `${directory}/removed-virtual-passkey-recovery-390.png` });
+    await page
+      .getByLabel('Email', { exact: true })
+      .fill('workflow-refinement-fixture-maya@example.test');
+    await page.getByLabel('Passphrase', { exact: true }).fill(TEST_PASSPHRASE);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.waitForURL((url) => url.pathname !== '/sign-in');
+    expect((await (await page.request.get('/api/auth/get-session')).json())?.user?.email).toBe(
+      'workflow-refinement-fixture-maya@example.test',
+    );
     writeFileSync(
       `${directory}/manifest.json`,
       JSON.stringify(

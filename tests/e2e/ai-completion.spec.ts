@@ -38,19 +38,25 @@ test('administrator guidance validates variables, retains conflicts and stays re
     'For {{task}}, answer briefly and preserve evidence limitations.',
   );
   mkdirSync(directory, { recursive: true });
+  const recovery = editor.getByRole('button', {
+    name: 'Load current version to compare',
+    exact: true,
+  });
+  await expect(save).toBeDisabled();
+  await expect(recovery).toBeEnabled();
   for (const viewport of [
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
     { width: 320, height: 568 },
   ]) {
     await page.setViewportSize(viewport);
-    await save.focus();
+    await recovery.focus();
     // Re-enter through keyboard navigation after reflow, even when the action
     // was already focused at the previous width (focus() then emits no event).
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
-    await expect(save).toBeFocused();
-    await expect(save).toBeInViewport();
+    await expect(recovery).toBeFocused();
+    await expect(recovery).toBeInViewport();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

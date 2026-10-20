@@ -94,6 +94,8 @@ test('interview and onboarding retain drafts with named errors and keyboard choi
     name: /Start guided questionnaire|Edit guided questionnaire/,
   });
   await start.click();
+  const editTaste = page.getByRole('button', { name: 'Edit taste', exact: true });
+  if (await editTaste.isVisible()) await editTaste.click();
   await page.getByLabel(/Do you lean sweet/).fill('Unsaved fixture answer');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Resume unsaved questionnaire' })).toBeVisible();
