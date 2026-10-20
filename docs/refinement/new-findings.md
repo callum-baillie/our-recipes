@@ -31,3 +31,5 @@ NEW-TARGET01: production Chromium measured the recipe photo-tools text button at
 NEW-LAYOUT01: wrapping recipe toolbar labels left grid peers with unequal heights on mobile. The owning action grid stretches items while retaining every visible label and 44px targets. Production Chromium checked 320/390/1440px; the final evidence gallery includes the resulting toolbar.
 
 NEW-PWA01: a first service-worker installation could briefly expose a waiting worker and be labelled as an update. The update notice now requires an existing active worker when observing a waiting installation; genuine update messages and controller changes retain explicit reload. Unit and isolated-browser initial-install/update checks cover this distinction.
+
+NEW-CI01: the first published clean GitHub runner lacked `pdftotext`, so the five real-PDF output tests failed with `ENOENT` despite passing locally. The workflow now installs `poppler-utils` explicitly, and README/testing instructions name the prerequisite. Assertions remain enabled; the rerun validates the clean-runner correction. No application code or document-generation behavior changes in this follow-up.

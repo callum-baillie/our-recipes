@@ -100,3 +100,7 @@ Prompt, model and image quality were evaluated deterministically for contracts. 
 Tested implementation and captured-evidence commit: [`3cb08576150147a600f757951c0cbe66af8010de`](https://github.com/callum-baillie/our-recipes/commit/3cb08576150147a600f757951c0cbe66af8010de). The following receipt commit changes documentation and evidence labels only.
 
 GitHub publication target: [`refinement/full-project-completion`](https://github.com/callum-baillie/our-recipes/tree/refinement/full-project-completion). The branch contains the three additive migrations and all reported implementation/tests/captures. No merge, release tag, production migration or deployment was performed. Remote CI status is reported separately from these executed local gates.
+
+### Clean GitHub runner correction
+
+The [first published verification run](https://github.com/callum-baillie/our-recipes/actions/runs/39454717753) passed the native job and root formatting/lint/types/unit gates, then failed five PDF tests because `pdftotext` was absent (`ENOENT`). CI now explicitly installs `poppler-utils`; local PDF assertions remain unchanged and are rerun. This follow-up changes CI prerequisites and documentation only. The final GitHub run remains separate execution evidence from the local pass.

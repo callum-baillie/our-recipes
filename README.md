@@ -53,6 +53,8 @@ You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persist
 
 ## Quality commands
 
+The PDF regression checks require Poppler’s `pdftotext` on `PATH` (`sudo apt-get install poppler-utils` on Debian/Ubuntu). CI installs it explicitly; the application runtime does not require this test-only command.
+
 Use `pnpm verify` for the complete non-browser code/build/artifact gate and `pnpm test:v1-release` for the isolated browser release oracle plus 1,000/10,000-recipe performance guards. The browser oracle resets only `.test-data` between specs and includes the explicit Recipe → plan → Pantry-aware list → purchase intake → cook → prepared Nutrition → consumption journey without external provider traffic. See [testing documentation](docs/testing.md), [architecture](docs/architecture.md), [security boundary](docs/security.md), and [implementation status](IMPLEMENTATION_STATUS.md).
 
 ## Current boundaries
