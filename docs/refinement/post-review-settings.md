@@ -63,3 +63,19 @@ Status: **verified in Chromium against the development server**. Both settings b
 ## Final retained-evidence reconciliation
 
 [Post-review retained findings](post-review-retained.md) accounts for all33 earlier IDs, distinguishes current behavioral checks from historical browser captures, and names the remaining production browser checks. Root's final isolated full-unit run passed656 tests across114 files; integration passed367 with9 skips. The earlier concurrent unit invocation had two timeout failures and is not relabelled as a pass. The new B3-SO10 archive/duplicate lifecycle test independently passed2 cases after that full-unit run. Latest type check passed; final revision/publication/build/browser status belongs to the lead register.
+
+## First-edit dirty-state correction after production verification
+
+At `4e22102`, the final production browser run passed20 of21 scenarios but the settings scenario timed out with Save disabled after changing the Nutrition goal (`/tmp/bord-post-browser-head.log`). The original browser event ordering was not traced. A deterministic mounted regression then reproduced the same state: changing the actual goal control during the layout phase, before passive effects run, caused the first passive effect to adopt that edited control as the saved baseline. The first-change assertion failed against the original component; the ordinary post-effect change control passed (`/tmp/bord-nutrition-first-change-before.log`). This establishes an application defect, independently of the original browser timing.
+
+`NutritionProfileSettings` now initializes its clean baseline synchronously from the acknowledged profile, never from the editable DOM. Saved nutrient order is preserved by the picker's ordered hidden controls; canonical measurement refs retain their full precision independently of rounded display text. Subsequent save and conflict reconciliation continue to replace the baseline only with acknowledged server values. Persisted consent and enablement changes remain dirty; preview-only controls remain separate.
+
+The focused mounted checks verify an early edit enables Save, submits the intended goal and expected version to the correct profile, preserves nutrient order and canonical precision, becomes clean after acknowledgement, and becomes dirty/clean when edited/reverted again. The browser fixture now resolves the viewed Nutrition profile ID from the authenticated session, asserts the displayed goal agrees with that profile's saved response, chooses an actually different value and asserts both first and reconciled request payloads. These are explicit scope/state assertions, without sleeps or retrying mutations.
+
+```sh
+node /tmp/bord-refinement-tools/node_modules/pnpm/bin/pnpm.cjs exec vitest run \
+  --project unit tests/unit/nutrition-settings-first-change.test.ts \
+  tests/unit/post-review-settings.test.ts tests/unit/settings-nutrition-completion.test.ts
+```
+
+Result: **3 files,29 tests passed** (`/tmp/bord-nutrition-first-change-regression.log`, 2026-10-20). The new regression alone passed2 cases (`/tmp/bord-nutrition-first-change-after.log`). Scoped ESLint passed and Prettier formatted the three touched source/test files. All requests in these tests are controlled fixtures; no database/provider/browser process was started by this follow-up. Production revalidation must use a rebuilt artifact containing this fix; the failed `4e22102` run is retained as a failure, and its prior screenshots are not evidence of the corrected timing behavior.

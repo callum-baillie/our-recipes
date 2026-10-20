@@ -176,11 +176,23 @@ test('profile preserves separate questionnaire, Nutrition and schedule retain cu
   );
   await page.unroute('**/api/v1/account/profile');
   await page.goto('/account/nutrition');
-  const nutrition = (
-    await (
-      await page.request.get(`/api/v1/nutrition/profiles/${initial.profile.id}?scope=settings`)
-    ).json()
-  ).profile;
+  const nutritionSessionResponse = await page.request.get('/api/v1/nutrition/session');
+  expect(nutritionSessionResponse.ok()).toBe(true);
+  const { actor: nutritionActor } = await nutritionSessionResponse.json();
+  expect(nutritionActor.viewedHouseholdProfileId).toBe(initial.profile.id);
+  const nutritionId = nutritionActor.viewedNutritionProfileId;
+  expect(typeof nutritionId).toBe('string');
+  const nutritionResponse = await page.request.get(
+    `/api/v1/nutrition/profiles/${nutritionId}?scope=settings`,
+  );
+  expect(nutritionResponse.ok()).toBe(true);
+  const { profile: nutrition } = await nutritionResponse.json();
+  expect(nutrition.id).toBe(nutritionId);
+  const goal = page.getByLabel(/^Nutrition goal type/);
+  await expect(goal).toHaveValue(nutrition.nutritionGoalType);
+  const nutritionSave = page.getByRole('button', { name: /Save Maya's preferences/ });
+  await expect(nutritionSave).toBeDisabled();
+  const editedGoal = (await goal.inputValue()) === 'maintain' ? 'none' : 'maintain';
   const latestNutrition = {
     ...nutrition,
     version: nutrition.version + 1,
@@ -188,7 +200,7 @@ test('profile preserves separate questionnaire, Nutrition and schedule retain cu
     dailyResetTimezone: 'Europe/London',
   };
   const nutritionWrites: Record<string, unknown>[] = [];
-  await page.route(`**/api/v1/nutrition/profiles/${initial.profile.id}*`, async (route) => {
+  await page.route(`**/api/v1/nutrition/profiles/${nutritionId}*`, async (route) => {
     if (route.request().method() === 'PATCH') {
       const body = route.request().postDataJSON();
       nutritionWrites.push(body);
@@ -208,10 +220,10 @@ test('profile preserves separate questionnaire, Nutrition and schedule retain cu
     }
     return route.fulfill({ json: { profile: latestNutrition } });
   });
-  await page
-    .getByLabel(/^Nutrition goal type/)
-    .selectOption(nutrition.nutritionGoalType === 'maintain' ? 'none' : 'maintain');
-  await page.getByRole('button', { name: /Save Maya's preferences/ }).click();
+  await goal.selectOption(editedGoal);
+  await expect(goal).toHaveValue(editedGoal);
+  await expect(nutritionSave).toBeEnabled();
+  await nutritionSave.click();
   await page.getByRole('button', { name: 'Load current preferences' }).click();
   review = page.getByRole('region', { name: 'Compare concurrent changes' });
   await review.scrollIntoViewIfNeeded();
@@ -219,9 +231,14 @@ test('profile preserves separate questionnaire, Nutrition and schedule retain cu
   await review.getByRole('button', { name: 'Use reviewed draft' }).click();
   await page.getByRole('button', { name: /Save Maya's preferences/ }).click();
   await expect.poll(() => nutritionWrites.length).toBe(2);
+  expect(nutritionWrites[0]).toMatchObject({
+    expectedVersion: nutrition.version,
+    settings: { nutritionGoalType: editedGoal },
+  });
   expect(nutritionWrites[1]).toMatchObject({
     expectedVersion: latestNutrition.version,
     settings: {
+      nutritionGoalType: editedGoal,
       estimatedTargetConsent: latestNutrition.estimatedTargetConsent,
       dailyResetTimezone: 'Europe/London',
     },

@@ -303,7 +303,11 @@ export function NutritionProfileSettings({
   );
   const [revision, setRevision] = useState(0);
   const [dirty, setDirty] = useState(false);
-  const baseline = useRef<string | null>(null);
+  // The saved baseline must exist before any browser edit or hydration event.
+  // Capturing the live form in a passive effect can acknowledge the first edit.
+  // NutrientPicker retains saved selection order in its hidden inputs, and the
+  // measurement refs retain canonical precision independently of display text.
+  const baseline = useRef(JSON.stringify(settingsValues(profile)));
   const [energyEstimate, setEnergyEstimate] = useState<EnergyEstimateResponse | null>(null);
   const [estimateStatus, setEstimateStatus] = useState('');
   const [estimatePending, setEstimatePending] = useState<'preview' | 'apply' | null>(null);
@@ -323,7 +327,6 @@ export function NutritionProfileSettings({
   useEffect(() => {
     if (!formRef.current || lock.current) return;
     const snapshot = JSON.stringify(settingsSnapshot(new FormData(formRef.current)).settings);
-    if (baseline.current === null) baseline.current = snapshot;
     setDirty(snapshot !== baseline.current);
     // The revision records changes after controlled and hidden fields have rendered.
     // eslint-disable-next-line react-hooks/exhaustive-deps
