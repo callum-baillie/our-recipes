@@ -154,6 +154,13 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   flex-wrap: wrap;
   min-width: 0;
 }
+.settings-content .settings-row-control > :is(button, a),
+.settings-content .settings-field-control > :is(button, a) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .settings-content
   .settings-field-control
   > input:not([type='checkbox']):not([type='radio']):not([type='color']),

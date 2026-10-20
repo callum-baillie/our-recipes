@@ -5,6 +5,33 @@ import { signInWorkflowFixture } from './helpers/onboarding';
 import { appAxe } from './helpers/accessibility';
 const directory = 'screenshots/post-review/settings';
 const states: string[] = [];
+async function expectNoHorizontalOverflow(page: Page) {
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    viewport: innerWidth,
+    overflowing: [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && (rect.right > innerWidth || rect.left < 0);
+      })
+      .slice(0, 25)
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          element: element.tagName,
+          className: element.className,
+          text: element.textContent?.trim().slice(0, 100),
+          left: rect.left,
+          right: rect.right,
+          font: style.font,
+          overflowWrap: style.overflowWrap,
+          minWidth: style.minWidth,
+        };
+      }),
+  }));
+  expect(layout.width, JSON.stringify(layout, null, 2)).toBeLessThanOrEqual(layout.viewport);
+}
 async function capture(page: Page, name: string) {
   mkdirSync(directory, { recursive: true });
   await page.screenshot({ path: `${directory}/${name}.png` });
@@ -82,17 +109,28 @@ test('runtime overlap has keyboard choices, responsive review and a merged next 
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
     await review.scrollIntoViewIfNeeded();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
+    await expectNoHorizontalOverflow(page);
     await capture(page, `runtime-overlap-${width}`);
   }
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
   await review.scrollIntoViewIfNeeded();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expectNoHorizontalOverflow(page);
   await capture(page, 'runtime-overlap-320-enlarged');
+  for (const family of ['Arial, sans-serif', 'DejaVu Sans, sans-serif']) {
+    await page.evaluate((value) => {
+      document.body.style.fontFamily = value;
+    }, family);
+    await page
+      .getByRole('button', { name: 'Update summaries', exact: true })
+      .scrollIntoViewIfNeeded();
+    if (family.startsWith('DejaVu')) await capture(page, 'summary-action-320-enlarged-fallback');
+    await expectNoHorizontalOverflow(page);
+  }
+  await page.evaluate(() => {
+    document.body.style.removeProperty('font-family');
+  });
   const local = review.getByRole('radio', {
     name: 'Keep my edit: My draft: concise cooking steps.',
   });

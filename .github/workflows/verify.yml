@@ -36,7 +36,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: browser-failure-screenshots
-          path: test-results/**/*.png
+          path: |
+            test-results/**/*.png
+            test-results/**/error-context.md
           if-no-files-found: ignore
           retention-days: 7
 

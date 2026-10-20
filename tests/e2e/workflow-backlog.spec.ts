@@ -84,11 +84,35 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   const recipe = (await post(page, '/api/v1/recipes', input)).recipe;
   await page.goto(`/recipes/${recipe.id}/edit`);
   const ingredient = page.getByLabel('Ingredient 1-1 item');
+  await ingredient.evaluate((element) => {
+    const events: unknown[] = [];
+    (window as unknown as { ingredientSubmitEvents: unknown[] }).ingredientSubmitEvents = events;
+    const form = element.closest('form')!;
+    for (const type of ['keydown', 'click', 'submit'])
+      form.addEventListener(
+        type,
+        (event) => {
+          const target = event.target as HTMLElement;
+          events.push({
+            type,
+            time: performance.now(),
+            target: target.getAttribute('name') ?? target.textContent?.slice(0, 80),
+            key: (event as KeyboardEvent).key,
+            review: Boolean(form.querySelector('[data-link-review]')),
+            submitDisabled: (form.querySelector('button[type="submit"]') as HTMLButtonElement)
+              .disabled,
+          });
+        },
+        true,
+      );
+  });
   await ingredient.fill('Oat drink');
   let recipeWrites = 0;
+  let submittedIngredient: unknown;
   await page.route(`**/api/v1/recipes/${recipe.id}`, async (route) => {
     if (route.request().method() === 'PUT') {
       recipeWrites++;
+      submittedIngredient = route.request().postDataJSON().ingredientGroups[0].ingredients[0];
       await route.fulfill({
         status: 409,
         json: { error: { message: 'Controlled version conflict' } },
@@ -100,11 +124,41 @@ test('refinement workflows preserve draft identity, request scope and recovery a
     page.getByText(/Review the changed ingredient food links before saving/),
   ).toBeVisible();
   expect(recipeWrites).toBe(0);
-  await page.getByRole('button', { name: 'Keep food link' }).click();
-  await ingredient.press('Enter');
-  await expect(
-    page.getByText('Controlled version conflict', { exact: true }).first(),
-  ).toBeVisible();
+  const keepLink = page.getByRole('button', { name: 'Keep food link', exact: true });
+  try {
+    await keepLink.click();
+    // Confirm the reviewed UI state before submitting again, rather than assuming click
+    // completion has also committed the acknowledgement and finished the earlier submit.
+    await expect(keepLink).toHaveCount(0);
+    await expect(
+      page.locator('.editor-save-bar').getByRole('button', { name: 'Save changes' }),
+    ).toBeEnabled();
+    await ingredient.press('Enter');
+    await expect
+      .poll(() => recipeWrites, 'One PUT after explicit link review and native Enter')
+      .toBe(1);
+    expect(submittedIngredient).toMatchObject({ item: 'Oat drink', pantryProductId: product.id });
+    await expect(
+      page.getByText('Controlled version conflict', { exact: true }).first(),
+    ).toBeVisible();
+  } catch (error) {
+    const diagnostics = await ingredient.evaluate((element) => ({
+      events: (window as unknown as { ingredientSubmitEvents: unknown[] }).ingredientSubmitEvents,
+      value: (element as HTMLInputElement).value,
+      alerts: [...element.closest('form')!.querySelectorAll('[role="alert"]')].map(
+        (item) => item.textContent,
+      ),
+      pending: (
+        element.closest('form')!.querySelector('button[type="submit"]') as HTMLButtonElement
+      ).disabled,
+    }));
+    await test.info().attach('ingredient-submit-state', {
+      body: JSON.stringify({ recipeWrites, submittedIngredient, ...diagnostics }, null, 2),
+      contentType: 'application/json',
+    });
+    console.log('INGREDIENT_SUBMIT_DIAGNOSTICS', JSON.stringify({ recipeWrites, ...diagnostics }));
+    throw error;
+  }
   expect(recipeWrites).toBe(1);
 
   let release!: () => void;
