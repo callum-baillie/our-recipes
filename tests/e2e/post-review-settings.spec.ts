@@ -122,11 +122,17 @@ test('runtime overlap has keyboard choices, responsive review and a merged next 
     await page.evaluate((value) => {
       document.body.style.fontFamily = value;
     }, family);
-    await page
-      .getByRole('button', { name: 'Update summaries', exact: true })
-      .scrollIntoViewIfNeeded();
+    const summaryAction = page.getByRole('button', { name: 'Update summaries', exact: true });
+    await summaryAction.scrollIntoViewIfNeeded();
     if (family.startsWith('DejaVu')) await capture(page, 'summary-action-320-enlarged-fallback');
     await expectNoHorizontalOverflow(page);
+    const actionBounds = await summaryAction.evaluate((button) => ({
+      right: button.getBoundingClientRect().right,
+      containerRight: button.parentElement!.getBoundingClientRect().right,
+      height: button.getBoundingClientRect().height,
+    }));
+    expect(actionBounds.right).toBeLessThanOrEqual(actionBounds.containerRight);
+    expect(actionBounds.height).toBeGreaterThanOrEqual(44);
   }
   await page.evaluate(() => {
     document.body.style.removeProperty('font-family');
