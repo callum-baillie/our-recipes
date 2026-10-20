@@ -749,7 +749,7 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   }
   .settings-content .settings-row-control > :is(.primary-button, .secondary-button),
   .settings-content .settings-field-control > :is(.primary-button, .secondary-button) {
-    padding-inline: 12px;
+    padding-inline: 8px;
   }
   .settings-content .settings-overview {
     grid-template-columns: minmax(0, 1fr);
