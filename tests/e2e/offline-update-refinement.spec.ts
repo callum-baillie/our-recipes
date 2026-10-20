@@ -61,6 +61,9 @@ test('update events preserve a dirty form and reload only after an explicit clea
   await expect(
     page.getByRole('heading', { name: 'Your recipe library', exact: true }),
   ).toBeVisible();
+  // The heading is server-rendered. Wait for the actual client update handoff
+  // before delivering another worker event, rather than racing hydration.
+  await expect(page.getByText(/^Bòrd updated to /)).toBeVisible();
   await announceUpdate(page);
   await expect(page.getByRole('button', { name: 'Reload when ready', exact: true })).toBeVisible();
   expect(navigations).toBe(beforeReload + 1);
