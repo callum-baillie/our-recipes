@@ -153,10 +153,16 @@ test('mobile planning, cooking, shopping, and assistant controls stay usable', a
   await page.getByRole('button', { name: 'Change quantity', exact: true }).click();
   await page.screenshot({ path: '/tmp/bord-mobile-cart-quantity.png', fullPage: true });
   await page.getByLabel('Quantity bought', { exact: true }).fill('6');
+  await expect(page.getByLabel('Purchase unit', { exact: true })).toHaveValue('each');
   await page.getByRole('button', { name: 'Save quantity', exact: true }).click();
-  await expect(page.getByText(/6 each in cart/)).toBeVisible();
+  await expect(page.getByText('6 each in cart', { exact: false })).toBeVisible();
   const savedList = await page.request.get(`/api/v1/shopping-lists/${list.id}`);
-  expect((await savedList.json()).list.items[0]).toMatchObject({ quantity: 12, cartQuantity: 6 });
+  expect((await savedList.json()).list.items[0]).toMatchObject({
+    quantity: 12,
+    unit: 'each',
+    cartQuantity: 6,
+    cartUnit: 'each',
+  });
   await page.screenshot({ path: '/tmp/bord-mobile-shopping.png', fullPage: true });
   await page.goto('/account');
   await page.getByRole('button', { name: 'Start guided questionnaire', exact: true }).click();
