@@ -105,7 +105,7 @@ Bòrd installs a small read-only PWA after a secure local visit. It keeps succes
 
 Open **System Settings → Local recovery** to create, download, validate, and restore a recovery bundle. Bundles are stored in `BACKUP_DIR` (default `DATA_DIR/backups`), include a consistent SQLite snapshot plus local `uploads`/`generated` media and safe household metadata, and never include environment secrets. Automatic in-process backups run every `BACKUP_INTERVAL_HOURS` (24 by default); bundles older than `BACKUP_RETENTION_DAYS` (30 by default) are removed during the next successful backup. A dedicated mounted `BACKUP_DIR`, such as `/backup`, lets Kopia or another host tool protect completed bundles independently.
 
-Before a restore, the app validates archive paths, manifest/schema information, every SHA-256 checksum, and SQLite integrity. It makes a pre-restore safety backup and requires typing `RESTORE` before atomically replacing the local data directory. See [backup and restore](docs/backup-and-restore.md) for recovery steps and limitations.
+Before a restore, the app validates archive paths, manifest/schema information, every SHA-256 checksum, and SQLite integrity. It makes a pre-restore safety backup and requires typing `RESTORE` before replacing the database/media with rollback protection while retaining the mounted data directory. An interrupted recovery blocks database use until repaired. See [backup and restore](docs/backup-and-restore.md) for recovery steps and limitations.
 
 ## Docker and Unraid
 

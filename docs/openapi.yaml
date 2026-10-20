@@ -282,7 +282,19 @@ paths:
                   migrationStatus: { type: string, enum: [current, incomplete] }
                   setupComplete: { type: boolean }
         '400': { $ref: '#/components/responses/InvalidRequest' }
-        '503': { description: Storage is unavailable }
+        '503':
+          description: Storage/migrations are unavailable, or interrupted backup recovery requires operator attention
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version, schemaVersion, migrationStatus, setupComplete]
+                properties:
+                  status: { type: string, enum: [error, recovery_required] }
+                  version: { type: string }
+                  schemaVersion: { type: string }
+                  migrationStatus: { type: string, enum: [incomplete, blocked] }
+                  setupComplete: { type: [boolean, 'null'] }
   /food-data/catalog/status:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]

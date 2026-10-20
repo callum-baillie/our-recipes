@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { access, mkdir, open, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { isAbsolute, join, parse, relative, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -22,6 +23,13 @@ const backupDirectory = isAbsolute(configuredBackupDirectory)
   ? configuredBackupDirectory
   : resolve(process.cwd(), configuredBackupDirectory);
 const pathWithinData = relative(dataDirectory, resolvedDatabasePath);
+
+// Match the runtime database guard before opening or creating any database.
+if (existsSync(join(dataDirectory, '.restore-in-progress.json'))) {
+  throw new Error(
+    'Backup recovery is incomplete. Preserve DATA_DIR and its safety backup for recovery.',
+  );
+}
 
 if (parse(backupDirectory).root === backupDirectory || backupDirectory === dataDirectory) {
   throw new Error('Container BACKUP_DIR must be a non-root directory distinct from DATA_DIR.');

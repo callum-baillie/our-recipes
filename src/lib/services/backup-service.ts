@@ -15,7 +15,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { c as createTar, t as listTar, x as extractTar } from 'tar';
 
 import {
@@ -33,6 +33,7 @@ import {
 import { backupIdSchema, backupManifestSchema, type BackupManifest } from '@/lib/domain/backup';
 import { getHouseholdState } from '@/lib/services/household-service';
 import { APPLICATION_VERSION, SCHEMA_VERSION } from '@/lib/release';
+import { BackupSwapRollbackError, swapBackupData } from '@/lib/services/backup-data-swap';
 
 const MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRY_BYTES = 512 * 1024 * 1024;
@@ -397,7 +398,17 @@ export async function previewBackup(id: string): Promise<BackupPreview> {
 }
 
 export async function restoreBackup(id: string): Promise<{ safetyBackup: BackupPreview }> {
-  const validated = await validateBackup(id);
+  const state = globalThis as typeof globalThis & { __bordRestoreInProgress?: boolean };
+  if (state.__bordRestoreInProgress) throw new BackupError('A backup restore is already running.');
+  state.__bordRestoreInProgress = true;
+  try {
+    return await restoreValidatedBackup(id);
+  } finally {
+    state.__bordRestoreInProgress = false;
+  }
+}
+
+async function restoreValidatedBackup(id: string): Promise<{ safetyBackup: BackupPreview }> {
   const dataDirectory = getDataDirectory();
   const databasePath = getDatabasePath();
   assertDatabaseWithinDataDirectory(databasePath);
@@ -409,17 +420,28 @@ export async function restoreBackup(id: string): Promise<{ safetyBackup: BackupP
   ) {
     throw new BackupError('DATABASE_URL must be a file inside DATA_DIR before restoration.');
   }
-  const safetyBackup = await createBackup('pre-restore');
-  const restoredDirectory = join(
-    dirname(dataDirectory),
-    `.${basename(dataDirectory)}-restored-${randomUUID()}`,
+  const validated = await validateBackup(id);
+  const restoredDirectory = join(dataDirectory, `.restore-new-${randomUUID()}`);
+  const previousDirectory = join(dataDirectory, `.restore-previous-${randomUUID()}`);
+  const databaseSidecars = ['-wal', '-shm', '-journal'].map(
+    (suffix) => `${databaseRelativePath}${suffix}`,
   );
-  const previousDirectory = join(
-    dirname(dataDirectory),
-    `.${basename(dataDirectory)}-previous-${randomUUID()}`,
-  );
-  let movedPrevious = false;
+  let preserveRecoveryDirectories = false;
   try {
+    if (['uploads', 'generated', 'config'].includes(databaseRelativePath.split(sep)[0]!))
+      throw new BackupError(
+        'DATABASE_URL must not be inside media or configuration storage before restoration.',
+      );
+    const backupDirectory = getBackupDirectory();
+    if (
+      ['uploads', 'generated', join('config', 'backup-export.json')].some(
+        (name) =>
+          backupDirectory === join(dataDirectory, name) ||
+          pathInside(join(dataDirectory, name), backupDirectory),
+      )
+    )
+      throw new BackupError('BACKUP_DIR must not overlap restored media or configuration files.');
+    const safetyBackup = await createBackup('pre-restore');
     await mkdir(restoredDirectory, { recursive: true });
     await mkdir(dirname(join(restoredDirectory, databaseRelativePath)), { recursive: true });
     await copyFile(
@@ -439,29 +461,51 @@ export async function restoreBackup(id: string): Promise<{ safetyBackup: BackupP
       join(validated.stagingDirectory, 'config.json'),
       join(restoredDirectory, 'config', 'backup-export.json'),
     );
-    const backupDirectory = getBackupDirectory();
-    if (pathInside(dataDirectory, backupDirectory)) {
-      const backupRelativePath = relative(dataDirectory, backupDirectory);
-      await copyDirectoryIfPresent(backupDirectory, join(restoredDirectory, backupRelativePath));
-    }
-    closeDatabaseConnection();
-    await rename(dataDirectory, previousDirectory);
-    movedPrevious = true;
-    await rename(restoredDirectory, dataDirectory);
-    ensureDatabase();
-    databaseIntegrity(getDatabasePath());
-    await rm(previousDirectory, { recursive: true, force: true });
+    swapBackupData({
+      dataDirectory,
+      restoredDirectory,
+      previousDirectory,
+      databaseSidecars,
+      paths: [
+        databaseRelativePath,
+        ...databaseSidecars,
+        'uploads',
+        'generated',
+        join('config', 'backup-export.json'),
+      ],
+      closeDatabase: closeDatabaseConnection,
+      verify: () => {
+        ensureDatabase();
+        databaseIntegrity(getDatabasePath());
+      },
+    });
     return { safetyBackup };
   } catch (error) {
-    if (movedPrevious) {
-      await rm(dataDirectory, { recursive: true, force: true });
-      await rename(previousDirectory, dataDirectory).catch(() => undefined);
+    if (error instanceof BackupSwapRollbackError) {
+      preserveRecoveryDirectories = true;
+      throw new BackupError(error.message, { cause: error });
     }
     closeDatabaseConnection();
+    if (!(error instanceof BackupError) && !(error instanceof BackupValidationError)) {
+      throw new BackupError(
+        'Restoration could not complete; the original data remains in place. Check storage permissions and free space before reviewing the backup again.',
+        { cause: error },
+      );
+    }
     throw error;
   } finally {
-    await rm(restoredDirectory, { recursive: true, force: true });
-    await rm(validated.stagingDirectory, { recursive: true, force: true });
+    const cleanup = async (directory: string) => {
+      await rm(directory, { recursive: true, force: true }).catch(() => {
+        // Cleanup cannot turn an acknowledged replacement into a reported failure
+        // or hide the actual restore/rollback error. Leave files for operator review.
+        console.error('Backup restoration left a staging directory that needs cleanup.');
+      });
+    };
+    if (!preserveRecoveryDirectories) {
+      await cleanup(restoredDirectory);
+      await cleanup(previousDirectory);
+    }
+    await cleanup(validated.stagingDirectory);
   }
 }
 

@@ -146,7 +146,6 @@ try {
      for (const path of ['.api_keys', '.env', '.git', '.test-data', 'data'])
        if (fs.existsSync('/app/' + path)) throw new Error('Unexpected runtime path: ' + path);`,
   );
-  await request('/api/v1/backups', { authenticated: false, expected: 401 });
   await request('/api/v1/setup', {
     expected: 201,
     body: {
@@ -167,6 +166,7 @@ try {
       },
     },
   });
+  await request('/api/v1/backups', { authenticated: false, expected: 401 });
   await signIn();
   const retainedRecipe = await createRecipe('Container backup soup');
   const backup = await (await request('/api/v1/backups', { body: {}, expected: 201 })).json();
@@ -194,6 +194,30 @@ try {
   await signIn();
   await request(`/api/v1/recipes/${retainedRecipe.id}`);
   await request(`/api/v1/recipes/${removedRecipe.id}`, { expected: 404 });
+  await docker(
+    'exec',
+    '--user',
+    '1001:1001',
+    container,
+    'node',
+    '-e',
+    "require('node:fs').writeFileSync('/data/.restore-in-progress.json', '{}', { flag: 'wx' })",
+  );
+  const blocked = await request('/api/v1/health', { authenticated: false, expected: 503 });
+  assert.equal((await blocked.json()).status, 'recovery_required');
+  await docker('stop', container);
+  await assert.rejects(
+    docker(
+      'run',
+      '--rm',
+      '-v',
+      `${dataDirectory}:/data`,
+      image,
+      'node',
+      'scripts/container-migrate.mjs',
+    ),
+    /Backup recovery is incomplete/u,
+  );
   console.log(
     JSON.stringify(
       {
@@ -205,6 +229,7 @@ try {
         persistentRestart: true,
         backupCreatedDownloadedValidatedRestored: true,
         restoredSessionsRevoked: true,
+        interruptedRecoveryBlocksRuntimeAndStartup: true,
         backupBytes: bytes.length,
         backupSha256: createHash('sha256').update(bytes).digest('hex'),
       },

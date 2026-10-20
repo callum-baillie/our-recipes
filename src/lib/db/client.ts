@@ -3,14 +3,15 @@ import 'server-only';
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { mkdirSync } from 'node:fs';
-import { dirname, isAbsolute, normalize, resolve } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, normalize, resolve } from 'node:path';
 
 import {
   assertDuplicate0026Lineage,
   recoverDuplicate0026Lineage,
 } from '../../../scripts/migration-lineage-recovery.cjs';
-import { getRuntimeConfig } from '@/lib/config';
+import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
+import { BACKUP_RESTORE_MARKER, BackupRecoveryRequiredError } from '@/lib/domain/backup-recovery';
 import * as schema from '@/lib/db/schema';
 
 type AppDatabase = BetterSQLite3Database<typeof schema>;
@@ -26,6 +27,12 @@ function resolveDatabasePath(databaseUrl: string): string {
 }
 
 function openDatabase(): { sqlite: Database.Database; db: AppDatabase; path: string } {
+  const state = globalThis as typeof globalThis & { __bordRestoreVerification?: boolean };
+  if (
+    !state.__bordRestoreVerification &&
+    existsSync(join(getDataDirectory(), BACKUP_RESTORE_MARKER))
+  )
+    throw new BackupRecoveryRequiredError();
   const path = resolveDatabasePath(getRuntimeConfig().databaseUrl);
 
   if (database && drizzleDatabase && openedPath === path) {

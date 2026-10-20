@@ -1,4 +1,5 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
@@ -15,6 +16,8 @@ import { resetDatabaseForTests } from '@/lib/db/client';
 import { completeSetup, getHouseholdState } from '@/lib/services/household-service';
 import { createRecipe, getRecipe } from '@/lib/services/recipe-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
+import { BACKUP_RESTORE_MARKER } from '@/lib/domain/backup-recovery';
+import { GET as health } from '@/app/api/v1/health/route';
 
 const backupDataDirectory = resolve(process.cwd(), '.test-data/backup-recovery');
 const dedicatedBackupDirectory = resolve(process.cwd(), '.test-data/backup-destination');
@@ -98,7 +101,9 @@ describe('backup and recovery', () => {
     );
     expect(getHouseholdState().profiles).toHaveLength(1);
 
+    const dataInode = statSync(backupDataDirectory).ino;
     const restored = await restoreBackup(backup.id);
+    expect(statSync(backupDataDirectory).ino).toBe(dataInode);
     expect(restored.safetyBackup.manifest.reason).toBe('pre-restore');
     expect(getRecipe(recipe.id)?.images).toHaveLength(1);
     expect(getHouseholdState().household?.kitchenName).toBe('Sunday suppers');
@@ -179,4 +184,68 @@ describe('backup and recovery', () => {
     expect(existsSync(resolve(dedicatedBackupDirectory, `${backup.id}.tar.gz`))).toBe(true);
     expect(existsSync(resolve(backupDataDirectory, 'backups'))).toBe(false);
   }, 20_000);
+
+  it('refuses a competing restore while the first validated operation is running', async () => {
+    completeSetup({
+      householdName: 'Restore lock fixture',
+      appName: 'Bord',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'metric',
+        temperatureUnit: 'C',
+        locale: 'en-US',
+        timezone: 'UTC',
+      },
+    });
+    const backup = await createBackup();
+    const first = restoreBackup(backup.id);
+    await expect(restoreBackup(backup.id)).rejects.toThrow('already running');
+    await expect(first).resolves.toHaveProperty('safetyBackup');
+    await expect(restoreBackup(backup.id)).resolves.toHaveProperty('safetyBackup');
+  }, 20_000);
+
+  it('blocks database use and health after an interrupted restore instead of creating an empty database', async () => {
+    completeSetup({
+      householdName: 'Interrupted restore fixture',
+      appName: 'Interrupted restore fixture',
+      profile: {
+        displayName: 'Maya',
+        color: '#637A45',
+        avatarUrl: '',
+        units: 'metric',
+        temperatureUnit: 'C',
+        locale: 'en-US',
+        timezone: 'UTC',
+      },
+    });
+    const marker = resolve(backupDataDirectory, BACKUP_RESTORE_MARKER);
+    await writeFile(marker, JSON.stringify({ previous: '.restore-previous-fixture' }));
+    resetDatabaseForTests();
+    expect(() => getHouseholdState()).toThrow('recovery is incomplete');
+    const response = health();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      status: 'recovery_required',
+      migrationStatus: 'blocked',
+    });
+    const interruptedRoot = resolve(backupDataDirectory, 'interrupted-start');
+    mkdirSync(interruptedRoot);
+    await writeFile(resolve(interruptedRoot, BACKUP_RESTORE_MARKER), '{}');
+    const startup = spawnSync(process.execPath, ['scripts/container-migrate.mjs'], {
+      env: {
+        ...process.env,
+        DATA_DIR: interruptedRoot,
+        DATABASE_URL: resolve(interruptedRoot, 'bord.db'),
+        BACKUP_DIR: resolve(interruptedRoot, 'backups'),
+      },
+      encoding: 'utf8',
+    });
+    expect(startup.status).not.toBe(0);
+    expect(startup.stderr).toContain('Backup recovery is incomplete');
+    expect(existsSync(resolve(interruptedRoot, 'bord.db'))).toBe(false);
+    rmSync(marker);
+    expect(getHouseholdState().household?.kitchenName).toBe('Interrupted restore fixture');
+  });
 });

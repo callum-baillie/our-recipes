@@ -22,6 +22,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Household metadata is a cheap local read. Send it with the document so
+  // refreshes never expose deferred/missing page titles to assistive technology.
+  htmlLimitedBots: /.*/,
   // Runtime household data always lives outside the immutable application
   // artifact. Dynamic filesystem paths can otherwise make output tracing copy
   // the project tree, including a developer's populated DATA_DIR.
