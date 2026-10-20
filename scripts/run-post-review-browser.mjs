@@ -19,6 +19,7 @@ run(
     'tests/e2e/workflow-backlog.spec.ts',
     'tests/e2e/ai-completion.spec.ts',
     'tests/e2e/post-review-chat.spec.ts',
+    'tests/e2e/post-review-auth.spec.ts',
     'tests/e2e/post-review-core.spec.ts',
     'tests/e2e/post-review-images.spec.ts',
     'tests/e2e/post-review-settings.spec.ts',
