@@ -101,7 +101,8 @@ test('text commands and interruption recovery stay readable in constrained chat 
     await expect(
       dialog.getByText('A genuinely progressive controlled fragment.', { exact: true }),
     ).toBeInViewport();
-    await stop.focus();
+    await composer.focus();
+    await composer.press('Tab');
     await stop.scrollIntoViewIfNeeded();
     await expect(stop).toBeFocused();
     await expect(stop).toBeInViewport();
@@ -116,7 +117,7 @@ test('text commands and interruption recovery stay readable in constrained chat 
     await page.screenshot({ path: `${directory}/running-${width}x${height}-${scale}x.png` });
   }
   await page.setViewportSize({ width: 390, height: 500 });
-  await stop.click();
+  await stop.press('Enter');
   await expect(stop).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Check the same request' })).toBeVisible();
   await page.screenshot({ path: `${directory}/stopped-recovery.png` });
@@ -128,7 +129,8 @@ test('text commands and interruption recovery stay readable in constrained chat 
   await expect(acknowledge).toBeInViewport();
   expect(await acknowledge.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await page.screenshot({ path: `${directory}/unknown-owned-review.png` });
-  await acknowledge.click();
+  await acknowledge.focus();
+  await acknowledge.press('Enter');
   expect(reviewed).toBe(true);
   await composer.fill('A separate deliberate next request');
   await expect(dialog.getByRole('button', { name: 'Send message' })).toBeEnabled();
