@@ -36,7 +36,7 @@ it('never infers an unreviewed legacy cart unit from recipe demand', () => {
     shoppingListItemSchema.parse({ ...input, cartQuantity: 600 }),
     actor,
   );
-  expect(getShoppingList(list.id).items[0]).toMatchObject({ cartQuantity: 600, cartUnit: null });
+  expect(getShoppingList(list.id)!.items[0]).toMatchObject({ cartQuantity: 600, cartUnit: null });
 });
 
 it('retains the reviewed purchase unit through unrelated demand edits and explicit zero', () => {
@@ -62,7 +62,7 @@ it('retains the reviewed purchase unit through unrelated demand edits and explic
     }),
     actor,
   );
-  expect(getShoppingList(list.id).items[0]).toMatchObject({
+  expect(getShoppingList(list.id)!.items[0]).toMatchObject({
     quantity: 3,
     unit: 'kg',
     cartQuantity: 0,
