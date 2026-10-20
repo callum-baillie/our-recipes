@@ -1,0 +1,90 @@
+{
+  "createdAt": "2026-10-20T19:55:53.080Z",
+  "status": "dry-run-complete",
+  "model": "gpt-image-2",
+  "quality": "low",
+  "size": "1024x1024",
+  "promptVersion": "finished-dish-v2",
+  "paidAuthorized": false,
+  "estimatedCost": null,
+  "results": [
+    {
+      "id": "soup",
+      "sourceDigest": "ea66a2c384130bb2532a94deb90da066a9093e55df60afff4c1cc4350c124e6e",
+      "promptDigest": "3b721a395c5cee7b36776ebb2e2f31a4823367fe57391d266ad555b5e16e2b0d",
+      "status": "not-generated",
+      "scores": {
+        "recipeIdentity": null,
+        "physicalRealism": null,
+        "presentation": null,
+        "artifacts": null
+      },
+      "reviewNotes": ""
+    },
+    {
+      "id": "stew",
+      "sourceDigest": "a6f0fd9e33bce460cd551909714b4848b07e4a869e25d46d4f8602595813ad19",
+      "promptDigest": "a2362c3d1f14a4ffed3967186453d69bf04b8a7930dfa538730a2b685d0d8f57",
+      "status": "not-generated",
+      "scores": {
+        "recipeIdentity": null,
+        "physicalRealism": null,
+        "presentation": null,
+        "artifacts": null
+      },
+      "reviewNotes": ""
+    },
+    {
+      "id": "casserole",
+      "sourceDigest": "fa894f82fdef90dd938167dd4bfd7681e3c801855f7386e2325293e2ba7071c2",
+      "promptDigest": "f8fa2440e04d4f9413ce38f1c741ca79ccd2d2445b525442062aa197df294e3e",
+      "status": "not-generated",
+      "scores": {
+        "recipeIdentity": null,
+        "physicalRealism": null,
+        "presentation": null,
+        "artifacts": null
+      },
+      "reviewNotes": ""
+    },
+    {
+      "id": "bread",
+      "sourceDigest": "b98df0725af5442e5b76b17c372caee65fc0813899917b6fef06330af573154e",
+      "promptDigest": "efe052b4b2a2f83de4656b37de59f9ae67013fc6afd6a724f71738b826e71752",
+      "status": "not-generated",
+      "scores": {
+        "recipeIdentity": null,
+        "physicalRealism": null,
+        "presentation": null,
+        "artifacts": null
+      },
+      "reviewNotes": ""
+    },
+    {
+      "id": "salad",
+      "sourceDigest": "102eeb610fa8d0464082c1204fc5a444a7c1ebaa7698b14176b9e59dee3fcbf6",
+      "promptDigest": "a5c4758954c082ea53813c09d2576c0e7a5226760d7adb64b5232e9ac36d861d",
+      "status": "not-generated",
+      "scores": {
+        "recipeIdentity": null,
+        "physicalRealism": null,
+        "presentation": null,
+        "artifacts": null
+      },
+      "reviewNotes": ""
+    },
+    {
+      "id": "dessert",
+      "sourceDigest": "118173ba7ea33a1ccac7b3462f55a801c53fa4c2893ea166d6b8433cebac93fa",
+      "promptDigest": "25c97b25aeb0396de7209486d1c03cb7b36aa0abe68872e84026e706a4e7a172",
+      "status": "not-generated",
+      "scores": {
+        "recipeIdentity": null,
+        "physicalRealism": null,
+        "presentation": null,
+        "artifacts": null
+      },
+      "reviewNotes": ""
+    }
+  ]
+}

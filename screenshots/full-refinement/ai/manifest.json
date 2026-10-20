@@ -1,8 +1,7 @@
 {
-  "baseCommit": "a278f81a272472b9ee2da6ff7c55788285c6fb4c",
-  "sourceState": "Final refinement source; tested code revision recorded in docs/refinement/release-evidence.md",
-  "capturedAt": "2026-10-20T15:59:57.628224+00:00",
+  "baseCommit": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
+  "sourceState": "Current working refinement code; controlled client stream fixture. Provider progressive callback and real HTTP stream covered separately by unit/integration tests.",
+  "capturedAt": "2026-10-20T21:42:11.344Z",
   "viewports": ["1440x1000", "390x500", "320x568 with 200% root text"],
-  "liveProviderCalls": 0,
-  "testedImplementationCommit": "3cb08576150147a600f757951c0cbe66af8010de"
+  "liveProviderCalls": 0
 }

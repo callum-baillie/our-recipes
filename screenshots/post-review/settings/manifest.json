@@ -1,0 +1,14 @@
+{
+  "revision": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
+  "state": "Working post-review changes; controlled HTTP outcomes, no provider requests or settings writes.",
+  "capturedAt": "2026-10-20T21:42:42.410Z",
+  "states": [
+    "runtime-overlap-1440",
+    "runtime-overlap-390",
+    "runtime-overlap-320",
+    "runtime-overlap-320-enlarged",
+    "personal-profile-merge-mobile",
+    "nutrition-merge-mobile",
+    "schedule-merge-mobile"
+  ]
+}

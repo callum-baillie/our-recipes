@@ -1,0 +1,19 @@
+{
+  "image": "bord:post-review-final",
+  "version": "1.0.0-rc.18",
+  "schemaVersion": "0073_shopping_cart_units",
+  "nonRoot": true,
+  "runtimePathsClean": true,
+  "persistentRestart": true,
+  "backupCreatedDownloadedValidatedRestored": true,
+  "restoredSessionsRevoked": true,
+  "interruptedRecoveryBlocksRuntimeAndStartup": true,
+  "backupBytes": 57726,
+  "backupSha256": "b8daa92ffa62a4534b58dc860a2791b4ffbb97bb690392522603fbe49c7d24dc",
+  "applicationSourceRevision": "a74c8db208d2dc26837fbeed0bfabda6a6accd49",
+  "fixtureRevision": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
+  "imageId": "sha256:95704343f8a86a945daeda8867e9247d892b4529a031c947732b91b041a491e9",
+  "platform": "linux/amd64",
+  "command": "DOCKER_IMAGE=bord:post-review-final pnpm test:docker",
+  "scope": "Local rebuilt image; isolated synthetic data only. Not published. No production or operator volumes, arm64 or target Unraid verification."
+}

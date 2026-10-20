@@ -1,0 +1,44 @@
+{
+  "fixtureRevision": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
+  "applicationSource": "a74c8db",
+  "test": "tests/e2e/catalog-post-review.spec.ts",
+  "state": "Real Chromium; controlled source-portion and identified-enrichment responses. Images show reviewed B portions and the enlarged confirmation before submission. Late A suppression, zero enrichment writes and uncertain-confirmation lock are asserted separately by the test; no native/device claim.",
+  "captures": [
+    {
+      "path": "confirm-short-enlarged-390.png",
+      "viewport": {
+        "width": 390,
+        "height": 500
+      },
+      "sha256": "a1a494e14dfa89804d5d5ae5ca15ba795f7761ceaa9a3efd494e3aeac0e879c5",
+      "fileCapturedAt": "2026-10-20T21:42:16.297850+00:00"
+    },
+    {
+      "path": "source-portion-1440.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "cf8840b1698f5bbafe604c340195e6844730eccd59c8716bbcb12c408acf2bef",
+      "fileCapturedAt": "2026-10-20T21:42:14.786832+00:00"
+    },
+    {
+      "path": "source-portion-320.png",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "sha256": "03855edba53f865c637cfd74f8f65b6ae0591eae6a2be09c133a8b0cc2f45a83",
+      "fileCapturedAt": "2026-10-20T21:42:15.064836+00:00"
+    },
+    {
+      "path": "source-portion-390.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "sha256": "2d9ef995f6ce9848010563f23252b13ae0f4beae2bbb76064bc7d22158cff61f",
+      "fileCapturedAt": "2026-10-20T21:42:14.957834+00:00"
+    }
+  ]
+}

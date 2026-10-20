@@ -1,0 +1,58 @@
+{
+  "baseCommit": "160441dd74ef79dab936a34a0f1c5e74065311c1",
+  "state": "Working post-review implementation; deterministic application service fixtures, generated before code commit",
+  "command": "BORD_PDF_EVIDENCE=/tmp/bord-post-review-pdfs pnpm exec vitest run --project integration tests/integration/pdf-export-refinement.test.ts",
+  "testsPassed": 5,
+  "documents": [
+    {
+      "file": "pantry-a4.pdf",
+      "pages": 3,
+      "sha256": "9b7fda689e34528f62ff8f4104221ac136ca18a8501b60c923b27a12543e9ff3",
+      "overview": "pantry-a4-overview.jpg"
+    },
+    {
+      "file": "pantry-letter.pdf",
+      "pages": 3,
+      "sha256": "a48e46552b8092241450e8c5ec6b00904e1a22e36d8877ee6b2ba41088bb4de7",
+      "overview": "pantry-letter-overview.jpg"
+    },
+    {
+      "file": "plan-a4.pdf",
+      "pages": 12,
+      "sha256": "ce29bc19609015655c18fae9b22c9aa7d599851f135a646cce8c43b65317b1e1",
+      "overview": "plan-a4-overview.jpg"
+    },
+    {
+      "file": "plan-letter.pdf",
+      "pages": 12,
+      "sha256": "b1ce2783e247e379b4f96b105081508aa7af9aff7bd1635485d7bee42a33c599",
+      "overview": "plan-letter-overview.jpg"
+    },
+    {
+      "file": "recipe-a4.pdf",
+      "pages": 3,
+      "sha256": "32b49a6b090b9a768e51b7257b899f322890937d5ef17842a2b85f6d224bcea2",
+      "overview": "recipe-a4-overview.jpg"
+    },
+    {
+      "file": "recipe-letter.pdf",
+      "pages": 3,
+      "sha256": "89d2911bf41aa455b6ccaafad5a01edd9c01018029f4a03ed7a3e1150be4ab8b",
+      "overview": "recipe-letter-overview.jpg"
+    },
+    {
+      "file": "shopping-a4.pdf",
+      "pages": 1,
+      "sha256": "dfa32c9844e9298964f92601828d7f42c4b0d60d474429506573a21084677dea",
+      "overview": "shopping-a4-overview.jpg"
+    },
+    {
+      "file": "shopping-letter.pdf",
+      "pages": 1,
+      "sha256": "cb0dec1b55a537af7abe9b3c4fd4c91cff3707b08705c484c422dac75b01fce1",
+      "overview": "shopping-letter-overview.jpg"
+    }
+  ],
+  "rendering": "Poppler; all 38 pages inspected in 8 contact sheets; representative shopping row inspected at full resolution",
+  "generatedAt": "2026-10-20T20:21:12.115884+00:00"
+}

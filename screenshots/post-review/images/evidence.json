@@ -1,0 +1,18 @@
+{
+  "baseRevision": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
+  "workingTree": "post-review implementation",
+  "fixtures": "intercepted owned action and synthetic WebP; no live provider request",
+  "states": [
+    "text draft no automatic image",
+    "explicit paid request pending",
+    "private preview ready",
+    "saved recipe links to separate candidate acceptance"
+  ],
+  "viewports": [
+    [1440, 1000],
+    [390, 844],
+    [320, 568]
+  ],
+  "axeViolations": 0,
+  "imageRequests": 1
+}

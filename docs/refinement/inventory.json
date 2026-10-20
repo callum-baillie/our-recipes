@@ -2,7 +2,7 @@
   "generatedAt": "2026-10-20T20:19:33.002Z",
   "baseCommit": "160441dd74ef79dab936a34a0f1c5e74065311c1",
   "branch": "refinement/post-review-completion",
-  "implementationState": "Starting 160441dd revision plus uncommitted post-review completion working tree; this static inventory is not a committed release or test receipt.",
+  "implementationState": "Application source committed at a74c8db on refinement/post-review-completion; static capability inventory, not a release or per-flow runtime approval.",
   "scope": "Current source inventory. Route patterns, exported HTTP methods, Expo file routes/layouts, source modules, direct assistant tools and curated operations are counted separately. Static presence does not establish authorization, usable UI, provider readiness or native-device behavior; see capability-matrix.md, post-review.md and post-review-catalog.md.",
   "countDefinitions": {
     "apiPaths": "Route patterns under src/app/api; catch-all auth counts once, not as every library subendpoint.",
@@ -3032,7 +3032,9 @@
     "capabilities": "docs/refinement/capability-matrix.md",
     "catalogNative": "docs/refinement/post-review-catalog.md",
     "previousRelease": "docs/refinement/release-evidence.md",
-    "note": "Commands/results and final committed revision belong to the current completion receipt. No testedImplementationCommit is asserted for uncommitted code."
+    "note": "Final verification and external limits are in post-review-verification.md. Static presence is separate from each workflow acceptance status."
   },
-  "sharedNativeDomainsUpdatedAt": "2026-10-20T20:57:58.714461+00:00"
+  "sharedNativeDomainsUpdatedAt": "2026-10-20T20:57:58.714461+00:00",
+  "sourceRevision": "a74c8db",
+  "revisionReconciledAt": "2026-10-20T21:34:38.344023+00:00"
 }
