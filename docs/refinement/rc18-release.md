@@ -1,0 +1,21 @@
+# 1.0.0-rc.18 container candidate
+
+The requested publication advances the application, service-worker cache version and default provider identification from rc.17 to rc.18. It includes the full refinement branch, the three additive migrations through `0071_ai_prompt_versions` (73 journal entries), and the clean-runner/font corrections. It remains a prerelease. The V1 checklist's physical-device and host-specific acceptance items are not declared complete.
+
+## Evidence and publication boundaries
+
+- The implementation at `ddfc8d267ed42536a28b125cbe49fbee69d1175d` passed both jobs in [GitHub verification run 39458320321](https://github.com/callum-baillie/our-recipes/actions/runs/39458320321): 607 unit tests, 331 integration passes/9 external-archive skips, 174 generated-client operations, a clean release artifact, 19 Chromium release cases and 3 performance cases. Native clean install/lint/types, 46 tests and both platform exports passed independently.
+- The version candidate must pass its own `verify` workflow before tagging. [Repository Actions](https://github.com/callum-baillie/our-recipes/actions) records the exact candidate revision and result; prior-revision evidence is not substituted for that result.
+- The release workflow builds `linux/amd64` and `linux/arm64` on native runners and publishes `ghcr.io/callum-baillie/bord:v1.0.0-rc.18` plus `latest`. Its two downstream smoke jobs pull and run the published image on the corresponding native architecture. Publication, image build and runtime verification are separate results.
+- The expanded `pnpm test:docker` uses only a disposable loopback-bound instance. It checks the expected version, current migrations, UID 1001 application process, absent runtime credential/data paths, synthetic authenticated recipe writes, backup creation/download/validation/restore, session revocation and persistence after container recreation. Its JSON receipt includes the downloaded synthetic archive's hash. It does not establish the safety of an operator's real volume or backup.
+- The [GitHub prerelease](https://github.com/callum-baillie/our-recipes/releases/tag/v1.0.0-rc.18) carries the final image manifest digest and verification receipt after the workflows complete. Tags/digests identify published artifacts; a release page alone does not prove deployment.
+
+The Docker build context now excludes nested native dependencies, local native build output, screenshots and nested environment/credential files. The shipped standalone denylist/runtime checks remain in place. Service-worker tests derive their current version from package metadata while retaining assertions against the actual worker.
+
+## Upgrade and rollback
+
+Create, download and validate a backup of the current installation before upgrading. Keep it outside the application volume and record the prior image digest. Pull the versioned image, retain the existing dedicated `/data` mount and configured secrets/origin, then require health to report version `1.0.0-rc.18`, schema `0071_ai_prompt_versions` and `migrationStatus: current` before accepting writes. The existing entrypoint takes a pre-migration SQLite safety copy. Do not point an older image at the migrated database; use a fresh data directory and the prior version's supported restore flow with the pre-upgrade backup. See [deployment](../deployment.md) and [backup recovery](../backup-and-restore.md).
+
+## Remaining limits
+
+No real Unraid host, iPhone Safari, native device/emulator, live passkey/email/provider flow, paid image-quality evaluation or production deployment is covered by this publication. The controlled PWA checks do not establish a real installed-device update. Native retains 22 high/8 moderate upstream advisories; the root tooling advisory and production audit scope are recorded in [release evidence](release-evidence.md). These limitations are not hidden by a successful Linux container check. No live household data, recovery credentials or provider keys are included in release evidence.

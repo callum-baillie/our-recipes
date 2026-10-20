@@ -5,10 +5,17 @@
 coverage
 data
 node_modules
+**/node_modules
+mobile/.expo
+mobile/dist
+screenshots
 playwright-report
 test-results
 *.tsbuildinfo
 .env
 .env.*
+**/.env
+**/.env.*
 .api_keys
+**/.api_keys
 !/.env.example

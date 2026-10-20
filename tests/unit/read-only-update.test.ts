@@ -3,6 +3,8 @@ import { createContext, runInContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { offlineDestination } from '@/components/kitchen-connection';
 const source = readFileSync('public/sw.js', 'utf8');
+const appVersion = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string })
+  .version;
 function worker(update = true) {
   const handlers = new Map<string, (event: Record<string, unknown>) => void>();
   const client = {
@@ -31,7 +33,7 @@ function worker(update = true) {
       'bord-read-previous',
       'our-recipes-read-legacy',
       'unrelated-cache',
-      'bord-read-1.0.0-rc.17',
+      `bord-read-${appVersion}`,
     ]),
     delete: vi.fn(async (name: string) => {
       deleted.push(name);
@@ -90,7 +92,7 @@ describe('read-only service-worker updates', () => {
     expect(w.client.navigate).not.toHaveBeenCalled();
     expect(w.client.postMessage).toHaveBeenCalledWith({
       type: 'BORD_UPDATED',
-      version: '1.0.0-rc.17',
+      version: appVersion,
     });
     expect(w.deleted).toEqual([]);
     await w.event('message', { data: { type: 'SKIP_WAITING' } });
@@ -104,13 +106,13 @@ describe('read-only service-worker updates', () => {
     });
     expect(w.deleted).toEqual([]);
     await w.event('message', {
-      data: { type: 'BORD_CLIENT_READY', version: '1.0.0-rc.17' },
+      data: { type: 'BORD_CLIENT_READY', version: appVersion },
       source: { id: 'open-client' },
     });
     expect(w.deleted).toEqual(['bord-read-previous', 'our-recipes-read-legacy']);
     w.deleted.length = 0;
     await w.event('message', { data: { type: 'CLEAR_AUTH_CACHES' } });
-    expect(w.deleted).toContain('bord-read-1.0.0-rc.17');
+    expect(w.deleted).toContain(`bord-read-${appVersion}`);
     expect(w.deleted).not.toContain('unrelated-cache');
   });
   it('serves an eligible cached recipe but never claims an offline catalogue or handles writes', async () => {

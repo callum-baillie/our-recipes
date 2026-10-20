@@ -8,7 +8,7 @@ Its optional OpenAI assistant can read permitted recipe, planning, and nutrition
 
 ## Release status
 
-**v1.0.0-rc.17** is a release candidate, not a public v1 tag. The [current refinement register](docs/refinement/README.md), [capability matrix](docs/refinement/capability-matrix.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish delivered behavior from device, live-provider and deployment checks. Please report issues through the [support and security guide](docs/support.md).
+**v1.0.0-rc.18** is a release candidate, not a public v1 tag. The [current refinement register](docs/refinement/README.md), [capability matrix](docs/refinement/capability-matrix.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish delivered behavior from device, live-provider and deployment checks. Please report issues through the [support and security guide](docs/support.md).
 
 ## Install with Docker
 
@@ -109,4 +109,4 @@ Before a restore, the app validates archive paths, manifest/schema information, 
 
 ## Docker and Unraid
 
-The repository includes a non-root multi-stage Docker image, compose files, an Unraid template, and a daemon-run persistence smoke script. See [Docker deployment](docs/deployment.md) and [Unraid deployment](docs/deployment-unraid.md). The local Docker smoke test validates image build, health, first-run setup, and persistence across a temporary container recreation; Unraid host ownership and reverse-proxy settings remain operator checks.
+The repository includes a non-root multi-stage Docker image, compose files, an Unraid template, and a daemon-run smoke script. See [Docker deployment](docs/deployment.md) and [Unraid deployment](docs/deployment-unraid.md). The Docker smoke test checks version/migrations, the non-root process, first-run setup, backup download/validation/restore, session revocation and persistence across a temporary container recreation. Release CI runs it on native amd64 and arm64; Unraid host ownership and reverse-proxy settings remain operator checks.

@@ -41,3 +41,41 @@ jobs:
         - registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+  smoke:
+    name: Container smoke (${{ matrix.platform }})
+    needs: build
+    if: github.event_name == 'push' || inputs.publish == true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Sign in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify the published image on its native architecture
+        env:
+          DOCKER_SKIP_BUILD: 'true'
+          IMAGE_REPOSITORY: ghcr.io/${{ github.repository_owner }}/bord
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            image_tag="$GITHUB_REF_NAME"
+          else
+            image_tag="sha-${GITHUB_SHA:0:7}"
+          fi
+          export DOCKER_IMAGE="$IMAGE_REPOSITORY:$image_tag"
+          docker pull "$DOCKER_IMAGE"
+          node scripts/docker-smoke.mjs
