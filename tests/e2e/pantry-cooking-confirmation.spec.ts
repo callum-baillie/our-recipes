@@ -9,7 +9,11 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   // A successful stock mutation refreshes the route and its streamed metadata.
   await page.waitForLoadState('networkidle');
   await expect(page).toHaveTitle(/\S/u);
-  await expect(page.locator('head > title')).toHaveText(/\S/u);
+  // Playwright text matching skips head nodes; inspect the actual DOM property.
+  await expect(page.locator('head > title')).toHaveJSProperty(
+    'textContent',
+    expect.stringMatching(/\S/u),
+  );
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, fullPage: true, caret: 'initial' });
   await testInfo.attach(name, { path, contentType: 'image/png' });
