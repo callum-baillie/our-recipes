@@ -1,6 +1,6 @@
 # Capability matrix
 
-**Snapshot:** application source `a74c8db` on `refinement/post-review-completion`, reconciled from starting `160441dd74ef79dab936a34a0f1c5e74065311c1`. This is implementation coverage, not a claim that each native screen or live service has been exercised. Current acceptance and the final committed revision belong to the [post-review register](post-review.md); earlier release evidence remains historical.
+**Snapshot:** application source `0e56ca0` on `refinement/post-review-completion`, reconciled from starting `160441dd74ef79dab936a34a0f1c5e74065311c1`. This is implementation coverage, not a claim that each native screen or live service has been exercised. Current acceptance and the final committed revision belong to the [post-review register](post-review.md); earlier release evidence remains historical.
 
 The inventory in [inventory.json](inventory.json) locates the current web routes, native routes, application APIs, services and curated assistant operations. This matrix describes user workflows rather than counting HTTP verbs. A POST lookup is a read. Device rendering, deployment readiness and live provider quality are separate from source presence and deterministic contract evidence.
 

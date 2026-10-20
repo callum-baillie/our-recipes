@@ -1,0 +1,20 @@
+{
+  "before": {
+    "file": "summary-action-320-enlarged-fallback-before.png",
+    "applicationSource": "a74c8db",
+    "state": "Old standalone artifact plus diagnostic test; fallback font at320px/200%, document329px, action outside pane.",
+    "sha256": "1a66d55c85c6d1f38b4331fae70f10d82d0349f974339d11c8a888fb653ce9d3",
+    "fileCapturedAt": "2026-10-20T22:05:26.166445+00:00"
+  },
+  "after": {
+    "file": "summary-action-320-enlarged-fallback.png",
+    "applicationSource": "0e56ca0c09740002a9fc553dd41aa43128fe1f83",
+    "state": "Rebuilt production artifact; complete two-line label, document<=320px, action inside parent, height>=44px, unbroken summaries fits content width.",
+    "sha256": "e0e01266d678e014579be55d9ea36d4183df2ee95115ce84e538a5cf1b36f728",
+    "fileCapturedAt": "2026-10-20T22:16:04.751021+00:00"
+  },
+  "test": "tests/e2e/post-review-settings.spec.ts",
+  "command": "V1_RELEASE_ORACLE=true pnpm exec playwright test tests/e2e/post-review-settings.spec.ts --workers=1 --retries=0",
+  "result": "2 passed; exact version/payload and keyboard review checks retained",
+  "review": "Before and final after viewed by lead and settings owner; intermediate failed word-fit build is not relabelled as a pass."
+}

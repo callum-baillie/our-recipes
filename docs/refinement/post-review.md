@@ -2,7 +2,7 @@
 
 Starting branch `refinement/full-project-completion`, clean revision `160441dd74ef79dab936a34a0f1c5e74065311c1`. Implementation branch `refinement/post-review-completion`. Started 2026-10-20. Prior release evidence is historical, not acceptance of these findings.
 
-The [verification receipt](post-review-verification.md) records application source `a74c8db`, final fixture revision `8f54eae`, executed gates, current screenshots/documents and publication limits. F/G statuses below have the explicit evidence scope stated in each linked report; native packaging is not device acceptance.
+The [verification receipt](post-review-verification.md) records application source `0e56ca0`, the final fixture revisions, executed gates, current screenshots/documents and publication limits. F/G statuses below have the explicit evidence scope stated in each linked report; native packaging is not device acceptance.
 
 Synthetic fixtures only. No new release/tag/deployment, paid calls, real email, production restore, source acquisition or live credential changes are authorized.
 

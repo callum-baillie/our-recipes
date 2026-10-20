@@ -1,6 +1,6 @@
 {
-  "revision": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
-  "capturedAt": "2026-10-20T21:43:28.580Z",
+  "revision": "f58be0778af28a49ebd195a6a3f0e4c3b4afd13c",
+  "capturedAt": "2026-10-20T22:08:27.683Z",
   "state": "Synthetic account and Chromium CDP virtual authenticator; real Better Auth handlers, no physical passkey or email",
   "viewport": "390x844"
 }

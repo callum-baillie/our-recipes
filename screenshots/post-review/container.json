@@ -1,5 +1,5 @@
 {
-  "image": "bord:post-review-final",
+  "image": "bord:post-review-word-fit",
   "version": "1.0.0-rc.18",
   "schemaVersion": "0073_shopping_cart_units",
   "nonRoot": true,
@@ -8,12 +8,12 @@
   "backupCreatedDownloadedValidatedRestored": true,
   "restoredSessionsRevoked": true,
   "interruptedRecoveryBlocksRuntimeAndStartup": true,
-  "backupBytes": 57726,
-  "backupSha256": "b8daa92ffa62a4534b58dc860a2791b4ffbb97bb690392522603fbe49c7d24dc",
-  "applicationSourceRevision": "a74c8db208d2dc26837fbeed0bfabda6a6accd49",
-  "fixtureRevision": "8f54eaeac9565dbc10302bfd09fdc8ff1d5c720b",
-  "imageId": "sha256:95704343f8a86a945daeda8867e9247d892b4529a031c947732b91b041a491e9",
+  "backupBytes": 57751,
+  "backupSha256": "f4e826bd1bfac8eb4ab9171f24bf5f9c1da88fffa702ff288fcf5316f4960448",
+  "applicationSourceRevision": "0e56ca0c09740002a9fc553dd41aa43128fe1f83",
+  "fixtureRevision": "0e56ca0c09740002a9fc553dd41aa43128fe1f83",
+  "imageId": "sha256:ecb4e0fd086554f2e7e85e3e716f84318a81510a4ae6a88a0916caa6d304474c",
   "platform": "linux/amd64",
-  "command": "DOCKER_IMAGE=bord:post-review-final pnpm test:docker",
-  "scope": "Local rebuilt image; isolated synthetic data only. Not published. No production or operator volumes, arm64 or target Unraid verification."
+  "command": "DOCKER_IMAGE=bord:post-review-word-fit pnpm test:docker",
+  "scope": "Local rebuilt final-source image; isolated synthetic data only. Not published. No production/operator volumes, arm64 or target Unraid verification."
 }
