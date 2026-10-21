@@ -1,5 +1,16 @@
 # Release notes
 
+## 1.0.0-rc.19
+
+- Keep restored sessions, API keys and transient authentication credentials blocked until invalidation completes inside the durable restore barrier. Fix SQLite authentication challenge handling and one-use email-verification replay.
+- Preserve newer interview answers during personal-profile saves and reconcile concurrent AI, Nutrition and schedule settings field by field without silently overwriting unrelated changes.
+- Store purchase quantity and unit independently of recipe demand. Confirm explicit cart changes atomically with replay receipts; preserve reviewed food identity and complete source portions in native and web flows.
+- Require separate image authorization, enforce current AI caps and cancellation through nested/queued work, unify typed dependent actions, and keep generated photos private revision-bound candidates until accepted.
+- Improve durable chat/scanner recovery, effective configuration, adaptive interviews, readable chat controls and settings reflow at 320px with enlarged text.
+- Add migrations `0072_ai_execution_recovery` and `0073_shopping_cart_units`. Review ambiguous legacy cart units before unpacking; request new links for verification emails issued before this upgrade. Back up before upgrading and never run an older image against the migrated database.
+- Verification of the implementation includes 671 unit tests, 376 integration passes/9 optional archive skips, 41 production browser cases plus 3 performance checks, 70 native tests/platform exports and isolated amd64 container recovery checks. The exact version candidate and published multi-platform image have separate workflow results.
+- This remains a prerelease: native device/installed-PWA/operator-host checks, paid-model image quality and unresolved dependency advisories remain open. See [the rc.19 publication record](refinement/rc19-release.md) and [post-review evidence](refinement/post-review-verification.md).
+
 ## 1.0.0-rc.18
 
 - Resolve the 33 retained UI verification findings across recipe review, cooking, Pantry, shopping, planner, Nutrition and scoped settings; record behavioral and current browser evidence under `docs/refinement/`.
