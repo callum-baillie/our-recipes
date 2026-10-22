@@ -1599,9 +1599,10 @@ paths:
       summary: Check an owned image request without starting provider work
       responses:
         '200':
-          {
-            description: 'Candidate state including requested, ready, failed, discarded or accepted',
-          }
+          description: Owned candidate state; outcome_unknown is not proof that provider work failed and must not trigger blind regeneration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecipeImageCandidateResult' }
         '404': { description: 'Request is unavailable to this account, active profile or recipe' }
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -1620,9 +1621,10 @@ paths:
                 action: { type: string, enum: [accept] }
       responses:
         '200':
-          {
-            description: Accepted candidate and saved image ID; exact acceptance replays this result,
-          }
+          description: Accepted candidate and saved image ID; exact acceptance replays this result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecipeImageCandidateResult' }
         '409': { description: Recipe changed or image is not ready }
     delete:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -1630,7 +1632,11 @@ paths:
       operationId: discardRecipeImageCandidate
       summary: Discard an owned preview; provider work or billing may already have occurred
       responses:
-        '200': { description: Discarded request retained for safe outcome reconciliation }
+        '200':
+          description: Discarded request retained for safe outcome reconciliation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecipeImageCandidateResult' }
         '409': { description: Image already saved; use the saved photo removal operation }
   /recipes/{recipeId}/image-candidates/{candidateId}/file:
     parameters:
@@ -4139,6 +4145,47 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    RecipeImageCandidateResult:
+      type: object
+      additionalProperties: false
+      required: [candidate]
+      properties:
+        candidate:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              id,
+              recipeId,
+              sourceRevision,
+              status,
+              altText,
+              width,
+              height,
+              model,
+              quality,
+              size,
+              promptVersion,
+              imageId,
+              createdAt,
+            ]
+          properties:
+            id: { type: string, format: uuid }
+            recipeId: { type: string, format: uuid }
+            sourceRevision: { type: integer }
+            status:
+              type: string
+              enum: [requested, ready, accepted, failed, discarded, outcome_unknown]
+              description: Only a ready candidate may be accepted against its unchanged source revision; unknown outcomes require reconciliation
+            altText: { type: string }
+            width: { type: [integer, 'null'] }
+            height: { type: [integer, 'null'] }
+            model: { type: string }
+            quality: { type: string, enum: [low, medium, high] }
+            size: { type: string, enum: [1024x1024, 1536x1024, 1024x1536] }
+            promptVersion: { type: string }
+            imageId: { type: [string, 'null'], format: uuid }
+            createdAt: { type: string, format: date-time }
     AiAppActionReviewMetadata:
       type: object
       additionalProperties: false

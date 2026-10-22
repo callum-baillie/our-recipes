@@ -59,6 +59,18 @@ export function useModalSurface({
       document.body.style.width = '100%';
     }
     const frame = window.requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      const active = document.activeElement;
+      // Native autofocus or a fast keyboard user may already have entered the
+      // surface. Deferred placement must not undo their first navigation.
+      if (
+        active instanceof HTMLElement &&
+        active !== panel &&
+        panel?.contains(active) &&
+        !active.matches(':disabled') &&
+        active.getClientRects().length
+      )
+        return;
       const preferred = initialFocusRef?.current;
       const initial =
         preferred && !preferred.matches(':disabled') && preferred.getClientRects().length
