@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   foreignKey,
   index,
@@ -385,6 +386,14 @@ export const recipes = sqliteTable('recipes', {
   sourceUrl: text('source_url'),
   originalAuthor: text('original_author'),
   cookingMethod: text('cooking_method').notNull().default(''),
+  equipmentRequirements: text('equipment_requirements', { mode: 'json' })
+    .$type<
+      import('zod').infer<
+        typeof import('@/lib/domain/recipe-equipment').recipeEquipmentRequirementSchema
+      >[]
+    >()
+    .notNull()
+    .default([]),
   nutritionCalories: real('nutrition_calories'),
   nutritionProteinGrams: real('nutrition_protein_grams'),
   nutritionCarbohydrateGrams: real('nutrition_carbohydrate_grams'),
@@ -662,6 +671,9 @@ export const aiProfileSettings = sqliteTable('ai_profile_settings', {
     .default(false),
   shareWeight: integer('share_weight', { mode: 'boolean' }).notNull().default(false),
   sharePantry: integer('share_pantry', { mode: 'boolean' }).notNull().default(false),
+  shareKitchenEquipment: integer('share_kitchen_equipment', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   shareShoppingLists: integer('share_shopping_lists', { mode: 'boolean' }).notNull().default(true),
   dailySummaryEnabled: integer('daily_summary_enabled', { mode: 'boolean' })
     .notNull()
@@ -1171,6 +1183,15 @@ export const cookSessions = sqliteTable('cook_sessions', {
   profileId: text('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
+  ownerUserId: text('owner_user_id'),
+  effectiveRecipe: text('effective_recipe', { mode: 'json' }).$type<
+    import('@/lib/services/recipe-service').RecipeDetail
+  >(),
+  effectiveRevision: integer('effective_revision').notNull().default(0),
+  cookingRestrictions: text('cooking_restrictions', { mode: 'json' }).$type<
+    import('@/lib/domain/cooking-episode').CookingRestrictions
+  >(),
+  contextRevision: integer('context_revision').notNull().default(0),
   targetServings: integer('target_servings').notNull(),
   mealPlanEntryId: text('meal_plan_entry_id').references(() => mealPlanEntries.id, {
     onDelete: 'set null',
@@ -2699,4 +2720,131 @@ export const aiExecutionTraces = sqliteTable('ai_execution_traces', {
   }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   completedAt: integer('completed_at', { mode: 'timestamp' }),
+});
+
+// Physical equipment is household data; personal interview answers remain on profiles.
+export const kitchens = sqliteTable(
+  'kitchens',
+  {
+    id: text('id').primaryKey(),
+    householdId: text('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(true),
+    constraints: text('constraints', { mode: 'json' })
+      .$type<import('@/lib/domain/kitchen').KitchenConstraints>()
+      .notNull()
+      .default({ preparationSpace: 'unknown', equipmentStorage: 'unknown' }),
+    coverage: text('coverage', { enum: ['not-started', 'partial', 'confirmed'] })
+      .notNull()
+      .default('not-started'),
+    revision: integer('revision').notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('kitchens_primary_household_idx')
+      .on(t.householdId)
+      .where(sql`${t.isPrimary} = 1`),
+  ],
+);
+export const kitchenEquipment = sqliteTable('kitchen_equipment', {
+  id: text('id').primaryKey(),
+  kitchenId: text('kitchen_id')
+    .notNull()
+    .references(() => kitchens.id, { onDelete: 'restrict' }),
+  revision: integer('revision').notNull(),
+  data: text('data', { mode: 'json' }).$type<import('@/lib/domain/kitchen').Equipment>().notNull(),
+});
+export const kitchenOperations = sqliteTable('kitchen_operations', {
+  id: text('id').primaryKey(),
+  kitchenId: text('kitchen_id')
+    .notNull()
+    .references(() => kitchens.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull(),
+  profileId: text('profile_id').notNull(),
+  intentHash: text('intent_hash').notNull(),
+  receipt: text('receipt', { mode: 'json' })
+    .$type<{ itemIds: string[]; revision: number }>()
+    .notNull(),
+  snapshot: text('snapshot').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+export const kitchenPhysicalUses = sqliteTable('kitchen_physical_uses', {
+  id: text('id').primaryKey(),
+  kitchenId: text('kitchen_id')
+    .notNull()
+    .references(() => kitchens.id, { onDelete: 'restrict' }),
+  episodeId: text('episode_id').notNull(),
+  phaseId: text('phase_id').notNull(),
+  userId: text('user_id').notNull(),
+  startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+  allocation: text('allocation', { mode: 'json' }).$type<
+    import('@/lib/domain/kitchen').ResourceAssignment
+  >(),
+  intentKey: text('intent_key').unique(),
+  releasedAt: integer('released_at', { mode: 'timestamp' }),
+  releaseActorId: text('release_actor_id'),
+});
+export const kitchenResourceClaims = sqliteTable(
+  'kitchen_resource_claims',
+  {
+    useId: text('use_id').references(() => kitchenPhysicalUses.id, { onDelete: 'restrict' }),
+    resourceId: text('resource_id').notNull(),
+    kitchenId: text('kitchen_id')
+      .notNull()
+      .references(() => kitchens.id, { onDelete: 'restrict' }),
+    episodeId: text('episode_id').notNull(),
+    phaseId: text('phase_id').notNull(),
+    userId: text('user_id').notNull(),
+    startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+    allocation: text('allocation', { mode: 'json' }).$type<
+      import('@/lib/domain/kitchen').ResourceAssignment
+    >(),
+  },
+  (table) => [primaryKey({ columns: [table.resourceId, table.episodeId, table.phaseId] })],
+);
+
+/** Durable reviewed session changes and compensating revisions, never physical-use releases. */
+export const cookingSessionChanges = sqliteTable('cooking_session_changes', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => cookSessions.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
+  intentHash: text('intent_hash').notNull(),
+  revision: integer('revision').notNull(),
+  before: text('before', { mode: 'json' })
+    .$type<import('@/lib/services/recipe-service').RecipeDetail>()
+    .notNull(),
+  after: text('after', { mode: 'json' })
+    .$type<import('@/lib/services/recipe-service').RecipeDetail>()
+    .notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const cookingEpisodeOperations = sqliteTable('cooking_episode_operations', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => cookSessions.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
+  profileId: text('profile_id').notNull(),
+  intentHash: text('intent_hash').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+export const kitchenAcceptedPlans = sqliteTable('kitchen_accepted_plans', {
+  id: text('id')
+    .primaryKey()
+    .references(() => cookingEpisodeOperations.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => cookSessions.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
+  request: text('request', { mode: 'json' })
+    .$type<import('zod').infer<typeof import('@/lib/domain/kitchen').kitchenPlanRequestSchema>>()
+    .notNull(),
+  allocation: text('allocation', { mode: 'json' })
+    .$type<import('@/lib/domain/kitchen').KitchenPlan>()
+    .notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });

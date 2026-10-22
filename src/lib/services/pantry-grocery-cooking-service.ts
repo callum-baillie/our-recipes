@@ -1983,6 +1983,7 @@ export function getCookSessionPantryPreview(sessionId: string, actorProfileId: s
     session.recipeId,
     session.targetServings,
     session.mealPlanEntryId,
+    session.effectiveRecipe,
   );
   const plannedMeal = session.mealPlanEntryId
     ? (getDatabase()

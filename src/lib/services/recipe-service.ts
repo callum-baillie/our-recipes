@@ -1,3 +1,4 @@
+import { recipeEquipmentRequirementSchema } from '@/lib/domain/recipe-equipment';
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
@@ -898,6 +899,12 @@ export function createRecipeInTransaction(
   actorProfileId: string,
 ): string {
   const payload = recipeInputSchema.parse(input);
+  if (
+    payload.equipmentRequirements?.some((requirement) =>
+      requirement.steps.some((ref) => !payload.instructionSections[ref.section]?.steps[ref.step]),
+    )
+  )
+    throw new RecipeConflictError('Equipment step references need a refreshed review.');
   const recipeId = randomUUID();
   const now = new Date();
   transaction
@@ -920,6 +927,7 @@ export function createRecipeInTransaction(
       sourceUrl: payload.sourceUrl || null,
       originalAuthor: payload.originalAuthor || null,
       cookingMethod: payload.cookingMethod,
+      equipmentRequirements: payload.equipmentRequirements ?? [],
       nutritionCalories: payload.nutritionCalories === '' ? null : payload.nutritionCalories,
       nutritionProteinGrams:
         payload.nutritionProteinGrams === '' ? null : payload.nutritionProteinGrams,
@@ -970,6 +978,28 @@ export function updateRecipeWithIntegrations(
       throw new RecipeConflictError(
         'This recipe changed in another tab. Refresh the card before saving your revision.',
       );
+    const before = getRecipe(recipeId)!;
+    const oldInstructions = recipePayloadFromDetail(before).instructionSections;
+    const instructionsChanged =
+      JSON.stringify(oldInstructions) !== JSON.stringify(payload.instructionSections);
+    const suppliedRequirements = payload.equipmentRequirements ?? current.equipmentRequirements;
+    const requirements =
+      instructionsChanged &&
+      JSON.stringify(
+        suppliedRequirements.map((value) => recipeEquipmentRequirementSchema.parse(value)),
+      ) ===
+        JSON.stringify(
+          current.equipmentRequirements.map((value) =>
+            recipeEquipmentRequirementSchema.parse(value),
+          ),
+        )
+        ? []
+        : suppliedRequirements;
+    for (const requirement of requirements)
+      for (const ref of requirement.steps) {
+        if (!payload.instructionSections[ref.section]?.steps[ref.step])
+          throw new RecipeConflictError('Equipment step references need a refreshed review.');
+      }
     const mappingSnapshot = captureRecipeIngredientMappings(recipeId, transaction);
     const revision = current.currentRevision + 1;
     const now = new Date();
@@ -992,6 +1022,7 @@ export function updateRecipeWithIntegrations(
         sourceUrl: payload.sourceUrl || null,
         originalAuthor: payload.originalAuthor || null,
         cookingMethod: payload.cookingMethod,
+        equipmentRequirements: requirements,
         nutritionCalories: payload.nutritionCalories === '' ? null : payload.nutritionCalories,
         nutritionProteinGrams:
           payload.nutritionProteinGrams === '' ? null : payload.nutritionProteinGrams,
@@ -1028,7 +1059,7 @@ export function updateRecipeWithIntegrations(
       .values({
         recipeId,
         revision,
-        snapshot: JSON.stringify(payload),
+        snapshot: JSON.stringify({ ...payload, equipmentRequirements: requirements }),
         editedByProfileId: actorProfileId,
         createdAt: now,
       })
@@ -1140,6 +1171,7 @@ export function recipePayloadFromDetail(recipe: RecipeDetail): RecipePayload {
     sourceUrl: recipe.sourceUrl || '',
     originalAuthor: recipe.originalAuthor || '',
     cookingMethod: recipe.cookingMethod,
+    equipmentRequirements: recipe.equipmentRequirements,
     equipment: recipe.equipment.map((item) => item.name),
     nutritionCalories: recipe.nutritionCalories ?? '',
     nutritionProteinGrams: recipe.nutritionProteinGrams ?? '',

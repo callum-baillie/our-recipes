@@ -1,7 +1,9 @@
 import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 
-import { exportRecipeAsJsonLd } from '@/lib/services/jsonld-service';
+import { resolveRecipeForExport } from '@/lib/services/effective-recipe-export-service';
+import { decisionErrorResponse } from '@/lib/services/decision-request-service';
+import { recipeAsJsonLd } from '@/lib/services/jsonld-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,7 +22,17 @@ export async function GET(_request: Request, context: { params: Promise<{ recipe
   if (access.response) return access.response;
 
   const { recipeId } = await context.params;
-  const document = exportRecipeAsJsonLd(recipeId);
+  let document;
+  try {
+    const recipe = resolveRecipeForExport(
+      access.principal,
+      recipeId,
+      new URL(_request.url).searchParams,
+    );
+    document = recipe ? recipeAsJsonLd(recipe) : null;
+  } catch (error) {
+    return withApiRequestId(decisionErrorResponse(error), access.requestId);
+  }
   if (!document) {
     return withApiRequestId(
       NextResponse.json(

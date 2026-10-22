@@ -724,6 +724,12 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('link', { name: 'Cook this recipe' }).click();
   await expect(page.getByRole('button', { name: 'Clear positive reaction' })).toBeVisible();
   await page.getByRole('button', { name: 'Start cooking' }).click();
+  await page.waitForURL(
+    (url) => url.pathname.endsWith('/cook') && url.searchParams.has('sessionId'),
+  );
+  await expect(
+    page.getByRole('button', { name: 'Finish cooking', exact: true }).first(),
+  ).toBeVisible();
   await page.getByLabel('Timer minutes').fill('1');
   await page.getByRole('button', { name: 'Add timer', exact: true }).click();
   await expect(page.getByText('1:00')).toBeVisible();
@@ -732,6 +738,7 @@ test('a fresh household can complete the supported local release acceptance work
     name: 'Confirm Pantry changes',
     exact: true,
   });
+  await expect(cookingConfirmation).toBeVisible();
   await expect(
     cookingConfirmation.getByText('No exact mapped ingredient deductions are proposed.'),
   ).toBeVisible();

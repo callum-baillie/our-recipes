@@ -1,3 +1,13 @@
+import { randomUUID } from 'node:crypto';
+import { user, profileAuthLinks, kitchenResourceClaims } from '@/lib/db/schema';
+import {
+  executeKitchenCommand,
+  readKitchenInventory,
+  manageKitchenPhase,
+} from '@/lib/services/kitchen-inventory-service';
+import { startCookSession } from '@/lib/services/cooking-service';
+import { readCookingSessionRecipe } from '@/lib/services/cooking-session-recipe-service';
+import type { RequestPrincipal } from '@/lib/services/auth-service';
 import { existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -12,7 +22,7 @@ import {
   previewBackup,
   restoreBackup,
 } from '@/lib/services/backup-service';
-import { resetDatabaseForTests } from '@/lib/db/client';
+import { resetDatabaseForTests, getDatabase } from '@/lib/db/client';
 import { completeSetup, getHouseholdState } from '@/lib/services/household-service';
 import { createRecipe, getRecipe } from '@/lib/services/recipe-service';
 import { createRecipeImage } from '@/lib/services/recipe-image-service';
@@ -76,12 +86,82 @@ describe('backup and recovery', () => {
       .toBuffer();
     const image = await createRecipeImage(recipe.id, profile.id, sourceImage, 'Backup soup');
 
+    const accountId = randomUUID(),
+      now = new Date();
+    getDatabase()
+      .insert(user)
+      .values({
+        id: accountId,
+        name: 'Maya',
+        email: `${accountId}@example.test`,
+        role: 'admin',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    getDatabase()
+      .insert(profileAuthLinks)
+      .values({ profileId: profile.id, userId: accountId, createdAt: now, updatedAt: now })
+      .run();
+    const principal: RequestPrincipal = {
+      kind: 'session',
+      userId: accountId,
+      linkedProfileId: profile.id,
+      profileId: profile.id,
+      role: 'admin',
+      accountRole: 'admin',
+      activeProfileRole: 'admin',
+      sessionId: 'backup-fixture',
+      apiKeyId: null,
+    };
+    const inventoryCommand = {
+      kind: 'add',
+      operationId: randomUUID(),
+      expectedRevision: 0,
+      count: 2,
+      item: {
+        typeKey: 'pressure-air-multicooker',
+        name: 'Backup cooker',
+        measurements: [{ value: 6, unit: 'us-qt', basis: 'nominal-volume' }],
+      },
+    };
+    const inventory = executeKitchenCommand(principal, inventoryCommand).kitchen;
+    const cookingSession = startCookSession(recipe.id, profile.id, 4, null, accountId);
+    manageKitchenPhase(principal, {
+      operation: 'start',
+      episodeId: cookingSession.id,
+      phaseId: 'soup',
+      plan: {
+        expectedRevision: inventory.revision,
+        episodeId: cookingSession.id,
+        episodeContextRevision: 0,
+        phases: [
+          {
+            id: 'soup',
+            recipeId: recipe.id,
+            recipeRevision: recipe.currentRevision,
+            cookSessionId: cookingSession.id,
+            cookSessionRevision: 1,
+            stepRefs: [recipe.instructionSections[0]!.steps[0]!.id],
+            capability: 'pressure-cook',
+            durationMinutes: 25,
+          },
+        ],
+      },
+    });
+
     const backup = await createBackup();
     expect(backup.manifest.files.map((file) => file.path)).toContain('database.sqlite');
     expect(backup.manifest.files.map((file) => file.path)).toContain(`uploads/${image.storageKey}`);
     expect(existsSync(resolve(backupDataDirectory, 'backups', `${backup.id}.tar.gz`))).toBe(true);
     await expect(previewBackup(backup.id)).resolves.toMatchObject({ id: backup.id });
 
+    executeKitchenCommand(principal, {
+      ...inventoryCommand,
+      operationId: randomUUID(),
+      expectedRevision: inventory.revision,
+      count: 1,
+    });
     createRecipe(
       {
         title: 'Should disappear after restore',
@@ -106,6 +186,15 @@ describe('backup and recovery', () => {
     expect(statSync(backupDataDirectory).ino).toBe(dataInode);
     expect(restored.safetyBackup.manifest.reason).toBe('pre-restore');
     expect(getRecipe(recipe.id)?.images).toHaveLength(1);
+    expect(readKitchenInventory(principal).items.map((item) => item.id)).toEqual(
+      inventory.items.map((item) => item.id),
+    );
+    expect(readCookingSessionRecipe(principal, cookingSession.id).effectiveRecipe?.title).toBe(
+      'Backup tomato soup',
+    );
+    expect(getDatabase().select().from(kitchenResourceClaims).all()).toHaveLength(1);
+    expect(executeKitchenCommand(principal, inventoryCommand).replayed).toBe(true);
+    expect(readKitchenInventory(principal).items).toHaveLength(2);
     expect(getHouseholdState().household?.kitchenName).toBe('Sunday suppers');
     expect((await listBackups()).length).toBeGreaterThanOrEqual(2);
     expect(existsSync(resolve(backupDataDirectory, 'uploads', image.storageKey))).toBe(true);

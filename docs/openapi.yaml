@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.19
+  version: 1.0.0-rc.20
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
@@ -16,6 +16,183 @@ servers:
 security:
   - SessionCookie: []
 paths:
+  /kitchen:
+    get:
+      operationId: readKitchenInventory
+      summary: Read the household physical equipment inventory
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+    post:
+      operationId: changeKitchenEquipment
+      summary: Apply a reviewed versioned equipment command
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KitchenCommand' }
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+  /kitchen/catalog:
+    get:
+      operationId: readKitchenCatalog
+      summary: Read the local versioned generic equipment catalog
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+  /kitchen/check:
+    post:
+      operationId: checkKitchenAllocation
+      summary: Preview coordinated physical resource allocation without reservations
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KitchenPlanRequest' }
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+  /kitchen/claims:
+    get:
+      operationId: readKitchenClaims
+      summary: Review equipment still marked physically in use
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+    post:
+      operationId: manageKitchenPhase
+      summary: Atomically start a phase or acknowledge physical release
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KitchenPhaseCommand' }
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+  /account/cooking-preferences:
+    get:
+      operationId: readCookingPreferences
+      summary: Read cooking preferences for the signed-in account
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
+    patch:
+      operationId: saveCookingPreferences
+      summary: Save account-owned cooking preferences with a revision check
+      description: >-
+        Household reads require shared.read; mutations recheck live account and active-profile permissions.
+        Session mutations require an exact trusted origin. Equipment commands are actor-bound and replayable.
+        Kitchen integration commands require kitchen:update plus create/delete for the relevant effect and kitchen:read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CookingPreferencesUpdate' }
+      responses:
+        '200':
+          description: Current state or acknowledged operation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: Invalid bounded fields }
+        '403': { description: 'Account, profile, scope or origin rejected' }
+        '409':
+          {
+            description: 'Stale revision, mismatched replay intent or resource in use; retain draft and refresh review',
+          }
   /nutrition/profiles/{profileId}/intake/product:
     post:
       operationId: recordProductConsumption
@@ -274,6 +451,8 @@ paths:
       operationId: exportSingleRecipePdf
       summary: Download a printable recipe card
       parameters:
+        - { $ref: '#/components/parameters/EffectiveRecipeSession' }
+        - { $ref: '#/components/parameters/EffectiveRecipeMeal' }
         - in: path
           name: recipeId
           required: true
@@ -1386,6 +1565,9 @@ paths:
       x-api-permissions: ['recipes:read']
       operationId: exportRecipeJsonLd
       summary: Download a deterministic Schema.org Recipe JSON-LD document
+      parameters:
+        - { $ref: '#/components/parameters/EffectiveRecipeSession' }
+        - { $ref: '#/components/parameters/EffectiveRecipeMeal' }
       responses:
         '200':
           description: Portable recipe JSON-LD without household-private fields
@@ -1404,6 +1586,9 @@ paths:
       x-api-permissions: ['recipes:read']
       operationId: exportRecipeMarkdown
       summary: Download a deterministic portable Markdown recipe without profile-private preferences
+      parameters:
+        - { $ref: '#/components/parameters/EffectiveRecipeSession' }
+        - { $ref: '#/components/parameters/EffectiveRecipeMeal' }
       responses:
         '200':
           description: Portable Markdown recipe
@@ -2701,6 +2886,152 @@ paths:
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Profile selection required }
         '422': { description: The bounded generated export could not be created safely }
+  /cook-sessions/{sessionId}/context:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      security: [{ SessionCookie: [] }]
+      operationId: readCookingEpisode
+      summary: Read owned episode restrictions and the latest accepted future allocation
+      responses:
+        '200':
+          {
+            description: 'Dated restrictions with active flag, contextRevision and acceptedPlan; no physical-use claim implied',
+          }
+        '403': { description: Account or profile lacks access }
+        '404': { description: Owned cooking episode not found }
+    patch:
+      security: [{ SessionCookie: [] }]
+      operationId: changeCookingEpisode
+      summary: Review dated equipment restrictions or accept a future plan for an owned episode
+      description: Restrictions have an explicit validOn local ISO date and IANA timezone. They expire after that date in this episode only. Accept-plan requires a compatible kitchen plan bound to the episode context and effective recipe revisions. Neither operation releases or claims physical equipment. Exact operation replay recovers the original intent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, operationId, expectedContextRevision]
+              properties:
+                kind: { type: string, enum: [restrictions, accept-plan] }
+                operationId: { type: string, format: uuid }
+                expectedContextRevision: { type: integer, minimum: 0 }
+                restrictions:
+                  type: [object, 'null']
+                  required: [timezone, validOn, excludedEquipmentIds, excludedCapabilities]
+                  properties:
+                    timezone: { type: string, maxLength: 100 }
+                    validOn: { type: string, format: date }
+                    excludedEquipmentIds:
+                      { type: array, maxItems: 100, items: { type: string, format: uuid } }
+                    excludedCapabilities:
+                      { type: array, maxItems: 30, items: { type: string, maxLength: 80 } }
+                plan:
+                  {
+                    type: object,
+                    description: Current bounded kitchen plan request including episodeId and episodeContextRevision,
+                  }
+      responses:
+        '200':
+          { description: 'Current episode, durable replay receipt and accepted allocation if any' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: Owned cooking episode not found }
+        '409':
+          {
+            description: 'Stale context, invalid allocation or mismatched replay; retain the draft',
+          }
+  /cook-sessions/{sessionId}/recipe:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      security: [{ SessionCookie: [] }]
+      operationId: readCookingSessionRecipe
+      summary: Read the signed-in account's owned effective cooking snapshot
+      responses:
+        '200': { description: 'Session with effectiveRecipe, effectiveRevision and latestChangeId' }
+        '403': { description: Account or effective profile lacks access }
+        '404': { description: No owned snapshot for this account and active profile }
+    patch:
+      security: [{ SessionCookie: [] }]
+      operationId: changeCookingSessionRecipe
+      summary: Apply a reviewed session-only method change or version-aware undo
+      description: Requires durable operationId, expectedRevision and expectedKitchenRevision. Adapt supplies coherent method, equipment, structured requirements, instructions and timing; optional ingredientGroups or servings invalidate nutrition evidence. Undo identifies the latest undoOperationId. Never edits the library or releases physical equipment. See docs/my-kitchen/api.md for examples.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, operationId, expectedRevision, expectedKitchenRevision]
+              properties:
+                kind: { type: string, enum: [adapt, undo] }
+                operationId: { type: string, format: uuid }
+                expectedRevision: { type: integer, minimum: 1 }
+                expectedKitchenRevision: { type: integer, minimum: 0 }
+                undoOperationId: { type: string, format: uuid }
+                change:
+                  type: object
+                  required:
+                    [
+                      cookingMethod,
+                      equipment,
+                      equipmentRequirements,
+                      instructionSections,
+                      prepMinutes,
+                      cookMinutes,
+                      restMinutes,
+                    ]
+                  properties:
+                    cookingMethod: { type: string, maxLength: 80 }
+                    equipment:
+                      { type: array, maxItems: 30, items: { type: string, maxLength: 120 } }
+                    equipmentRequirements:
+                      {
+                        type: array,
+                        maxItems: 30,
+                        items: { $ref: '#/components/schemas/RecipeEquipmentRequirement' },
+                      }
+                    instructionSections:
+                      {
+                        type: array,
+                        minItems: 1,
+                        maxItems: 20,
+                        items:
+                          {
+                            type: object,
+                            required: [title, steps],
+                            properties:
+                              {
+                                title: { type: string, maxLength: 120 },
+                                steps:
+                                  {
+                                    type: array,
+                                    minItems: 1,
+                                    maxItems: 80,
+                                    items: { type: string, minLength: 1, maxLength: 4000 },
+                                  },
+                              },
+                          },
+                      }
+                    prepMinutes: { type: integer, minimum: 0, maximum: 10080 }
+                    cookMinutes: { type: integer, minimum: 0, maximum: 10080 }
+                    restMinutes: { type: integer, minimum: 0, maximum: 10080 }
+      responses:
+        '200': { description: Saved or recovered receipt with current session and appliedRevision }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/UntrustedOrigin' }
+        '404': { description: No owned session snapshot }
+        '409':
+          {
+            description: 'Stale review, completed session, occupied equipment or mismatched replay; retain draft',
+          }
   /cook-sessions/{sessionId}/complete:
     post:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -4013,6 +4344,16 @@ components:
       scheme: bearer
       bearerFormat: opaque integration token
   parameters:
+    EffectiveRecipeSession:
+      name: sessionId
+      in: query
+      description: Export the signed-in account's owned effective cooking snapshot; mutually exclusive with mealEntryId. API keys cannot export private cooking sessions. No physical assignments or household resource IDs are included.
+      schema: { type: string, format: uuid }
+    EffectiveRecipeMeal:
+      name: mealEntryId
+      in: query
+      description: Export this planned meal's effective recipe, leaving the library unchanged. API keys also need mealPlans:read. Mutually exclusive with sessionId.
+      schema: { type: string, format: uuid }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -4033,6 +4374,271 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    KitchenMeasurement:
+      type: object
+      additionalProperties: false
+      required: [value, unit, basis]
+      properties:
+        value: { type: number, exclusiveMinimum: 0, maximum: 100000 }
+        unit:
+          {
+            type: string,
+            enum: [ml, l, us-qt, imperial-qt, cm, mm, in, g, kg, slices, device-cups],
+          }
+        basis:
+          {
+            type: string,
+            enum:
+              [
+                nominal-volume,
+                working-liquid,
+                dry-input,
+                cooked-output,
+                food-mass,
+                diameter,
+                depth,
+                width,
+                height,
+                length,
+                slices-per-cycle,
+              ],
+          }
+        mode: { type: string, maxLength: 80 }
+        deviceCupMl: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+        provenance: { type: string, enum: [user-confirmed, curated-type-default] }
+    KitchenEquipmentMeasurement:
+      type: object
+      additionalProperties: false
+      required: [value, unit, basis]
+      properties:
+        value: { type: number, exclusiveMinimum: 0, maximum: 100000 }
+        unit:
+          {
+            type: string,
+            enum: [ml, l, us-qt, imperial-qt, cm, mm, in, g, kg, slices, device-cups],
+          }
+        basis:
+          {
+            type: string,
+            enum:
+              [
+                nominal-volume,
+                working-liquid,
+                dry-input,
+                cooked-output,
+                food-mass,
+                diameter,
+                depth,
+                width,
+                height,
+                length,
+                slices-per-cycle,
+              ],
+          }
+        mode: { type: string, maxLength: 80 }
+        deviceCupMl: { type: number, exclusiveMinimum: 0, maximum: 1000 }
+        provenance: { type: string, enum: [user-confirmed, curated-type-default] }
+        resourceIndex: { type: integer, minimum: 1, maximum: 8 }
+    KitchenEquipmentInput:
+      type: object
+      additionalProperties: false
+      required: [typeKey, name]
+      properties:
+        typeKey: { type: string, maxLength: 80, description: Catalog key or custom }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        make: { type: string, maxLength: 100 }
+        model: { type: string, maxLength: 100 }
+        capabilities: { type: array, maxItems: 24, items: { type: string, maxLength: 80 } }
+        measurements:
+          {
+            type: array,
+            maxItems: 16,
+            items: { $ref: '#/components/schemas/KitchenEquipmentMeasurement' },
+          }
+        availability: { type: string, enum: [available, unavailable, archived], default: available }
+        material: { type: string, maxLength: 80 }
+        induction: { type: string, enum: [yes, no, unknown], default: unknown }
+        ovenSafe: { type: string, enum: [yes, no, unknown], default: unknown }
+        ovenMaxC: { type: [number, 'null'], minimum: 0, maximum: 600 }
+        lid: { type: string, enum: [yes, no, unknown], default: unknown }
+        parentId: { type: [string, 'null'], format: uuid }
+        independentZones: { type: integer, minimum: 1, maximum: 8, default: 1 }
+        independentZonesConfirmed: { type: boolean, default: false }
+        sharedResourceKeys: { type: array, maxItems: 8, items: { type: string, maxLength: 80 } }
+    KitchenCommand:
+      type: object
+      description: Add requires item and optional count; update requires item, itemId and expectedItemRevision; coverage requires coverage. Updates replace the reviewed item, omitted optional item fields reset to conservative defaults. operationId is immutable and replayed only for identical actor, kitchen and normalized intent.
+      required: [kind, operationId, expectedRevision]
+      properties:
+        kind: { type: string, enum: [add, update, coverage, setup] }
+        operationId: { type: string, format: uuid }
+        expectedRevision: { type: integer, minimum: 0 }
+        count: { type: integer, minimum: 1, maximum: 20, default: 1 }
+        item: { $ref: '#/components/schemas/KitchenEquipmentInput' }
+        itemId: { type: string, format: uuid }
+        expectedItemRevision: { type: integer, minimum: 1 }
+        coverage: { type: string, enum: [not-started, partial, confirmed] }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        constraints:
+          type: object
+          additionalProperties: false
+          properties:
+            preparationSpace: { type: string, enum: [unknown, limited, standard] }
+            equipmentStorage: { type: string, enum: [unknown, limited, standard] }
+    KitchenCavityLoad:
+      type: object
+      additionalProperties: false
+      required: [widthMm, depthMm, heightMm]
+      description: Measured dish footprint including user-confirmed placement clearance, in millimetres. Cavity co-use requires recorded usable cavity width/depth/height, matching confirmed mode and temperature, and combined same-level strip fit. No shelves, stacking, rotation, safety limits or completion time are inferred. Omission keeps cavity use exclusive.
+      properties:
+        widthMm: { type: integer, minimum: 1, maximum: 10000 }
+        depthMm: { type: integer, minimum: 1, maximum: 10000 }
+        heightMm: { type: integer, minimum: 1, maximum: 10000 }
+    KitchenPhase:
+      type: object
+      required: [id, recipeId, recipeRevision, stepRefs, capability, durationMinutes]
+      properties:
+        vesselCapability: { type: string, enum: [vessel, bakeware, pressure-vessel] }
+        cavityLoad: { $ref: '#/components/schemas/KitchenCavityLoad' }
+        cookSessionId: { type: string, format: uuid }
+        cookSessionRevision: { type: integer, minimum: 1 }
+        targetServings: { type: integer, minimum: 1, maximum: 100 }
+        mealPlanEntryId: { type: string, format: uuid }
+        mealExpectedUpdatedAt: { type: string, format: date-time }
+        id: { type: string, maxLength: 80 }
+        recipeId: { type: string, format: uuid }
+        recipeRevision: { type: integer, minimum: 1 }
+        stepRefs:
+          {
+            type: array,
+            minItems: 1,
+            maxItems: 80,
+            items: { type: string, maxLength: 80 },
+            description: Actual step IDs for the exact recipe revision,
+          }
+        capability: { type: string, maxLength: 80 }
+        quantity: { type: integer, minimum: 1, maximum: 20, default: 1 }
+        durationMinutes: { type: integer, minimum: 1, maximum: 10080 }
+        releaseMinutes: { type: integer, minimum: 0, maximum: 10080, default: 0 }
+        after: { type: array, maxItems: 40, items: { type: string, maxLength: 80 } }
+        capacityReviewRequired: { type: boolean, default: false }
+        amount: { $ref: '#/components/schemas/KitchenMeasurement' }
+        temperatureC: { type: number, minimum: 0, maximum: 600 }
+        mode: { type: string, maxLength: 80 }
+        needsVessel: { type: boolean, default: false }
+        inductionRequired: { type: boolean, default: false }
+        accessoryIds: { type: array, maxItems: 8, items: { type: string, format: uuid } }
+        handsOn: { type: boolean, default: false }
+    KitchenPlanRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, phases]
+      properties:
+        episodeId: { type: string, format: uuid }
+        episodeContextRevision: { type: integer, minimum: 0 }
+        expectedRevision: { type: integer, minimum: 0 }
+        phases:
+          {
+            type: array,
+            minItems: 1,
+            maxItems: 40,
+            items: { $ref: '#/components/schemas/KitchenPhase' },
+          }
+        strategy: { type: string, enum: [parallel, sequence], default: sequence }
+        maxHandsOn: { type: integer, minimum: 1, maximum: 8, default: 1 }
+    KitchenPhaseCommand:
+      type: object
+      additionalProperties: false
+      required: [operation, episodeId, phaseId]
+      properties:
+        operation: { type: string, enum: [start, release] }
+        episodeId: { type: string, format: uuid }
+        phaseId: { type: string, maxLength: 80 }
+        expectedUseId:
+          {
+            type: string,
+            format: uuid,
+            description: Required to release the exact physical use shown in the review. A stale token never releases a later use.,
+          }
+        recoverAbandoned:
+          {
+            type: boolean,
+            default: false,
+            description: Explicit recovery after physical review; releasing another owner requires current account and effective active-profile administrator authority.,
+          }
+        acknowledged: { type: boolean, default: false }
+        acceptedPlanId: { type: string, format: uuid }
+        plan: { $ref: '#/components/schemas/KitchenPlanRequest' }
+    RecipeEquipmentRequirement:
+      type: object
+      additionalProperties: false
+      required: [capability, steps]
+      properties:
+        vesselCapability: { type: string, enum: [vessel, bakeware, pressure-vessel] }
+        cavityLoad: { $ref: '#/components/schemas/KitchenCavityLoad' }
+        temperatureC: { type: number, minimum: 0, maximum: 600 }
+        mode: { type: string, minLength: 1, maxLength: 80 }
+        capability: { type: string, maxLength: 80 }
+        quantity: { type: integer, minimum: 1, maximum: 20, default: 1 }
+        capacityReviewRequired: { type: boolean, default: false }
+        amount: { $ref: '#/components/schemas/KitchenMeasurement' }
+        alternativeCapabilities:
+          { type: array, maxItems: 8, items: { type: string, maxLength: 80 } }
+        steps:
+          type: array
+          maxItems: 80
+          items:
+            type: object
+            required: [section, step]
+            properties:
+              section: { type: integer, minimum: 0, maximum: 79 }
+              step: { type: integer, minimum: 0, maximum: 79 }
+    CookingPreferencesUpdate:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, preferences]
+      properties:
+        expectedRevision: { type: string, pattern: '^[a-f0-9]{64}$' }
+        preferences:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              methodPreferences,
+              priorities,
+              typicalMinutes,
+              maxHandsOn,
+              confidence,
+              instructionDetail,
+              equipmentPolicy,
+            ]
+          properties:
+            methodPreferences: { type: string, maxLength: 800 }
+            priorities:
+              {
+                type: array,
+                maxItems: 7,
+                items:
+                  {
+                    type: string,
+                    enum:
+                      [
+                        less-cleanup,
+                        fewer-pans,
+                        shorter-elapsed,
+                        less-hands-on,
+                        batch-preparation,
+                        less-chopping,
+                        lighter-cookware,
+                      ],
+                  },
+              }
+            typicalMinutes: { type: [integer, 'null'], minimum: 1, maximum: 1440 }
+            maxHandsOn: { type: integer, minimum: 1, maximum: 8 }
+            confidence: { type: string, enum: [learning, comfortable, experienced, unspecified] }
+            instructionDetail: { type: string, enum: [brief, standard, detailed] }
+            equipmentPolicy: { type: string, enum: [recorded-only, ask-about-missing] }
+
     ProductConsumptionRequest:
       type: object
       additionalProperties: false
@@ -4186,6 +4792,7 @@ components:
         shoppingLists: { $ref: '#/components/schemas/ApiActions' }
         collections: { $ref: '#/components/schemas/ApiActions' }
         pantry: { $ref: '#/components/schemas/ApiActions' }
+        kitchen: { $ref: '#/components/schemas/ApiActions' }
         settings:
           type: array
           uniqueItems: true
@@ -4538,6 +5145,12 @@ components:
         sourceName: { type: string }
         sourceUrl: { type: string, format: uri }
         originalAuthor: { type: string, maxLength: 160 }
+        equipmentRequirements:
+          {
+            type: array,
+            maxItems: 30,
+            items: { $ref: '#/components/schemas/RecipeEquipmentRequirement' },
+          }
         cookingMethod: { type: string, maxLength: 80 }
         equipment:
           type: array
@@ -4860,6 +5473,17 @@ components:
       type: object
       required: [title, summary, servings, ingredientGroups, instructionSections]
       properties:
+        cookingMethod: { type: string, maxLength: 80 }
+        equipment: { type: array, maxItems: 30, items: { type: string, maxLength: 120 } }
+        prepMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        cookMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        restMinutes: { type: integer, minimum: 0, maximum: 10080 }
+        equipmentRequirements:
+          {
+            type: array,
+            maxItems: 30,
+            items: { $ref: '#/components/schemas/RecipeEquipmentRequirement' },
+          }
         title: { type: string, minLength: 1, maxLength: 160 }
         summary: { type: string, maxLength: 800 }
         servings: { type: string, maxLength: 80 }

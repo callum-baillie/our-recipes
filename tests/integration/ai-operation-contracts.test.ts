@@ -909,4 +909,160 @@ describe('authorized AI operations and prompt contracts', () => {
       restored.promptVersion,
     );
   });
+  it('K13/K14 applies and replays a reviewed acquisition, then clarifies that same item', async () => {
+    const { randomUUID } = await import('node:crypto');
+    const kitchen = await import('@/lib/services/kitchen-inventory-service');
+    await signIn();
+    setSharing({ shareKitchenEquipment: true });
+    const source = request('/ai/app-actions');
+    const before = kitchen.readKitchenInventory(principal);
+    const command = {
+      kind: 'add',
+      operationId: randomUUID(),
+      expectedRevision: before.revision,
+      item: { typeKey: 'electric-pressure-cooker', name: 'New Instant Pot' },
+    };
+    const proposal = await actions.prepareAppActions(principal, source, threadId, {
+      title: 'Add the new Instant Pot',
+      actions: [
+        {
+          operationId: 'changeKitchenEquipment',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify(command),
+        },
+      ],
+    });
+    expect(kitchen.readKitchenInventory(principal).items.length).toBe(before.items.length);
+    const confirm = {
+      id: proposal.appAction.id,
+      version: proposal.appAction.version,
+      decision: 'apply',
+    };
+    const result = await actions.confirmAppActions(principal, source, confirm);
+    expect(result.status).toBe('applied');
+    expect((await actions.confirmAppActions(principal, source, confirm)).replayed).toBe(true);
+    let current = kitchen.readKitchenInventory(principal);
+    expect(current.items).toHaveLength(before.items.length + 1);
+    const item = current.items.find((i) => i.name === 'New Instant Pot')!;
+    expect(item.capabilities).toEqual(['pressure-cook']);
+    expect(item.measurements).toEqual([]);
+    const update = {
+      kind: 'update',
+      operationId: randomUUID(),
+      expectedRevision: current.revision,
+      itemId: item.id,
+      expectedItemRevision: item.revision,
+      item: {
+        typeKey: 'pressure-air-multicooker',
+        name: item.name,
+        model: 'Duo Crisp',
+        measurements: [{ value: 6, unit: 'us-qt', basis: 'nominal-volume' }],
+      },
+    };
+    const clarification = await actions.prepareAppActions(principal, source, threadId, {
+      title: 'Confirm the newly added cooker variant and US quart size',
+      actions: [
+        {
+          operationId: 'changeKitchenEquipment',
+          parametersJson: '{}',
+          bodyJson: JSON.stringify(update),
+        },
+      ],
+    });
+    await actions.confirmAppActions(principal, source, {
+      id: clarification.appAction.id,
+      version: clarification.appAction.version,
+      decision: 'apply',
+    });
+    current = kitchen.readKitchenInventory(principal);
+    expect(current.items).toHaveLength(before.items.length + 1);
+    expect(current.items.find((i) => i.id === item.id)?.model).toBe('Duo Crisp');
+    setSharing({ shareKitchenEquipment: false });
+    await expect(
+      actions.readAppData(principal, source, {
+        operationId: 'readKitchenInventory',
+        parametersJson: '{}',
+        bodyJson: '',
+      }),
+    ).rejects.toThrow(/sharing/);
+  });
+  it('K15/K16 reviews and applies a coherent session-only potato adaptation through authenticated operations', async () => {
+    await signIn();
+    setSharing({ shareKitchenEquipment: true, shareSharedRecipes: true, sharePantry: true });
+    const { emptyRecipeInput } = await import('@/lib/domain/recipe');
+    const { createRecipe, getRecipe } = await import('@/lib/services/recipe-service');
+    const { startCookSession } = await import('@/lib/services/cooking-service');
+    const { readKitchenInventory } = await import('@/lib/services/kitchen-inventory-service');
+    const { readCookingSessionRecipe } =
+      await import('@/lib/services/cooking-session-recipe-service');
+    const recipe = createRecipe(
+      {
+        ...emptyRecipeInput,
+        title: 'Fixture air-fried potatoes',
+        servings: '2',
+        cookingMethod: 'Air fry',
+        equipment: ['Air fryer'],
+        ingredientGroups: [
+          { name: '', ingredients: [{ quantity: 500, unit: 'g', item: 'Potatoes', note: '' }] },
+        ],
+        instructionSections: [{ title: '', steps: ['Air fry the potatoes.'] }],
+      },
+      principal.profileId,
+    );
+    const session = startCookSession(recipe.id, principal.profileId, 2, null, principal.userId);
+    const source = request('/ai/app-actions');
+    const proposal = await actions.prepareAppActions(principal, source, threadId, {
+      title: 'Use stovetop potatoes for this cooking session',
+      actions: [
+        {
+          operationId: 'changeCookingSessionRecipe',
+          parametersJson: JSON.stringify({ sessionId: session.id }),
+          bodyJson: JSON.stringify({
+            kind: 'adapt',
+            operationId: crypto.randomUUID(),
+            expectedRevision: 1,
+            expectedKitchenRevision: readKitchenInventory(principal).revision,
+            change: {
+              cookingMethod: 'Stovetop',
+              equipment: ['Saucepan', 'Hob'],
+              equipmentRequirements: [],
+              prepMinutes: 5,
+              cookMinutes: 25,
+              restMinutes: 0,
+              instructionSections: [
+                {
+                  title: '',
+                  steps: ['Cut into even pieces. Simmer in water until tender, then drain.'],
+                },
+              ],
+            },
+          }),
+        },
+      ],
+    });
+    expect(readCookingSessionRecipe(principal, session.id).effectiveRecipe?.cookingMethod).toBe(
+      'Air fry',
+    );
+    const result = await actions.confirmAppActions(principal, source, {
+      id: proposal.appAction.id,
+      version: proposal.appAction.version,
+      decision: 'apply',
+    });
+    expect(result.status).toBe('applied');
+    const saved = readCookingSessionRecipe(principal, session.id);
+    expect(saved.effectiveRecipe?.cookingMethod).toBe('Stovetop');
+    expect(saved.effectiveRecipe?.cookMinutes).toBe(25);
+    expect(saved.effectiveRecipe?.equipment.map((item) => item.name)).toEqual(['Saucepan', 'Hob']);
+    expect(saved.effectiveRecipe?.instructionSections[0]?.steps[0]?.body).toMatch(/Simmer/);
+    expect(saved.ingredientReviewRequired).toBe(false);
+    expect(getRecipe(recipe.id)?.cookingMethod).toBe('Air fry');
+    setSharing({ shareKitchenEquipment: false });
+    await expect(
+      actions.readAppData(principal, source, {
+        operationId: 'readCookingSessionRecipe',
+        parametersJson: JSON.stringify({ sessionId: session.id }),
+        bodyJson: '',
+      }),
+    ).rejects.toThrow(/sharing/);
+  });
 });

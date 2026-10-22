@@ -1,7 +1,9 @@
+import { resolveRecipeForExport } from '@/lib/services/effective-recipe-export-service';
+import { decisionErrorResponse } from '@/lib/services/decision-request-service';
 import { withApiRequestId, authorizeCoreApi } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 
-import { getRecipe, recipeAsMarkdown } from '@/lib/services/recipe-service';
+import { recipeAsMarkdown } from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,16 @@ export async function GET(_request: Request, context: { params: Promise<{ recipe
   const access = await authorizeCoreApi(_request);
   if (access.response) return access.response;
 
-  const recipe = getRecipe((await context.params).recipeId);
+  let recipe;
+  try {
+    recipe = resolveRecipeForExport(
+      access.principal,
+      (await context.params).recipeId,
+      new URL(_request.url).searchParams,
+    );
+  } catch (error) {
+    return withApiRequestId(decisionErrorResponse(error), access.requestId);
+  }
   if (!recipe) {
     return withApiRequestId(
       NextResponse.json(

@@ -21,7 +21,18 @@ import { AppDialog } from './app-dialog';
 type Adaptation = Pick<
   RecipePayload,
   'title' | 'summary' | 'servings' | 'ingredientGroups' | 'instructionSections'
->;
+> &
+  Partial<
+    Pick<
+      RecipePayload,
+      | 'cookingMethod'
+      | 'equipment'
+      | 'equipmentRequirements'
+      | 'prepMinutes'
+      | 'cookMinutes'
+      | 'restMinutes'
+    >
+  >;
 
 type PantryProductOption = { id: string; displayName: string };
 
@@ -189,6 +200,12 @@ export function MealEntryEditor({
         const { recipe } = (await response.json()) as { recipe: RecipeDetail };
         if (active)
           setAdaptation({
+            cookingMethod: recipe.cookingMethod,
+            equipment: recipe.equipment.map((item) => item.name),
+            equipmentRequirements: recipe.equipmentRequirements,
+            prepMinutes: recipe.prepMinutes,
+            cookMinutes: recipe.cookMinutes,
+            restMinutes: recipe.restMinutes,
             title: recipe.title,
             summary: recipe.summary,
             servings: recipe.servings,
@@ -706,6 +723,49 @@ export function MealEntryEditor({
                       Ingredient quantities below are for the recipe yield. Shopping amounts scale
                       to this meal’s servings. Nutrition will need recalculating after changes.
                     </p>
+                    <label>
+                      Cooking method
+                      <input
+                        value={adaptation.cookingMethod ?? ''}
+                        onChange={(e) =>
+                          setAdaptation({ ...adaptation, cookingMethod: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Equipment (one per line)
+                      <textarea
+                        value={(adaptation.equipment ?? []).join('\n')}
+                        onChange={(e) =>
+                          setAdaptation({
+                            ...adaptation,
+                            equipment: e.target.value
+                              .split('\n')
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                    </label>
+                    {(['prepMinutes', 'cookMinutes', 'restMinutes'] as const).map((field) => (
+                      <label key={field}>
+                        {field === 'prepMinutes'
+                          ? 'Preparation'
+                          : field === 'cookMinutes'
+                            ? 'Cooking'
+                            : 'Rest'}{' '}
+                        minutes
+                        <input
+                          type="number"
+                          min={0}
+                          max={10080}
+                          value={adaptation[field] ?? 0}
+                          onChange={(e) =>
+                            setAdaptation({ ...adaptation, [field]: Number(e.target.value) })
+                          }
+                        />
+                      </label>
+                    ))}
                     {adaptation.ingredientGroups.map((group, g) => (
                       <fieldset key={g}>
                         <legend>{group.name || 'Ingredients'}</legend>

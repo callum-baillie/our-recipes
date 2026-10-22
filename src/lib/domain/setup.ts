@@ -28,7 +28,9 @@ export const personalProfileSettingsSchema = profileInputSchema
   .extend({
     avatarUrl: z.union([z.literal(''), z.string().url().max(2_048)]),
     mainGoals: z.string().trim().max(2_000),
-    goalContext: profileGoalContextSchema.omit({ kitchenInterview: true }).strict(),
+    goalContext: profileGoalContextSchema
+      .omit({ kitchenInterview: true, cookingPreferences: true })
+      .strict(),
   })
   .strict();
 export const personalProfileUpdateSchema = z
@@ -41,9 +43,13 @@ export type PersonalProfileSettings = z.infer<typeof personalProfileSettingsSche
 export function personalProfileValues(
   profile: ProfileInput | (Omit<ProfileInput, 'avatarUrl'> & { avatarUrl: string | null }),
 ): PersonalProfileSettings {
-  const { kitchenInterview: _interview, ...goals } =
-    profile.goalContext ?? defaultProfileGoalContext;
+  const {
+    kitchenInterview: _interview,
+    cookingPreferences: _cooking,
+    ...goals
+  } = profile.goalContext ?? defaultProfileGoalContext;
   void _interview;
+  void _cooking;
   return personalProfileSettingsSchema.parse({
     displayName: profile.displayName,
     color: profile.color,

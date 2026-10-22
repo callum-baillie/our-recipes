@@ -254,6 +254,34 @@ function nutritionValues(value: JsonValue | undefined) {
   };
 }
 
+function portableMethodMetadata(node: JsonObject, warnings: string[]) {
+  const properties = Array.isArray(node.additionalProperty)
+    ? node.additionalProperty
+    : [node.additionalProperty];
+  const property = properties.find(
+    (value) => isObject(value) && value.name === 'Bòrd recipe method metadata',
+  );
+  if (!isObject(property) || typeof property.value !== 'string') return {};
+  try {
+    if (property.value.length > 24000) throw new Error('Too large');
+    return recipeInputSchema
+      .pick({ restMinutes: true, equipmentRequirements: true })
+      .strict()
+      .parse(JSON.parse(property.value));
+  } catch {
+    warnings.push(
+      'Bòrd method metadata was invalid and was omitted. Review equipment requirements and rest time.',
+    );
+    return {};
+  }
+}
+function toolNames(value: JsonValue | undefined) {
+  return (Array.isArray(value) ? value : [value])
+    .slice(0, 80)
+    .map((item) => (isObject(item) ? text(item.name, 120) : text(item, 120)))
+    .filter(Boolean);
+}
+
 function mapCandidate(recipeNode: RecipeNode, index: number): JsonLdDraft {
   const { node, hasSchemaContext } = recipeNode;
   const warnings: string[] = [];
@@ -289,6 +317,9 @@ function mapCandidate(recipeNode: RecipeNode, index: number): JsonLdDraft {
     prepMinutes: prepMinutes ?? 0,
     cookMinutes: cookMinutes ?? 0,
     restMinutes: 0,
+    cookingMethod: text(node.cookingMethod, 80),
+    equipment: toolNames(node.tool),
+    ...portableMethodMetadata(node, warnings),
     difficulty: '',
     cuisine: joinRecipeTaxonomyValues(textList(node.recipeCuisine, 8, 60)),
     category: joinRecipeTaxonomyValues(textList(node.recipeCategory, 8, 60)),
@@ -451,6 +482,20 @@ export function recipeAsJsonLd(
     name: recipe.title,
     ...(recipe.summary ? { description: recipe.summary } : {}),
     recipeYield: recipe.servings,
+    additionalProperty: [
+      {
+        '@type': 'PropertyValue',
+        name: 'Bòrd recipe method metadata',
+        value: JSON.stringify({
+          restMinutes: recipe.restMinutes,
+          equipmentRequirements: recipe.equipmentRequirements,
+        }),
+      },
+    ],
+    ...(recipe.cookingMethod ? { cookingMethod: recipe.cookingMethod } : {}),
+    ...(recipe.equipment.length
+      ? { tool: recipe.equipment.map((item) => ({ '@type': 'HowToTool', name: item.name })) }
+      : {}),
     prepTime: isoDuration(recipe.prepMinutes),
     cookTime: isoDuration(recipe.cookMinutes),
     totalTime: isoDuration(totalMinutes),

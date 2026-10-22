@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetDatabaseForTests } from '@/lib/db/client';
 import { completeSetup } from '@/lib/services/household-service';
-import { exportRecipeAsJsonLd } from '@/lib/services/jsonld-service';
+import { exportRecipeAsJsonLd, createJsonLdDraft } from '@/lib/services/jsonld-service';
 import { createRecipe } from '@/lib/services/recipe-service';
 
 describe('JSON-LD recipe export', () => {
@@ -74,6 +74,13 @@ describe('JSON-LD recipe export', () => {
       name: 'Lemon pasta',
       description: 'A bright weeknight bowl.',
       recipeYield: '4 servings',
+      additionalProperty: [
+        {
+          '@type': 'PropertyValue',
+          name: 'Bòrd recipe method metadata',
+          value: JSON.stringify({ restMinutes: 5, equipmentRequirements: [] }),
+        },
+      ],
       prepTime: 'PT10M',
       cookTime: 'PT15M',
       totalTime: 'PT30M',
@@ -107,7 +114,59 @@ describe('JSON-LD recipe export', () => {
         },
       ],
     });
+    const roundTrip = createJsonLdDraft(JSON.stringify(document), 0);
+    expect(roundTrip.recipe.restMinutes).toBe(5);
+    expect(roundTrip.recipe.equipmentRequirements).toEqual([]);
     expect(JSON.stringify(document)).not.toContain('Maya');
     expect(JSON.stringify(document)).not.toContain('Save pasta water');
   });
+});
+
+it('round-trips portable method requirements and omits invalid private assignment metadata', () => {
+  const requirements = [
+    {
+      capability: 'heat-electric',
+      quantity: 1,
+      capacityReviewRequired: true,
+      alternativeCapabilities: ['heat-gas'],
+      steps: [{ section: 0, step: 0 }],
+    },
+  ];
+  const source = {
+    '@context': 'https://schema.org',
+    '@type': 'Recipe',
+    name: 'Stovetop potatoes',
+    recipeYield: '2 servings',
+    cookingMethod: 'Simmer',
+    prepTime: 'PT5M',
+    cookTime: 'PT25M',
+    tool: [{ '@type': 'HowToTool', name: 'Saucepan' }, 'Hob'],
+    recipeIngredient: ['500 g potatoes'],
+    recipeInstructions: ['Simmer until tender, then drain.'],
+    additionalProperty: [
+      {
+        '@type': 'PropertyValue',
+        name: 'Bòrd recipe method metadata',
+        value: JSON.stringify({ restMinutes: 2, equipmentRequirements: requirements }),
+      },
+    ],
+  };
+  const draft = createJsonLdDraft(JSON.stringify(source), 0);
+  expect(draft.recipe).toMatchObject({
+    cookingMethod: 'Simmer',
+    restMinutes: 2,
+    cookMinutes: 25,
+    equipment: ['Saucepan', 'Hob'],
+    equipmentRequirements: requirements,
+  });
+  source.additionalProperty[0]!.value = JSON.stringify({
+    restMinutes: 2,
+    equipmentRequirements: [{ ...requirements[0], resourceIds: ['private-household-base'] }],
+  });
+  const invalid = createJsonLdDraft(JSON.stringify(source), 0);
+  expect(invalid.recipe.equipmentRequirements ?? []).toEqual([]);
+  expect(invalid.warnings).toContain(
+    'Bòrd method metadata was invalid and was omitted. Review equipment requirements and rest time.',
+  );
+  expect(JSON.stringify(invalid.recipe)).not.toContain('private-household-base');
 });

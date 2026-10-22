@@ -1,3 +1,5 @@
+import { readCookingPreferences } from '@/lib/services/cooking-preferences-service';
+import { CookingPreferencesForm } from '@/components/cooking-preferences-form';
 import { appRoleCan } from '@/lib/domain/permissions';
 import { getAiReadiness } from '@/lib/services/ai-readiness-service';
 import { KitchenInterview, kitchenInterviewQuestions } from '@/components/kitchen-interview';
@@ -33,6 +35,7 @@ export default async function AccountPage() {
           profile={{ ...profile, role: principal.role, isLastAdmin: false }}
         />
       )}
+      <CookingPreferencesForm initial={readCookingPreferences(principal)} />
       {profile && (
         <KitchenInterview
           aiEnabled={getAiReadiness().enabled}

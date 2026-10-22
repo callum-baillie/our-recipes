@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.0-rc.20
+
+- Add **My Kitchen**, a household inventory for distinct physical appliances, cookware, facilities, sizes, capabilities, attachments, availability and resource limits. Multiple identical items keep separate IDs; unknown measurements stay unknown.
+- Add deterministic recipe/meal equipment checks, multicooker mode conflicts, measured shared-oven checks, coordinated meal previews, reviewed allocations, atomic physical-use claims and explicit release/recovery controls.
+- Connect guided setup, personal cooking preferences, default-off equipment sharing, reviewed assistant inventory operations, session-only recipe adaptations, effective cooking/export views and native inventory/setup recovery.
+- Add migrations `0074_my_kitchen` through `0080_kitchen_physical_uses`. Back up before upgrading; startup migrations are additive. This release candidate does not complete every K01–K30 scenario: see the [acceptance register](my-kitchen/acceptance.md) and [verification receipt](my-kitchen/verification.md).
+- Verified with `pnpm verify` (1,095 root tests, 9 skipped), 76 native tests, 4 My Kitchen production Chromium journeys, 19 release-browser journeys plus 3 performance checks, OpenAPI checks and a clean standalone build. Production dependency audit and the local disposable Docker backup/restore smoke passed. Native-device, live-model, GitHub multi-architecture image and operator-host/production-volume recovery checks are recorded separately; this is not the final v1 release. See the [rc.20 release receipt](refinement/rc20-release.md).
+
 ## 1.0.0-rc.19
 
 - Keep restored sessions, API keys and transient authentication credentials blocked until invalidation completes inside the durable restore barrier. Fix SQLite authentication challenge handling and one-use email-verification replay.

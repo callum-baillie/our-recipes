@@ -182,7 +182,7 @@ describe('AI readiness boundary', () => {
 
     const invalidSourceUrlCandidate = {
       ...fakeCandidate,
-      recipe: { ...fakeCandidate.recipe, sourceUrl: 'not a valid URL' },
+      recipe: { ...fakeCandidate.recipe, equipmentRequirements: [], sourceUrl: 'not a valid URL' },
     };
     expect(
       aiRecipeCandidateStructuredOutputSchema.safeParse(invalidSourceUrlCandidate).success,

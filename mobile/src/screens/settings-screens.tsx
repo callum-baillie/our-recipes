@@ -78,6 +78,7 @@ export function SettingsScreen({ basePath = '/settings' }: { basePath?: '/settin
   ];
   return (
     <Screen>
+      <Button label="My Kitchen" onPress={() => router.push('/my-kitchen' as Href)} />
       <SettingsHeader
         eyebrow="YOUR KITCHEN, YOUR WAY"
         title="Settings"

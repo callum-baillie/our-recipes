@@ -32,6 +32,7 @@ import { useToast } from '@/components/toast-provider';
 import { ButtonSpinner } from '@/components/skeleton';
 
 const resources: Array<{ id: ApiResource; label: string; icon: typeof BookOpen }> = [
+  { id: 'kitchen', label: 'My Kitchen', icon: BookOpen },
   { id: 'recipes', label: 'Recipes', icon: BookOpen },
   { id: 'mealPlans', label: 'Meal plans', icon: CalendarDays },
   { id: 'shoppingLists', label: 'Grocery lists', icon: ListChecks },

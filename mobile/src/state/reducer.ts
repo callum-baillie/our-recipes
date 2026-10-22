@@ -1,3 +1,4 @@
+import type { KitchenDraft } from '../../../shared/mobile-domain/kitchen-recovery';
 import type {
   MealPlanItem,
   HouseholdProfile,
@@ -26,6 +27,7 @@ export type BordState = {
   nutrition: NutritionCache;
   lastSyncedAt: string | null;
   recipeDraft: RecipeDraft | null;
+  kitchenDraft?: KitchenDraft | null;
   collections: RecipeCollection[];
   tags: RecipeTag[];
   profiles: HouseholdProfile[];
@@ -45,6 +47,7 @@ export type BordAction =
   | { type: 'set-offline'; value: boolean }
   | { type: 'add-plan'; item: MealPlanItem }
   | { type: 'set-recipe-draft'; draft: RecipeDraft | null }
+  | { type: 'set-kitchen-draft'; draft: KitchenDraft | null }
   | { type: 'reset' }
   | { type: 'hydrate'; state: BordState }
   | {
@@ -81,6 +84,7 @@ export function bordReducer(state: BordState, action: BordAction): BordState {
         nutrition: { profiles: [], household: null, profileDetails: {} },
         lastSyncedAt: null,
         recipeDraft: null,
+        kitchenDraft: null,
         collections: [],
         tags: [],
         profiles: [],
@@ -148,6 +152,8 @@ export function bordReducer(state: BordState, action: BordAction): BordState {
       return { ...state, offline: action.value };
     case 'add-plan':
       return { ...state, mealPlan: [...state.mealPlan, action.item] };
+    case 'set-kitchen-draft':
+      return { ...state, kitchenDraft: action.draft };
     case 'set-recipe-draft':
       return { ...state, recipeDraft: action.draft };
   }

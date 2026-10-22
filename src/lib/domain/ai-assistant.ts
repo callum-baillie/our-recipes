@@ -1,3 +1,4 @@
+import { aiDataPolicySchema, type AiDataPolicy } from '../../../shared/ai-data-policy';
 import { z } from 'zod';
 
 import { aiStructuredRecipeSchema } from '@/lib/domain/ai';
@@ -89,32 +90,7 @@ export const aiWorkloadSettingSchema = z
   })
   .strict();
 
-export const aiDataPolicySchema = z
-  .object({
-    shareSharedRecipes: z.boolean(),
-    shareMealPlans: z.boolean(),
-    shareDietaryPreferences: z.boolean(),
-    shareRecipePreferences: z.boolean(),
-    shareProfileGoals: z.boolean(),
-    shareNutritionGoals: z.boolean(),
-    shareNutritionAggregates: z.boolean(),
-    shareRawDiary: z.boolean(),
-    shareIdentity: z.boolean(),
-    sharePersonalMetrics: z.boolean(),
-    shareWeight: z.boolean(),
-    shareShoppingLists: z.boolean(),
-    sharePantry: z.boolean().default(false),
-    dailySummaryEnabled: z.boolean(),
-    weeklySummaryEnabled: z.boolean(),
-    summaryFrequency: z.enum(['off', 'daily', 'every_3_days', 'weekly', 'monthly']),
-    summaryNutritionEnabled: z.boolean(),
-    summaryMealPlansEnabled: z.boolean(),
-    summaryShoppingListsEnabled: z.boolean(),
-    summaryRecipesEnabled: z.boolean(),
-    version: z.number().int().positive(),
-  })
-  .strict();
-export type AiDataPolicy = z.infer<typeof aiDataPolicySchema>;
+export { aiDataPolicySchema, type AiDataPolicy } from '../../../shared/ai-data-policy';
 
 export const AI_SUMMARY_FREQUENCY_MS = {
   daily: 24 * 60 * 60 * 1_000,
@@ -137,6 +113,7 @@ export const DEFAULT_AI_DATA_POLICY: Omit<AiDataPolicy, 'version'> = {
   shareWeight: false,
   shareShoppingLists: true,
   sharePantry: false,
+  shareKitchenEquipment: false,
   dailySummaryEnabled: false,
   weeklySummaryEnabled: false,
   summaryFrequency: 'off',

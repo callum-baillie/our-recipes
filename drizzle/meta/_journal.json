@@ -526,6 +526,55 @@
       "when": 1792454400001,
       "tag": "0073_shopping_cart_units",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "6",
+      "when": 1792454400002,
+      "tag": "0074_my_kitchen",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1792540800000,
+      "tag": "0075_cooking_session_recipes",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1792540800001,
+      "tag": "0076_cooking_episode_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1792627200000,
+      "tag": "0077_kitchen_setup_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "6",
+      "when": 1792627200001,
+      "tag": "0078_primary_kitchen_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "6",
+      "when": 1792627200002,
+      "tag": "0079_kitchen_cavity_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "6",
+      "when": 1792627200003,
+      "tag": "0080_kitchen_physical_uses",
+      "breakpoints": true
     }
   ]
 }

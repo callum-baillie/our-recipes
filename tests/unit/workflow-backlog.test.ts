@@ -2,9 +2,14 @@
 import { createElement } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn(), zxing: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  push: vi.fn(),
+  replace: vi.fn(),
+  zxing: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }),
+  useRouter: () => ({ refresh: mocks.refresh, push: mocks.push, replace: mocks.replace }),
 }));
 vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock('@/components/food-catalog-picker', () => ({ FoodCatalogPicker: () => null }));
@@ -102,12 +107,13 @@ describe('workflow acknowledgement and submitted scope', () => {
         : Promise.resolve(Response.json({ dashboard: { products: [], locations: [] } })),
     );
     vi.stubGlobal('fetch', fetch);
-    render(
+    const view = render(
       createElement(CookingMode, {
         recipe: {
           ...initial,
           id: recipeId,
           images: [],
+          equipmentRequirements: [],
           instructionSections: [{ title: '', steps: [{ body: 'Heat gently.' }] }],
         } as never,
         initialFavorite: false,
@@ -122,7 +128,42 @@ describe('workflow acknowledgement and submitted scope', () => {
       complete(Response.json({ session: { id: 'session', targetServings: 4 } })),
     );
     expect((count as HTMLInputElement).value).toBe('4');
+    expect(
+      screen.getByText('Cooking session saved. Loading its recipe and Pantry context…'),
+    ).toBeTruthy();
+    expect(
+      (screen.getAllByRole('button', { name: 'Finish cooking' })[0] as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(mocks.replace).toHaveBeenCalledWith(`/recipes/${recipeId}/cook?sessionId=session`, {
+      scroll: false,
+    });
+    view.rerender(
+      createElement(CookingMode, {
+        recipe: {
+          ...initial,
+          id: recipeId,
+          images: [],
+          equipmentRequirements: [],
+          instructionSections: [{ title: '', steps: [{ body: 'Heat gently.' }] }],
+        } as never,
+        initialFavorite: false,
+        nutritionPreparation: null,
+        initialSession: {
+          id: 'session',
+          revision: 1,
+          completed: false,
+          contextRevision: 1,
+          restrictions: null,
+          restrictionsActive: false,
+          timezone: 'UTC',
+          ingredientReviewRequired: false,
+        },
+      }),
+    );
     expect(screen.getByText(/Cooking session for 4 servings/)).toBeTruthy();
+    expect(
+      (screen.getAllByRole('button', { name: 'Finish cooking' })[0] as HTMLButtonElement).disabled,
+    ).toBe(false);
     expect(screen.getByLabelText('Temperature to convert')).toBeTruthy();
     expect(screen.getByLabelText('From unit')).toBeTruthy();
   });

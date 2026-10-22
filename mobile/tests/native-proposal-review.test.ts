@@ -16,6 +16,25 @@ describe('native proposal review and edits', () => {
       { label: 'meals 1 · optional', value: 'No' },
     ]);
   });
+  it('shows equipment facts while hiding transport identities and revision guards', () => {
+    expect(
+      reviewValues({
+        operationId: 'private-operation',
+        expectedRevision: 3,
+        itemId: 'private-item',
+        item: {
+          name: 'Large saucepan',
+          measurements: [{ value: 3, unit: 'l', basis: 'nominal-volume' }],
+        },
+        phase: { stepRefs: ['private-step'], resourceIds: ['private-base'] },
+      }),
+    ).toEqual([
+      { label: 'item · name', value: 'Large saucepan' },
+      { label: 'item · measurements 1 · value', value: '3' },
+      { label: 'item · measurements 1 · unit', value: 'l' },
+      { label: 'item · measurements 1 · basis', value: 'nominal-volume' },
+    ]);
+  });
   it('prepares editable scalar values without changing identities, versions or nested content', () => {
     const original = {
       mealId: 'original',

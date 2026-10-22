@@ -69,6 +69,32 @@ export const aiStructuredRecipeSchema = z
     originalAuthor: z.string().max(160),
     cookingMethod: z.string().max(80),
     equipment: z.array(z.string().min(1).max(120)).max(30),
+    equipmentRequirements: z
+      .array(
+        z
+          .object({
+            capability: z
+              .string()
+              .min(1)
+              .max(80)
+              .regex(/^[a-z0-9-]+$/),
+            quantity: z.number().int().min(1).max(20),
+            capacityReviewRequired: z.boolean(),
+            alternativeCapabilities: z.array(z.string().min(1).max(80)).max(8),
+            steps: z
+              .array(
+                z
+                  .object({
+                    section: z.number().int().min(0).max(79),
+                    step: z.number().int().min(0).max(79),
+                  })
+                  .strict(),
+              )
+              .max(80),
+          })
+          .strict(),
+      )
+      .max(30),
     nutritionCalories: z.union([z.literal(''), z.number().min(0).max(100_000)]),
     nutritionProteinGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),
     nutritionCarbohydrateGrams: z.union([z.literal(''), z.number().min(0).max(100_000)]),

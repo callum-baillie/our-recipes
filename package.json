@@ -1,6 +1,6 @@
 {
   "name": "bord",
-  "version": "1.0.0-rc.19",
+  "version": "1.0.0-rc.20",
   "private": true,
   "description": "A self-hosted household recipe manager for a local Unraid deployment.",
   "packageManager": "pnpm@11.13.1",
@@ -64,8 +64,8 @@
     "drizzle-orm": "0.45.2",
     "fflate": "0.8.3",
     "lucide-react": "1.24.0",
-    "next": "16.3.8",
-    "nodemailer": "10.0.9",
+    "next": "16.4.2",
+    "nodemailer": "10.0.10",
     "openai": "6.46.0",
     "pdfjs-dist": "6.2.108",
     "react": "19.2.7",
@@ -96,7 +96,7 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.2",
     "jsdom": "29.1.1",
     "png-to-ico": "3.0.2",
     "prettier": "3.9.5",
@@ -104,6 +104,7 @@
     "tailwindcss": "4.3.2",
     "tsx": "4.23.0",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vite": "8.1.6",
+    "vitest": "4.1.12"
   }
 }

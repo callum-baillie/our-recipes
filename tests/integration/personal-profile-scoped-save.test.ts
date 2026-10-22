@@ -1,3 +1,7 @@
+import { eq } from 'drizzle-orm';
+import { getDatabase } from '@/lib/db/client';
+import { profiles } from '@/lib/db/schema';
+import { cookingPreferencesSchema } from '@/lib/domain/cooking-preferences';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDatabaseForTests } from '@/lib/db/client';
 import {
@@ -73,6 +77,38 @@ describe('scoped personal profile transaction', () => {
       }),
     ).toThrow();
     expect(getProfile(id)?.displayName).toBe('Concurrent household name');
+  });
+  it('general profile edits preserve independently saved cooking preferences and reject hidden-field injection', () => {
+    const id = fixture();
+    const base = readPersonalProfile(id);
+    const preferences = cookingPreferencesSchema.parse({ priorities: ['less-cleanup'] });
+    getDatabase()
+      .update(profiles)
+      .set({ goalContext: { ...base.profile.goalContext, cookingPreferences: preferences } })
+      .where(eq(profiles.id, id))
+      .run();
+    expect(readPersonalProfile(id).revision).toBe(base.revision);
+    const saved = updatePersonalProfile(id, {
+      expectedRevision: base.revision,
+      settings: { ...personalProfileValues(base.profile), locale: 'fr-FR' },
+    });
+    expect(saved.profile.goalContext.cookingPreferences).toEqual(preferences);
+    expect(personalProfileValues(saved.profile).goalContext).not.toHaveProperty(
+      'cookingPreferences',
+    );
+    expect(() =>
+      updatePersonalProfile(id, {
+        expectedRevision: saved.revision,
+        settings: {
+          ...personalProfileValues(saved.profile),
+          goalContext: {
+            ...personalProfileValues(saved.profile).goalContext,
+            cookingPreferences: {},
+          },
+        },
+      }),
+    ).toThrow();
+    expect(getProfile(id)?.goalContext.cookingPreferences).toEqual(preferences);
   });
   it('binds revisions to the intended profile even when two people have identical settings', () => {
     const base = readPersonalProfile(fixture());

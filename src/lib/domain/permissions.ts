@@ -95,6 +95,7 @@ export function authorizeAppRequest(input: {
     pathname === '/api/v1/integrations' ||
     pathname === '/api/v1/account/profile' ||
     pathname === '/api/v1/account/kitchen-context' ||
+    pathname === '/api/v1/account/cooking-preferences' ||
     pathname === '/api/v1/ai/settings'
   )
     return { allowed: true };

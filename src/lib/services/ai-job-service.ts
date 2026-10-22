@@ -1,3 +1,4 @@
+import { kitchens, profiles as householdProfilesTable } from '@/lib/db/schema';
 import { executeAiWorkload, resolveAiExecutionOptions } from './ai-execution-service';
 import { withAiExecutionContext } from './ai-execution-context';
 import { getRecipe } from './recipe-service';
@@ -200,6 +201,44 @@ function assertQueuedRecipeContextSharing(job: AiJobRow, context: unknown) {
   if (!Object.keys(household).length) return;
   const current = getAiDataPolicy(job.profileId);
   const shared = object(household.sharedCategories);
+  const cookingPreferences = object(household.cookingPreferences);
+  const legacyPreferences = object(household.equipment).personalCookingPreferences;
+  if (cookingPreferences.status === 'available' || legacyPreferences != null) {
+    if (!current.shareRecipePreferences)
+      throw new AiJobForbiddenError('Cooking preference sharing changed. Prepare a new draft.');
+    const profile = getDatabase()
+      .select()
+      .from(householdProfilesTable)
+      .where(eq(householdProfilesTable.id, job.profileId))
+      .get();
+    const stored = profile?.goalContext.cookingPreferences ?? null;
+    if (
+      !profile ||
+      profile.archivedAt ||
+      (cookingPreferences.status === 'available' && cookingPreferences.revision !== digest(stored))
+    )
+      throw new AiJobForbiddenError(
+        'Cooking preferences changed after queueing. Prepare a refreshed review.',
+      );
+    if (legacyPreferences != null && digest(legacyPreferences) !== digest(stored))
+      throw new AiJobForbiddenError(
+        'Legacy cooking preference context requires a refreshed review.',
+      );
+  }
+
+  if (object(household.equipment).status === 'available') {
+    if (!current.shareKitchenEquipment)
+      throw new AiJobForbiddenError('Equipment sharing changed. Prepare a new draft.');
+    const equipment = object(household.equipment);
+    if (equipment.personalCookingPreferences != null && !current.shareRecipePreferences)
+      throw new AiJobForbiddenError('Cooking preference sharing changed. Prepare a new draft.');
+    const kitchen =
+      typeof equipment.kitchenId === 'string'
+        ? getDatabase().select().from(kitchens).where(eq(kitchens.id, equipment.kitchenId)).get()
+        : null;
+    if (!kitchen || kitchen.revision !== equipment.revision)
+      throw new AiJobForbiddenError('Kitchen changed after queueing. Prepare a refreshed review.');
+  }
   const require = (allowed: boolean) => {
     if (!allowed)
       throw new AiJobForbiddenError(

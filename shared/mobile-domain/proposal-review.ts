@@ -1,3 +1,9 @@
+/** Targets are named in the action summary/record label; transport identities are never review content. */
+export function isVisibleReviewField(key: string) {
+  return !/(?:^id$|Id$|Ids$|^expected|^version$|Revision$|^intentHash$|^sourceDigest$|^stepRefs$)/u.test(
+    key,
+  );
+}
 export function fieldLabel(key: string) {
   return key.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ');
 }
@@ -5,9 +11,11 @@ export function reviewValues(value: unknown, prefix = ''): { label: string; valu
   if (Array.isArray(value))
     return value.flatMap((item, index) => reviewValues(item, `${prefix} ${index + 1}`.trim()));
   if (value && typeof value === 'object')
-    return Object.entries(value).flatMap(([key, item]) =>
-      reviewValues(item, [prefix, fieldLabel(key)].filter(Boolean).join(' · ')),
-    );
+    return Object.entries(value)
+      .filter(([key]) => isVisibleReviewField(key))
+      .flatMap(([key, item]) =>
+        reviewValues(item, [prefix, fieldLabel(key)].filter(Boolean).join(' · ')),
+      );
   return [
     {
       label: prefix || 'Value',

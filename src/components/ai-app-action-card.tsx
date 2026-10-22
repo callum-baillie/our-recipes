@@ -1,4 +1,5 @@
 'use client';
+import { isVisibleReviewField } from '../../shared/mobile-domain/proposal-review';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,14 +23,16 @@ function ReviewValue({ value }: { value: unknown }) {
   if (typeof value === 'object')
     return (
       <dl className={styles.reviewValues}>
-        {Object.entries(value).map(([key, item]) => (
-          <div key={key}>
-            <dt>{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}</dt>
-            <dd>
-              <ReviewValue value={item} />
-            </dd>
-          </div>
-        ))}
+        {Object.entries(value)
+          .filter(([key]) => isVisibleReviewField(key))
+          .map(([key, item]) => (
+            <div key={key}>
+              <dt>{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}</dt>
+              <dd>
+                <ReviewValue value={item} />
+              </dd>
+            </div>
+          ))}
       </dl>
     );
   return <span>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}</span>;

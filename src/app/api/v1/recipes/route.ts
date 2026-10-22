@@ -4,7 +4,11 @@ import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@
 import { executeIdempotentMutation, prepareIdempotentMutation } from '@/lib/api-idempotency';
 import { recipeInputSchema, recipeLibraryQuerySchema } from '@/lib/domain/recipe';
 import { jsonError } from '@/lib/http';
-import { createRecipe, listRecipeLibrary } from '@/lib/services/recipe-service';
+import {
+  createRecipe,
+  listRecipeLibrary,
+  RecipeConflictError,
+} from '@/lib/services/recipe-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,10 +46,19 @@ export async function POST(request: Request) {
   const parsed = recipeInputSchema.safeParse(idempotency.context.body);
   if (!parsed.success)
     return jsonError(400, 'invalid_recipe', 'Check the highlighted recipe details.');
-  return executeIdempotentMutation(
-    idempotency.context,
-    () => ({ recipe: createRecipe(parsed.data, authorization.principal.profileId) }),
-    authorization.requestId,
-    201,
-  );
+  try {
+    return executeIdempotentMutation(
+      idempotency.context,
+      () => ({ recipe: createRecipe(parsed.data, authorization.principal.profileId) }),
+      authorization.requestId,
+      201,
+    );
+  } catch (error) {
+    if (error instanceof RecipeConflictError)
+      return withApiRequestId(
+        jsonError(409, 'recipe_requirements_conflict', error.message),
+        authorization.requestId,
+      );
+    throw error;
+  }
 }

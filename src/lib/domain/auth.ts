@@ -51,6 +51,7 @@ export const apiResources = [
   'shoppingLists',
   'collections',
   'pantry',
+  'kitchen',
   'settings',
 ] as const;
 export const apiActions = ['read', 'create', 'update', 'delete'] as const;
@@ -66,6 +67,7 @@ export const apiPermissionsSchema = z
     shoppingLists: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
     collections: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
     pantry: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
+    kitchen: z.array(z.enum(apiActions)).max(apiActions.length).optional(),
     settings: z
       .array(z.enum(['read', 'update']))
       .max(2)

@@ -7,6 +7,17 @@ export type MealIngredient = {
   pantryProductId?: string;
 };
 export type MealAdaptation = {
+  cookingMethod?: string;
+  equipment?: string[];
+  equipmentRequirements?: {
+    capability: string;
+    quantity: number;
+    alternativeCapabilities: string[];
+    steps: { section: number; step: number }[];
+  }[];
+  prepMinutes?: number;
+  cookMinutes?: number;
+  restMinutes?: number;
   title: string;
   summary: string;
   servings: string;

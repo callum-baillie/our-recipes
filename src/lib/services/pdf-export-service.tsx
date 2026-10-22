@@ -30,7 +30,7 @@ import {
   type RecipePrintCard,
   type MealPrintSchedule,
 } from '@/lib/pdf/kitchen-documents';
-import { getRecipe, recipePayloadFromDetail } from './recipe-service';
+import { getRecipe, recipePayloadFromDetail, type RecipeDetail } from './recipe-service';
 import { getRecipeForPlannedMeal, listPlannedMeals } from './planning-service';
 
 export class PdfExportError extends Error {
@@ -156,6 +156,22 @@ export function exportRecipesPdf(input: RecipePdfExportInput) {
       input,
       cards.length === 1 ? exportFileStem(cards[0]!.recipe.title) : 'bord-recipe-cards',
     );
+  });
+}
+/** A private resolver supplies content; neither session nor household resource IDs enter the card. */
+export function exportEffectiveRecipePdf(detail: RecipeDetail, input: RecipePdfExportInput) {
+  return serializedExport(async () => {
+    const cards: RecipePrintCard[] = [
+      {
+        key: 'effective-recipe',
+        recipeId: detail.id,
+        revision: detail.currentRevision,
+        recipe: recipePayloadFromDetail(detail),
+        servings: input.servings,
+      },
+    ];
+    await prepareCards(cards, input);
+    return bundle(cards, input, exportFileStem(detail.title));
   });
 }
 export function exportMealPlanPdf(input: MealPlanPdfExportInput) {

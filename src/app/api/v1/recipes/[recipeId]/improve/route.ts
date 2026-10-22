@@ -40,6 +40,7 @@ export async function POST(request: Request, context: { params: Promise<{ recipe
     const { recipeId } = await context.params;
     const improved = await improveAiRecipe({
       actorProfileId: actor.profileId,
+      principal: access.principal,
       recipeId,
       expectedRevision: parsed.data.expectedRevision,
       recipe: parsed.data.recipe,

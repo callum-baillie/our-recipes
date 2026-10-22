@@ -94,6 +94,10 @@ export const integrationRoutes: IntegrationRoute[] = [
   { path: '/meal-plan/bulk', resource: 'mealPlans', methods: { GET: 'read' } },
   { path: '/meal-plan/duplicate', resource: 'mealPlans', methods: { POST: 'create' } },
   { path: '/meal-plan/export', resource: 'mealPlans', methods: { GET: 'read' } },
+  { path: '/kitchen', resource: 'kitchen', methods: { GET: 'read', POST: 'update' } },
+  { path: '/kitchen/catalog', resource: 'kitchen', methods: { GET: 'read' } },
+  { path: '/kitchen/check', resource: 'kitchen', methods: { POST: 'read' } },
+  { path: '/kitchen/claims', resource: 'kitchen', methods: { POST: 'update', GET: 'read' } },
   { path: '/meal-plan', resource: 'mealPlans', methods: { GET: 'read', POST: 'create' } },
   { path: '/meal-plan/swap', resource: 'mealPlans', methods: { POST: 'update' } },
   { path: '/pantry/batches/{batchId}/actions', resource: 'pantry', methods: { POST: 'update' } },
@@ -298,6 +302,8 @@ export function additionalIntegrationPermissions(
       { resource: 'pantry', action: 'create' },
       { resource: 'shoppingLists', action: 'update' },
     ];
+  if (pathname === '/api/v1/kitchen/check' && method.toUpperCase() === 'POST')
+    return [{ resource: 'recipes', action: 'read' }];
   if (pathname === '/api/v1/meal-plan/export/pdf' && method.toUpperCase() === 'POST')
     return [{ resource: 'recipes', action: 'read' }];
   if (['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) return [];

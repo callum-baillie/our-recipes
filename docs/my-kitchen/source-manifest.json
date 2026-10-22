@@ -1,0 +1,442 @@
+{
+  "baseRevision": "45ed512b2d4909dac78ceb096d985dab85387d24",
+  "state": "My Kitchen release candidate source state for v1.0.0-rc.20",
+  "digestAlgorithm": "sha256 of compact JSON file hash list",
+  "files": [
+    {
+      "path": "drizzle/0074_my_kitchen.sql",
+      "sha256": "91ef323ce72fa5d4e734dcb3d7c14ad9e6181bbdba95cc516efd39f901121c0e"
+    },
+    {
+      "path": "drizzle/0075_cooking_session_recipes.sql",
+      "sha256": "a730dc353f7eb78b6eaf2eada22ca8e99ad7f7a0b855dcecb9f2d62a28efd1d4"
+    },
+    {
+      "path": "drizzle/0076_cooking_episode_plans.sql",
+      "sha256": "409e79b679053e1700aeba0d380554debcc3b3bfb18b9e51d86baa869d6b5397"
+    },
+    {
+      "path": "drizzle/0077_kitchen_setup_constraints.sql",
+      "sha256": "958d58972134ad9e4e03a2f241788b71f19fd1f37092b17091b7c09d16c59d85"
+    },
+    {
+      "path": "drizzle/0078_primary_kitchen_identity.sql",
+      "sha256": "fb5a20e4751be8c2d439d594c7501d432bc02e32343f2eea2a2e61d81df9a309"
+    },
+    {
+      "path": "drizzle/0079_kitchen_cavity_claims.sql",
+      "sha256": "5d4361501e7d5edfca5e05b4f6a4204fe2651435eda7ab843b47ba4daf366429"
+    },
+    {
+      "path": "drizzle/0080_kitchen_physical_uses.sql",
+      "sha256": "d175b3e8d86a544f5d942ca239a21c8b1cb7715b8236a14121f122d0b2a8ceed"
+    },
+    {
+      "path": "drizzle/meta/_journal.json",
+      "sha256": "6ed2eced64c3b6237c67712f73dcec439292a57e18d9c2d8c0ae0622d1035962"
+    },
+    {
+      "path": "mobile/app/my-kitchen.tsx",
+      "sha256": "05161aac15862852eeaed99c262dd0a6b2708af308fc6a5ad29cd7bcd0956dec"
+    },
+    {
+      "path": "mobile/src/components/kitchen-measurements-editor.tsx",
+      "sha256": "14eedd1ef1896a1d84296b41b84b432c66bff0fba1c27d880845f0dc7cba301c"
+    },
+    {
+      "path": "mobile/src/components/kitchen-setup-guide.tsx",
+      "sha256": "2a1d4239849b6f27f996490523772d6fcba0fc6d39a0790f5fc0eec96fb6daaf"
+    },
+    {
+      "path": "mobile/src/data/kitchen-recovery.ts",
+      "sha256": "124dd317ca5d5f8010d2e92c252ceb7edd515b2fc8b63acfac6df4a3cc2382b7"
+    },
+    {
+      "path": "mobile/src/data/recipe-edit.ts",
+      "sha256": "30a6c373f52307a67938d4533a6d98e4c3318eb812a0abdc1bdc8f7391be7a8e"
+    },
+    {
+      "path": "mobile/src/screens/my-kitchen-screen.tsx",
+      "sha256": "264072f923c1966f061cbe2f9d8e1d327d094572d0d5a957dd1b2703c7608087"
+    },
+    {
+      "path": "mobile/src/screens/settings-screens.tsx",
+      "sha256": "6fd3506d9ce0d8103df039589ce01cd729666bdff12dd3fb936d7a4b097e846d"
+    },
+    {
+      "path": "mobile/src/state/model.ts",
+      "sha256": "0b5f0cc0bf1f51b890a068d43b6f049659b26e73c205887f4313df819983b329"
+    },
+    {
+      "path": "mobile/src/state/reducer.ts",
+      "sha256": "fe5fcfb26152875546f91fff98e77bd1b1d65a56946236caf55c4f0903e1e153"
+    },
+    {
+      "path": "shared/ai-data-policy.ts",
+      "sha256": "ddf693437b6eea70486a5964d00559633e5ae5fd6f933ad5d3c1fd689b7601b5"
+    },
+    {
+      "path": "shared/kitchen-measurements.ts",
+      "sha256": "c8b12e34dac5d5203e7e5ed0af21ef25184e30815327a498a7367038120b9790"
+    },
+    {
+      "path": "shared/mobile-domain/kitchen-recovery.ts",
+      "sha256": "d89c6b7d5ebe069793bc64e95263865823b752140ac866cc6504083a68b7ce8b"
+    },
+    {
+      "path": "shared/mobile-domain/meal-entry.ts",
+      "sha256": "69b2e4ed1f392bfdc8a9f9d8dac187022ee62c9439ec1b87f86d52e74f2f6de3"
+    },
+    {
+      "path": "shared/mobile-domain/proposal-review.ts",
+      "sha256": "2a8d5ef656aee51fe5062564c09d503cd049e7542da4cc7163375feadd671bc1"
+    },
+    {
+      "path": "src/app/account/page.tsx",
+      "sha256": "a9f18411de241e1b70935d15588ffcb6f46956bc2d499a2e4003a855e61ba096"
+    },
+    {
+      "path": "src/app/api/v1/account/cooking-preferences/route.ts",
+      "sha256": "72e26f69277ea229aef0a46ed1e749abd4d9d21f737cd850f293cdf45a594cfa"
+    },
+    {
+      "path": "src/app/api/v1/cook-sessions/[sessionId]/context/route.ts",
+      "sha256": "83640404c1cc6a54e61f201cdb8da2b504929a3b3fda52e609a8284398eceafd"
+    },
+    {
+      "path": "src/app/api/v1/cook-sessions/[sessionId]/recipe/route.ts",
+      "sha256": "f43ddf7077a256123e3825f7eddc106116b56d4dac6248b42d8b5754363128a1"
+    },
+    {
+      "path": "src/app/api/v1/cook-sessions/route.ts",
+      "sha256": "7e2db1d2db7b9ad8217e89580fb3c3b4226418b6c84eb25d4d9fcc645ad9ad7b"
+    },
+    {
+      "path": "src/app/api/v1/kitchen/catalog/route.ts",
+      "sha256": "7921d2bcbd74f51a4952fcbf82f4a97599978501a836faaf851fa7d4bc8a8bd9"
+    },
+    {
+      "path": "src/app/api/v1/kitchen/check/route.ts",
+      "sha256": "64670581870bbbc959b952f2742cbbe4988bf80ca8218563ceea89c3de4a8020"
+    },
+    {
+      "path": "src/app/api/v1/kitchen/claims/route.ts",
+      "sha256": "f4963d73ca6131c94367bc02b54b7fcabf0bcf75688384b36eebfb52b73f32f0"
+    },
+    {
+      "path": "src/app/api/v1/kitchen/route.ts",
+      "sha256": "94a45df3be33e0a8c39aedc9f5c049f71d0cd66eb99a396205c072156b268dce"
+    },
+    {
+      "path": "src/app/api/v1/recipes/[recipeId]/export/markdown/route.ts",
+      "sha256": "86ac971decf7ffbc4267eb89aed2a2636d881ac1f70e09771bd14dbfc22dc80a"
+    },
+    {
+      "path": "src/app/api/v1/recipes/[recipeId]/export/pdf/route.ts",
+      "sha256": "396410266154469ca301a2c552f6e82237b66b171524f0f512e6c740f4521ca3"
+    },
+    {
+      "path": "src/app/api/v1/recipes/[recipeId]/export/route.ts",
+      "sha256": "ed68ae436ddbd74a82e61f30696c5873063a48a2eb3ca878a9d349eeb3c62eef"
+    },
+    {
+      "path": "src/app/api/v1/recipes/[recipeId]/improve/route.ts",
+      "sha256": "6170b6030f2f20a212eb7848486095853bd3c03b65d90b4d84062ae934d80919"
+    },
+    {
+      "path": "src/app/api/v1/recipes/route.ts",
+      "sha256": "f0a89ab86fdbc8811789146e65b190a736f9eb8f1967c6cba25870fd3b46d93b"
+    },
+    {
+      "path": "src/app/my-kitchen/page.tsx",
+      "sha256": "2d8aa2366b63ca69aae1d0b70f69c95446df1bce5e409dc73ba1717b0f0017d7"
+    },
+    {
+      "path": "src/app/my-kitchen/plan/page.tsx",
+      "sha256": "d39e3e17e8609f40492c774b5d31169badb9e02b661909277a24ccd88f912d83"
+    },
+    {
+      "path": "src/app/my-kitchen/setup/page.tsx",
+      "sha256": "612d49d4008eb737387bc238ef02a5e09a90ca816382abb14fd33306f201297a"
+    },
+    {
+      "path": "src/app/recipes/[recipeId]/cook/page.tsx",
+      "sha256": "bff5d255553ebd3cd0785e665155b1e9e26aed14df4cc5c7d39b72bbfd459444"
+    },
+    {
+      "path": "src/app/recipes/[recipeId]/page.tsx",
+      "sha256": "2a2f00a942f241a90a649af365edfed0d61912ae0112a139b5caa1acaf6fc8d5"
+    },
+    {
+      "path": "src/components/account-nav.tsx",
+      "sha256": "29d548455876d1f2b171f67757d79ca4ae2204e95f977c212f7a63a54995b9e7"
+    },
+    {
+      "path": "src/components/add-recipe-dialog.tsx",
+      "sha256": "89144a542cc3451c8110a3eb764c1ee3e64ed9bd858f185b5cf2308827ac9178"
+    },
+    {
+      "path": "src/components/ai-app-action-card.tsx",
+      "sha256": "ab2f641e6e7a2fb00392be58f8da829c4c6d93b447753a0d1d89f53c21849818"
+    },
+    {
+      "path": "src/components/ai-settings-form.tsx",
+      "sha256": "c014775cac0f0ddd7c760efbaeb129c43693a95a12a98af063ce60f30a7e003b"
+    },
+    {
+      "path": "src/components/api-key-manager.tsx",
+      "sha256": "b75ff5e987bc64d24f91420b11f37acff17ad982a59f379d1ba61f826626ab8a"
+    },
+    {
+      "path": "src/components/cooking-episode-restrictions.tsx",
+      "sha256": "f6cf35c76ecb731c43e9b92ea8d7f10d2a63b72a9a95cc5ad98708c2ab161954"
+    },
+    {
+      "path": "src/components/cooking-mode.module.css",
+      "sha256": "5cca8807e75677dce8a7eebe18be4649029bce3d672446c618e222a722fbed04"
+    },
+    {
+      "path": "src/components/cooking-mode.tsx",
+      "sha256": "0fd0d90df9e23afc423df0a9a22eacb709ecd6d840d305d5bd3ef7748e389e2a"
+    },
+    {
+      "path": "src/components/cooking-preferences-form.tsx",
+      "sha256": "55ae6dc76e46b5aebe6f1eb8484af0c627d14a243d750b548b2e62a480836e1b"
+    },
+    {
+      "path": "src/components/cooking-session-adaptation.tsx",
+      "sha256": "8e51a7653084cbb5bab11f9ebc7040118c52b8a30f78790178486b418a5fb439"
+    },
+    {
+      "path": "src/components/kitchen-claims-review.tsx",
+      "sha256": "bf3cdaffa3c12c54e821450f971c234bac09eb1ba9cc7d70f056a4e0eee850f9"
+    },
+    {
+      "path": "src/components/kitchen-facilities-form.tsx",
+      "sha256": "a754ab3d776d0a3fbcd3be179c98a20d95320bbec87c65c61ea622fc920bc5ca"
+    },
+    {
+      "path": "src/components/kitchen-meal-planner.tsx",
+      "sha256": "4698666f7894f2dc9be7ff74f2880db92e30704aab5bc129cb5129b0c09257ee"
+    },
+    {
+      "path": "src/components/kitchen-measurements-editor.tsx",
+      "sha256": "c44c97ea897f4512ef8d8ddd3c1db5cc96c41f4c3d9dd2e01ded8dc19949f30b"
+    },
+    {
+      "path": "src/components/kitchen-setup-guide.tsx",
+      "sha256": "6ad6972b0428bea403755aadc6be2fb69c423fa7347cde9fc3217539df286e8d"
+    },
+    {
+      "path": "src/components/meal-entry-editor.tsx",
+      "sha256": "396254366d271d3450bc74ba09fd14f774b4433a7e6a6cd4ca2c94d2fabae387"
+    },
+    {
+      "path": "src/components/my-kitchen.module.css",
+      "sha256": "812c02f5eb7171b2aee534c4b431702547063401df7446e0dafa2903238c88d5"
+    },
+    {
+      "path": "src/components/my-kitchen.tsx",
+      "sha256": "36ddffd338cf3e9472c4da2a1978c3e86d30a3fb616fbac6aebf4f9faf63fab8"
+    },
+    {
+      "path": "src/components/recipe-kitchen-check.tsx",
+      "sha256": "6bcb8b59e4240e9ec34e10fd2d4f0e273fe16af7305368004055d190522f4e6c"
+    },
+    {
+      "path": "src/components/settings-nav.tsx",
+      "sha256": "f73171e58c88a53c679adeafca7ca83140149d1873b5ca08fb1fef6a23b64e73"
+    },
+    {
+      "path": "src/lib/api-auth.ts",
+      "sha256": "a96ff2a7f1fe079b5c1c72f62ac63856ab68519db79bed1d8114ababb7101cac"
+    },
+    {
+      "path": "src/lib/config.ts",
+      "sha256": "4acc787606cf28cb1f53ca2cb035bb86e14222bda7d817442d7e13e8b0d5e438"
+    },
+    {
+      "path": "src/lib/db/schema.ts",
+      "sha256": "047eff06f08b3134ef08614ee39caf4821a12650c463a72104b410aa9dcc79a7"
+    },
+    {
+      "path": "src/lib/domain/ai-assistant.ts",
+      "sha256": "24b35aa3f2e053d60bf47ff0ad2f73941efa4023f609a05445f3374168489f16"
+    },
+    {
+      "path": "src/lib/domain/ai-grounding.ts",
+      "sha256": "6de078d32fc99a5f14baa349e780317a3d8243c3fe63b9456c896b0f7f375b6e"
+    },
+    {
+      "path": "src/lib/domain/ai.ts",
+      "sha256": "5db47c2f5dd9106acbf4362de7e7d18622985fb1ea40ae144cf1a8d537e54993"
+    },
+    {
+      "path": "src/lib/domain/auth.ts",
+      "sha256": "ac9f35ec268279105f8738bc0ab12a1673f87eafa32996758c89dd19ba423be3"
+    },
+    {
+      "path": "src/lib/domain/cooking-episode.ts",
+      "sha256": "91c0b2c61fd7636594b3c66d6be53d24cc373bf279453789733a16daf73e8139"
+    },
+    {
+      "path": "src/lib/domain/cooking-preferences.ts",
+      "sha256": "9c0ab051ec9ca3f69971d6e2b59a0c6b384fc072cf2d7b6fba1cee559a65978c"
+    },
+    {
+      "path": "src/lib/domain/cooking-session-recipe.ts",
+      "sha256": "0bcc9402fe55bf7360d586f16807b57b77ea681ae049dcb97a80e9b3c304243c"
+    },
+    {
+      "path": "src/lib/domain/integration-routes.ts",
+      "sha256": "07219018fca277c1c8ca4f371d1d01c9f8de8f5558ea1069331363e6b84ec571"
+    },
+    {
+      "path": "src/lib/domain/kitchen-catalog.ts",
+      "sha256": "613c12e20cfacf507fa668f3b7546cedfa7f4de6a572da40edb279ea37798d54"
+    },
+    {
+      "path": "src/lib/domain/kitchen-cavity.ts",
+      "sha256": "4a70eb133c4fd84bfe314c0f5a8104f175a8a1376d10ec6ff830f7257d7d3e8d"
+    },
+    {
+      "path": "src/lib/domain/kitchen-feasibility.ts",
+      "sha256": "c023a8423a67d7ee1ed98dc83c2ff49b5cb60d618880bcdcc590621f6c7a67a8"
+    },
+    {
+      "path": "src/lib/domain/kitchen-recipe-requirements.ts",
+      "sha256": "91dba4e5fbbf7e897679b0106dd73945a5bda7cc62bf426b2c32757523e82d40"
+    },
+    {
+      "path": "src/lib/domain/kitchen.ts",
+      "sha256": "0c80100602f49b389e6d02d97ec999d1a82c0472f12db0578478e67c8564ff7f"
+    },
+    {
+      "path": "src/lib/domain/permissions.ts",
+      "sha256": "de6fcb150b9a42736ec81a80ccbb05bd95ff1b1934d215e5323328b02c918045"
+    },
+    {
+      "path": "src/lib/domain/planning.ts",
+      "sha256": "7183f19c5f6d58f47328020885cf64e033ba0be78485890e4bfe27f6471c29aa"
+    },
+    {
+      "path": "src/lib/domain/profile-goals.ts",
+      "sha256": "380b9ca3c477c7dda363839fc6e0127d9b197721a67f7f52deccd3f5b48942f1"
+    },
+    {
+      "path": "src/lib/domain/recipe-equipment.ts",
+      "sha256": "f4f1e6b570bbb469244fc0bb1eed3803537e9d7aabb36094b6c6ed790f92385d"
+    },
+    {
+      "path": "src/lib/domain/recipe.ts",
+      "sha256": "f21549d6abd23a15e49946d26fd6bd6b9c8e122f252ed16f875a69a3381aa534"
+    },
+    {
+      "path": "src/lib/domain/setup.ts",
+      "sha256": "1f65068a233a33c847c2861850df3ada5ca8b019d19f01711c66fedbe19994f7"
+    },
+    {
+      "path": "src/lib/providers/ai-provider.ts",
+      "sha256": "0f04e795aed265ad76041522a7863e524fe5b26caef8c2952c1ea272a8f64dd3"
+    },
+    {
+      "path": "src/lib/release.ts",
+      "sha256": "74405c867883f82b686a0141ed5d60fea3e47612a9cf512e5156e8873282951e"
+    },
+    {
+      "path": "src/lib/services/ai-app-action-service.ts",
+      "sha256": "cff60cd07f675b3e98679b173664ecb675d1b2a6b93f5ebfc11e009c762de92e"
+    },
+    {
+      "path": "src/lib/services/ai-app-operation-catalog.ts",
+      "sha256": "db14bb76226b220ca662c5de59d15ef42bc5107f1f5f4c4a133572f20ac58a95"
+    },
+    {
+      "path": "src/lib/services/ai-chat-service.ts",
+      "sha256": "72be1c383bc50ab9b4e59209f41e73f5e83141f3e4b475678addc713d6dc1e21"
+    },
+    {
+      "path": "src/lib/services/ai-context-service.ts",
+      "sha256": "42bfe0e4a0a917cae6665dd985f35a5d672b4a673df832472ef83750c7f73b59"
+    },
+    {
+      "path": "src/lib/services/ai-equipment-context-service.ts",
+      "sha256": "ef1de46ec2946cffc285dc3c3c068e508d65aa83230969a690a3460a5207b52d"
+    },
+    {
+      "path": "src/lib/services/ai-job-service.ts",
+      "sha256": "b4a0fe6c46c73b3ef0966b39aa9146a8f9068b3d2ee5ce48b94032be160973ff"
+    },
+    {
+      "path": "src/lib/services/ai-kitchen-context-service.ts",
+      "sha256": "e6ccf398a7050bd88a82962b847786920d65c64366f16f8293e0ef06c940e797"
+    },
+    {
+      "path": "src/lib/services/ai-operation-service.ts",
+      "sha256": "6330d7588a1508d5d3a20eafe6ffe6cf91e0a0ee355769d30c69229500964a71"
+    },
+    {
+      "path": "src/lib/services/ai-settings-service.ts",
+      "sha256": "ffce149dac15e6e4a2a808abc0c46856fa836c4124a0eda9301f3251824430ca"
+    },
+    {
+      "path": "src/lib/services/cooking-episode-service.ts",
+      "sha256": "0180057c9cc4b127da839cbc058458869e9ee2b469dfad3519ede0a6f117575a"
+    },
+    {
+      "path": "src/lib/services/cooking-preferences-service.ts",
+      "sha256": "f7561ba8d372dd329ae9cda0f50b1a0fea49c3b5da14e8a3cf43a5e1b39f3e4f"
+    },
+    {
+      "path": "src/lib/services/cooking-service.ts",
+      "sha256": "725524dd7a7be95beca2318f53a7cf7101047dd1d35ac36c91ef9c47361d0575"
+    },
+    {
+      "path": "src/lib/services/cooking-session-recipe-service.ts",
+      "sha256": "2940a56242b75cc4f0c2011bff32a594dfba3e3d5c05cfda4d8dd522150cd296"
+    },
+    {
+      "path": "src/lib/services/decision-request-service.ts",
+      "sha256": "a2a070a1843f102bdf57d9f6ac738fb2ed276c5ac5456363de25aa22b777b9e3"
+    },
+    {
+      "path": "src/lib/services/effective-recipe-export-service.ts",
+      "sha256": "ba9c62716794abea1bda357426cdaaef72e07a9283ba9598c83edea5fcd33eb6"
+    },
+    {
+      "path": "src/lib/services/effective-recipe.ts",
+      "sha256": "f60fe19272b6f79f77180123dda6a3b7f5e1fa7d4500fb3121bff5587227c48e"
+    },
+    {
+      "path": "src/lib/services/jsonld-service.ts",
+      "sha256": "0e6e3b4507da24373ee5dba7a999187e9588c53b15dc42062e062ffaf13ea9f4"
+    },
+    {
+      "path": "src/lib/services/kitchen-inventory-service.ts",
+      "sha256": "2e8d322b0630c1ea5760a2d58ae50f9b160a84554bd0fe7773293f92e62dad34"
+    },
+    {
+      "path": "src/lib/services/pantry-availability-service.ts",
+      "sha256": "6d2e1d53f1cfa3e66b3764fcb32cf8740f2194277ede29d12cb53fe1fe5f71af"
+    },
+    {
+      "path": "src/lib/services/pantry-grocery-cooking-service.ts",
+      "sha256": "efffe9cae599526fdce8d066419f3e6859728dc88913f2594bd14765bedaf2b3"
+    },
+    {
+      "path": "src/lib/services/pdf-export-service.tsx",
+      "sha256": "cbf4f585814abd886652094ac4e400795ac05bc53020305bb2073c38eb38d5aa"
+    },
+    {
+      "path": "src/lib/services/planning-service.ts",
+      "sha256": "754786ae7b47dc3194d06d121eb68029a7d1eb39d5bd382c6921e85247c8485d"
+    },
+    {
+      "path": "src/lib/services/recipe-service.ts",
+      "sha256": "1d6403889af8effef604ece8156e7147da39c82252ba1251534bd830ed4b42c8"
+    }
+  ],
+  "sourceDigest": "374f2b7ed5431b9b6582a2af5b14c2975a00c68d099fa32cd55a34dc3567b0b4",
+  "webSourceDigest": "68b4f14e073b21f92f1e42f90fbb51de7ae3f2b658654bf766725addb599f6b5",
+  "nativeSourceDigest": "0b89ee82e66511f9dff24b946121e8c478f6abf15e05cc3edcfb7462ae94f558"
+}

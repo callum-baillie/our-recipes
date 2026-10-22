@@ -14,6 +14,7 @@ export const initialState: BordState = {
   nutrition: { profiles: [], household: null, profileDetails: {} },
   lastSyncedAt: null,
   recipeDraft: null,
+  kitchenDraft: null,
   collections: [],
   tags: [],
   profiles: [],

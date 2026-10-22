@@ -48,6 +48,15 @@ export function decisionErrorResponse(error: unknown) {
   return Response.json(
     {
       error: {
+        ...(error instanceof z.ZodError
+          ? {
+              fields: Object.fromEntries(
+                error.issues
+                  .slice(0, 40)
+                  .map((issue) => [issue.path.join('.') || '_form', issue.message]),
+              ),
+            }
+          : {}),
         message:
           error instanceof DecisionError
             ? error.message

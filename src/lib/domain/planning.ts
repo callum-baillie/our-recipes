@@ -29,6 +29,23 @@ export type MealPlanOptionInput = z.output<typeof mealPlanOptionSchema>;
 
 export const mealPlanStatusUpdateSchema = z.object({ status: mealPlanStatusSchema }).strict();
 
+export const mealRecipeOverrideSchema = recipeInputSchema
+  .pick({
+    title: true,
+    summary: true,
+    servings: true,
+    ingredientGroups: true,
+    instructionSections: true,
+  })
+  .extend({
+    cookingMethod: recipeInputSchema.shape.cookingMethod.removeDefault().optional(),
+    equipment: recipeInputSchema.shape.equipment.removeDefault().optional(),
+    equipmentRequirements: recipeInputSchema.shape.equipmentRequirements,
+    prepMinutes: recipeInputSchema.shape.prepMinutes.optional(),
+    cookMinutes: recipeInputSchema.shape.cookMinutes.optional(),
+    restMinutes: recipeInputSchema.shape.restMinutes.removeDefault().optional(),
+  });
+
 export const mealPlanEntrySchema = z
   .object({
     kind: z.enum(['recipe', 'item', 'takeout', 'leftover', 'custom', 'fast', 'options']).optional(),
@@ -40,16 +57,7 @@ export const mealPlanEntrySchema = z
     options: z.array(mealPlanOptionSchema).min(2).max(12).optional(),
     leftoverSourceId: z.string().uuid().nullable().optional(),
     foodItem: recipeIngredientSchema.nullable().optional(),
-    recipeOverride: recipeInputSchema
-      .pick({
-        title: true,
-        summary: true,
-        servings: true,
-        ingredientGroups: true,
-        instructionSections: true,
-      })
-      .nullable()
-      .optional(),
+    recipeOverride: mealRecipeOverrideSchema.nullable().optional(),
     plannedFor: isoDateSchema,
     meal: mealTypePreferenceSchema,
     recipeId: z.union([z.literal(''), z.string().uuid()]).default(''),

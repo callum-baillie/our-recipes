@@ -1,3 +1,8 @@
+import {
+  buildAiEquipmentContext,
+  buildAiCookingPreferencesContext,
+} from './ai-equipment-context-service';
+import type { RequestPrincipal } from './auth-service';
 import { executeAiWorkload } from './ai-execution-service';
 import 'server-only';
 import { getEffectiveAiPolicy, aiUserIdForProfile } from './ai-access-service';
@@ -304,6 +309,7 @@ export async function improveAiRecipe(input: {
   expectedRevision: number;
   recipe: RecipePayload;
   mode?: 'enhance' | 'improve';
+  principal?: RequestPrincipal;
 }): Promise<{ candidate: AiRecipeCandidate; audit: AiOperationAudit }> {
   ensureDatabase();
   const savedRecipe = getRecipe(input.recipeId, input.actorProfileId);
@@ -331,7 +337,12 @@ export async function improveAiRecipe(input: {
   try {
     const candidate = await executeAiWorkload(input.actorProfileId, 'recipe_review', (options) =>
       provider.improveRecipe(
-        { recipe: input.recipe, ...(input.mode === 'enhance' ? { mode: 'enhance' as const } : {}) },
+        {
+          recipe: input.recipe,
+          ...(input.mode === 'enhance' ? { mode: 'enhance' as const } : {}),
+          kitchen: buildAiEquipmentContext(input.principal),
+          cookingPreferences: buildAiCookingPreferencesContext(input.principal),
+        },
         options,
       ),
     );

@@ -1,3 +1,4 @@
+import { recipeEquipmentRequirementSchema } from './recipe-equipment';
 import { z } from 'zod';
 
 import { shoppingCategorySchema } from '@/lib/domain/list-settings';
@@ -134,6 +135,7 @@ export const recipeInputSchema = z.object({
   sourceUrl: z.union([z.literal(''), z.string().trim().url().max(2_048)]),
   originalAuthor: boundedText(160).default(''),
   cookingMethod: boundedText(80).default(''),
+  equipmentRequirements: z.array(recipeEquipmentRequirementSchema).max(30).optional(),
   equipment: z
     .array(requiredText(120))
     .max(30)

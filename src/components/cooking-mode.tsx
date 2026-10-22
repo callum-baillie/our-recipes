@@ -1,4 +1,8 @@
 'use client';
+import { CookingEpisodeRestrictions } from './cooking-episode-restrictions';
+import type { CookingRestrictions } from '@/lib/domain/cooking-episode';
+import { CookingSessionAdaptation } from './cooking-session-adaptation';
+import { RecipeKitchenCheck } from './recipe-kitchen-check';
 import { formatShoppingQuantity } from '@/lib/domain/shopping-quantity';
 import { ButtonSpinner } from './skeleton';
 import { InlineAlert } from './inline-alert';
@@ -81,7 +85,23 @@ export function CookingMode({
   mealPlanEntryId,
   nutritionPreparation,
   pantryAvailability,
+  initialSession,
+  initialPantryPreview,
 }: {
+  initialSession?: {
+    id: string;
+    revision: number;
+    completed: boolean;
+    contextRevision: number;
+    restrictions: CookingRestrictions | null;
+    restrictionsActive: boolean;
+    timezone: string;
+    ingredientReviewRequired: boolean;
+  };
+  initialPantryPreview?: {
+    plannedMeal?: { plannedFor: string; meal: string; title: string } | null;
+    recommendedConsumptions?: Array<Omit<ReviewLine, 'decision' | 'note'>>;
+  };
   recipe: RecipeDetail;
   initialFavorite: boolean;
   initialServings?: number;
@@ -107,7 +127,9 @@ export function CookingMode({
     recipeId: recipe.id,
     targetServings: servingInput,
   }).success;
-  const [sessionServings, setSessionServings] = useState<number | null>(null);
+  const [sessionServings, setSessionServings] = useState<number | null>(
+    initialSession ? (initialServings ?? null) : null,
+  );
   const servings =
     sessionServings ?? (servingsValid ? Number(servingInput) : (initialServings ?? baseServings));
   const [checkedAvailability, setCheckedAvailability] = useState(pantryAvailability);
@@ -120,13 +142,22 @@ export function CookingMode({
   const [actionError, setActionError] = useState('');
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set());
   const [favorite, setFavorite] = useState(initialFavorite);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [pantryReview, setPantryReview] = useState<ReviewLine[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(
+    initialSession?.completed ? null : (initialSession?.id ?? null),
+  );
+  const sessionRouteReady = sessionId === null || initialSession?.id === sessionId;
+  const [pantryReview, setPantryReview] = useState<ReviewLine[]>(
+    (initialPantryPreview?.recommendedConsumptions ?? []).map((entry) => ({
+      ...entry,
+      decision: 'deduct',
+      note: '',
+    })),
+  );
   const [plannedMeal, setPlannedMeal] = useState<{
     plannedFor: string;
     meal: string;
     title: string;
-  } | null>(null);
+  } | null>(initialPantryPreview?.plannedMeal ?? null);
   const [showPantryConfirmation, setShowPantryConfirmation] = useState(false);
   const [finishStatus, setFinishStatus] = useState('');
   const [pantryOptions, setPantryOptions] = useState<{
@@ -185,6 +216,7 @@ export function CookingMode({
       setSessionServings(acceptedServings);
       setServingInput(String(acceptedServings));
       setSessionId(body.session.id);
+      router.replace(`/recipes/${recipe.id}/cook?sessionId=${body.session.id}`, { scroll: false });
       const currentStep = document.getElementById('current-cooking-step');
       currentStep?.scrollIntoView({ block: 'start' });
       currentStep?.focus({ preventScroll: true });
@@ -500,6 +532,13 @@ export function CookingMode({
         </button>
       </header>
       {actionError && <InlineAlert tone="error">{actionError}</InlineAlert>}
+      {initialSession?.ingredientReviewRequired && (
+        <InlineAlert tone="warning">
+          Ingredients or yield changed for this session. Review{' '}
+          <Link href="/lists">shopping needs</Link> and <Link href="/nutrition">nutrition</Link>{' '}
+          before relying on earlier calculations. Pantry below uses the saved session ingredients.
+        </InlineAlert>
+      )}
       <section className="cooking-top">
         <div>
           {recipe.images[0] ? (
@@ -532,7 +571,7 @@ export function CookingMode({
             <button
               className="primary-button compact"
               type="button"
-              disabled={cookingBusy || !servingsValid}
+              disabled={cookingBusy || !servingsValid || (sessionId !== null && !sessionRouteReady)}
               aria-busy={cookingBusy}
               onClick={() => void runCookingAction()}
             >
@@ -553,7 +592,9 @@ export function CookingMode({
           </div>
           <p id="cook-serving-context" role="status">
             {sessionId
-              ? `Cooking session for ${servings} servings. Batch size is fixed for this session.`
+              ? sessionRouteReady
+                ? `Cooking session for ${servings} servings. Batch size is fixed for this session.`
+                : 'Cooking session saved. Loading its recipe and Pantry context…'
               : servingsValid
                 ? 'Browse steps freely; Start cooking records this batch size.'
                 : 'Choose a whole number from 1 to 100 servings.'}
@@ -587,6 +628,31 @@ export function CookingMode({
           nutrition and pantry checks do not apply.
         </p>
       )}
+      {sessionId && initialSession && !initialSession.completed && (
+        <CookingSessionAdaptation
+          recipe={recipe}
+          sessionId={sessionId}
+          revision={initialSession.revision}
+        />
+      )}
+      {sessionId && initialSession && !initialSession.completed && (
+        <CookingEpisodeRestrictions
+          sessionId={sessionId}
+          revision={initialSession.contextRevision}
+          current={initialSession.restrictions}
+          active={initialSession.restrictionsActive}
+          timezone={initialSession.timezone}
+        />
+      )}
+      <RecipeKitchenCheck
+        immersive
+        recipe={recipe}
+        mealPlanEntryId={mealPlanEntryId}
+        episodeId={sessionId}
+        sessionRevision={initialSession?.revision}
+        contextRevision={initialSession?.contextRevision}
+        targetServings={servings}
+      />
       <section className="cooking-layout">
         <aside className="scaled-ingredients">
           <h2>Ingredients</h2>
@@ -719,7 +785,7 @@ export function CookingMode({
               <button
                 type="button"
                 className="primary-button"
-                disabled={cookingBusy}
+                disabled={cookingBusy || !sessionRouteReady}
                 onClick={() => void finishCooking()}
               >
                 Finish cooking

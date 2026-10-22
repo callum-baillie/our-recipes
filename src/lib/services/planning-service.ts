@@ -1,3 +1,5 @@
+import { projectEffectiveRecipe } from './effective-recipe';
+import { mealRecipeOverrideSchema } from '@/lib/domain/planning';
 import 'server-only';
 
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
@@ -344,7 +346,35 @@ function mealDetails(
     if (input.recipeOverride) {
       if (!input.recipeId || kind !== 'recipe')
         throw new PlanningNotFoundError('Only recipe meals can have a recipe adaptation.');
-      const override = input.recipeOverride;
+      const priorOverride =
+        previous?.recipeId === input.recipeId && previous.recipeOverride
+          ? mealRecipeOverrideSchema.parse(JSON.parse(previous.recipeOverride))
+          : null;
+      const override = { ...priorOverride, ...input.recipeOverride };
+      // Legacy clients can edit titles/ingredients without erasing method metadata they do not know.
+      // Carried-forward step references are invalid after instruction changes.
+      const priorInstructions =
+        priorOverride?.instructionSections ??
+        getRecipeForPlannedMeal(
+          input.recipeId,
+          previous?.recipeId === input.recipeId ? previous.id : undefined,
+        )?.instructionSections.map((section) => ({
+          title: section.title,
+          steps: section.steps.map((step) => step.body),
+        }));
+      if (
+        JSON.stringify(priorInstructions) !== JSON.stringify(override.instructionSections) &&
+        input.recipeOverride.equipmentRequirements === undefined
+      )
+        override.equipmentRequirements = [];
+      if (
+        override.equipmentRequirements?.some((requirement) =>
+          requirement.steps.some(
+            (ref) => !override.instructionSections[ref.section]?.steps[ref.step],
+          ),
+        )
+      )
+        throw new PlanningNotFoundError('Equipment step references need a refreshed review.');
       const oldSnapshot =
         previous?.recipeId === input.recipeId
           ? parseMealPlanIngredientSnapshot(previous.recipeIngredientsSnapshot)
@@ -504,77 +534,15 @@ export function getRecipeForPlannedMeal(recipeId: string, entryId?: string) {
     baseline = recipeInputSchema.parse(JSON.parse(revision.snapshot));
   }
   const override = meal.recipeOverride
-    ? recipeInputSchema
-        .pick({
-          title: true,
-          summary: true,
-          servings: true,
-          ingredientGroups: true,
-          instructionSections: true,
-        })
-        .parse(JSON.parse(meal.recipeOverride))
+    ? { ...baseline, ...mealRecipeOverrideSchema.parse(JSON.parse(meal.recipeOverride)) }
     : baseline;
-  return {
-    ...recipe,
-    currentRevision: meal.recipeRevision ?? recipe.currentRevision,
-    title: override.title,
-    summary: override.summary,
-    servings: override.servings,
-    nutritionCalories: meal.recipeOverride
-      ? null
-      : baseline.nutritionCalories === ''
-        ? null
-        : baseline.nutritionCalories,
-    nutritionProteinGrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionProteinGrams === ''
-        ? null
-        : baseline.nutritionProteinGrams,
-    nutritionCarbohydrateGrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionCarbohydrateGrams === ''
-        ? null
-        : baseline.nutritionCarbohydrateGrams,
-    nutritionFatGrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionFatGrams === ''
-        ? null
-        : baseline.nutritionFatGrams,
-    nutritionSaturatedFatGrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionSaturatedFatGrams === ''
-        ? null
-        : baseline.nutritionSaturatedFatGrams,
-    nutritionFiberGrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionFiberGrams === ''
-        ? null
-        : baseline.nutritionFiberGrams,
-    nutritionSugarGrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionSugarGrams === ''
-        ? null
-        : baseline.nutritionSugarGrams,
-    nutritionSodiumMilligrams: meal.recipeOverride
-      ? null
-      : baseline.nutritionSodiumMilligrams === ''
-        ? null
-        : baseline.nutritionSodiumMilligrams,
-    ingredientGroups: override.ingredientGroups.map((group, g) => ({
-      id: `${entryId}-g${g}`,
-      name: group.name,
-      ingredients: group.ingredients.map((item, i) => ({
-        ...item,
-        id: `${entryId}-g${g}-i${i}`,
-        quantity: item.quantity === '' ? null : item.quantity,
-      })),
-    })),
-    instructionSections: override.instructionSections.map((section, i) => ({
-      id: `${entryId}-s${i}`,
-      title: section.title,
-      steps: section.steps.map((body, j) => ({ id: `${entryId}-s${i}-${j}`, body })),
-    })),
-  };
+  return projectEffectiveRecipe(
+    recipe,
+    baseline,
+    override,
+    entryId,
+    meal.recipeRevision ?? recipe.currentRevision,
+  );
 }
 
 export type ShoppingListDetail = typeof shoppingLists.$inferSelect & {
