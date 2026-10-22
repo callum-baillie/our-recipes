@@ -159,6 +159,13 @@ describe('native write-ahead recovery', () => {
     expect(
       sameScannerActor(restored!, operation.instanceUrl, {
         ...operation.actor,
+        userId: 'another-account-with-the-same-viewed-profile',
+      }),
+    ).toBe(false);
+    expect(restored!.actor).toEqual(operation.actor);
+    expect(
+      sameScannerActor(restored!, operation.instanceUrl, {
+        ...operation.actor,
         profileId: 'other',
       }),
     ).toBe(false);

@@ -31,8 +31,9 @@ export async function authorizeApi(
   try {
     const principal = await authenticateApiRequest(request, resource, action);
     const expectedProfile = request.headers.get('x-bord-expected-profile-id');
+    const expectedUser = request.headers.get('x-bord-expected-user-id');
     if (
-      expectedProfile !== null &&
+      (expectedProfile !== null || expectedUser !== null) &&
       request.method === 'POST' &&
       /^\/api\/v1\/(?:pantry\/(?:batches|catalog-imports)|shopping-lists\/[^/]+\/catalog-items)$/.test(
         new URL(request.url).pathname,
@@ -40,7 +41,41 @@ export async function authorizeApi(
     ) {
       const originError = requireTrustedSessionMutation(request, principal, requestId);
       if (originError) return { principal: null, requestId, response: originError };
-      if (!z.string().uuid().safeParse(expectedProfile).success)
+      if (
+        expectedUser !== null &&
+        !z
+          .string()
+          .min(1)
+          .max(256)
+          .refine((value) => value.trim() === value)
+          .safeParse(expectedUser).success
+      )
+        return {
+          principal: null,
+          requestId,
+          response: withApiRequestId(
+            jsonError(
+              400,
+              'invalid_expected_user',
+              'Review the original account before confirming.',
+            ),
+            requestId,
+          ),
+        };
+      if (expectedUser !== null && expectedUser !== principal.userId)
+        return {
+          principal: null,
+          requestId,
+          response: withApiRequestId(
+            jsonError(
+              409,
+              'reviewed_actor_changed',
+              'The signed-in account changed. Return to the original account to reconcile this reviewed operation.',
+            ),
+            requestId,
+          ),
+        };
+      if (expectedProfile !== null && !z.string().uuid().safeParse(expectedProfile).success)
         return {
           principal: null,
           requestId,
@@ -53,7 +88,7 @@ export async function authorizeApi(
             requestId,
           ),
         };
-      if (expectedProfile !== principal.profileId)
+      if (expectedProfile !== null && expectedProfile !== principal.profileId)
         return {
           principal: null,
           requestId,

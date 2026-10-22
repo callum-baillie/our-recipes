@@ -5,6 +5,7 @@ import { POST as createBatch } from '@/app/api/v1/pantry/batches/route';
 import { POST as recoverBatch } from '@/app/api/v1/food-data/confirmations/recovery/route';
 import { POST as importCatalogBatch } from '@/app/api/v1/pantry/catalog-imports/route';
 import { POST as confirmShopping } from '@/app/api/v1/shopping-lists/[listId]/catalog-items/route';
+import { PATCH as switchProfile } from '@/app/api/v1/profiles/[profileId]/active/route';
 import { prepareIdempotentMutation } from '@/lib/api-idempotency';
 import {
   apiIdempotencyRecords,
@@ -12,6 +13,7 @@ import {
   session,
   shoppingLists,
   shoppingListItems,
+  foodCatalogImportOperations,
 } from '@/lib/db/schema';
 import { getDatabase, resetDatabaseForTests } from '@/lib/db/client';
 import { pantryProductInputSchema, pantryLocationInputSchema } from '@/lib/domain/pantry';
@@ -26,6 +28,7 @@ import { createManualShoppingList, addShoppingListItem } from '@/lib/services/pl
 import { catalogConfirmation } from '../../shared/mobile-domain/catalog';
 import { foodCatalogImportInputSchema } from '@/lib/domain/food-data';
 import { startCatalogFixture } from '../fixtures/bord-catalog-server';
+import { defaultOnboardingNutrition, profileInputSchema } from '@/lib/domain/setup';
 
 const origin = 'http://localhost:3000';
 let cookie: string;
@@ -524,6 +527,145 @@ describe('durable local Pantry confirmation and recovery through authenticated h
       }
     },
   );
+  it('rejects a different valid account viewing the same profile before every reviewed write, while retaining independent header and replay behavior', async () => {
+    const enrollment = await authentication.prepareProfileEnrollment(
+      'Second reviewer',
+      { email: 'rv-pantry-second@example.test', passphrase: 'synthetic second review passphrase' },
+      'admin',
+    );
+    const { onboardProfileWithEnrollment } = await import('@/lib/services/household-service');
+    onboardProfileWithEnrollment(
+      {
+        profile: profileInputSchema.parse({
+          displayName: 'Second reviewer',
+          color: '#637A45',
+          avatarUrl: '',
+          units: 'metric',
+          temperatureUnit: 'C',
+          locale: 'en-GB',
+          timezone: 'Europe/London',
+        }),
+        nutrition: defaultOnboardingNutrition,
+        role: 'admin',
+      },
+      enrollment,
+    );
+    const { auth } = await import('@/lib/auth/server');
+    const signedIn = await auth.api.signInEmail({
+      body: {
+        email: 'rv-pantry-second@example.test',
+        password: 'synthetic second review passphrase',
+      },
+      headers: new Headers({ origin }),
+      asResponse: true,
+    });
+    expect(signedIn.status).toBe(200);
+    let secondCookie = signedIn.headers
+      .getSetCookie()
+      .map((value) => value.split(';')[0])
+      .join('; ');
+    const switched = await switchProfile(
+      new Request(`${origin}/api/v1/profiles/${actor.profileId}/active`, {
+        method: 'PATCH',
+        headers: { origin, cookie: secondCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: 'synthetic pantry review passphrase' }),
+      }),
+      { params: Promise.resolve({ profileId: actor.profileId }) },
+    );
+    expect(switched.status).toBe(200);
+    secondCookie += `; ${switched.headers
+      .getSetCookie()
+      .map((value) => value.split(';')[0])
+      .join('; ')}`;
+    expect(
+      await authentication.getAuthenticatedSessionPrincipal(
+        new Request(`${origin}/api/v1/auth/context`, { headers: { cookie: secondCookie } }),
+      ),
+    ).toMatchObject({ userId: enrollment.user.id, profileId: actor.profileId });
+    const list = createManualShoppingList('Account-bound confirmation', actor.profileId);
+    const localId = randomUUID();
+    const catalogId = randomUUID();
+    const cartId = randomUUID();
+    const { productId: _productId, ...batch } = command;
+    void _productId;
+    const catalogInput = {
+      ...catalogConfirmation(
+        { ...reviewed, displayName: 'Account-bound Pantry source' },
+        catalogId,
+        'g',
+      ),
+      batches: [batch],
+    };
+    const cartInput = {
+      ...catalogConfirmation(
+        { ...reviewed, displayName: 'Account-bound shopping source' },
+        cartId,
+        'g',
+      ),
+      cartQuantity: 1,
+      cartUnit: 'g',
+    };
+    const original = (path: string, body: unknown, operationId: string) => {
+      const submitted = request(path, body, operationId);
+      submitted.headers.set('cookie', secondCookie);
+      submitted.headers.set('X-Bord-Expected-User-Id', actor.userId);
+      return submitted;
+    };
+    const before = {
+      batches: getDatabase().select().from(pantryBatches).all(),
+      receipts: getDatabase().select().from(apiIdempotencyRecords).all(),
+      imports: getDatabase().select().from(foodCatalogImportOperations).all(),
+      items: getDatabase().select().from(shoppingListItems).all(),
+      providerCalls: fixture.calls.length,
+    };
+    const localRequest = original('/pantry/batches', command, localId);
+    const catalogRequest = original('/pantry/catalog-imports', catalogInput, catalogId);
+    const cartRequest = original(`/shopping-lists/${list.id}/catalog-items`, cartInput, cartId);
+    for (const response of [
+      await createBatch(localRequest),
+      await importCatalogBatch(catalogRequest),
+      await confirmShopping(cartRequest, { params: Promise.resolve({ listId: list.id }) }),
+    ]) {
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ error: { code: 'reviewed_actor_changed' } });
+    }
+    expect(getDatabase().select().from(pantryBatches).all()).toEqual(before.batches);
+    expect(getDatabase().select().from(apiIdempotencyRecords).all()).toEqual(before.receipts);
+    expect(getDatabase().select().from(foodCatalogImportOperations).all()).toEqual(before.imports);
+    expect(getDatabase().select().from(shoppingListItems).all()).toEqual(before.items);
+    expect(fixture.calls).toHaveLength(before.providerCalls);
+    const invalid = request('/pantry/batches', command, localId);
+    invalid.headers.set('X-Bord-Expected-User-Id', 'x'.repeat(257));
+    expect((await createBatch(invalid)).status).toBe(400);
+    const wrongProfile = request('/pantry/batches', command, localId);
+    wrongProfile.headers.set('X-Bord-Expected-User-Id', actor.userId);
+    wrongProfile.headers.set('X-Bord-Expected-Profile-Id', 'not-a-profile');
+    expect((await createBatch(wrongProfile)).status).toBe(400);
+    const accountOnly = request('/pantry/batches', command, localId);
+    accountOnly.headers.delete('X-Bord-Expected-Profile-Id');
+    accountOnly.headers.set('X-Bord-Expected-User-Id', actor.userId);
+    expect((await createBatch(accountOnly)).status).toBe(201);
+    // Original clients with only the profile guard still receive their exact receipt.
+    const replay = await createBatch(request('/pantry/batches', command, localId));
+    expect(replay.status).toBe(201);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(
+      (
+        await createBatch(
+          request('/pantry/batches', { ...command, quantityRemaining: 400 }, localId),
+        )
+      ).status,
+    ).toBe(409);
+    const correctCatalog = request('/pantry/catalog-imports', catalogInput, catalogId);
+    correctCatalog.headers.set('X-Bord-Expected-User-Id', actor.userId);
+    const imported = await importCatalogBatch(correctCatalog);
+    expect(imported.status, JSON.stringify(await imported.clone().json())).toBe(201);
+    const correctCart = request(`/shopping-lists/${list.id}/catalog-items`, cartInput, cartId);
+    correctCart.headers.set('X-Bord-Expected-User-Id', actor.userId);
+    expect(
+      (await confirmShopping(correctCart, { params: Promise.resolve({ listId: list.id }) })).status,
+    ).toBe(201);
+  });
   it('keeps authentication required after revocation even when a matching receipt exists', async () => {
     const operationId = randomUUID();
     await createBatch(request('/pantry/batches', command, operationId));

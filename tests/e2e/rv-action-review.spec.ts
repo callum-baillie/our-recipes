@@ -95,7 +95,7 @@ test('named meal removal review has context and retains its stale error at deskt
     const confirm = card.getByRole('button', { name: 'Confirm changes' });
     await confirm.focus();
     await expect(confirm).toBeFocused();
-    await expect(confirm).toBeInViewport();
+    await expect(confirm).toBeInViewport({ ratio: 1 });
     expect(await card.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
       true,
     );

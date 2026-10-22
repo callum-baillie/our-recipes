@@ -654,6 +654,8 @@ paths:
       description: Creates or reuses the reviewed local product and immutable source snapshot, then matches a current list item or creates an in-cart item. It never records a purchase or adds stock. operationId is durable and bound to the authenticated account, active actor, list and command. Retry the identical command after a lost response; acknowledged replay succeeds during catalog outage. Changed scope requires a new review. Existing item matching requires expectedUpdatedAt; source changes require renewed review.
       parameters:
         - { name: listId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/ReviewedAccount' }
+        - { $ref: '#/components/parameters/ReviewedProfile' }
       requestBody:
         required: true
         content:
@@ -707,6 +709,9 @@ paths:
       x-api-permissions: ['pantry:create']
       operationId: importReviewedFoodDataToPantry
       summary: Atomically import reviewed food data and add one or more physical Pantry batches
+      parameters:
+        - { $ref: '#/components/parameters/ReviewedAccount' }
+        - { $ref: '#/components/parameters/ReviewedProfile' }
       requestBody:
         required: true
         content:
@@ -785,7 +790,7 @@ paths:
     get:
       operationId: readSessionActorContext
       summary: Read minimal current account and viewing actor for reviewed native recovery
-      description: Session-only, independent of Nutrition permission. Native scanner confirmations send X-Bord-Expected-Profile-Id; the reviewed Pantry and catalog shopping POST routes reject a changed actor with 409 before writing. This header never grants permission or bypasses trusted-origin checks.
+      description: Session-only, independent of Nutrition permission. Current web/native scanner confirmations retain the returned account and profile in X-Bord-Expected-User-Id and X-Bord-Expected-Profile-Id. The three reviewed Pantry and catalog shopping POST routes validate either optional header independently and reject a changed account or profile with 409 before receipt lookup, provider access or writing. These headers never grant permission or bypass trusted-origin checks.
       security: [{ SessionCookie: [] }]
       responses:
         '200':
@@ -2930,6 +2935,8 @@ paths:
         another stock write. No key still means no durable replay guarantee.
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/ReviewedAccount' }
+        - { $ref: '#/components/parameters/ReviewedProfile' }
       requestBody:
         required: true
         content:
@@ -4100,6 +4107,18 @@ components:
       scheme: bearer
       bearerFormat: opaque integration token
   parameters:
+    ReviewedAccount:
+      name: X-Bord-Expected-User-Id
+      in: header
+      required: false
+      description: Original account ID returned by auth/context. Compared with the authenticated principal before reviewed confirmation or replay; mismatch is 409 and malformed input is 400. Independently optional for compatibility; current scanner clients send both account and profile headers.
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    ReviewedProfile:
+      name: X-Bord-Expected-Profile-Id
+      in: header
+      required: false
+      description: Original viewing profile returned by auth/context. Compared with the authenticated principal before reviewed confirmation or replay; mismatch is 409 and malformed input is 400. Does not authenticate a profile or grant authority.
+      schema: { type: string, format: uuid }
     IdempotencyKey:
       name: Idempotency-Key
       in: header

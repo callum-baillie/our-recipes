@@ -327,6 +327,7 @@ function ScannerReview() {
         headers: {
           'Idempotency-Key': command.operationId,
           'X-Bord-Expected-Profile-Id': command.actor.profileId,
+          'X-Bord-Expected-User-Id': command.actor.userId,
         },
         body: JSON.stringify(command.body),
       });
@@ -447,7 +448,10 @@ function ScannerReview() {
         message?: string;
       }>('/api/v1/food-data/confirmations/recovery', {
         method: 'POST',
-        headers: { 'X-Bord-Expected-Profile-Id': attempt.actor.profileId },
+        headers: {
+          'X-Bord-Expected-Profile-Id': attempt.actor.profileId,
+          'X-Bord-Expected-User-Id': attempt.actor.userId,
+        },
         body: JSON.stringify({
           action,
           operationId: attempt.operationId,

@@ -135,6 +135,7 @@ describe('actual shopping scan review consumer', () => {
     expect(new Headers(submitted[1]?.headers).get('X-Bord-Expected-Profile-Id')).toBe(
       actor.profileId,
     );
+    expect(new Headers(submitted[1]?.headers).get('X-Bord-Expected-User-Id')).toBe(actor.userId);
     expect(
       fetchMock.mock.calls.some(
         ([url, init]) => String(url).endsWith(`/items/${itemId}`) && init?.method === 'PATCH',
@@ -338,6 +339,7 @@ describe('actual shopping scan review consumer', () => {
             expect(new Headers(init?.headers).get('X-Bord-Expected-Profile-Id')).toBe(
               actor.profileId,
             );
+            expect(new Headers(init?.headers).get('X-Bord-Expected-User-Id')).toBe(actor.userId);
             return Response.json({
               status: command.action === 'inspect' ? 'not_recorded' : 'abandoned',
               outcome: 'unknown',

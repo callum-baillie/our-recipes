@@ -70,6 +70,7 @@ test('web scan uses the saved local product during provider outage and keeps pur
   await page.goto(`/lists/${list.id}`);
   expect(page.url()).toContain(`/lists/${list.id}`);
   expect(await page.title()).toBeTruthy();
+  await page.getByText('Shopping tools', { exact: true }).click();
   await page.getByRole('button', { name: 'Scan item' }).click();
   const dialog = page.getByRole('dialog', { name: 'Scan mode' });
   await dialog.getByLabel('Enter barcode').fill('049000042511');

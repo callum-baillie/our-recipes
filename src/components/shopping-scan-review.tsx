@@ -199,6 +199,7 @@ export function ShoppingScanReview({
         headers: {
           'Content-Type': 'application/json',
           'X-Bord-Expected-Profile-Id': submitted.actor.profileId,
+          'X-Bord-Expected-User-Id': submitted.actor.userId,
         },
         body: JSON.stringify(submitted.command),
       });
@@ -253,6 +254,7 @@ export function ShoppingScanReview({
         headers: {
           'Content-Type': 'application/json',
           'X-Bord-Expected-Profile-Id': original.actor.profileId,
+          'X-Bord-Expected-User-Id': original.actor.userId,
         },
         body: JSON.stringify({
           action,
