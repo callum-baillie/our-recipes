@@ -1,5 +1,3 @@
-import { cookies } from 'next/headers';
-import { SCALE_ONBOARDING_COOKIE } from '@/lib/services/nutrition-scale-service';
 import { NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -40,7 +38,7 @@ export async function POST(request: Request) {
       return jsonError(
         400,
         'profile_credentials_required',
-        'Every profile needs a unique email and a password of at least 8 characters.',
+        'Every profile needs a unique email, a strong passphrase, and a six-digit PIN.',
       );
     }
     const normalizedEmails = credentialInputs.map((credentials) =>
@@ -69,7 +67,6 @@ export async function POST(request: Request) {
     const { state, firstRecipeId, recoveryCodes } = completeSetupWithResult(
       parsed.data,
       enrollments,
-      (await cookies()).get(SCALE_ONBOARDING_COOKIE)?.value ?? '',
     );
     const activeProfile = state.profiles[0];
     if (firstRecipeId && activeProfile) {
