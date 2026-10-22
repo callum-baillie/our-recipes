@@ -182,6 +182,7 @@ export function getAiDataPolicy(profileId: string): AiDataPolicy {
     shareWeight: row.shareWeight,
     shareShoppingLists: row.shareShoppingLists,
     sharePantry: row.sharePantry,
+    shareKitchenEquipment: row.shareKitchenEquipment,
     dailySummaryEnabled: row.dailySummaryEnabled,
     weeklySummaryEnabled: row.weeklySummaryEnabled,
     summaryFrequency: row.summaryFrequency,

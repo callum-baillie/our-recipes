@@ -1,3 +1,6 @@
+import { cookingEpisodeCommandSchema } from '@/lib/domain/cooking-episode';
+import { cookingSessionRecipeChangeSchema } from '@/lib/domain/cooking-session-recipe';
+import { kitchenCommandSchema, kitchenPlanRequestSchema } from '@/lib/domain/kitchen';
 import 'server-only';
 import { cookSessionStartSchema } from '@/lib/domain/cooking';
 import { pantryCookConfirmationSchema } from '@/lib/domain/pantry-grocery-cooking';
@@ -97,6 +100,90 @@ export type AppOperation = {
   effect: 'read' | 'write' | 'paid';
 };
 export const APP_OPERATIONS: AppOperation[] = [
+  {
+    id: 'readKitchenInventory',
+    path: '/kitchen',
+    method: 'GET',
+    effect: 'read',
+    summary:
+      'Read confirmed household equipment instances, revisions, resources and availability. Requires equipment sharing.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'readKitchenCatalog',
+    path: '/kitchen/catalog',
+    method: 'GET',
+    effect: 'read',
+    summary:
+      'Search local generic equipment types; a catalog item is not ownership or an exact model specification.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'changeKitchenEquipment',
+    path: '/kitchen',
+    method: 'POST',
+    effect: 'write',
+    summary:
+      'Review add, update, availability or archive of physical equipment. Use a fresh UUID operationId for a new intent, exact replay for recovery, current expectedRevision and expectedItemRevision for edits. Attachments do not create bases.',
+    parameters: [],
+    body: null,
+    validator: kitchenCommandSchema,
+  },
+  {
+    id: 'checkKitchenAllocation',
+    path: '/kitchen/check',
+    method: 'POST',
+    effect: 'read',
+    summary:
+      'Check all coordinated meal phases against actual kitchen resources. Preview does not reserve physical equipment.',
+    parameters: [],
+    body: null,
+    validator: kitchenPlanRequestSchema,
+  },
+  {
+    id: 'readCookingEpisode',
+    path: '/cook-sessions/{sessionId}/context',
+    method: 'GET',
+    effect: 'read',
+    summary:
+      'Read the owned cooking episode, dated timezone restrictions and saved future allocation. A saved plan does not mean equipment is in use.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'changeCookingEpisode',
+    path: '/cook-sessions/{sessionId}/context',
+    method: 'PATCH',
+    effect: 'write',
+    summary:
+      'Review a session-only dated equipment restriction or accept a compatible allocation without reserving actual resources. Never change household ownership for no oven tonight. Supply the relevant local date and timezone; after that date the restriction is inactive. Revalidate context and kitchen revisions.',
+    parameters: [],
+    body: null,
+    validator: cookingEpisodeCommandSchema,
+  },
+  {
+    id: 'readCookingSessionRecipe',
+    path: '/cook-sessions/{sessionId}/recipe',
+    method: 'GET',
+    effect: 'read',
+    summary:
+      'Read the owned effective cooking snapshot and revision for a session-only adaptation. Does not edit the library.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'changeCookingSessionRecipe',
+    path: '/cook-sessions/{sessionId}/recipe',
+    method: 'PATCH',
+    effect: 'write',
+    summary:
+      'Review and apply a coherent method adaptation to this cooking session only, or undo its latest change. Preserve unrelated content. Supply all method, equipment, requirements, instructions and timing fields with expected session and kitchen revisions. Ingredients/yield changes require review. Does not release physical-use claims or save a global preference.',
+    parameters: [],
+    body: null,
+    validator: cookingSessionRecipeChangeSchema,
+  },
   {
     id: 'readCookHistory',
     path: '/cook-sessions',
@@ -2239,6 +2326,14 @@ export const APP_OPERATIONS: AppOperation[] = [
   },
 ];
 export const APP_ROUTE_LOADERS = {
+  readCookingEpisode: () => import('@/app/api/v1/cook-sessions/[sessionId]/context/route'),
+  changeCookingEpisode: () => import('@/app/api/v1/cook-sessions/[sessionId]/context/route'),
+  readCookingSessionRecipe: () => import('@/app/api/v1/cook-sessions/[sessionId]/recipe/route'),
+  changeCookingSessionRecipe: () => import('@/app/api/v1/cook-sessions/[sessionId]/recipe/route'),
+  readKitchenInventory: () => import('@/app/api/v1/kitchen/route'),
+  readKitchenCatalog: () => import('@/app/api/v1/kitchen/catalog/route'),
+  changeKitchenEquipment: () => import('@/app/api/v1/kitchen/route'),
+  checkKitchenAllocation: () => import('@/app/api/v1/kitchen/check/route'),
   readCookHistory: () => import('@/app/api/v1/cook-sessions/route'),
   startReviewedCookSession: () => import('@/app/api/v1/cook-sessions/route'),
   readCookPantryPreview: () => import('@/app/api/v1/cook-sessions/[sessionId]/pantry/route'),

@@ -112,6 +112,14 @@ export function AddRecipeDialog({ open, onClose, returnFocusRef }: AddRecipeDial
             Choose a starting point. You’ll review everything before it joins your cookbook.
           </p>
         </div>
+        <p>
+          For equipment-aware suggestions, you can{' '}
+          <Link href="/my-kitchen" onClick={onClose}>
+            set up My Kitchen
+          </Link>{' '}
+          first, then choose whether to share it with AI. Setup is optional and can be resumed
+          later.
+        </p>
         <div className="add-recipe-options">
           {options.map(({ href, label, icon: Icon }) => (
             <Link href={href} key={href} onClick={onClose}>

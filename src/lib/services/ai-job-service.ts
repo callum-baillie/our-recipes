@@ -1,3 +1,4 @@
+import { kitchens } from '@/lib/db/schema';
 import { executeAiWorkload, resolveAiExecutionOptions } from './ai-execution-service';
 import { withAiExecutionContext } from './ai-execution-context';
 import { getRecipe } from './recipe-service';
@@ -200,6 +201,19 @@ function assertQueuedRecipeContextSharing(job: AiJobRow, context: unknown) {
   if (!Object.keys(household).length) return;
   const current = getAiDataPolicy(job.profileId);
   const shared = object(household.sharedCategories);
+  if (object(household.equipment).status === 'available') {
+    if (!current.shareKitchenEquipment)
+      throw new AiJobForbiddenError('Equipment sharing changed. Prepare a new draft.');
+    const equipment = object(household.equipment);
+    if (equipment.personalCookingPreferences != null && !current.shareRecipePreferences)
+      throw new AiJobForbiddenError('Cooking preference sharing changed. Prepare a new draft.');
+    const kitchen =
+      typeof equipment.kitchenId === 'string'
+        ? getDatabase().select().from(kitchens).where(eq(kitchens.id, equipment.kitchenId)).get()
+        : null;
+    if (!kitchen || kitchen.revision !== equipment.revision)
+      throw new AiJobForbiddenError('Kitchen changed after queueing. Prepare a refreshed review.');
+  }
   const require = (allowed: boolean) => {
     if (!allowed)
       throw new AiJobForbiddenError(

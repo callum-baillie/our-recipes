@@ -1,3 +1,4 @@
+import { cookingPreferencesSchema } from './cooking-preferences';
 import { z } from 'zod';
 
 export const profileGoalFocusValues = [
@@ -62,6 +63,7 @@ export const kitchenContextPatchSchema = z
 export const profileGoalContextSchema = z
   .object({
     kitchenInterview: kitchenInterviewSchema.optional(),
+    cookingPreferences: cookingPreferencesSchema.optional(),
     focusAreas: z
       .array(profileGoalFocusSchema)
       .max(8)

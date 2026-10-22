@@ -1,3 +1,4 @@
+import { getRecipeForPlannedMeal } from './planning-service';
 import { desc, eq, and, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
@@ -109,6 +110,7 @@ export function startCookSession(
   profileId: string,
   targetServings: number,
   mealPlanEntryId: string | null = null,
+  ownerUserId: string | null = null,
 ): typeof cookSessions.$inferSelect {
   ensureDatabase();
   const recipe = getDatabase()
@@ -141,6 +143,9 @@ export function startCookSession(
     profileId,
     targetServings,
     mealPlanEntryId,
+    ownerUserId,
+    effectiveRecipe: getRecipeForPlannedMeal(recipeId, mealPlanEntryId ?? undefined),
+    effectiveRevision: 1,
     startedAt: new Date(),
     completedAt: null,
   };
@@ -161,7 +166,15 @@ export function completeCookSession(sessionId: string, profileId: string): void 
 export function listCookHistory(profileId: string) {
   ensureDatabase();
   return getDatabase()
-    .select()
+    .select({
+      id: cookSessions.id,
+      recipeId: cookSessions.recipeId,
+      profileId: cookSessions.profileId,
+      targetServings: cookSessions.targetServings,
+      mealPlanEntryId: cookSessions.mealPlanEntryId,
+      startedAt: cookSessions.startedAt,
+      completedAt: cookSessions.completedAt,
+    })
     .from(cookSessions)
     .where(and(eq(cookSessions.profileId, profileId), isNotNull(cookSessions.completedAt)))
     .orderBy(desc(cookSessions.completedAt))

@@ -34,7 +34,7 @@ export async function authorizeApi(
     if (
       expectedProfile !== null &&
       request.method === 'POST' &&
-      /^\/api\/v1\/(?:pantry\/(?:batches|catalog-imports)|shopping-lists\/[^/]+\/catalog-items)$/.test(
+      /^\/api\/v1\/(?:kitchen|pantry\/(?:batches|catalog-imports)|shopping-lists\/[^/]+\/catalog-items)$/.test(
         new URL(request.url).pathname,
       )
     ) {

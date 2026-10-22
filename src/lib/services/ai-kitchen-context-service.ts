@@ -1,3 +1,4 @@
+import { buildAiEquipmentContext } from './ai-equipment-context-service';
 import 'server-only';
 
 import { z } from 'zod';
@@ -12,7 +13,7 @@ import { getShoppingList, listShoppingLists } from '@/lib/services/planning-serv
 
 const kitchenContextRequestSchema = z
   .object({
-    resource: z.enum(['pantry', 'shopping_lists', 'supermarkets', 'preferences']),
+    resource: z.enum(['pantry', 'shopping_lists', 'supermarkets', 'preferences', 'equipment']),
     recordId: z.string().uuid().nullable(),
     query: z.string().trim().max(160),
     offset: z.number().int().min(0).max(100_000),
@@ -29,7 +30,8 @@ export function readAiKitchenContext(principal: RequestPrincipal, input: unknown
     throw new DecisionError('This account cannot read kitchen data through chat.', 403);
   }
   const args = kitchenContextRequestSchema.parse(input);
-  const policy = getAiDataPolicy(principal.profileId);
+  if (args.resource === 'equipment') return buildAiEquipmentContext(principal);
+  const policy = getAiDataPolicy(principal.linkedProfileId);
   const shared =
     args.resource === 'pantry'
       ? policy.sharePantry

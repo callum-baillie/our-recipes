@@ -24,7 +24,7 @@ import {
 } from '@/lib/domain/pantry-availability';
 import { parseServingCount } from '@/lib/domain/ingredient-scaling';
 import { parseMealPlanIngredientSnapshot } from '@/lib/domain/meal-plan-snapshot';
-import { getRecipe } from '@/lib/services/recipe-service';
+import { getRecipe, type RecipeDetail } from '@/lib/services/recipe-service';
 
 export class PantryAvailabilityNotFoundError extends Error {}
 export class PantryAvailabilityConflictError extends Error {}
@@ -221,10 +221,56 @@ export function getRecipePantryAvailability(
   recipeId: string,
   targetServings?: number,
   mealPlanEntryId?: string | null,
+  effectiveRecipe?: RecipeDetail | null,
 ): PantryRecipeAvailability {
   ensureDatabase();
   const recipe = getRecipe(recipeId);
   if (!recipe) throw new PantryAvailabilityNotFoundError('That recipe no longer exists.');
+  if (effectiveRecipe) {
+    const mappings = recipeIngredientsWithMappings(recipeId);
+    const meal = mealPlanEntryId
+      ? getDatabase()
+          .select()
+          .from(mealPlanEntries)
+          .where(eq(mealPlanEntries.id, mealPlanEntryId))
+          .get()
+      : null;
+    const planned =
+      meal?.recipeId === recipeId
+        ? (parseMealPlanIngredientSnapshot(meal.recipeIngredientsSnapshot)?.ingredients ?? [])
+        : [];
+    return calculateRecipeAvailability({
+      recipeId,
+      recipeTitle: effectiveRecipe.title,
+      baseServings: parseServingCount(effectiveRecipe.servings),
+      targetServings,
+      ingredients: effectiveRecipe.ingredientGroups.flatMap((group) =>
+        group.ingredients.map((item) => {
+          const exact = planned.filter(
+            (m) => m.item === item.item && m.unit === item.unit && m.quantity === item.quantity,
+          );
+          const legacy =
+            planned.length === 0
+              ? mappings.filter(
+                  (m) =>
+                    m.item === item.item && m.unit === item.unit && m.quantity === item.quantity,
+                )
+              : [];
+          const mapping =
+            mappings.find(
+              (m) => m.id === item.id && m.item === item.item && m.unit === item.unit,
+            ) ?? (exact.length === 1 ? exact[0] : legacy.length === 1 ? legacy[0] : undefined);
+          return {
+            ...item,
+            productId: mapping?.productId ?? null,
+            productName: mapping?.productName ?? null,
+            isOptional: mapping?.isOptional ?? false,
+          };
+        }),
+      ),
+      stock: availableStock(),
+    });
+  }
   if (mealPlanEntryId) {
     const meal = getDatabase()
       .select()

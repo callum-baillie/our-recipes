@@ -1,3 +1,4 @@
+import { RecipeKitchenCheck } from '@/components/recipe-kitchen-check';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
 import { PageHeader } from '@/components/page-header';
@@ -126,6 +127,7 @@ export default async function RecipeDetailPage({
         <RecipeServingDetails
           preparation={
             <>
+              <RecipeKitchenCheck recipe={recipe} />
               <RecipePantryCard
                 initialAvailability={pantryAvailability}
                 products={pantryProducts}

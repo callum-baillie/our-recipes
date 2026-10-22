@@ -15,6 +15,7 @@ import {
 import { SettingsSectionNav } from './settings-section-nav';
 
 const links = [
+  { href: '/my-kitchen', label: 'My Kitchen', icon: ChefHat },
   { href: '/settings', label: 'All settings', icon: Settings2 },
   { href: '/settings/profiles', label: 'Profiles & roles', icon: Users },
   { href: '/settings/recipes', label: 'Recipes', icon: ClipboardList },

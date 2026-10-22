@@ -105,3 +105,25 @@
     width: 100%;
   }
 }
+
+.episodePanel {
+  --label: var(--immersive-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.episodePanel fieldset {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--surface-radius);
+}
+.episodePanel label {
+  margin-block: 0.8rem;
+}
+.episodePanel button {
+  white-space: normal;
+  margin: 0.3rem;
+  max-width: 100%;
+  height: auto;
+  min-height: 2.75rem;
+}

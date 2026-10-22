@@ -1,3 +1,7 @@
+import { readCookingEpisode } from './cooking-episode-service';
+import { readCookingSessionRecipe } from './cooking-session-recipe-service';
+import { recipePayloadFromDetail } from './recipe-service';
+import { buildAiEquipmentContext } from './ai-equipment-context-service';
 import {
   aiDependencySchema as dependencySchema,
   aiProducedIds as producedIds,
@@ -88,6 +92,11 @@ function operation(p: RequestPrincipal, id: string) {
     return op;
   }
   const requirements = new Set<keyof ReturnType<typeof getAiDataPolicy>>();
+  if (op.path.startsWith('/kitchen') && op.path !== '/kitchen/catalog') {
+    if (p.profileId !== p.linkedProfileId)
+      throw new DecisionError('Use your own account for equipment sharing.', 403);
+    requirements.add('shareKitchenEquipment');
+  }
   if (/^\/(recipes|collections|tags)(?:\/|$)/u.test(op.path))
     requirements.add('shareSharedRecipes');
   if (op.path.startsWith('/meal-plan')) {
@@ -95,6 +104,14 @@ function operation(p: RequestPrincipal, id: string) {
     requirements.add('shareSharedRecipes');
   }
   if (op.path.startsWith('/pantry')) requirements.add('sharePantry');
+  if (
+    (op.path.endsWith('/recipe') || op.path.endsWith('/context')) &&
+    op.path.startsWith('/cook-sessions')
+  ) {
+    if (p.profileId !== p.linkedProfileId)
+      throw new DecisionError('Use your own account for cooking adaptations.', 403);
+    requirements.add('shareKitchenEquipment');
+  }
   if (op.path.startsWith('/cook-sessions')) {
     requirements.add('shareSharedRecipes');
     requirements.add('sharePantry');
@@ -249,6 +266,33 @@ export async function readAppData(p: RequestPrincipal, request: Request, input: 
   const parsed = parseAction(p, action);
   if (parsed.op.effect !== 'read' || action.bindings.length)
     throw new DecisionError('Use a reviewed proposal for this operation.');
+  if (parsed.op.id === 'readCookingEpisode') {
+    const episode = readCookingEpisode(p, parsed.parameters.sessionId);
+    return {
+      ...episode,
+      acceptedPlan: episode.acceptedPlan
+        ? {
+            id: episode.acceptedPlan.id,
+            request: episode.acceptedPlan.request,
+            allocation: episode.acceptedPlan.allocation,
+          }
+        : null,
+    };
+  }
+  if (parsed.op.id === 'readCookingSessionRecipe') {
+    const session = readCookingSessionRecipe(p, parsed.parameters.sessionId);
+    return {
+      session: {
+        id: session.id,
+        recipeId: session.recipeId,
+        effectiveRevision: session.effectiveRevision,
+        latestChangeId: session.latestChangeId,
+        ingredientReviewRequired: session.ingredientReviewRequired,
+        recipe: recipePayloadFromDetail(session.effectiveRecipe!),
+      },
+    };
+  }
+  if (parsed.op.id === 'readKitchenInventory') return buildAiEquipmentContext(p);
   if (parsed.op.id === 'listShoppingLists' || parsed.op.id === 'getShoppingList')
     return readAiKitchenContext(p, {
       resource: 'shopping_lists',
@@ -433,10 +477,16 @@ function resultDestination(
   if (listId && op.path.startsWith('/shopping-lists'))
     return `/lists/${encodeURIComponent(listId)}`;
   if (recipeId && op.path.startsWith('/recipes')) return `/recipes/${encodeURIComponent(recipeId)}`;
+  if (op.path.startsWith('/kitchen')) return '/my-kitchen';
   if (op.path.startsWith('/pantry')) return '/pantry';
   if (op.path.startsWith('/meal-plan')) return '/planner';
   if (op.path.startsWith('/nutrition')) return '/nutrition?view=diary';
-  if (op.path.startsWith('/cook-sessions')) return '/recipes';
+  if (op.path.startsWith('/cook-sessions')) {
+    const session = output?.session as { id?: string; recipeId?: string } | undefined;
+    if (session?.id && session.recipeId)
+      return `/recipes/${encodeURIComponent(session.recipeId)}/cook?sessionId=${encodeURIComponent(session.id)}`;
+    return '/recipes';
+  }
   return undefined;
 }
 export async function prepareAppActions(
@@ -752,7 +802,14 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
         message: uncertain
           ? 'The outcome is uncertain. Inspect the affected records before starting another operation.'
           : response.ok
-            ? 'Change acknowledged by the app.'
+            ? op.path === '/kitchen' && payload?.kitchen?.items
+              ? `Saved kitchen change: ${
+                  payload.kitchen.items
+                    .filter((item: { id: string }) => payload.receipt?.itemIds?.includes(item.id))
+                    .map((item: { name: string }) => item.name)
+                    .join(', ') || 'Inventory updated'
+                }.`
+              : 'Change acknowledged by the app.'
             : typeof payload?.error?.message === 'string'
               ? payload.error.message
               : 'The app rejected this change.',

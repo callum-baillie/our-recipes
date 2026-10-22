@@ -1,4 +1,11 @@
+import { restrictionsApply } from '@/lib/domain/cooking-episode';
+import { getProfile } from '@/lib/services/household-service';
+import { DecisionError } from '@/lib/providers/decisions-provider';
 import type { Metadata } from 'next';
+import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
+import { readCookingSessionRecipe } from '@/lib/services/cooking-session-recipe-service';
+import { getCookSessionPantryPreview } from '@/lib/services/pantry-grocery-cooking-service';
+import { headers } from 'next/headers';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
@@ -33,14 +40,34 @@ export default async function CookRecipePage({
   searchParams,
 }: {
   params: Promise<{ recipeId: string }>;
-  searchParams: Promise<{ mealPlanEntryId?: string }>;
+  searchParams: Promise<{ mealPlanEntryId?: string; sessionId?: string }>;
 }) {
-  const mealPlanEntryId = (await searchParams).mealPlanEntryId;
+  const query = await searchParams;
+  const principal = query.sessionId
+    ? await getAuthenticatedSessionPrincipal(
+        new Request('http://localhost/cook', { headers: await headers() }),
+      )
+    : null;
+  let session: ReturnType<typeof readCookingSessionRecipe> | null = null;
+  if (query.sessionId && principal) {
+    try {
+      session = readCookingSessionRecipe(principal, query.sessionId);
+    } catch (error) {
+      if (error instanceof DecisionError && error.status === 404) notFound();
+      throw error;
+    }
+  }
+  if (query.sessionId && !session) notFound();
+  const mealPlanEntryId = session?.mealPlanEntryId ?? query.mealPlanEntryId;
   const meal = mealPlanEntryId ? getPlannedMeal(mealPlanEntryId) : null;
-  const recipe = getRecipeForPlannedMeal((await params).recipeId, mealPlanEntryId);
-  if (!recipe) notFound();
+  const recipeId = (await params).recipeId;
+  const recipe = session?.effectiveRecipe ?? getRecipeForPlannedMeal(recipeId, mealPlanEntryId);
+  if (!recipe || recipe.id !== recipeId) notFound();
   const actor = getActorContext((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value);
-  const calculation = meal?.recipeOverride ? null : getLatestRecipeNutritionCalculation(recipe.id);
+  const calculation =
+    session?.ingredientReviewRequired || meal?.recipeOverride
+      ? null
+      : getLatestRecipeNutritionCalculation(recipe.id);
   const nutrition = actor.profileId ? resolveNutritionHouseholdContext(actor) : null;
   const nutritionPreparation =
     nutrition && calculation?.recipeRevision === recipe.currentRevision
@@ -52,12 +79,37 @@ export default async function CookRecipePage({
       : null;
   return (
     <CookingMode
+      key={`${session?.id ?? recipe.id}:${session?.effectiveRevision ?? recipe.currentRevision}:${session?.contextRevision ?? 0}`}
       recipe={recipe}
-      initialServings={meal?.servings}
+      initialSession={
+        session
+          ? {
+              id: session.id,
+              revision: session.effectiveRevision,
+              completed: Boolean(session.completedAt),
+              contextRevision: session.contextRevision,
+              restrictions: session.cookingRestrictions,
+              restrictionsActive: restrictionsApply(session.cookingRestrictions),
+              timezone: getProfile(session.profileId)?.timezone ?? 'UTC',
+              ingredientReviewRequired: session.ingredientReviewRequired,
+            }
+          : undefined
+      }
+      initialPantryPreview={
+        session && actor.profileId
+          ? getCookSessionPantryPreview(session.id, actor.profileId)
+          : undefined
+      }
+      initialServings={session?.targetServings ?? meal?.servings}
       initialFavorite={actor.profileId ? isFavorite(recipe.id, actor.profileId) : false}
-      mealPlanEntryId={mealPlanEntryId}
+      mealPlanEntryId={mealPlanEntryId ?? undefined}
       nutritionPreparation={nutritionPreparation}
-      pantryAvailability={getRecipePantryAvailability(recipe.id, meal?.servings, mealPlanEntryId)}
+      pantryAvailability={getRecipePantryAvailability(
+        recipe.id,
+        session?.targetServings ?? meal?.servings,
+        mealPlanEntryId,
+        session?.effectiveRecipe,
+      )}
     />
   );
 }

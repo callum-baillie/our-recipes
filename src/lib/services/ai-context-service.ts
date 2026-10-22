@@ -1,3 +1,4 @@
+import { buildAiEquipmentContext } from './ai-equipment-context-service';
 import 'server-only';
 
 import { createHmac } from 'node:crypto';
@@ -260,6 +261,7 @@ export function buildAiSharedContext(
   const pantry = policy.sharePantry ? getPantryDashboard().batches : [];
   const lists = policy.shareShoppingLists ? listShoppingLists() : [];
   return {
+    equipment: buildAiEquipmentContext(principal),
     capturedAt: new Date().toISOString(),
     mealPlanRange: resolvedRange,
     coverage: {

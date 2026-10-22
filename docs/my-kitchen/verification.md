@@ -1,0 +1,47 @@
+# Verification receipt
+
+Branch: `refinement/post-review-completion`. Base: `45ed512b2d4909dac78ceb096d985dab85387d24`. Changes are uncommitted. The initial tree was clean; no historical reset, branch replacement, publication, deployment or paid provider calls were performed.
+
+Node 24.21.0, project pnpm 11.13.1 and installed Next 16.3.8 documentation were used. Native retains its independent npm toolchain. Direct `node node_modules/...` invocations use the installed project versions. The existing `/tmp/bord-refinement-bin` wrapper provides project pnpm without modifying either lockfile.
+
+| Gate                              | Result                                                                                                                                                                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root `tsc --noEmit`               | Passed on the implementation; production build also runs TypeScript.                                                                                                                                                                                                 |
+| Root `eslint .`                   | Passed with no warnings after correcting the client directive and test imports.                                                                                                                                                                                      |
+| Root `prettier --check .`         | Passed.                                                                                                                                                                                                                                                              |
+| Full root Vitest first pass       | 181 files passed; 1,055 tests passed, 11 skipped; four files failed. Two failures exposed migration/release assumptions and were corrected; auth/recovery subprocess checks timed out during contending heavyweight checks. This first run is not reported as green. |
+| Full root Vitest final rerun      | **186 files passed; 1,068 tests passed, 9 skipped**, with two workers. No failures.                                                                                                                                                                                  |
+| Focused corrected integration run | 45 tests passed across My Kitchen, authenticated assistant operations, account-settings upgrade, release status and process-interruption recovery, with one worker.                                                                                                  |
+| Latest inventory/service run      | 16 tests passed, including account-personal preference ownership, requirement invalidation and distinct induction vessels/zones.                                                                                                                                     |
+| Auth subprocess recheck           | Both real SQLite/auth tests passed in isolation.                                                                                                                                                                                                                     |
+| OpenAPI                           | Lint valid; 187 operations documented, 69 explicitly internal; generated-client smoke passed for all 187 operations.                                                                                                                                                 |
+| Native TypeScript                 | Passed via native `tsc --noEmit`.                                                                                                                                                                                                                                    |
+| Native lint                       | `npm run lint` passed.                                                                                                                                                                                                                                               |
+| Native tests                      | 16 files / 70 tests passed. This suite is not device evidence.                                                                                                                                                                                                       |
+| Production build                  | See final appended result below. Ordinary `pnpm build` compiled/types passed but configuration collection correctly rejected missing production auth secrets. `build:release` uses repository-provided synthetic build-only credentials.                             |
+| Browser                           | Initial development-server startup exceeded the configured 120-second timeout while contending with build/full-suite work. Production retry and fresh capture results are recorded below; no historical screenshots are relabelled.                                  |
+
+The Browser plugin/skill is absent; browser verification uses the repository’s Playwright Chromium workflow under the frontend-testing-debugging skill. The target flow is My Kitchen → add two identical cookers → edit one → reopen an unsaved draft → responsive views. Required states are 1440×1000, 390×844, 320×844, 390×560 and 850×1000 with 200% root text. Captures use a synthetic authenticated household and no provider calls.
+
+Live language-model interpretation/quality, real appliance behavior, native emulator/device accessibility/keyboard/dynamic-text, Docker/PWA/Unraid/operator-volume recovery and production deployment are not established by this receipt. The [acceptance register](acceptance.md) records remaining implementation, not just external checks.
+
+## Final rendered evidence
+
+`tests/e2e/my-kitchen.spec.ts` exercises real authenticated inventory writes against the standalone production artifact. It archives only its own prior synthetic fixture items before each run. The final viewport capture loop scrolls to the top; an initial full-page capture from a scrolled document was superseded because the sticky header obscured the page title. The corrected test uses the accessible combobox role for equipment selection.
+
+Page identity, meaningful content, no framework overlay/page exceptions, actual add/edit/reopen interactions, zero horizontal overflow in all five viewport/text states and the mounted error-state axe scan passed. The runner's NO_COLOR/FORCE_COLOR warning is a harness warning. Captures are browser evidence, not native screenshots.
+
+The application/migration file hashes and working source digest are in [source-manifest.json](source-manifest.json). Screenshots record the base commit plus uncommitted source state; no new code commit was made. All implementation remains in the original branch's working tree.
+
+The broad 1,068-pass run preceded the final two UI-message improvements and the legacy planned-override omission fix. After those changes, 19 inventory/security tests and then 21 inventory/planning tests passed; the latter includes an actual old-client-style update preserving existing method/equipment/timing metadata. Additional related Nutrition/AI-operation tests and the final artifact/browser checks are recorded below. Omitted metadata schemas remove their inner defaults before becoming optional, so missing fields cannot silently overwrite stored adaptations with empty strings/arrays.
+
+## Final checks after compatibility repair
+
+- `build:release`: passed on the final source, including TypeScript and the clean 3,607-file standalone artifact.
+- Production Playwright: **1 journey passed in 16.4 seconds**, including real duplicate CRUD, one-item edit, draft recovery/discard status, all five viewport/text states, meaningful inline errors and zero axe violations. Final desktop and 320px error-state captures were inspected visually.
+- Focused final planning/inventory tests: **21 passed**. Related Nutrition/planned-allocation/authenticated AI-operation tests: **26 passed**. Changed-file lint passed.
+- A compiler process exited with a native SIGTRAP; a clean `tsc --noEmit --incremental false` rerun passed, and the final production build’s TypeScript check also passed.
+- Formatting and whitespace checks passed. No package/lockfile changes, commits, publication or deployment were made.
+- Fresh native availability check: `adb devices -l` returned an empty device list; no emulator or xcrun executable was available. XcodeBuildMCP `list_sims` failed with `spawn xcrun ENOENT`. Native types/lint/70 tests are not a substitute for device accessibility and recovery acceptance.
+
+The final source digest is `d0c7843b0946da3db08a7f1eeb21fbe8353452ec0803139ceed4f21992690044`. Screenshot metadata records that digest and the actual production BUILD_ID. The [working-tree status](working-tree-status.txt) lists every modified/new file against the original branch; nothing is staged. The feature remains incomplete for the implementation gaps enumerated in K01–K30.

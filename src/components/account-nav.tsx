@@ -2,6 +2,7 @@
 import { SettingsSectionNav } from './settings-section-nav';
 import { UserRound, HeartPulse, Sparkles, Plug, Workflow, ShieldCheck } from 'lucide-react';
 const links = [
+  { href: '/my-kitchen', label: 'My Kitchen', icon: UserRound },
   { href: '/account', label: 'My profile', icon: UserRound },
   { href: '/account/nutrition', label: 'Nutrition preferences', icon: HeartPulse },
   { href: '/account/ai', label: 'AI preferences & privacy', icon: Sparkles },

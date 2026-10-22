@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       pantryParsed.success && pantryParsed.data.mealPlanEntryId
         ? pantryParsed.data.mealPlanEntryId
         : null,
+      access.principal.userId,
     );
     return withApiRequestId(
       NextResponse.json(

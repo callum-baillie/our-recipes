@@ -1,0 +1,10 @@
+{
+  "baseRevision": "45ed512b2d4909dac78ceb096d985dab85387d24",
+  "testedState": "Uncommitted My Kitchen implementation",
+  "buildId": "3M4r47Pv8C2dOg9c7d6rm",
+  "sourceDigest": "d0c7843b0946da3db08a7f1eeb21fbe8353452ec0803139ceed4f21992690044",
+  "capturedAt": "2026-10-21T06:00:42.792Z",
+  "provider": "No provider calls",
+  "browser": "Chromium",
+  "states": ["1440x1000", "390x844", "320x844", "390x560", "850x1000 at 200% root font"]
+}

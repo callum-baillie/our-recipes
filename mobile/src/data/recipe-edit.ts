@@ -39,6 +39,7 @@ export function preserveRecipeFields(
     'sourceUrl',
     'originalAuthor',
     'cookingMethod',
+    'equipmentRequirements',
     'tags',
     'nutritionCalories',
     'nutritionProteinGrams',
@@ -49,7 +50,7 @@ export function preserveRecipeFields(
     'nutritionSugarGrams',
     'nutritionSodiumMilligrams',
   ])
-    fields[key] = detail[key] ?? '';
+    fields[key] = detail[key] ?? (key === 'equipmentRequirements' ? [] : '');
   fields.equipment = detail.equipment.map((item) => item.name);
   const unchanged = (a: string[], b: string[]) =>
     a.length === b.length && a.every((value, i) => value === b[i]);

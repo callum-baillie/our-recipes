@@ -40,6 +40,11 @@ type Settings = {
 };
 
 const policyFields = [
+  [
+    'shareKitchenEquipment',
+    'Equipment and facilities',
+    'Physical household equipment, capabilities, measurements and availability. Consent belongs to your signed-in account.',
+  ],
   ['shareSharedRecipes', 'Shared recipes', 'Titles, ingredients, tags, and recipe details.'],
   ['shareMealPlans', 'Meal plans', 'Planned dates, meal slots, servings, and notes.'],
   [
