@@ -12,11 +12,11 @@ Review date: 2026-10-20. Starting revision: `160441dd74ef79dab936a34a0f1c5e74065
 
 | Evidence                                                      | Result and scope                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Full local `pnpm verify`, `4e22102`                           | 669 unit tests in116 files and376 integration tests in66 files passed;9 optional historical archive cases skipped. Formatting, lint, types,179-operation API/client checks and the3,585-file release artifact passed.                                                |
+| Full local `pnpm verify`, `4e22102`                           | 669 unit tests in116 files and 376 integration tests in66 files passed; 9 optional historical archive cases skipped. Formatting, lint, types,179-operation API/client checks and the3,585-file release artifact passed.                                              |
 | Final application `pnpm test:unit`, fixture `8f54eae`         | All671 tests in117 files passed against application source `a74c8db`; final Nutrition types/build and the rebuilt isolated Docker smoke also passed.                                                                                                                 |
 | Final Nutrition follow-up, `a74c8db`                          | 29 focused component tests passed, including a first-layout-phase change that failed before the baseline fix. Types and rebuilt artifact passed; profile scope, expected versions, canonical precision, nutrient order and dirty/clean acknowledgement are asserted. |
 | Production `pnpm test:post-review:browser`, fixture `8f54eae` | All22 cases passed (21 main +1 isolated virtual-auth case) on application source `a74c8db`. Browser WF and all Browser SN scenarios passed; persistent screenshots retain source/state metadata.                                                                     |
-| Standard production `pnpm test:v1-release`, `4e22102`         | All19 browser cases and3 performance checks passed. This predates only the final Nutrition baseline correction; final CI executes the same gate on the published revision.                                                                                           |
+| Standard production `pnpm test:v1-release`, `4e22102`         | All19 browser cases and 3 performance checks passed. This predates only the final Nutrition baseline correction; final CI executes the same gate on the published revision.                                                                                          |
 | Settings reflow follow-up, `0e56ca0`                          | Both affected production cases passed with the original no-overflow requirement plus full-word and44px-height assertions. First CI failure and intermediate whole-word failure remain recorded in the verification receipt; final GitHub reruns the unified suites.  |
 | Shopping lifecycle                                            | The2 archive/duplicate error-owner cases passed and are included in full unit gates.                                                                                                                                                                                 |
 
@@ -73,7 +73,18 @@ Earlier failures remain failures: an overloaded concurrent run had two five-seco
 
 ## Remaining verification and release limits
 
-- All33 rows above have executed current evidence within their stated scope; none is a claim of physical-device or live-provider approval.
+- All 33 rows above have executed current evidence within their stated scope; none is a claim of physical-device or live-provider approval.
 - The final production runner passed22 cases and persistently recaptured Browser WF/SN. Current metadata distinguishes these from original supplied baselines and earlier failed runs.
 - Native physical camera/software keyboard/SecureStore process-kill, physical passkeys/live email/scale, paid image realism, installed PWA, operator volumes and production deployment require separate evidence. The local isolated Docker restore is recorded in the verification receipt.
 - Captures under `screenshots/bord` remain historical. No earlier image is relabelled as a newer run.
+
+## RV completion retention rerun ·2026-10-22
+
+The implementation at `f2ff37c` retains all 33 corrections above. Exact commands
+and scope are in [rv-verification.md](rv-verification.md): 702 root unit, 440
+integration, 75 native and 24 production post-review browser cases passed; 9
+historical archive cases remain skipped. The 19-browser/3-performance gate passed
+locally and in final-source CI after the shared modal correction. Fresh WF/SN,
+chat and settings captures keep their own revision labels. Physical camera,
+native accessibility/storage restart, live services, paid quality, installed PWA
+and operator deployment remain outside that automated approval.

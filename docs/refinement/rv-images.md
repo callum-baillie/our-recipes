@@ -41,3 +41,8 @@ quality and model/tool-choice evaluation still require explicit paid allowance
 and credentials, followed by human rubric scores. See `recipe-images.md` and the
 bounded opt-in `scripts/evaluate-recipe-images.ts` path. A null-score dry run is
 not quality evidence.
+
+OpenAPI now describes the actual owned candidate response, including
+`outcome_unknown`, for inspection, acceptance and discard. Unknown is explicitly
+not proof of failure and cannot be used as a blind-regeneration signal. The
+180-operation generated-client gate passes with this contract.

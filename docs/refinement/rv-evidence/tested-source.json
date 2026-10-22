@@ -1,9 +1,12 @@
 {
-  "baseRevision": "45ed512b2d4909dac78ceb096d985dab85387d24",
+  "startingRevision": "45ed512b2d4909dac78ceb096d985dab85387d24",
+  "runtimeRevision": "f2ff37c9a630fed809719f6db885385fff7b8efe",
   "branch": "refinement/rv-completion",
-  "sourceSha256": "991756ea9be9b9c34b6696becfd107fd85242b9fcbe45e4385e9f338737f3b3d",
-  "scope": "Source, tests, migrations, scripts, manifests, lockfiles and CI configuration; excludes docs and screenshot output. Working patch, not deployment.",
-  "fileCount": 1180,
-  "recordedAt": "2026-10-22T17:41:07.326264+00:00",
-  "node": "v24.21.0"
+  "sourceSha256": "0702e052939a0cb27f62c52c926e56b62b0f542e6132e740435029b5c7a31ccf",
+  "openApiSha256": "6431feac2b4a9f984fd4ce28a0e9b47e47dcffca750d45a457c2c38a11ff2dad",
+  "scope": "Tracked runtime/configuration/assets/tests excluding narrative Markdown, docs and screenshots. Validated OpenAPI has a separate hash. All runtime changes are committed; not deployment evidence.",
+  "fileCount": 1323,
+  "recordedAt": "2026-10-22T18:27:15.037003+00:00",
+  "hostNode": "v24.21.0",
+  "dockerNode": "v24.22.1"
 }

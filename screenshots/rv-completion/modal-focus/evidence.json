@@ -1,0 +1,8 @@
+{
+  "revision": "f2ff37c9a630fed809719f6db885385fff7b8efe",
+  "fixture": "Real synthetic Plan settings from the standard mobile release scenario. Shift+Tab wraps to the last action and Tab returns to the first at each width; both assertions pass before these captures.",
+  "capturedState": "After meal-type and date-picker keyboard/Escape interactions; not a claim the pictured focus is the earlier wrap target.",
+  "viewports": ["320x844", "390x844", "768x844", "1440x844"],
+  "sourceTest": "tests/e2e/mobile-refinements.spec.ts",
+  "scope": "Desktop/mobile web Chromium; not native-device accessibility."
+}

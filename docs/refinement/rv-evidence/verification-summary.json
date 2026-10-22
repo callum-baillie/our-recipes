@@ -1,0 +1,56 @@
+{
+  "runtimeRevision": "f2ff37c9a630fed809719f6db885385fff7b8efe",
+  "ci": "https://github.com/callum-baillie/our-recipes/actions/runs/39828959519",
+  "ciConclusion": "success",
+  "unit": {
+    "passed": 702,
+    "files": 120
+  },
+  "integration": {
+    "passed": 440,
+    "skipped": 9,
+    "files": 72,
+    "skipReason": "Four unavailable historical archive fixture inputs"
+  },
+  "browser": {
+    "release": 19,
+    "postReview": 24,
+    "performance": 3,
+    "viewports": "1440 desktop;390 mobile;320 reflow/200% text;390x500 and568x320 chat;850px settings",
+    "newRvTests": "Named stale meal review; local/outage scan with real cart persistence and unknown receipt inspection/closure"
+  },
+  "native": {
+    "passed": 75,
+    "files": 17,
+    "exports": ["ios", "android"],
+    "deviceCoverage": "None: no attached adb device, SDK/emulator or Xcode"
+  },
+  "openApi": {
+    "documentedClientOperations": 180,
+    "explicitInternalOperations": 69
+  },
+  "standalone": {
+    "filesChecked": 3676,
+    "next": "16.4.1"
+  },
+  "docker": "Passed disposable linux/amd64 smoke; separate docker-smoke.json; no operator-volume or registry-publication claim",
+  "audits": {
+    "rootFull": {
+      "high": 1,
+      "total": 1
+    },
+    "rootProduction": {
+      "total": 0
+    },
+    "native": {
+      "high": 22,
+      "moderate": 8,
+      "total": 30
+    }
+  },
+  "baselineArchive": {
+    "pngFiles": 216,
+    "unchangedAgainstStartingRevision": true
+  },
+  "externalAcceptance": "Paid/live evaluation; physical native/camera/accessibility/login; physical passkey/email; installed PWA; live packs/provider/worker; real-volume Unraid; missing historical archives; unresolved dependency chains. See verification receipt for prerequisites."
+}

@@ -1,6 +1,6 @@
 {
   "android": {
-    "bundle": "entry-4634b512df5a7ca5d9256149ce8011b8.hbc",
+    "bundle": "entry-2e5f88088926f3650d74c1985ebb65c9.hbc",
     "sources": 1953,
     "auditedModulePresence": {
       "decode-uri-component": true,
@@ -13,7 +13,7 @@
     }
   },
   "ios": {
-    "bundle": "entry-c82cae9c4c5bea352b79cda1494fc077.hbc",
+    "bundle": "entry-e1673036642e5052a6dacd9e5ee84b54.hbc",
     "sources": 1956,
     "auditedModulePresence": {
       "decode-uri-component": true,

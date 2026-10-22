@@ -1,0 +1,6 @@
+{
+  "revision": "a0a0f2cd2926ee0b72f86d40d013c15f5848464e",
+  "viewport": "320x568 at 200% text",
+  "state": "Controlled named-meal proposal; Confirm changes retains focus but auto-follow scrolls it above the visible conversation after resize. Corrective toBeInViewport assertion failed.",
+  "classification": "Reproduced focus/scroll defect before the follow-up; not supplied baseline imagery."
+}

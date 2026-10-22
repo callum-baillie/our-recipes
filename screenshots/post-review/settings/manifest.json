@@ -1,7 +1,7 @@
 {
-  "revision": "0e56ca0c09740002a9fc553dd41aa43128fe1f83",
+  "revision": "f2ff37c9a630fed809719f6db885385fff7b8efe",
   "state": "Working post-review changes; controlled HTTP outcomes, no provider requests or settings writes.",
-  "capturedAt": "2026-10-20T22:16:08.697Z",
+  "capturedAt": "2026-10-22T18:20:54.692Z",
   "states": [
     "runtime-overlap-1440",
     "runtime-overlap-390",

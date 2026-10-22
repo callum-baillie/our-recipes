@@ -4,7 +4,7 @@ Starting point: isolated `refinement/rv-completion`, `45ed512b2d4909dac78ceb096d
 
 ## Implementation
 
-**Status: implemented; focused behavioral checks verified; production browser and device review pending.**
+**Status: implemented; focused handler/component and production-browser checks verified. Native device presentation/accessibility remains unverified.**
 
 - `ai-app-action-service.ts` now derives each review from the same authorized response used to compute its stale-approval hash. It persists only bounded presentation metadata and the existing guard hashes, not those additional source responses. Recipe identity no longer comes from a separate, unguarded display lookup.
 - Shared versioned `shared/mobile-domain/app-action-review.ts` defines the web/native subject, effect, context, before/after changes and caveats. The server normalizer resolves actual meal/recipe/list/item/product/batch/person names. A proposal's model-written title is separate from target identity. Context includes meal date, human slot, servings, recipe revision, selected people, parent shopping list, recorded quantity/unit, batch location and Nutrition recipient/event state where applicable.
@@ -33,7 +33,7 @@ The first integration iterations exposed a wrong preferences-property name (corr
 
 ## Prepared browser acceptance and remaining evidence
 
-`tests/e2e/rv-action-review.spec.ts` is included by the lead in the production browser runner. It supplies the same normalized named-meal review with controlled action409, checks visible identity/date/meal/servings, no raw UUID/empty-value rows, keyboard activation, and overflow at1440×1000,390×844 and320×568 with200% text. It writes revision-labelled captures under `screenshots/rv-completion/action-review/`. Its mocked409 checks UI recovery; the integration test above establishes actual handler/database stale rejection. **No browser pass or screenshots are claimed until this runner executes.** Browser plugin was unavailable; the existing Playwright harness is used.
+`tests/e2e/rv-action-review.spec.ts` is included by the lead in the production browser runner. It supplies the same normalized named-meal review with controlled action409, checks visible identity/date/meal/servings, no raw UUID/empty-value rows, keyboard activation, and overflow at 1440×1000,390×844 and 320×568 with 200% text. It writes revision-labelled captures under `screenshots/rv-completion/action-review/`. Its mocked409 checks UI recovery; the integration test above establishes actual handler/database stale rejection. **No browser pass or screenshots are claimed until this runner executes.** Browser plugin was unavailable; the existing Playwright harness is used.
 
 Native device/screen-reader behavior remains unexecuted here. The lead owns native type/build and integrated gates. No deployment, real household mutation, paid generation, backup or recovery operation was performed by this workstream.
 
@@ -47,7 +47,22 @@ and keep Amount to buy separate from Cart amount. A cart change shows its own
 quantity/unit before and after, including zero and unknown units; demand units
 are never substituted.
 
-On Vitest4.1.12, the helper suite passed7/7 and the real authenticated
+On Vitest 4.1.12, the helper suite passed7/7 and the real authenticated
 prepare/apply suite passed4/4. The added case creates Chopped tomatoes and Bread,
 reviews333g to buy versus2can in cart, asserts preview performs no mutation,
 then applies deletion and verifies only Bread remains. Targeted lint passed.
+
+## Current browser correction
+
+The first `a0a0f2c` capture at 320px/200% text reproduced an obscured focused
+Confirm action: chat auto-follow moved to the bottom after resize. The drawer
+now treats focused conversation controls as reading intent and scrolls that
+control into view on layout/content changes, retaining scroll padding. The
+component test passes and the current production browser requires the entire
+control in view (`ratio:1`), then applies with Enter and retains the local409.
+The before capture and final 1440/390/320 captures are separate.
+
+A separate shared-modal initial-focus race surfaced in CI at `fd6d35e`. Its
+queued-frame unit regression failed before the hook correction and now passes.
+`f2ff37c` passes both standard and post-review browser gates with real keyboard
+wrap, return, short/narrow and enlarged-text checks.

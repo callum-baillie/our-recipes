@@ -29,10 +29,22 @@ intake was recorded. A failed read-after-write preserves the acknowledgement and
 offers refresh without another write. An uncertain in-memory web request retains
 the same operation and frozen payload for exact retry. The account and viewing
 profile are read before the first mutation and retained with the command; the
-expected-profile header guards the write. A failed context read is not attempted
+expected-account and expected-profile headers guard the write. A failed context read is not attempted
 and leaves the draft editable. Retry and recovery require the current actor to
 match the original account/profile. This pass does not claim browser-restart
 persistence for the web scan dialog.
+
+The final scope review found a gap between the context read and the mutation: a
+different authenticated account could legitimately view the same profile before
+the POST. The server now independently validates optional
+`X-Bord-Expected-User-Id` and `X-Bord-Expected-Profile-Id` on the three reviewed
+confirmation paths before receipt lookup or provider/write work. Current web and
+native scanners send both captured values. Existing clients remain compatible;
+the headers never grant authority or replace the signed session/profile seam.
+The added real-handler regression signs in two accounts, uses the actual password
+switch route to give the second session the same viewed profile, and checks all
+three rejected writes plus original-account positive controls and intent guards.
+The updated authenticated recovery suite passed 13/13 on Vitest 4.1.12, including this case. The original-account positives use distinct synthetic product names so the existing no-merge-by-name rule remains enforced.
 
 The final mounted-component review found a web recovery trap after an uncertain
 request followed by a permanent 404/409. The dialog now supports inspection of the
@@ -109,20 +121,19 @@ and reports the storage limitation rather than silently deleting evidence.
 All provider responses in these checks are bounded synthetic fixtures. No real
 credentials, household records, provider acquisition or paid calls were used.
 
-| Command                                                                                                                                                                                           | Executed result / coverage                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PATH=/tmp/bord-refinement-bin:$PATH pnpm exec vitest run --project unit tests/unit/rv-shopping-scan.test.ts tests/unit/catalog-post-review.test.ts tests/unit/pantry-shopping-workflows.test.ts` | **29 passed.** Actual `ShoppingListEditor` consumer plus direct scan review; local-only outage, explicit replacement/separate amount, full source portion, immutable retry, shared journal/archive rules.                                                                                                                              |
-| `PATH=/tmp/bord-refinement-bin:$PATH pnpm exec vitest run --project integration tests/integration/rv-pantry-recovery.test.ts`                                                                     | **12 passed.** Expired historical receipt retention, exact replay, changed intent, account/profile/origin/permission/revocation, unknown/closure, historical missing receipt, raw provider 404 and expired revision, deleted shopping target, acknowledged replay during outage, and both in-flight catalog write paths after closure. |
-| `PATH=/tmp/bord-refinement-bin:$PATH pnpm exec vitest run --project integration tests/integration/bord-catalog.test.ts -t 'RV scan'`                                                              | **1 passed; 17 unrelated cases not selected.** Real adapter's raw barcode fixture with local fallback during outage, persisted 500 g/2 each/1 g semantics, separate entry and one-batch purchase intake replay.                                                                                                                        |
-| `cd mobile && npx --yes npm@11.4.2 exec -- vitest run tests/catalog-post-review.test.ts`                                                                                                          | **15 passed.** Shared native identity/portion/generation and encrypted journal contracts, including unknown archive persistence and storage failure. These are deterministic tests, not a device run.                                                                                                                                  |
+| Command                                                                                                                                                                                           | Executed result / coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PATH=/tmp/bord-refinement-bin:$PATH pnpm exec vitest run --project unit tests/unit/rv-shopping-scan.test.ts tests/unit/catalog-post-review.test.ts tests/unit/pantry-shopping-workflows.test.ts` | **29 passed.** Actual `ShoppingListEditor` consumer plus direct scan review; local-only outage, explicit replacement/separate amount, full source portion, immutable retry, shared journal/archive rules.                                                                                                                                                                                                                                                                           |
+| `PATH=/tmp/bord-refinement-bin:$PATH pnpm exec vitest run --project integration tests/integration/rv-pantry-recovery.test.ts`                                                                     | **13 passed.** Different-account/same-profile rejection before all three confirmation writes, original-account positives, independent header compatibility, expired historical receipt retention, exact replay, changed intent, account/profile/origin/permission/revocation, unknown/closure, historical missing receipt, raw provider 404 and expired revision, deleted shopping target, acknowledged replay during outage, and both in-flight catalog write paths after closure. |
+| `PATH=/tmp/bord-refinement-bin:$PATH pnpm exec vitest run --project integration tests/integration/bord-catalog.test.ts -t 'RV scan'`                                                              | **1 passed; 17 unrelated cases not selected.** Real adapter's raw barcode fixture with local fallback during outage, persisted 500 g/2 each/1 g semantics, separate entry and one-batch purchase intake replay.                                                                                                                                                                                                                                                                     |
+| `cd mobile && npx --yes npm@11.4.2 exec -- vitest run tests/catalog-post-review.test.ts`                                                                                                          | **15 passed.** Shared native identity/portion/generation and encrypted journal contracts, including unknown archive persistence and storage failure. These are deterministic tests, not a device run.                                                                                                                                                                                                                                                                               |
 
 Final web follow-up: `pnpm exec vitest run --project unit tests/unit/rv-shopping-scan.test.ts`
-passed **10/10** on Vitest 4.1.11, including the original three cases plus failed
+passed **10/10** again on Vitest 4.1.12 after the account-header correction, including the original three cases plus failed
 auth-context lookup, uncertain 404 and 409, acknowledgement winning during closure,
 account and profile changes, and preserved actor binding after a known initial
 rejection. Scoped ESLint passed for the component and mounted tests. The earlier
-29-test combined receipt predates these seven added cases. The consolidated gate
-records the final results with the subsequently updated dependencies.
+29-test combined receipt predates these seven added cases. The native contract file also passed 15/15 again, including same-profile/different-account rejection. The consolidated gate records the final full-suite results.
 
 The first generalized test run exposed two fixture assertions, corrected before
 the passing run: a missing pinned provider revision intentionally maps raw 404 to

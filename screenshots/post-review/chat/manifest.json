@@ -1,7 +1,7 @@
 {
-  "baseCommit": "30ae09eda519331684a0e50e7b93e10b7835c0ba",
+  "baseCommit": "f2ff37c9a630fed809719f6db885385fff7b8efe",
   "state": "Working post-review code; deterministic HTTP/stream fixture, no paid calls",
-  "capturedAt": "2026-10-20T22:12:32.309Z",
+  "capturedAt": "2026-10-22T18:20:35.877Z",
   "browser": "Chromium",
   "viewports": ["1440x1000", "390x844", "320x568", "320x568 with200%text", "390x500", "568x320"]
 }

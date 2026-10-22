@@ -2,7 +2,8 @@
 
 This supersedes the audit counts in `post-review-dependencies.md` for this
 working patch. Node 24.21.0, pnpm 11.13.1 and the native lockfile's npm 11.4.2
-were used. Host npm 11.19.0 was identified during discovery; the native clean
+were used. CI now explicitly installs npm11.4.2 before native `npm ci`,
+matching `mobile/package.json` rather than inheriting the runner version. Host npm 11.19.0 was identified during discovery; the native clean
 installation and final audit are rerun explicitly with `npx --yes npm@11.4.2`.
 
 | Audit                                                 | Before                         | After               | Disposition                                                                        |
@@ -17,15 +18,15 @@ every parser is included in or reachable from a deployed application.
 
 ## Root
 
-A fresh October22 rerun found additional advisories after the earlier receipt:
-Next16.3.8 was affected by [image optimization RCE](https://github.com/advisories/GHSA-2464-fhr4-w9xw)
+A fresh October 22 rerun found additional advisories after the earlier receipt:
+Next 16.3.8 was affected by [image optimization RCE](https://github.com/advisories/GHSA-2464-fhr4-w9xw)
 and [Server Actions denial of service](https://github.com/advisories/GHSA-p3m5-59mp-jv5r),
-and Vitest4.1.11 by two mocker advisories
+and Vitest 4.1.11 by two mocker advisories
 ([registration](https://github.com/advisories/GHSA-qxg6-89mg-rqv8),
 [Windows traversal](https://github.com/advisories/GHSA-xp26-3454-mjgp)).
-The root now pins Next and its ESLint config16.4.1 plus Vitest4.1.12.
+The root now pins Next and its ESLint config16.4.1 plus Vitest 4.1.12.
 Current pre-patch and post-patch JSON files are retained alongside the October21
-receipts; the table uses October22 counts. Production includes Next, so its
+receipts; the table uses October 22 counts. Production includes Next, so its
 findings were addressed regardless of whether this app exercised the specific
 vulnerable image path. Vitest entered the production-filtered dependency graph
 through Better Auth's optional peer, without establishing deployed reachability.
@@ -39,8 +40,9 @@ micromatch → braces@3.0.3` (GHSA-vfj7-8cjw-p6xm). `pnpm view braces@3.0.4 vers
 returns package-not-found; `pnpm view braces version` returns 3.0.3. This is a
 lint/build tooling risk for hostile glob input, not evidence of a deployed HTTP
 handler accepting that input. Next step: adopt the published compatible fix and
-rerun lint/build/audit when available. The release artifact verification below
-will separately inspect its traced dependencies.
+rerun lint/build/audit when available. The final standalone inspection covers184 package manifests: Next 16.4.1 is
+present; Vite, Vitest, its mocker, braces, micromatch and ESLint config are absent.
+This is the traced artifact, not an operator-volume runtime acceptance.
 
 ## Native unresolved chains
 
@@ -54,13 +56,13 @@ URLs and suggested replacements are in the raw native audit.
 | Expo/React Native → Metro/Jest → micromatch → braces 3.0.3                                                                            | Node development, source watching and test/build globbing                                                                                                         | No published 3.0.4. Adopt fixed compatible release when available                                                                                                        |
 | Expo → @expo/cli → @expo/code-signing-certificates → node-forge 1.4.0                                                                 | Node update signing/certificate tooling; not proof of Hermes runtime inclusion                                                                                    | Registry latest is 1.4.0; use supported Expo signing-tool update when patched, retain trusted certificate inputs                                                         |
 | Expo Router 6.0.24 → query-string 7.1.3 → decode-uri-component 0.2.2                                                                  | Both current iOS and Android Hermes source maps include query-string and decode-uri-component; this is confirmed bundled code, not merely a production dependency | Latest compatible 0.2.x is 0.2.2; patched 0.5.x is outside the range. Requires a supported Router/Expo migration and hostile/deep-link tests, not a forced leaf override |
-| React Native → babel-jest → babel-plugin-istanbul → @istanbuljs/load-nyc-config → js-yaml 3.15.2 → argparse 1.0.10 → sprintf-js 1.0.3 | Node test/coverage configuration parsing                                                                                                                          | Compatible js-yaml 3.x latest remains 3.15.2; npm's suggested React Native major is outside Expo54's matrix. Upgrade the supported test/build chain when available       |
+| React Native → babel-jest → babel-plugin-istanbul → @istanbuljs/load-nyc-config → js-yaml 3.15.2 → argparse 1.0.10 → sprintf-js 1.0.3 | Node test/coverage configuration parsing                                                                                                                          | Compatible js-yaml 3.x latest remains 3.15.2; npm's suggested React Native major is outside Expo 54's matrix. Upgrade the supported test/build chain when available      |
 
 Native navigation is aligned to Expo's declared `^7.1.8` range with the lockfile
 resolving the compatible 7.5.1 release; this is a compatibility correction, not a
 claim that it fixes these advisories. Expo's audit suggestions include downgrading
-to SDK44 and jumping React Native majors. Neither is a supported repair for this
-SDK54 installation. No new override forces those versions.
+to SDK 44 and jumping React Native majors. Neither is a supported repair for this
+SDK 54 installation. No new override forces those versions.
 
 ## Export reachability evidence
 
