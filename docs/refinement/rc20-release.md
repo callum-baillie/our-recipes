@@ -10,7 +10,7 @@ The browser source digest is `374f2b7ed5431b9b6582a2af5b14c2975a00c68d099fa32cd5
 
 ## GitHub release and image
 
-Tag `v1.0.0-rc.20` starts the repository's existing release workflow. That workflow publishes `ghcr.io/callum-baillie/bord:v1.0.0-rc.20` as a multi-platform image and updates `latest`, then runs disposable smoke checks on native amd64 and arm64 GitHub runners. The local Docker pass is not a substitute for those published-image checks. Their final run links, result and image digest will be recorded here after completion.
+The prerelease is [published on GitHub](https://github.com/callum-baillie/our-recipes/releases/tag/v1.0.0-rc.20) from commit `51ec3a1d824983b23720ba7742f7cb5fc576c22b` on `refinement/post-review-completion`. The [release workflow passed](https://github.com/callum-baillie/our-recipes/actions/runs/39859284821): native amd64 and arm64 builds, publication/finalize, and both published-image container smoke checks. The published version tag and `latest` resolve to OCI index digest `sha256:ea2891af3b75e80b8abfb55d21b30a7bead6a3703f9de6d0e469f71d922bc574`. Its linux/amd64 manifest is `sha256:84db899c6b6e3c4eb6661dfcf02f18533acf6e1879355c5bf12085b3f9098250`; linux/arm64 is `sha256:24ddb8c45fa1dd19f169d232371087115383271d299b66840d1bb5c758b2e1cc`. The local Docker pass is separate from these published-image checks.
 
 The GitHub prerelease is the distribution event. It is not a deployment to the user's household or an Unraid/operator-host validation. Back up and validate household data before upgrading; migrations `0074`–`0080` are additive, but an older image must not be run against the migrated database.
 
