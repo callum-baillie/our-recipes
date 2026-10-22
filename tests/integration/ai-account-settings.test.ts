@@ -344,7 +344,7 @@ describe('bulk import results and upgrade compatibility', () => {
       await getSqliteDatabase().backup(path);
       const legacy = new Database(path);
       legacy.exec(
-        'DROP TABLE ai_execution_traces; ALTER TABLE ai_action_preview_images DROP COLUMN source_digest; ALTER TABLE ai_action_preview_images DROP COLUMN owner_user_id; ALTER TABLE ai_action_proposals DROP COLUMN turn_id; ALTER TABLE ai_jobs DROP COLUMN turn_id; ALTER TABLE ai_decision_records DROP COLUMN turn_id; ALTER TABLE shopping_list_items DROP COLUMN cart_unit; DROP TABLE ai_prompt_versions; DROP TABLE recipe_image_candidates; DROP TABLE ai_chat_turns; ALTER TABLE ai_operation_audits DROP COLUMN prompt_version; DROP TABLE ai_user_settings; DROP TABLE ai_runtime_settings; DELETE FROM __drizzle_migrations WHERE created_at >= 1792281600001;',
+        'ALTER TABLE ai_chat_threads DROP COLUMN privacy_scope_json; DROP TABLE ai_execution_traces; ALTER TABLE ai_action_preview_images DROP COLUMN source_digest; ALTER TABLE ai_action_preview_images DROP COLUMN owner_user_id; ALTER TABLE ai_action_proposals DROP COLUMN turn_id; ALTER TABLE ai_jobs DROP COLUMN turn_id; ALTER TABLE ai_decision_records DROP COLUMN turn_id; ALTER TABLE shopping_list_items DROP COLUMN cart_unit; DROP TABLE ai_prompt_versions; DROP TABLE recipe_image_candidates; DROP TABLE ai_chat_turns; ALTER TABLE ai_operation_audits DROP COLUMN prompt_version; DROP TABLE ai_user_settings; DROP TABLE ai_runtime_settings; DELETE FROM __drizzle_migrations WHERE created_at >= 1792281600001;',
       );
       legacy.close();
       resetDatabaseForTests();

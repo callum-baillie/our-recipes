@@ -8,7 +8,7 @@ import { Body, Button, EditorialText, Surface } from '@/components/ui';
 
 type Candidate = {
   id: string;
-  status: 'requested' | 'ready' | 'accepted' | 'failed' | 'discarded';
+  status: 'requested' | 'ready' | 'accepted' | 'failed' | 'discarded' | 'outcome_unknown';
   sourceRevision: number;
   altText: string;
   model: string;
@@ -181,7 +181,11 @@ export function RecipeImageReview({
                   ? 'Reviewed photo added.'
                   : candidate?.status === 'discarded'
                     ? 'Preview discarded.'
-                    : 'A paid request was started. Check its outcome before starting another.'}
+                    : candidate?.status === 'outcome_unknown'
+                      ? 'The provider outcome is unknown. Keep this request for reconciliation; it will not be generated again automatically.'
+                      : candidate?.status === 'failed'
+                        ? 'This request failed. A new preview is a separate paid action.'
+                        : 'A paid request was started. Check its outcome before starting another.'}
           </Body>
           <Button
             label={busy === 'checking' ? 'Checking request…' : 'Check this request'}

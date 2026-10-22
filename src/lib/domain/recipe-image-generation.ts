@@ -21,7 +21,7 @@ export type RecipeImageCandidate = {
   id: string;
   recipeId: string;
   sourceRevision: number;
-  status: 'requested' | 'ready' | 'accepted' | 'failed' | 'discarded';
+  status: 'requested' | 'ready' | 'accepted' | 'failed' | 'discarded' | 'outcome_unknown';
   altText: string;
   width: number | null;
   height: number | null;

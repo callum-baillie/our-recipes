@@ -1170,7 +1170,7 @@ describe('AI assistant services', () => {
       });
       expect(appAction.actions[0]).toMatchObject({
         recordLabel: 'Queued recipe 1',
-        changeLabel: 'Create image',
+        changeLabel: 'Prepare an image preview',
       });
       const result = await confirmAppActions(principal, request, {
         id: appAction.id,

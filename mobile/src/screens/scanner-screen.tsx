@@ -11,6 +11,7 @@ import {
   barcodeReviewChoices,
   catalogConfirmation,
   catalogQuantity,
+  shoppingScanConfirmation,
   type ReviewedCatalogFood,
   type ReviewedLocalProduct,
   type BarcodeReviewResult,
@@ -18,6 +19,7 @@ import {
 import {
   nativeScannerRecovery,
   sameScannerActor,
+  scannerRecoveryMode,
   type ScannerActor,
   type ScannerOperation,
 } from '@/data/scanner-recovery';
@@ -90,6 +92,8 @@ function ScannerReview() {
   const [locationId, setLocationId] = React.useState('');
   const [list, setList] = React.useState<List | null>(null);
   const [attempt, setAttempt] = React.useState<ScannerOperation | null>(null);
+  const [closedUnknown, setClosedUnknown] = React.useState<ScannerOperation[]>([]);
+  const [recoveryReviewed, setRecoveryReviewed] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
   const [completedDestination, setCompletedDestination] = React.useState<'pantry' | 'shopping'>(
     target,
@@ -105,6 +109,11 @@ function ScannerReview() {
   const generation = React.useRef(createRequestGeneration());
   const controller = React.useRef<AbortController | null>(null);
   const alive = React.useRef(true);
+  const accountScope = `${instanceUrl ?? ''}\n${user?.id ?? ''}`;
+  const currentAccountScope = React.useRef(accountScope);
+  React.useEffect(() => {
+    currentAccountScope.current = accountScope;
+  }, [accountScope]);
   const sourceKey = record?.catalogRef
     ? catalogContextKey(record.catalogRef, record.displayName)
     : (localProduct?.id ?? '');
@@ -130,13 +139,19 @@ function ScannerReview() {
   }, []);
   React.useEffect(() => {
     let current = true;
+    setReady(false);
+    setActor(null);
+    setBusy(false);
     void (async () => {
       if (!instanceUrl || !user) return;
       const stored = await nativeScannerRecovery(instanceUrl, user.id);
       const pending = await stored.read();
+      const closed = await stored.closedUnknown();
       if (!current) return;
       journal.current = stored;
       setAttempt(pending);
+      setRecoveryReviewed(false);
+      setClosedUnknown(closed);
       const context = await request<{ actor: ScannerActor }>('/api/v1/auth/context');
       if (!current) return;
       if (context.actor.userId !== user.id)
@@ -284,6 +299,9 @@ function ScannerReview() {
   };
   const send = async (command: ScannerOperation) => {
     if (lock.current || !journal.current || !instanceUrl) return;
+    const savedJournal = journal.current;
+    const submittedScope = accountScope;
+    const current = () => alive.current && currentAccountScope.current === submittedScope;
     lock.current = true;
     setBusy(true);
     setMessage('Checking the original account and profile…');
@@ -296,9 +314,11 @@ function ScannerReview() {
         throw new Error(
           'Return to the original account and viewing profile before retrying this confirmation. It has not been retargeted.',
         );
-      existing = await journal.current.read();
-      await journal.current.write(command);
-      if (!alive.current) return;
+      if (!current()) return;
+      existing = await savedJournal.read();
+      if (!existing) setRecoveryReviewed(false);
+      await savedJournal.write(command);
+      if (!current()) return;
       setAttempt(command);
       setMessage('Saving the reviewed selection…');
       sent = true;
@@ -312,8 +332,8 @@ function ScannerReview() {
       });
       acknowledged = true;
       // Acknowledgement remains durable even when workspace refresh fails.
-      await journal.current.acknowledge(command.operationId);
-      if (!alive.current) return;
+      await savedJournal.acknowledge(command.operationId);
+      if (!current()) return;
       setAttempt(null);
       setCompletedDestination(command.destination);
       setSaved(true);
@@ -321,13 +341,13 @@ function ScannerReview() {
       try {
         await refresh();
       } catch {
-        if (alive.current)
+        if (current())
           setMessage(
             `${command.description} Workspace refresh failed; refresh the saved destination when connected.`,
           );
       }
     } catch (error) {
-      if (!alive.current) return;
+      if (!current()) return;
       const knownRejected =
         sent &&
         error instanceof Error &&
@@ -335,8 +355,8 @@ function ScannerReview() {
         [400, 401, 403, 404, 409, 422].includes(Number(error.status));
       if (knownRejected && !existing) {
         try {
-          await journal.current.acknowledge(command.operationId);
-          setAttempt(null);
+          await savedJournal.acknowledge(command.operationId);
+          if (current()) setAttempt(null);
         } catch {
           /* Keep the durable recovery record if local cleanup fails. */
         }
@@ -348,7 +368,7 @@ function ScannerReview() {
       );
     } finally {
       lock.current = false;
-      if (alive.current) setBusy(false);
+      if (current()) setBusy(false);
     }
   };
   const confirm = (item?: List['items'][number]) => {
@@ -366,13 +386,14 @@ function ScannerReview() {
       if (target === 'shopping') {
         if (!list) throw new Error('Reload the selected shopping list before confirming.');
         path = `/api/v1/shopping-lists/${list.id}/catalog-items`;
-        body = {
-          ...base,
-          cartIntent: item ? 'replace_existing' : 'separate_entry',
-          ...(item ? { itemId: item.id, expectedUpdatedAt: item.updatedAt } : {}),
-          cartQuantity: amount.quantity,
-          cartUnit: amount.unit,
-        };
+        body = shoppingScanConfirmation({
+          operationId,
+          record,
+          localProduct,
+          quantity,
+          unit,
+          item,
+        });
         description = `${amount.quantity} ${amount.unit} of ${reviewName} recorded in ${list.name}'s cart. No purchase or Pantry intake was recorded.`;
       } else {
         if (!locationId) throw new Error('Choose a storage location.');
@@ -405,6 +426,74 @@ function ScannerReview() {
       });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Check the fields.');
+    }
+  };
+  const recoverConfirmation = async (action: 'inspect' | 'abandon') => {
+    if (!attempt || lock.current || busy || !journal.current || !instanceUrl) return;
+    const savedJournal = journal.current;
+    const submittedScope = accountScope;
+    const current = () => alive.current && currentAccountScope.current === submittedScope;
+    lock.current = true;
+    setBusy(true);
+    try {
+      const context = await request<{ actor: ScannerActor }>('/api/v1/auth/context');
+      if (!sameScannerActor(attempt, instanceUrl, context.actor))
+        throw new Error(
+          'Return to the original account and viewing profile. This recovery has not been retargeted.',
+        );
+      if (!current()) return;
+      const result = await request<{
+        status: 'acknowledged' | 'not_recorded' | 'abandoned';
+        message?: string;
+      }>('/api/v1/food-data/confirmations/recovery', {
+        method: 'POST',
+        headers: { 'X-Bord-Expected-Profile-Id': attempt.actor.profileId },
+        body: JSON.stringify({
+          action,
+          operationId: attempt.operationId,
+          actor: attempt.actor,
+          command: attempt.body,
+          commandPath: attempt.path,
+        }),
+      });
+      if (result.status === 'acknowledged') {
+        await savedJournal.acknowledge(attempt.operationId);
+        if (!current()) return;
+        setAttempt(null);
+        setCompletedDestination(attempt.destination);
+        setSaved(true);
+        setMessage('The original confirmation was saved. No additional write was performed.');
+      } else if (result.status === 'abandoned') {
+        // Preserve the original unknown outcome before clearing the active lock.
+        await savedJournal.archiveUnknown(attempt.operationId);
+        await savedJournal.acknowledge(attempt.operationId);
+        const closed = await savedJournal.closedUnknown();
+        if (!current()) return;
+        setClosedUnknown(closed);
+        setAttempt(null);
+        setRecords([]);
+        setLocalProduct(null);
+        setMessage(
+          'Further execution of that operation is blocked. Its original unknown outcome is retained below; no changes were undone.',
+        );
+      } else {
+        if (!current()) return;
+        setRecoveryReviewed(true);
+        setMessage(
+          result.message ??
+            'No receipt was found. The earlier outcome remains unknown. Review the saved destination before closing this confirmation.',
+        );
+      }
+    } catch (error) {
+      if (current())
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Recovery failed. The original confirmation is retained.',
+        );
+    } finally {
+      lock.current = false;
+      if (current()) setBusy(false);
     }
   };
   const reloadList = async () => {
@@ -449,11 +538,18 @@ function ScannerReview() {
             {new Date(attempt.createdAt).toLocaleString()}. This saved command may already have
             committed; opening this screen does not retry it.
           </Body>
-          <Button
-            label={busy ? 'Checking confirmation…' : 'Retry original confirmation'}
-            disabled={busy || !ready}
-            onPress={() => void send(attempt)}
-          />
+          {scannerRecoveryMode(attempt) === 'exact_retry' ? (
+            <Button
+              label={busy ? 'Checking confirmation…' : 'Retry original confirmation'}
+              disabled={busy || !ready}
+              onPress={() => void send(attempt)}
+            />
+          ) : (
+            <Body muted>
+              Local Pantry recovery checks the retained receipt first. An absent older receipt
+              cannot safely authorize another stock write.
+            </Body>
+          )}
           <Button
             label="Review saved destination"
             tone="secondary"
@@ -462,6 +558,31 @@ function ScannerReview() {
               router.push(attempt.destination === 'shopping' ? '/(app)/(lists)' : '/(app)/(pantry)')
             }
           />
+          {
+            <>
+              <Button
+                label="Check original confirmation receipt"
+                tone="secondary"
+                disabled={busy || !ready}
+                onPress={() => void recoverConfirmation('inspect')}
+              />
+              {recoveryReviewed ? (
+                <>
+                  <Body muted>
+                    After reviewing the saved destination, you can stop future execution of this
+                    command. This does not prove that an older write failed and does not undo
+                    changes. The original command stays in your closed-confirmation history.
+                  </Body>
+                  <Button
+                    label="I reviewed the destination — close unknown confirmation"
+                    tone="secondary"
+                    disabled={busy}
+                    onPress={() => void recoverConfirmation('abandon')}
+                  />
+                </>
+              ) : null}
+            </>
+          }
           <Button
             label="Switch viewing profile"
             tone="quiet"
@@ -823,6 +944,22 @@ function ScannerReview() {
         >
           {message}
         </Text>
+      ) : null}
+      {closedUnknown.length ? (
+        <Surface>
+          <EditorialText>Closed confirmations with unknown outcomes</EditorialText>
+          <Body muted>
+            These commands cannot run again. An earlier stock change may exist; closing did not undo
+            it.
+          </Body>
+          {closedUnknown.map((operation) => (
+            <Body key={operation.operationId}>
+              {operation.description.replace(/ added to | recorded in /g, ' reviewed for ')} ·{' '}
+              {new Date(operation.createdAt).toLocaleString()} · original operation{' '}
+              {operation.operationId}
+            </Body>
+          ))}
+        </Surface>
       ) : null}
     </Screen>
   );

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, lt } from 'drizzle-orm';
+import { and, eq, lt, ne, notLike } from 'drizzle-orm';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 
@@ -12,6 +12,13 @@ import { jsonError } from '@/lib/http';
 import type { RequestPrincipal } from '@/lib/services/auth-service';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
+// Scanner confirmations can outlive a day while the device is offline. These receipts
+// (including historical rows with an old expiry) must survive generic cleanup.
+const DURABLE_PANTRY_PATH = '/api/v1/pantry/batches';
+const durableConfirmationPath = (path: string) =>
+  /^\/api\/v1\/(?:pantry\/(?:batches|catalog-imports)|shopping-lists\/[^/]+\/catalog-items)$/.test(
+    path,
+  );
 
 export type IdempotencyContext = {
   body: unknown;
@@ -34,6 +41,31 @@ function keyDigest(principal: RequestPrincipal, key: string): string {
         : `${principal.apiKeyId}:${key}`,
     )
     .digest('base64url');
+}
+
+/** Service/AI callers must also honor a scanner closure recorded by an authenticated session. */
+export function isSessionConfirmationAbandoned(args: {
+  userId: string;
+  profileId: string;
+  operationId: string;
+  path: string;
+}) {
+  ensureDatabase();
+  const keyHash = createHmac('sha256', getRuntimeConfig().auth.secret)
+    .update(`session:${args.userId}:${args.profileId}:${args.operationId}`)
+    .digest('base64url');
+  const receipt = getDatabase()
+    .select()
+    .from(apiIdempotencyRecords)
+    .where(
+      and(
+        eq(apiIdempotencyRecords.keyHash, keyHash),
+        eq(apiIdempotencyRecords.path, args.path),
+        eq(apiIdempotencyRecords.method, 'POST'),
+      ),
+    )
+    .get();
+  return Boolean(receipt && JSON.parse(receipt.responseBody).recovery?.status === 'abandoned');
 }
 
 function requestDigest(method: string, path: string, rawBody: string): string {
@@ -129,7 +161,16 @@ export async function prepareIdempotentMutation(
   ensureDatabase();
   const db = getDatabase();
   const now = new Date();
-  db.delete(apiIdempotencyRecords).where(lt(apiIdempotencyRecords.expiresAt, now)).run();
+  db.delete(apiIdempotencyRecords)
+    .where(
+      and(
+        lt(apiIdempotencyRecords.expiresAt, now),
+        ne(apiIdempotencyRecords.path, DURABLE_PANTRY_PATH),
+        ne(apiIdempotencyRecords.path, '/api/v1/pantry/catalog-imports'),
+        notLike(apiIdempotencyRecords.path, '/api/v1/shopping-lists/%/catalog-items'),
+      ),
+    )
+    .run();
   const keyHash = keyDigest(principal, key.data);
   const existing = db
     .select()
@@ -197,7 +238,9 @@ export function idempotentJsonResponse(
         userId: context.principal.userId,
         apiKeyId: context.principal.apiKeyId,
         createdAt: now,
-        expiresAt: new Date(now.getTime() + IDEMPOTENCY_TTL_MS),
+        expiresAt: durableConfirmationPath(context.path)
+          ? new Date('9999-12-31T00:00:00.000Z')
+          : new Date(now.getTime() + IDEMPOTENCY_TTL_MS),
       })
       .onConflictDoNothing()
       .run();
@@ -212,6 +255,48 @@ export function idempotentJsonResponse(
   return responseWithRequestId(response, requestId);
 }
 
+/** Read under the caller's transaction when guarding a delayed reviewed write. */
+export function readIdempotentMutationReplay(
+  context: IdempotencyContext,
+  requestId: string,
+): NextResponse | null {
+  if (context.keyHash) {
+    const existing = getDatabase()
+      .select()
+      .from(apiIdempotencyRecords)
+      .where(
+        and(
+          eq(apiIdempotencyRecords.keyHash, context.keyHash),
+          eq(apiIdempotencyRecords.method, context.method),
+          eq(apiIdempotencyRecords.path, context.path),
+        ),
+      )
+      .get();
+    if (existing) {
+      if (
+        existing.userId !== context.principal.userId ||
+        ![context.requestHash, context.legacyRequestHash].includes(existing.requestHash)
+      )
+        return responseWithRequestId(
+          jsonError(
+            409,
+            'idempotency_key_conflict',
+            'That operation key belongs to a different request.',
+          ),
+          requestId,
+        );
+      return responseWithRequestId(
+        new NextResponse(existing.responseBody, {
+          status: existing.status,
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Replayed': 'true' },
+        }),
+        requestId,
+      );
+    }
+  }
+  return null;
+}
+
 /** Synchronous SQLite mutations and their acknowledged receipts commit or roll back together. */
 export function executeIdempotentMutation<T>(
   context: IdempotencyContext,
@@ -223,40 +308,8 @@ export function executeIdempotentMutation<T>(
   return getDatabase().transaction(
     () => {
       // Recheck under the write lock: another process may have completed after preparation.
-      if (context.keyHash) {
-        const existing = getDatabase()
-          .select()
-          .from(apiIdempotencyRecords)
-          .where(
-            and(
-              eq(apiIdempotencyRecords.keyHash, context.keyHash),
-              eq(apiIdempotencyRecords.method, context.method),
-              eq(apiIdempotencyRecords.path, context.path),
-            ),
-          )
-          .get();
-        if (existing) {
-          if (
-            existing.userId !== context.principal.userId ||
-            ![context.requestHash, context.legacyRequestHash].includes(existing.requestHash)
-          )
-            return responseWithRequestId(
-              jsonError(
-                409,
-                'idempotency_key_conflict',
-                'That operation key belongs to a different request.',
-              ),
-              requestId,
-            );
-          return responseWithRequestId(
-            new NextResponse(existing.responseBody, {
-              status: existing.status,
-              headers: { 'Content-Type': 'application/json', 'Idempotency-Replayed': 'true' },
-            }),
-            requestId,
-          );
-        }
-      }
+      const replay = readIdempotentMutationReplay(context, requestId);
+      if (replay) return replay;
       const payload = operation();
       if (payload && typeof payload === 'object' && 'then' in payload)
         throw new Error('Idempotent SQLite operations must complete synchronously.');

@@ -1,0 +1,119 @@
+{
+  "advisories": {
+    "1242767": {
+      "findings": [
+        {
+          "version": "4.1.11",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>vitest>@vitest/mocker",
+            ".>@better-auth/expo>better-auth>vitest>@vitest/mocker",
+            ".>@better-auth/passkey>better-auth>vitest>@vitest/mocker",
+            ".>better-auth>vitest>@vitest/mocker"
+          ],
+          "dev": false,
+          "optional": true,
+          "bundled": false
+        }
+      ],
+      "id": 1242767,
+      "title": "Vitest: Code injection via unauthenticated manual mock registration",
+      "module_name": "@vitest/mocker",
+      "vulnerable_versions": ">=2.1.0-beta.7 <4.1.12",
+      "patched_versions": ">=4.1.12",
+      "severity": "moderate",
+      "cwe": "CWE-94, CWE-116, CWE-306",
+      "github_advisory_id": "GHSA-qxg6-89mg-rqv8",
+      "url": "https://github.com/advisories/GHSA-qxg6-89mg-rqv8"
+    },
+    "1242769": {
+      "findings": [
+        {
+          "version": "4.1.11",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>vitest>@vitest/mocker",
+            ".>@better-auth/expo>better-auth>vitest>@vitest/mocker",
+            ".>@better-auth/passkey>better-auth>vitest>@vitest/mocker",
+            ".>better-auth>vitest>@vitest/mocker"
+          ],
+          "dev": false,
+          "optional": true,
+          "bundled": false
+        }
+      ],
+      "id": 1242769,
+      "title": "Vitest: Windows backslash traversal bypasses the @vitest/mocker redirect allowlist fix",
+      "module_name": "@vitest/mocker",
+      "vulnerable_versions": ">=4.1.11 <4.1.12",
+      "patched_versions": ">=4.1.12",
+      "severity": "moderate",
+      "cwe": "CWE-22",
+      "github_advisory_id": "GHSA-xp26-3454-mjgp",
+      "url": "https://github.com/advisories/GHSA-xp26-3454-mjgp"
+    },
+    "1242816": {
+      "findings": [
+        {
+          "version": "16.3.8",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>next",
+            ".>@better-auth/expo>better-auth>next",
+            ".>@better-auth/passkey>better-auth>next",
+            ".>better-auth>next",
+            ".>next"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1242816,
+      "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when SVG files are used",
+      "module_name": "next",
+      "vulnerable_versions": ">=16.0.0 <=16.4.0",
+      "patched_versions": ">=16.4.1",
+      "severity": "critical",
+      "cwe": "CWE-1395",
+      "github_advisory_id": "GHSA-2464-fhr4-w9xw",
+      "url": "https://github.com/advisories/GHSA-2464-fhr4-w9xw"
+    },
+    "1242818": {
+      "findings": [
+        {
+          "version": "16.3.8",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>next",
+            ".>@better-auth/expo>better-auth>next",
+            ".>@better-auth/passkey>better-auth>next",
+            ".>better-auth>next",
+            ".>next"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1242818,
+      "title": "Next.js: Denial of Service in App Router using Server Actions",
+      "module_name": "next",
+      "vulnerable_versions": ">=16.0.0 <=16.4.0",
+      "patched_versions": ">=16.4.1",
+      "severity": "high",
+      "cwe": "CWE-770",
+      "github_advisory_id": "GHSA-p3m5-59mp-jv5r",
+      "url": "https://github.com/advisories/GHSA-p3m5-59mp-jv5r"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 2,
+      "high": 1,
+      "critical": 1
+    },
+    "dependencies": 250,
+    "devDependencies": 0,
+    "optionalDependencies": 231,
+    "totalDependencies": 481
+  }
+}

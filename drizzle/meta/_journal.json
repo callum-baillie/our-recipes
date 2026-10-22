@@ -526,6 +526,13 @@
       "when": 1792454400001,
       "tag": "0073_shopping_cart_units",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1792540800000,
+      "tag": "0075_ai_chat_privacy_scope",
+      "breakpoints": true
     }
   ]
 }

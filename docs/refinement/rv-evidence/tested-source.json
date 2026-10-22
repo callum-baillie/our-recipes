@@ -1,0 +1,9 @@
+{
+  "baseRevision": "45ed512b2d4909dac78ceb096d985dab85387d24",
+  "branch": "refinement/rv-completion",
+  "sourceSha256": "991756ea9be9b9c34b6696becfd107fd85242b9fcbe45e4385e9f338737f3b3d",
+  "scope": "Source, tests, migrations, scripts, manifests, lockfiles and CI configuration; excludes docs and screenshot output. Working patch, not deployment.",
+  "fileCount": 1180,
+  "recordedAt": "2026-10-22T17:41:07.326264+00:00",
+  "node": "v24.21.0"
+}

@@ -707,6 +707,11 @@ paths:
       x-api-permissions: ['pantry:create']
       operationId: importReviewedFoodDataToPantry
       summary: Atomically import reviewed food data and add one or more physical Pantry batches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CatalogPantryImportInput' }
       responses:
         '201': { description: Catalog product and Pantry batches created or reused }
         '400': { $ref: '#/components/responses/InvalidRequest' }
@@ -1728,6 +1733,7 @@ paths:
       x-api-key-scope: mealPlans.read
       operationId: getMealPlanEntry
       summary: Read one planned meal
+      description: The meal includes its configured human mealLabel alongside the stored meal identifier.
       responses:
         '200': { description: Planned meal }
         '404': { description: Planned meal not found }
@@ -2917,6 +2923,11 @@ paths:
       x-api-key-scope: pantry.create
       operationId: createPantryBatch
       summary: Add a physical Pantry batch
+      description: >-
+        When an Idempotency-Key is supplied, the acknowledged response is retained beyond
+        24 hours and replayed only for the same authorized account/profile and original intent.
+        A confirmation explicitly closed through the recovery endpoint returns 409 without
+        another stock write. No key still means no durable replay guarantee.
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
@@ -2929,6 +2940,75 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
         '409': { description: Active profile required }
+  /food-data/confirmations/recovery:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
+      x-api-key-scope: pantry.create
+      operationId: reconcileReviewedFoodConfirmation
+      summary: Inspect or close an original reviewed food confirmation without changing stock or cart
+      description: >-
+        Requires current Pantry create authority, the original account and viewing profile,
+        and the exact original command. Shopping recovery also requires its original shopping create/update permissions. Inspection never retries a write.
+        An absent receipt has an unknown historical outcome. Explicit abandonment stores
+        a durable tombstone that blocks future execution of the original key and command;
+        it does not undo previous stock or cart changes. Matching acknowledged receipts are returned
+        before contacting the provider or inspecting current product, location or list availability.
+        Receipts and closures for these confirmation routes are retained beyond the generic
+        24-hour create-request window. Inspect and abandon validate the same original actor,
+        operation and normalized intent; an uncertain operation must not be replaced with a new key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [operationId, action, actor, commandPath, command]
+              properties:
+                operationId: { type: string, format: uuid }
+                action: { type: string, enum: [inspect, abandon] }
+                actor:
+                  type: object
+                  additionalProperties: false
+                  required: [userId, profileId]
+                  properties:
+                    userId: { type: string, minLength: 1 }
+                    profileId: { type: string, format: uuid }
+                commandPath:
+                  type: string
+                  description: Original whitelisted confirmation route; never an arbitrary URL.
+                  pattern: '^/api/v1/(pantry/(batches|catalog-imports)|shopping-lists/[0-9a-fA-F-]{36}/catalog-items)$'
+                command:
+                  oneOf:
+                    - { $ref: '#/components/schemas/PantryBatchInput' }
+                    - { $ref: '#/components/schemas/CatalogPantryImportInput' }
+                    - { $ref: '#/components/schemas/CatalogShoppingInput' }
+                  description: >-
+                    Exact original JSON, strictly validated for commandPath. Local batches use
+                    PantryBatchInput. Catalog Pantry imports use the catalog import selection/product
+                    schema plus 1–20 valid batch drafts. Shopping catalog-items use the existing
+                    localProductId or reviewed source union with cartQuantity/cartUnit and reviewed
+                    item/version when replacing. Its operationId must match this recovery request.
+      responses:
+        '200':
+          description: Original acknowledgement, no retained receipt, or durable abandonment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [acknowledged, not_recorded, abandoned] }
+                  outcome: { type: string, enum: [unknown] }
+                  message: { type: string }
+                  result:
+                    type: object
+                    description: Original acknowledged batch, catalog import or shopping confirmation response
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: Authentication missing or revoked }
+        '403': { description: 'Original account, current permission, or trusted origin required' }
+        '409': { description: Original viewing profile or exact original intent does not match }
   /pantry/batches/{batchId}:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -3908,6 +3988,13 @@ paths:
     get:
       operationId: listMyReviewedAiActions
       summary: Reconcile account-owned proposals and per-step outcomes
+      description: >-
+        Each newly prepared action includes optional versioned review metadata (schemaVersion1):
+        a named subject, effect, context label/value pairs, before/after changes and caveats.
+        This bounded presentation is derived from the same authorized responses whose hashes
+        guard application; model proposal titles and raw record identifiers are not target labels.
+        Existing saved JSON without review metadata remains readable, but non-image pending
+        proposals require a fresh review before application. Completed-result replay is preserved.
       parameters:
         - { in: query, name: threadId, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3922,7 +4009,7 @@ paths:
       operationId: confirmMyReviewedAiActions
       summary: Apply or dismiss the exact reviewed proposal
       description: >-
-        Revalidates actor, permissions, sharing, source versions and dependency contracts before execution. Steps execute in order using server-bound output IDs. A failure stops later steps; only acknowledged steps are completed. Lost mutation outcomes are reported as outcome-unknown and are not automatically retried. Repeating an acknowledged confirmation returns stored results without repeating writes. Image groups require explicit paid confirmation and are queued separately.
+        Revalidates actor, permissions, sharing, source versions and dependency contracts before execution. Steps execute in order using server-bound output IDs. A failure stops later steps; only acknowledged steps are completed. Lost mutation outcomes are reported as outcome-unknown and are not automatically retried. Repeating an acknowledged confirmation returns stored results without repeating writes. Image groups require explicit paid confirmation and are queued separately. They prepare private image candidates for a later acceptance step; existing photos are unchanged. Pending non-image proposals without current named review metadata return409 and require a fresh review.
       requestBody:
         required: true
         content:
@@ -4033,6 +4120,44 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    AiAppActionReviewMetadata:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, subject, effect, context, changes, caveats]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        subject:
+          type: object
+          required: [kind, label]
+          properties:
+            kind: { type: string }
+            label:
+              {
+                type: string,
+                description: Authorized target name or explicitly new proposed record,
+              }
+            href: { type: string, description: Same-origin relative workspace destination }
+        effect: { type: string }
+        context:
+          type: array
+          maxItems: 12
+          items:
+            type: object
+            required: [label, value]
+            properties:
+              label: { type: string }
+              value: { type: string }
+        changes:
+          type: array
+          maxItems: 60
+          items:
+            type: object
+            required: [label, after]
+            properties:
+              label: { type: string }
+              before: { type: string }
+              after: { type: string }
+        caveats: { type: array, items: { type: string } }
     ProductConsumptionRequest:
       type: object
       additionalProperties: false
@@ -4135,6 +4260,59 @@ components:
               { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 } }
             dietaryTags:
               { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 } }
+    CatalogPantryImportInput:
+      allOf:
+        - { $ref: '#/components/schemas/CatalogImportInput' }
+        - type: object
+          required: [batches]
+          properties:
+            batches:
+              type: array
+              minItems: 1
+              maxItems: 20
+              items: { $ref: '#/components/schemas/CatalogPantryBatchDraft' }
+    CatalogPantryBatchDraft:
+      type: object
+      additionalProperties: false
+      required: [locationId]
+      description: The confirmed source determines productId. Exact and approximate quantity rules match PantryBatchInput. Blank or null date fields are accepted.
+      properties:
+        productId: { type: string, format: uuid }
+        quantityRemaining: { type: [number, 'null'], minimum: 0 }
+        originalQuantity: { type: [number, 'null'], exclusiveMinimum: 0 }
+        unit: { type: string, maxLength: 30 }
+        packageCount: { type: [number, 'null'], exclusiveMinimum: 0 }
+        amountPerPackage: { type: [number, 'null'], exclusiveMinimum: 0 }
+        packageUnit: { type: string, maxLength: 30 }
+        approximateState:
+          {
+            type: [string, 'null'],
+            enum: [full, three_quarters, half, quarter, almost_empty, unknown, null],
+          }
+        locationId: { type: string, format: uuid }
+        sublocation: { type: string, maxLength: 120 }
+        purchaseDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        bestBeforeDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        useByDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        sellByDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        openedDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        frozenDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        thawedDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        preparedDate: { anyOf: [{ type: string, format: date }, { const: '' }, { type: 'null' }] }
+        expiryPrecision:
+          { type: string, enum: [exact, estimated, month_only, unknown], default: unknown }
+        status:
+          {
+            type: string,
+            enum: [unopened, opened, frozen, thawed, reserved, depleted, discarded, donated],
+          }
+        purchasePriceCents: { type: [integer, 'null'], minimum: 0, maximum: 100000000 }
+        source: { type: string, maxLength: 160 }
+        notes: { type: string, maxLength: 2000 }
+        excludeFromGrocery: { type: boolean, default: false }
+        sourceRecipeId: { anyOf: [{ type: string, format: uuid }, { const: '' }] }
+        sourceMealPlanEntryId: { anyOf: [{ type: string, format: uuid }, { const: '' }] }
+        sourceShoppingListItemId: { anyOf: [{ type: string, format: uuid }, { const: '' }] }
     CatalogShoppingInput:
       description: An explicit cart amount and unit, independent of recipe demand. Existing row confirmations replace its cart amount; new entries remain separate. Exact replay is actor-bound and works without the provider.
       allOf:
@@ -4287,25 +4465,44 @@ components:
     PantryBatchInput:
       type: object
       required: [productId, locationId]
+      description: Exact quantity and unit, or one approximate state; never both.
       properties:
         productId: { type: string, format: uuid }
         quantityRemaining: { type: [number, 'null'], minimum: 0 }
         originalQuantity: { type: [number, 'null'], exclusiveMinimum: 0 }
         unit: { type: string, maxLength: 30 }
+        packageCount: { type: [number, 'null'], exclusiveMinimum: 0 }
+        amountPerPackage: { type: [number, 'null'], exclusiveMinimum: 0 }
+        packageUnit: { type: string, maxLength: 30 }
         approximateState:
           {
             type: [string, 'null'],
             enum: [full, three_quarters, half, quarter, almost_empty, unknown, null],
           }
         locationId: { type: string, format: uuid }
-        bestBeforeDate: { type: [string, 'null'], format: date }
-        useByDate: { type: [string, 'null'], format: date }
+        sublocation: { type: string, maxLength: 120 }
+        purchaseDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        bestBeforeDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        useByDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        sellByDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        openedDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        frozenDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        thawedDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        preparedDate: { anyOf: [{ type: string, format: date }, { const: '' }] }
+        expiryPrecision:
+          { type: string, enum: [exact, estimated, month_only, unknown], default: unknown }
         status:
           {
             type: string,
             enum: [unopened, opened, frozen, thawed, reserved, depleted, discarded, donated],
           }
+        purchasePriceCents: { type: [integer, 'null'], minimum: 0, maximum: 100000000 }
+        source: { type: string, maxLength: 160 }
         notes: { type: string, maxLength: 2000 }
+        excludeFromGrocery: { type: boolean, default: false }
+        sourceRecipeId: { anyOf: [{ type: string, format: uuid }, { const: '' }] }
+        sourceMealPlanEntryId: { anyOf: [{ type: string, format: uuid }, { const: '' }] }
+        sourceShoppingListItemId: { anyOf: [{ type: string, format: uuid }, { const: '' }] }
     HomepageSummary:
       type: object
       required: [generatedAt, nextMeal, groceryList]

@@ -1,0 +1,28 @@
+{
+  "android": {
+    "bundle": "entry-4634b512df5a7ca5d9256149ce8011b8.hbc",
+    "sources": 1953,
+    "auditedModulePresence": {
+      "decode-uri-component": true,
+      "query-string": true,
+      "image-size": false,
+      "node-forge": false,
+      "braces": false,
+      "js-yaml": false,
+      "sprintf-js": false
+    }
+  },
+  "ios": {
+    "bundle": "entry-c82cae9c4c5bea352b79cda1494fc077.hbc",
+    "sources": 1956,
+    "auditedModulePresence": {
+      "decode-uri-component": true,
+      "query-string": true,
+      "image-size": false,
+      "node-forge": false,
+      "braces": false,
+      "js-yaml": false,
+      "sprintf-js": false
+    }
+  }
+}

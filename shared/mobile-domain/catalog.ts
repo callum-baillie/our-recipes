@@ -89,3 +89,26 @@ export function barcodeReviewChoices(result: BarcodeReviewResult) {
     ),
   };
 }
+
+/** A scan replaces one explicitly reviewed cart amount, or creates a separate entry. */
+export function shoppingScanConfirmation(args: {
+  operationId: string;
+  record: ReviewedCatalogFood | null;
+  localProduct: ReviewedLocalProduct | null;
+  quantity: string;
+  unit: string;
+  item?: { id: string; updatedAt: string };
+}) {
+  const amount = catalogQuantity(args.quantity, args.unit);
+  if (!args.localProduct && !args.record) throw new Error('Review a food before confirming.');
+  const identity = args.localProduct
+    ? { operationId: args.operationId, localProductId: args.localProduct.id }
+    : catalogConfirmation(args.record!, args.operationId, amount.unit);
+  return {
+    ...identity,
+    cartIntent: args.item ? ('replace_existing' as const) : ('separate_entry' as const),
+    ...(args.item ? { itemId: args.item.id, expectedUpdatedAt: args.item.updatedAt } : {}),
+    cartQuantity: amount.quantity,
+    cartUnit: amount.unit,
+  };
+}

@@ -64,7 +64,7 @@
     "drizzle-orm": "0.45.2",
     "fflate": "0.8.3",
     "lucide-react": "1.24.0",
-    "next": "16.3.8",
+    "next": "16.4.1",
     "nodemailer": "10.0.9",
     "openai": "6.46.0",
     "pdfjs-dist": "6.2.108",
@@ -96,7 +96,7 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.1",
     "jsdom": "29.1.1",
     "png-to-ico": "3.0.2",
     "prettier": "3.9.5",
@@ -104,6 +104,6 @@
     "tailwindcss": "4.3.2",
     "tsx": "4.23.0",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }

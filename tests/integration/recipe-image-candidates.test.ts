@@ -186,11 +186,15 @@ describe('reviewed recipe image requests', () => {
       /Review an available/,
     );
   });
-  it('preserves failed operation identity and requires new deliberate paid intent', async () => {
+  it('preserves uncertain operation identity and requires new deliberate paid intent', async () => {
     const { owner, recipe, request } = fixture();
     generate.mockRejectedValueOnce(new Error('Controlled provider timeout'));
-    expect((await prepareRecipeImageCandidate(owner, recipe.id, request)).status).toBe('failed');
-    expect((await prepareRecipeImageCandidate(owner, recipe.id, request)).status).toBe('failed');
+    expect((await prepareRecipeImageCandidate(owner, recipe.id, request)).status).toBe(
+      'outcome_unknown',
+    );
+    expect((await prepareRecipeImageCandidate(owner, recipe.id, request)).status).toBe(
+      'outcome_unknown',
+    );
     expect(generate).toHaveBeenCalledTimes(1);
     expect(getDatabase().select().from(recipeImageCandidates).all()).toHaveLength(1);
   });

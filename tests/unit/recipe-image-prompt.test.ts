@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import OpenAI from 'openai';
 import {
   recipeImageInput,
   recipeImagePrompt,
@@ -15,6 +16,30 @@ const fixtures = [
   ['Chocolate pudding', 'cocoa', 'Steam until set around the edges with a soft centre.'],
 ];
 describe('finished dish image grounding', () => {
+  it.each([
+    [
+      new OpenAI.BadRequestError(
+        400,
+        { message: 'Synthetic rejection' },
+        'Rejected',
+        new Headers(),
+      ),
+      'failed',
+    ],
+    [new DOMException('Synthetic timeout', 'TimeoutError'), 'unknown'],
+  ])('keeps explicit rejection separate from a lost provider outcome', async (error, outcome) => {
+    const provider = new OpenAiProvider('dummy-never-sent', {
+      responses: { parse: vi.fn() },
+      images: {
+        generate: vi.fn(async () => {
+          throw error;
+        }),
+      },
+    });
+    await expect(
+      provider.generateRecipeImage({ recipeTitle: 'Soup', recipeSummary: '', ingredientNames: [] }),
+    ).rejects.toMatchObject({ generationOutcome: outcome });
+  });
   it.each(fixtures)('retains actual proportions and method for %s', (title, item, method) => {
     const recipe = recipeInputSchema.parse({
       ...emptyRecipeInput,

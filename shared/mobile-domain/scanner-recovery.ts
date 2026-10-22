@@ -15,6 +15,17 @@ export type RecoveryStorage = {
   setItem(key: string, value: string): Promise<void>;
   removeItem(key: string): Promise<void>;
 };
+export type ScannerJournal = {
+  read(): Promise<ScannerOperation | null>;
+  write(operation: ScannerOperation): Promise<void>;
+  acknowledge(operationId: string): Promise<void>;
+  archiveUnknown(operationId: string): Promise<void>;
+  closedUnknown(): Promise<ScannerOperation[]>;
+};
+/** Legacy local-stock receipts may already have expired before this release. */
+export function scannerRecoveryMode(operation: ScannerOperation) {
+  return operation.path === '/api/v1/pantry/batches' ? 'inspect_only' : 'exact_retry';
+}
 export function sameScannerActor(
   operation: ScannerOperation,
   instanceUrl: string,
@@ -62,7 +73,7 @@ export function scannerRecovery(
   key: string,
   instanceUrl: string,
   userId: string,
-) {
+): ScannerJournal {
   const read = async () => {
     const manifest = await storage.getItem(key);
     if (!manifest) return null;
@@ -84,6 +95,42 @@ export function scannerRecovery(
   };
   return {
     read,
+    async closedUnknown() {
+      const raw = await storage.getItem(`${key}.closed`);
+      const ids = raw ? (JSON.parse(raw) as string[]) : [];
+      if (!Array.isArray(ids) || ids.length > 50 || ids.some((id) => typeof id !== 'string'))
+        throw new Error('Closed confirmation history could not be read.');
+      return Promise.all(
+        ids.map(async (id) => {
+          const operation = await scannerRecovery(
+            storage,
+            `${key}.closed.${id}`,
+            instanceUrl,
+            userId,
+          ).read();
+          if (!operation) throw new Error('Closed confirmation history is incomplete.');
+          return operation;
+        }),
+      );
+    },
+    async archiveUnknown(operationId: string) {
+      const operation = await read();
+      if (!operation || operation.operationId !== operationId) return;
+      const raw = await storage.getItem(`${key}.closed`);
+      const ids = raw ? (JSON.parse(raw) as string[]) : [];
+      if (!Array.isArray(ids) || (ids.length >= 50 && !ids.includes(operationId)))
+        throw new Error(
+          'Closed confirmation history is full. Keep this recovery record until reviewed.',
+        );
+      await scannerRecovery(storage, `${key}.closed.${operationId}`, instanceUrl, userId).write(
+        operation,
+      );
+      if (!ids.includes(operationId))
+        await storage.setItem(`${key}.closed`, JSON.stringify([...ids, operationId]));
+      if (!(await storage.getItem(`${key}.closed`))?.includes(operationId))
+        throw new Error('The original confirmation could not be retained.');
+      // The caller must acknowledge only after the server blocks future execution.
+    },
     async write(operation: ScannerOperation) {
       const serialized = JSON.stringify(operation);
       parseScannerOperation(serialized, instanceUrl, userId);

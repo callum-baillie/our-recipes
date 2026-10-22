@@ -2,6 +2,7 @@ packages:
   - '.'
 
 overrides:
+  'vite@>=8.0.0 <8.1.6': 8.1.6
   'postcss@^8': 8.5.23
   'next>sharp': 0.35.5
   'undici@^7': 7.29.1

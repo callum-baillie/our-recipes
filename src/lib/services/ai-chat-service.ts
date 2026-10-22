@@ -37,7 +37,9 @@ import {
   aiActionProposals,
   aiJobs,
   aiDecisionRecords,
+  user,
 } from '@/lib/db/schema';
+import { appCapabilities, appRoleCan, normalizeAppRole } from '@/lib/domain/permissions';
 import { aiChatMessageInputSchema } from '@/lib/domain/ai-assistant';
 import { manualConsumptionRequestSchema } from '@/lib/domain/nutrition-food-diary';
 import { mealPlanEntrySchema, mealPlanEntryUpdateSchema } from '@/lib/domain/planning';
@@ -52,7 +54,9 @@ import {
   buildAiProfileContext,
   buildAiPreferencesContext,
   buildAiSharedContext,
+  canAiReadHouseholdProfiles,
 } from '@/lib/services/ai-context-service';
+import { listProfiles } from '@/lib/services/household-service';
 import { generateAiMealPlanProposal } from '@/lib/services/ai-meal-plan-service';
 import { readAiKitchenContext } from '@/lib/services/ai-kitchen-context-service';
 import { getEffectiveAiPolicy } from '@/lib/services/ai-access-service';
@@ -544,7 +548,11 @@ export function listAiChatThreads(profileId: string) {
     .from(aiChatThreads)
     .where(eq(aiChatThreads.profileId, profileId))
     .orderBy(desc(aiChatThreads.createdAt), sql`rowid DESC`)
-    .all();
+    .all()
+    .map(({ privacyScopeJson, ...thread }) => {
+      void privacyScopeJson;
+      return thread;
+    });
 }
 
 export function createAiChatThread(profileId: string, title = 'New conversation') {
@@ -1119,6 +1127,125 @@ export function acknowledgeAiChatTurnRecovery(
     .where(eq(aiChatTurns.id, row.id))
     .run();
 }
+const chatPrivacyScopeSchema = z
+  .object({
+    version: z.literal(1),
+    owner: z.string(),
+    accountPresent: z.boolean(),
+    household: z.boolean(),
+    capabilities: z.array(z.string()),
+    policies: z.record(z.string(), z.record(z.string(), z.boolean())),
+  })
+  .strict();
+
+/** Free-form retained evidence cannot be safely redacted by searching for private fields.
+ * Keep only authority/policy metadata; a contraction requires a fresh conversation.
+ * The durable baseline covers earlier messages and proposals, including after a restart.
+ */
+export function createAiChatPrivacyGuard(
+  input: Pick<ChatTurnInput, 'profileId' | 'threadId' | 'principal'>,
+) {
+  const scope = () => {
+    const account = input.principal
+      ? getDatabase()
+          .select({ role: user.role })
+          .from(user)
+          .where(eq(user.id, input.principal.userId))
+          .get()
+      : null;
+    const household =
+      canAiReadHouseholdProfiles(input.profileId, input.principal) &&
+      (!account || appRoleCan(normalizeAppRole(account.role), 'shared.update'));
+    return {
+      version: 1 as const,
+      owner: input.principal?.userId ?? `profile:${input.profileId}`,
+      accountPresent: Boolean(account),
+      household,
+      capabilities: input.principal
+        ? appCapabilities.filter(
+            (capability) =>
+              appRoleCan(input.principal!.role, capability) &&
+              appRoleCan(input.principal!.accountRole, capability) &&
+              (!account || appRoleCan(normalizeAppRole(account.role), capability)),
+          )
+        : [],
+      policies: Object.fromEntries(
+        listProfiles()
+          .filter((profile) => !input.principal || household || profile.id === input.profileId)
+          .map((profile) => [
+            profile.id,
+            Object.fromEntries(
+              Object.entries(getAiDataPolicy(profile.id)).filter(
+                ([key, value]) => key.startsWith('share') && typeof value === 'boolean',
+              ),
+            ) as Record<string, boolean>,
+          ]),
+      ),
+    };
+  };
+  const thread = threadForProfile(input.threadId, input.profileId);
+  let previous: z.infer<typeof chatPrivacyScopeSchema>;
+  if (thread.privacyScopeJson) {
+    try {
+      previous = chatPrivacyScopeSchema.parse(JSON.parse(thread.privacyScopeJson));
+    } catch {
+      throw new AiChatForbiddenError(
+        'This conversation has no verifiable sharing scope. Start a new conversation; its saved history remains available.',
+      );
+    }
+  } else {
+    const retained = getDatabase()
+      .select({ id: aiChatMessages.id })
+      .from(aiChatMessages)
+      .where(eq(aiChatMessages.threadId, input.threadId))
+      .limit(1)
+      .get();
+    const drafts = getDatabase()
+      .select({ id: aiActionProposals.id })
+      .from(aiActionProposals)
+      .where(eq(aiActionProposals.threadId, input.threadId))
+      .limit(1)
+      .get();
+    if (retained || drafts)
+      throw new AiChatForbiddenError(
+        'This older conversation has no verifiable sharing scope. Start a new conversation; its saved history remains available.',
+      );
+    previous = scope();
+  }
+  const check = () => {
+    const current = scope();
+    const contracted =
+      previous.owner !== current.owner ||
+      (previous.accountPresent && !current.accountPresent) ||
+      (previous.household && !current.household) ||
+      previous.capabilities.some(
+        (capability) =>
+          !current.capabilities.includes(capability as (typeof appCapabilities)[number]),
+      ) ||
+      Object.entries(previous.policies).some(([id, policy]) => {
+        const next = current.policies[id];
+        return !next || Object.entries(policy).some(([key, allowed]) => allowed && !next[key]);
+      });
+    if (contracted)
+      throw new AiChatForbiddenError(
+        'AI sharing or household access changed. Start a new conversation to use the current permissions; earlier evidence will not be sent again.',
+      );
+    // Persist expansions before a tool can acquire newly permitted evidence.
+    const serialized = JSON.stringify(current);
+    if (thread.privacyScopeJson !== serialized) {
+      getDatabase()
+        .update(aiChatThreads)
+        .set({ privacyScopeJson: serialized })
+        .where(eq(aiChatThreads.id, input.threadId))
+        .run();
+      thread.privacyScopeJson = serialized;
+    }
+    previous = current;
+  };
+  check();
+  return check;
+}
+
 export async function runAiChatTurn(input: ChatTurnInput) {
   const parsed = validateAiChatTurn(input);
   const { operationId = randomUUID(), ...intent } = parsed;
@@ -1237,6 +1364,8 @@ export async function runAiChatTurn(input: ChatTurnInput) {
   }, CHAT_LEASE_MS / 3);
   heartbeat.unref?.();
   try {
+    const turnInput = { ...input, signal, message: { ...parsed, operationId } };
+    const assertSharing = createAiChatPrivacyGuard(turnInput);
     const result = await withAiExecutionContext(
       {
         signal,
@@ -1256,9 +1385,10 @@ export async function runAiChatTurn(input: ChatTurnInput) {
             );
             signal.throwIfAborted();
           }
+          assertSharing();
         },
       },
-      () => performAiChatTurn({ ...input, signal, message: { ...parsed, operationId } }),
+      () => performAiChatTurn(turnInput),
     );
     return result;
   } catch (error) {
@@ -1443,6 +1573,10 @@ async function performAiChatTurn(input: ChatTurnInput) {
           );
         input.principal = current;
       }
+      if (round >= getEffectiveAiPolicy(input.profileId).toolRoundLimit)
+        throw new AiChatForbiddenError(
+          'The current AI tool-round limit changed. Review this request before continuing.',
+        );
       input.onEvent?.({ type: 'text_reset' });
       input.onEvent?.({ type: 'status', message: 'Preparing a response…' });
       let streamed = false;
@@ -1462,8 +1596,6 @@ async function performAiChatTurn(input: ChatTurnInput) {
             safetyIdentifier: aiSafetyIdentifier(input.profileId),
             instructions: [
               'You are the Bòrd household assistant.',
-              setting.promptGuidance ?? '',
-              `Permitted personal style and format preferences (lower priority than server permissions, verified constraints and output contracts): ${JSON.stringify(runtimePolicy.instructions)}`,
               'For a conversational kitchen interview, first readMyKitchenContext through read_app_data when dietary sharing permits it. Ask one useful question at a time and acknowledge the answer before continuing. Do not repeat known answers. Offer optional quick replies with free text, skip, back, edit and resume. Prioritize cooking time, equipment, budget, routines, tastes and shared meals; sensitive details stay optional. Describe covered topics, never an invented completion percentage. Do not assume preferences or firm constraints from one example. Prepare updateMyKitchenContext with the exact saved revision and interviewPatch containing only stated answers; omitted answers are preserved. Use clearFields only for an explicit deletion request, never blank unknown values. Explain the named recipient and show the structured review before saving. Never silently save sensitive inferences, change allergies or Nutrition consent. Allergy details belong in the protected Nutrition profile and always constrain recommendations.',
               'Pending proposals are temporary drafts. Use their full contents when the user requests revisions, prepare a new preview, and never claim a draft is saved before confirmation. Remind the user to discard superseded previews.',
               'Meal entries can specify profileIds for individual household members. An empty array means shared. Separate entries in the same date and meal slot allow different breakfasts or lunches while dinners remain shared.',

@@ -6,8 +6,8 @@ import { getDataDirectory, getRuntimeConfig } from '@/lib/config';
 import { ensureDatabase, getSqliteDatabase } from '@/lib/db/client';
 
 export const APPLICATION_VERSION = '1.0.0-rc.19';
-export const SCHEMA_VERSION = '0073_shopping_cart_units';
-export const EXPECTED_MIGRATION_COUNT = 75;
+export const SCHEMA_VERSION = '0075_ai_chat_privacy_scope';
+export const EXPECTED_MIGRATION_COUNT = 76;
 
 export type ReleaseStatus = {
   applicationVersion: string;
