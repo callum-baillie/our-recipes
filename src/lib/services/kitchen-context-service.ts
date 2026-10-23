@@ -13,6 +13,7 @@ export function readKitchenContext(profileId: string) {
   if (!profile) throw new DecisionError('Profile not found.', 404);
   const interview = profile.goalContext.kitchenInterview ?? null;
   return {
+    subject: { displayName: profile.displayName },
     interview,
     revision: createHash('sha256').update(JSON.stringify(interview)).digest('hex'),
   };

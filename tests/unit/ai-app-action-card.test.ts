@@ -62,3 +62,43 @@ it('retains fresh recipe labels and does not classify waiting or cancelled job i
   );
   expect(screen.getByText('Create image')).toBeTruthy();
 });
+it('renders the authoritative named meal and context for a bodyless removal without raw IDs or empty values', () => {
+  render(
+    createElement(AiAppActionCard, {
+      proposal: {
+        id: 'review',
+        version: 1,
+        title: 'Model description only',
+        status: 'pending',
+        actions: [
+          {
+            summary: 'Remove meal',
+            method: 'DELETE',
+            path: '/meal-plan/{entryId}',
+            parameters: { entryId: 'hidden-record-id' },
+            body: null,
+            review: {
+              schemaVersion: 1,
+              subject: { kind: 'Meal', label: 'Friday lentil supper', href: '/planner' },
+              effect: 'Remove meal',
+              context: [
+                { label: 'Date', value: '2026-10-23' },
+                { label: 'Meal', value: 'Dinner' },
+                { label: 'Servings', value: '4' },
+              ],
+              changes: [],
+              caveats: [],
+            },
+          },
+        ],
+      },
+    }),
+  );
+  expect(screen.getByRole('link', { name: 'Friday lentil supper' }).getAttribute('href')).toBe(
+    '/planner',
+  );
+  expect(screen.getByText('2026-10-23')).toBeTruthy();
+  expect(screen.getByText('Dinner')).toBeTruthy();
+  expect(screen.getByText('4')).toBeTruthy();
+  expect(screen.queryByText(/Not set|hidden-record-id/)).toBeNull();
+});

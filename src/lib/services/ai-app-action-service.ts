@@ -28,6 +28,8 @@ import {
 import { DecisionError } from '@/lib/providers/decisions-provider';
 import { readAiKitchenContext } from './ai-kitchen-context-service';
 import { getRecipe } from './recipe-service';
+import { buildAppActionReview } from '@/lib/domain/ai-app-action-review';
+import type { AppActionReviewMetadata } from '../../../shared/mobile-domain/app-action-review';
 import { enqueueRecipeImageJob, getAiJob } from './ai-job-service';
 import { getAiReadiness } from './ai-readiness-service';
 import { getAiWorkloadSetting } from './ai-settings-service';
@@ -68,6 +70,7 @@ export type AppActionReview = {
     bindings?: z.infer<typeof dependencySchema>[];
     recordLabel?: string;
     changeLabel?: string;
+    review?: AppActionReviewMetadata;
   }[];
   status: string;
   results?: {
@@ -322,12 +325,35 @@ export async function readAppData(p: RequestPrincipal, request: Request, input: 
     return { message: 'The result is too large. Narrow the query or pagination.' };
   return JSON.parse(value) as unknown;
 }
-type Snapshot = { operationId: string; parameters: Record<string, string>; hash: string };
+type Snapshot = {
+  operationId: string;
+  parameters: Record<string, string>;
+  hash: string;
+  // A food identity used by an authorized raw-diary operation is not a Pantry-stock disclosure.
+  nutritionIdentityOnly?: boolean;
+};
+async function reviewedPeople(request: Request, ids: string[]) {
+  const chosen = z.array(z.string().uuid()).max(50).parse(ids);
+  const route = await import('@/app/api/v1/profiles/route');
+  const response = await route.GET(
+    new Request(new URL('/api/v1/profiles?includeArchived=true', request.url), {
+      headers: request.headers,
+    }),
+  );
+  if (!response.ok) throw new DecisionError('The selected people could not be reviewed.', 403);
+  const profiles = (await response.json()) as { id: string; displayName: string }[];
+  return chosen.map((id) => {
+    const profile = profiles.find((candidate) => candidate.id === id);
+    if (!profile)
+      throw new DecisionError('A selected person is unavailable. Review the meal again.', 409);
+    return { id, displayName: profile.displayName };
+  });
+}
 async function snapshot(
   request: Request,
   op: AppOperation,
   parameters: Record<string, string>,
-): Promise<Snapshot | null> {
+): Promise<{ guard: Snapshot; value: unknown } | null> {
   // Creating a record has no existing record version to approve. In particular,
   // GET /meal-plan requires an explicit range; it is not a version of POST's new meal.
   if (op.method === 'POST' && !op.path.includes('{')) return null;
@@ -335,7 +361,9 @@ async function snapshot(
     (candidate) =>
       candidate.effect === 'read' &&
       candidate.method === 'GET' &&
-      (op.path === candidate.path || op.path.startsWith(`${candidate.path}/`)) &&
+      (op.path === candidate.path ||
+        op.path.startsWith(`${candidate.path}/`) ||
+        (op.id === 'copyMoveNutritionDiary' && candidate.id === 'readNutritionDiaryRevisions')) &&
       [...candidate.path.matchAll(/\{([^}]+)\}/g)].every((m) => parameters[m[1]]),
   ).sort((a, b) => b.path.length - a.path.length)[0];
   if (!reader) return null;
@@ -345,7 +373,7 @@ async function snapshot(
       'The current record could not be read. Refresh its details before preparing changes.',
     );
   const body: unknown = await response.json();
-  return { operationId: reader.id, parameters, hash: decisionHash(body) };
+  return { guard: { operationId: reader.id, parameters, hash: decisionHash(body) }, value: body };
 }
 export function listPendingAppActions(p: RequestPrincipal, threadId: string): AppActionReview[] {
   z.string().uuid().parse(threadId);
@@ -564,41 +592,176 @@ export async function prepareAppActions(
     throw new DecisionError(
       'Prepare image generation as its own group so it can run in the background.',
     );
-  const previews = parsed.actions.map((action, index) => {
+  const previews: AppActionReview['actions'] = [];
+  const snapshots: Snapshot[] = [];
+  for (const [index, action] of parsed.actions.entries()) {
     const { op, parameters, body } = parseAction(p, bindAction(parsed.actions, index));
     if (op.effect === 'read') throw new DecisionError('Read operations do not need a proposal.');
-    const recipe = parameters.recipeId ? getRecipe(parameters.recipeId, p.profileId) : null;
-    return {
+    // New dependent path targets do not exist yet. Existing targets and references
+    // are each read once: review metadata and stale protection share that response.
+    const dependentTarget = action.bindings.some(
+      (binding) =>
+        binding.target.startsWith('parameters.') &&
+        op.path.includes(`{${binding.target.slice('parameters.'.length)}}`),
+    );
+    const current = dependentTarget ? null : await snapshot(request, op, parameters);
+    if (current) snapshots.push(current.guard);
+    const references: Record<string, unknown> = {};
+    const submitted = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    for (const [key, readerId, kind] of [
+      ['recipeId', 'getRecipe', 'recipe'],
+      ['productId', 'getPantryProduct', 'product'],
+    ] as const) {
+      const id = submitted[key];
+      if (
+        typeof id !== 'string' ||
+        !id.trim() ||
+        action.bindings.some((binding) => binding.target === `body.${key}`)
+      )
+        continue;
+      const nutritionIdentityOnly = op.path.startsWith('/nutrition/');
+      const reader = nutritionIdentityOnly
+        ? APP_OPERATIONS.find((candidate) => candidate.id === readerId)!
+        : operation(p, readerId);
+      const response = await invoke(request, reader, { [key]: id }, undefined);
+      if (!response.ok)
+        throw new DecisionError(
+          'A referenced record could not be reviewed. Refresh its details and try again.',
+          409,
+        );
+      const value: unknown = await response.json();
+      references[kind] = value;
+      snapshots.push({
+        operationId: reader.id,
+        parameters: { [key]: id },
+        hash: decisionHash(value),
+        ...(nutritionIdentityOnly ? { nutritionIdentityOnly: true } : {}),
+      });
+    }
+    for (const [field, readerId] of [
+      ['locationId', 'listPantryLocations'],
+      ['parentId', 'listPantryLocations'],
+      ['supermarketProfileId', 'listSupermarketProfiles'],
+      ['aisleId', 'listShoppingAisles'],
+      ['aisleIds', 'listShoppingAisles'],
+      ['tagIds', 'listTags'],
+      ['tagId', 'listTags'],
+      ['collectionId', 'listCollections'],
+    ] as const) {
+      if (
+        !(field in submitted) ||
+        action.bindings.some((binding) => binding.target === `body.${field}`)
+      )
+        continue;
+      const reader = operation(p, readerId);
+      const response = await invoke(request, reader, {}, undefined);
+      if (!response.ok)
+        throw new DecisionError(
+          'A selected destination could not be reviewed. Open its workspace and refresh.',
+          409,
+        );
+      const value: unknown = await response.json();
+      references[field] = value;
+      snapshots.push({ operationId: reader.id, parameters: {}, hash: decisionHash(value) });
+    }
+    if (op.id === 'swapMealPlanEntries') {
+      for (const [field, key] of [
+        ['sourceId', 'sourceMeal'],
+        ['targetId', 'targetMeal'],
+      ] as const) {
+        const reader = operation(p, 'getMealPlanEntry');
+        const parameters = { entryId: z.string().uuid().parse(submitted[field]) };
+        const response = await invoke(request, reader, parameters, undefined);
+        if (!response.ok)
+          throw new DecisionError(
+            'One of the meals is unavailable. Review the current planner.',
+            409,
+          );
+        const value: unknown = await response.json();
+        references[key] = value;
+        snapshots.push({ operationId: reader.id, parameters, hash: decisionHash(value) });
+      }
+    }
+    if (
+      op.id === 'copyMoveNutritionDiary' &&
+      typeof submitted.targetProfileId === 'string' &&
+      submitted.targetProfileId !== parameters.profileId
+    ) {
+      const parameters = { profileId: submitted.targetProfileId };
+      const reader = parseAction(p, {
+        operationId: 'readNutritionDiaryRevisions',
+        parametersJson: JSON.stringify(parameters),
+        bodyJson: '',
+        bindings: [],
+      }).op;
+      const response = await invoke(request, reader, parameters, undefined);
+      if (!response.ok)
+        throw new DecisionError(
+          'The destination person could not be reviewed. Use the authorized diary workspace.',
+          403,
+        );
+      const value: unknown = await response.json();
+      references.destinationPerson = value;
+      snapshots.push({ operationId: reader.id, parameters, hash: decisionHash(value) });
+    }
+    if (op.path.startsWith('/meal-plan')) {
+      const meal = (current?.value as { meal?: { profileIds?: string | string[] } } | undefined)
+        ?.meal;
+      const beforeIds: string[] =
+        typeof meal?.profileIds === 'string'
+          ? JSON.parse(meal.profileIds)
+          : (meal?.profileIds ?? []);
+      const afterIds = Array.isArray(submitted.profileIds)
+        ? (submitted.profileIds as string[])
+        : beforeIds;
+      const ids = [...new Set([...beforeIds, ...afterIds])];
+      if (ids.length) {
+        const people = await reviewedPeople(request, ids);
+        snapshots.push({
+          operationId: 'reviewHouseholdPeople',
+          parameters: { ids: JSON.stringify(ids) },
+          hash: decisionHash(people),
+        });
+        references.people = {
+          before: beforeIds.map((id) => people.find((person) => person.id === id)!.displayName),
+          after: afterIds.map((id) => people.find((person) => person.id === id)!.displayName),
+        };
+      }
+    }
+    const review = buildAppActionReview({
+      operationId: op.id,
+      path: op.path,
+      method: op.method,
+      parameters,
+      body,
+      snapshot: current?.value,
+      references,
+      dependentTarget,
+    });
+    if (review.caveats.some((message) => message.includes('additional fields are omitted')))
+      throw new DecisionError(
+        'This change is too large for a complete action review. Prepare smaller groups of changes.',
+      );
+    if (
+      (op.method === 'DELETE' && review.subject.label.startsWith('Saved ')) ||
+      review.changes.some((change) => change.after === 'Item unavailable')
+    )
+      throw new DecisionError(
+        'The affected record could not be identified for review. Open its workspace and refresh the current data.',
+        409,
+      );
+    previews.push({
       summary: op.summary,
       method: op.method,
       path: op.path,
       parameters,
       body: body ?? null,
       bindings: action.bindings,
-      recordLabel: recipe?.title,
+      review,
+      recordLabel: review.subject.label,
       changeLabel:
-        op.id === 'generateRecipeImage'
-          ? recipe?.images.length
-            ? 'Replace cover image'
-            : 'Create image'
-          : nutritionLabels.get(index),
-    };
-  });
-  const snapshots: Snapshot[] = [];
-  for (const [index, action] of parsed.actions.entries()) {
-    const { op, parameters } = parseAction(p, bindAction(parsed.actions, index));
-    // Only a newly created path target is absent. A body dependency must not skip
-    // the reviewed version of an already-existing target record.
-    if (
-      action.bindings.some(
-        (binding) =>
-          binding.target.startsWith('parameters.') &&
-          op.path.includes(`{${binding.target.slice('parameters.'.length)}}`),
-      )
-    )
-      continue;
-    const current = await snapshot(request, op, parameters);
-    if (current) snapshots.push(current);
+        op.id === 'generateRecipeImage' ? 'Prepare an image preview' : nutritionLabels.get(index),
+    });
   }
   enforceDecisionBudget(p);
   const row = getDatabase().transaction(() => {
@@ -715,6 +878,19 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
       409,
     );
   value.actions = compatible.data;
+  const evidence = JSON.parse(row.evidenceJson) as AppActionReview['actions'];
+  if (
+    decision === 'apply' &&
+    value.actions.some(
+      (action, index) =>
+        action.operationId !== 'generateRecipeImage' &&
+        evidence[index]?.review?.schemaVersion !== 1,
+    )
+  )
+    throw new DecisionError(
+      'This older proposal does not contain reviewed target details. Prepare a fresh review; no changes were applied.',
+      409,
+    );
   if (
     decision === 'apply' &&
     value.actions.some(
@@ -728,9 +904,36 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
       'This older intake proposal does not identify its reviewed nutrition record. Prepare a fresh review before logging food.',
       409,
     );
-  if (decision === 'apply')
+  if (decision === 'apply') {
+    // Revalidate recipient sharing before reading any reviewed evidence.
+    for (const [index] of value.actions.entries()) parseAction(p, bindAction(value.actions, index));
     for (const saved of value.snapshots ?? []) {
-      const op = operation(p, saved.operationId);
+      if (saved.operationId === 'reviewHouseholdPeople') {
+        if (
+          decisionHash(await reviewedPeople(request, JSON.parse(saved.parameters.ids))) !==
+          saved.hash
+        )
+          throw new DecisionError(
+            'The selected people changed since this review. Prepare a fresh proposal.',
+            409,
+          );
+        continue;
+      }
+      if (saved.operationId === 'readNutritionDiaryRevisions')
+        parseAction(p, {
+          operationId: saved.operationId,
+          parametersJson: JSON.stringify(saved.parameters),
+          bodyJson: '',
+          bindings: [],
+        });
+      const op =
+        saved.nutritionIdentityOnly &&
+        ['getRecipe', 'getPantryProduct'].includes(saved.operationId) &&
+        value.actions.some((action) =>
+          operation(p, action.operationId).path.startsWith('/nutrition/'),
+        )
+          ? APP_OPERATIONS.find((candidate) => candidate.id === saved.operationId)!
+          : operation(p, saved.operationId);
       const response = await invoke(request, op, saved.parameters, undefined);
       if (!response.ok || decisionHash(await response.json()) !== saved.hash)
         throw new DecisionError(
@@ -738,6 +941,7 @@ export async function confirmAppActions(p: RequestPrincipal, request: Request, i
           409,
         );
     }
+  }
   const imageGroup = value.actions.every((action) => action.operationId === 'generateRecipeImage');
   if (decision === 'apply' && imageGroup) {
     if (!appRoleCan(p.role, 'shared.update') || !appRoleCan(p.accountRole, 'shared.update'))

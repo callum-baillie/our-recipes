@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createElement } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AppDialog } from '@/components/app-dialog';
 beforeEach(() => {
@@ -134,3 +134,29 @@ it.each([false, true])(
     destination.remove();
   },
 );
+
+it('does not reset keyboard focus when initial placement runs after the first Tab', () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  render(
+    createElement(
+      AppDialog,
+      { onClose: vi.fn(), 'aria-label': 'Fast keyboard review' },
+      createElement('button', null, 'Close review'),
+      createElement('button', null, 'Final action'),
+    ),
+  );
+  const first = screen.getByRole('button', { name: 'Close review' });
+  const last = screen.getByRole('button', { name: 'Final action' });
+  first.focus();
+  first.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
+  );
+  expect(document.activeElement).toBe(last);
+  act(() => frames[0]!(0));
+  expect(document.activeElement).toBe(last);
+});

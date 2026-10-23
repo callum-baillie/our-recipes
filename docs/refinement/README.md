@@ -1,5 +1,12 @@
 # Full project refinement
 
+**Current integrated candidate:** [RC21 integration receipt](rc21-integration.md) combines the published RC20 My Kitchen line with the outstanding RV completion changes and records cross-release fixes and fresh gates. The K01–K30 register remains explicit about partial acceptance.
+
+**Latest implementation pass:** [RV01–RV09 completion register](rv-completion.md)
+starts at `45ed512` in an isolated worktree, preserving concurrent My Kitchen
+changes. Its current evidence and external blockers supersede earlier completion
+claims for the affected execution paths. See also the [fresh dependency report](rv-dependencies.md).
+
 **Current follow-up:** [post-review completion register](post-review.md) starts from160441d and supersedes broad completion claims below for the F/G execution paths. The entries below describe the previous release and its bounded historical evidence. New fixes and acceptance must be read in the follow-up register.
 
 Started 2026-10-19 from clean `main` at `a278f81a272472b9ee2da6ff7c55788285c6fb4c`. Implementation branch: `refinement/full-project-completion`. Local implementation, GitHub publication and deployment are separate outcomes; the final receipt is in [release-evidence.md](release-evidence.md).

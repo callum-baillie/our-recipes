@@ -1,0 +1,130 @@
+{
+  "advisories": {
+    "1240992": {
+      "findings": [
+        {
+          "version": "3.0.3",
+          "paths": [".>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1240992,
+      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+      "module_name": "braces",
+      "vulnerable_versions": "<=3.0.3",
+      "patched_versions": ">=3.0.4",
+      "severity": "high",
+      "cwe": "CWE-674",
+      "github_advisory_id": "GHSA-vfj7-8cjw-p6xm",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+    },
+    "1242624": {
+      "findings": [
+        {
+          "version": "8.1.4",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/api-key>better-auth>vitest>vite",
+            ".>@better-auth/expo>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/expo>better-auth>vitest>vite",
+            ".>@better-auth/passkey>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/passkey>better-auth>vitest>vite",
+            ".>better-auth>vitest>@vitest/mocker>vite",
+            ".>better-auth>vitest>vite",
+            ".>vitest>@vitest/mocker>vite",
+            ".>vitest>vite"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1242624,
+      "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+      "module_name": "vite",
+      "vulnerable_versions": ">=8.0.0 <=8.1.5",
+      "patched_versions": ">=8.1.6",
+      "severity": "moderate",
+      "cwe": "CWE-78",
+      "github_advisory_id": "GHSA-698v-4r3x-3vcv",
+      "url": "https://github.com/advisories/GHSA-698v-4r3x-3vcv"
+    },
+    "1242653": {
+      "findings": [
+        {
+          "version": "8.1.4",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/api-key>better-auth>vitest>vite",
+            ".>@better-auth/expo>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/expo>better-auth>vitest>vite",
+            ".>@better-auth/passkey>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/passkey>better-auth>vitest>vite",
+            ".>better-auth>vitest>@vitest/mocker>vite",
+            ".>better-auth>vitest>vite",
+            ".>vitest>@vitest/mocker>vite",
+            ".>vitest>vite"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1242653,
+      "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+      "module_name": "vite",
+      "vulnerable_versions": ">=8.0.0 <=8.1.5",
+      "patched_versions": ">=8.1.6",
+      "severity": "moderate",
+      "cwe": "CWE-88",
+      "github_advisory_id": "GHSA-r825-w8mm-5pxw",
+      "url": "https://github.com/advisories/GHSA-r825-w8mm-5pxw"
+    },
+    "1242660": {
+      "findings": [
+        {
+          "version": "8.1.4",
+          "paths": [
+            ".>@better-auth/api-key>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/api-key>better-auth>vitest>vite",
+            ".>@better-auth/expo>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/expo>better-auth>vitest>vite",
+            ".>@better-auth/passkey>better-auth>vitest>@vitest/mocker>vite",
+            ".>@better-auth/passkey>better-auth>vitest>vite",
+            ".>better-auth>vitest>@vitest/mocker>vite",
+            ".>better-auth>vitest>vite",
+            ".>vitest>@vitest/mocker>vite",
+            ".>vitest>vite"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1242660,
+      "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+      "module_name": "vite",
+      "vulnerable_versions": ">=8.0.0 <=8.1.5",
+      "patched_versions": ">=8.1.6",
+      "severity": "high",
+      "cwe": "CWE-77",
+      "github_advisory_id": "GHSA-587h-7wmj-h5pm",
+      "url": "https://github.com/advisories/GHSA-587h-7wmj-h5pm"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 2,
+      "high": 2,
+      "critical": 0
+    },
+    "dependencies": 367,
+    "devDependencies": 334,
+    "optionalDependencies": 151,
+    "totalDependencies": 815
+  }
+}

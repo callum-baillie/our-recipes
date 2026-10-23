@@ -124,6 +124,51 @@ describe('AI assistant drawer', () => {
     expect(drawer.style.getPropertyValue('--assistant-viewport-height')).toBe('844px');
   });
 
+  it('keeps a focused conversation control visible instead of following the bottom after resize', async () => {
+    const viewport = Object.assign(new EventTarget(), { height: 844, offsetTop: 0, scale: 1 });
+    vi.stubGlobal('visualViewport', viewport);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/threads')) return Response.json({ threads: [{ id: 'focus-review' }] });
+        if (url.includes('app-actions')) return Response.json({ proposals: [] });
+        return Response.json({
+          messages: [
+            {
+              id: 'review-link',
+              role: 'assistant',
+              content: '[Review saved recipe](/recipes/fixture)',
+            },
+          ],
+          actions: [],
+          jobs: [],
+        });
+      }),
+    );
+    render(createElement(AiAssistantDrawer, { open: true, onClose: vi.fn() }));
+    const link = await screen.findByRole('link', { name: 'Review saved recipe' });
+    const list = screen.getByRole('log', { name: 'Conversation' });
+    Object.defineProperties(list, {
+      scrollHeight: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 300 },
+    });
+    list.scrollTop = 250;
+    await act(async () => link.focus());
+    const scroll = vi.mocked(HTMLElement.prototype.scrollIntoView);
+    scroll.mockClear();
+    await act(async () => {
+      viewport.height = 500;
+      viewport.dispatchEvent(new Event('resize'));
+    });
+    await waitFor(() =>
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' }),
+    );
+    expect(scroll.mock.contexts).toContain(link);
+    expect(list.scrollTop).toBe(250);
+    expect(document.activeElement).toBe(link);
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();

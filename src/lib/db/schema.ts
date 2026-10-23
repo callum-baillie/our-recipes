@@ -607,7 +607,9 @@ export const aiOperationAudits = sqliteTable('ai_operation_audits', {
       'household-summary',
     ],
   }).notNull(),
-  status: text('status', { enum: ['requested', 'succeeded', 'failed'] }).notNull(),
+  status: text('status', {
+    enum: ['requested', 'succeeded', 'failed', 'cancelled', 'outcome_unknown'],
+  }).notNull(),
   sourceDigest: text('source_digest').notNull(),
   sourceLabel: text('source_label').notNull(),
   provider: text('provider').notNull(),
@@ -711,6 +713,7 @@ export const aiChatThreads = sqliteTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
+    privacyScopeJson: text('privacy_scope_json'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },

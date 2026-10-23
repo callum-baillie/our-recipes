@@ -9,6 +9,7 @@ import { eq, and, gte, sql } from 'drizzle-orm';
 import { getDatabase, ensureDatabase } from '@/lib/db/client';
 import { aiExecutionTraces } from '@/lib/db/schema';
 import { AI_MODEL_CATALOG, type AiWorkload } from '@/lib/domain/ai-assistant';
+import { aiApprovedExecutionSchema } from '@/lib/domain/ai-approved-execution';
 import { DECISIONS_MODEL } from '@/lib/providers/decisions-provider';
 import { getAiWorkloadSetting } from './ai-settings-service';
 import {
@@ -19,13 +20,32 @@ import {
 } from './ai-access-service';
 
 type Setting = ReturnType<typeof getAiWorkloadSetting>;
-type Approved = Partial<Setting>;
+type Approved = Partial<Setting> & { personalInstructions?: string };
+
+export function captureAiExecutionApproval(profileId: string, workload: AiWorkload) {
+  assertProfileAiEnabled(profileId);
+  const setting = getAiWorkloadSetting(profileId, workload);
+  if (!setting.enabled) throw new Error('This AI workload is disabled for the account.');
+  return aiApprovedExecutionSchema.parse({
+    schemaVersion: 1,
+    workload,
+    model: setting.model,
+    reasoningEffort: setting.reasoningEffort,
+    promptGuidance: setting.promptGuidance,
+    promptVersion: setting.promptVersion,
+    personalInstructions: getEffectiveAiPolicy(profileId).instructions,
+    maxOutputTokens: setting.maxOutputTokens,
+    requestTimeoutSeconds: setting.requestTimeoutSeconds,
+  });
+}
 export function resolveAiExecutionOptions(
   profileId: string,
   workload: AiWorkload,
   approved?: Approved,
 ) {
   assertAiExecutionActive();
+  if (approved?.workload && approved.workload !== workload)
+    throw new Error('The reviewed workload changed. Review a new request.');
   assertProfileAiEnabled(profileId);
   const current = getAiWorkloadSetting(profileId, workload);
   if (!current.enabled) throw new Error('This AI workload is disabled for the account.');
@@ -44,8 +64,12 @@ export function resolveAiExecutionOptions(
     );
   const fixedDecisionContract =
     currentAiExecutionContext()?.providerEndpoint === 'decisions' && model === DECISIONS_MODEL;
-  if (!global.allowPersonalModelOverrides && model !== current.model && !fixedDecisionContract)
-    throw new Error('The reviewed model is no longer allowed. Review a new request.');
+  if (
+    !global.allowPersonalModelOverrides &&
+    !fixedDecisionContract &&
+    (model !== current.model || reasoning !== current.reasoningEffort)
+  )
+    throw new Error('The reviewed model or reasoning is no longer allowed. Review a new request.');
   if (
     workload === 'image_generation' &&
     !global.allowPersonalImageOverrides &&
@@ -66,7 +90,7 @@ export function resolveAiExecutionOptions(
   const signal = context?.signal
     ? AbortSignal.any([context.signal, deadlineSignal])
     : deadlineSignal;
-  const personal = getEffectiveAiPolicy(profileId).instructions;
+  const personal = approved?.personalInstructions ?? getEffectiveAiPolicy(profileId).instructions;
   return {
     ...current,
     ...snapshot,

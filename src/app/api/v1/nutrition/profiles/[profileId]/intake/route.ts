@@ -1,3 +1,4 @@
+import { authorizeNutritionProfileRead } from '@/lib/services/nutrition-profile-service';
 import { NextResponse } from 'next/server';
 
 import {
@@ -20,6 +21,10 @@ export async function GET(request: Request, context: Context) {
   try {
     const profileId = parseNutritionProfileId((await context.params).profileId);
     return NextResponse.json({
+      subject: {
+        displayName: authorizeNutritionProfileRead(profileId, auth.principal.id, 'view_diary')
+          .displayName,
+      },
       revisions: listNutritionIntakeRevisions(profileId, auth.principal.id),
     });
   } catch (error) {

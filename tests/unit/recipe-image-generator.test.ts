@@ -74,6 +74,24 @@ async function render() {
   );
 }
 describe('recipe image preview UI', () => {
+  it.each([
+    ['failed', 'No image is available'],
+    ['outcome_unknown', 'provider outcome is unknown'],
+  ])(
+    'shows %s locally without offering acceptance or starting another generation',
+    async (status, message) => {
+      const fetch = vi.fn().mockResolvedValue(Response.json({ candidate: { ...ready, status } }));
+      vi.stubGlobal('fetch', fetch);
+      await render();
+      await click('Generate preview with OpenAI');
+      expect(host.querySelector('[role="status"]')?.textContent).toContain(message);
+      expect(button('Add reviewed photo')).toBeUndefined();
+      expect(button('Generate preview with OpenAI')).toBeUndefined();
+      expect(button('Check this request')).toBeTruthy();
+      expect(refresh).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledOnce();
+    },
+  );
   it('requires review before accepting, freezes submitted controls and keeps existing outcome distinct', async () => {
     let release!: (value: Response) => void;
     const fetch = vi

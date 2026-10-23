@@ -19,7 +19,6 @@ import { AiAssistantDrawer } from './ai-assistant-drawer';
 import {
   ArrowDown,
   ArrowUp,
-  Barcode,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -40,7 +39,6 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -56,10 +54,9 @@ import {
 
 import { useToast } from '@/components/toast-provider';
 import { createClientUuid } from '@/lib/client/client-uuid';
-import { AsyncSkeleton } from '@/components/skeleton';
 import type { FoodRecord } from '@/lib/domain/food-data';
 import { rankPantryMatches, type PantryMatchCandidate } from '@/lib/domain/pantry-shopping-match';
-import { rankShoppingScanMatches } from '@/lib/domain/shopping-scan-match';
+import { ShoppingScanReview } from './shopping-scan-review';
 import type { ShoppingListDetail } from '@/lib/services/planning-service';
 
 import styles from './shopping-list-editor.module.css';
@@ -68,14 +65,6 @@ type Item = ShoppingListDetail['items'][number];
 type ShoppingState = Item['shoppingState'];
 type SortMode = 'position' | 'alpha' | 'recent';
 type GroupMode = 'aisle' | 'none';
-
-const BarcodeScanner = dynamic(
-  () => import('@/components/barcode-scanner').then((module) => module.BarcodeScanner),
-  {
-    loading: () => <AsyncSkeleton label="Opening barcode scanner" variant="scanner" />,
-    ssr: false,
-  },
-);
 
 type PantryOptions = {
   products: Array<{
@@ -518,10 +507,7 @@ export function ShoppingListEditor({
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [barcode, setBarcode] = useState('');
-  const [scanRecord, setScanRecord] = useState<FoodRecord | null>(null);
-  const [scanStatus, setScanStatus] = useState('');
-  const [scanQuantity, setScanQuantity] = useState('1');
+  const [scanLocked, setScanLocked] = useState(false);
   const [substituteItem, setSubstituteItem] = useState<Item | null>(null);
   const [substituteQuery, setSubstituteQuery] = useState('');
   const [substituteResults, setSubstituteResults] = useState<FoodRecord[]>([]);
@@ -667,18 +653,6 @@ export function ShoppingListEditor({
   const progressCount = wholeTrip.inCart.length + wholeTrip.sourced.length;
   const remaining = wholeTrip.toBuy.length + wholeTrip.cantFind.length;
   const progress = total ? Math.round((progressCount / total) * 100) : 0;
-  const scanMatches = useMemo(
-    () =>
-      scanRecord
-        ? rankShoppingScanMatches(
-            items
-              .filter((item) => unpackMode || normalizedState(item) !== 'sourced')
-              .map((item) => ({ id: item.id, item: item.item })),
-            scanRecord,
-          )
-        : [],
-    [items, scanRecord, unpackMode],
-  );
   const stockedPantryProducts = useMemo(
     () => pantryOptions.products.filter((product) => product.stock.length > 0),
     [pantryOptions.products],
@@ -871,143 +845,6 @@ export function ShoppingListEditor({
       setItems((current) => current.map((row) => (row.id === previous.id ? previous : row)));
     }
     setBusy('');
-  };
-
-  const lookupBarcode = async (value: string) => {
-    const normalized = value.replace(/[\s-]+/gu, '');
-    if (!normalized) return;
-    setBusy('scan');
-    setScanStatus('Looking up this barcode…');
-    setScanRecord(null);
-    try {
-      const response = await fetch('/api/v1/food-data/barcode-lookups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          barcode: normalized,
-          language: navigator.language.slice(0, 2),
-          compareUsda: true,
-        }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        preferred?: FoodRecord | null;
-        alternatives?: FoodRecord[];
-        error?: { message?: string };
-      } | null;
-      const record = body?.preferred ?? body?.alternatives?.[0] ?? null;
-      if (!response.ok || !record)
-        throw new Error(body?.error?.message ?? 'No product was found for that barcode.');
-      setBarcode(normalized);
-      setScanRecord(record);
-      setScanStatus('');
-    } catch (error) {
-      setScanStatus(error instanceof Error ? error.message : 'Barcode lookup failed.');
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const applyScanMatch = async (item: Item) => {
-    if (!scanRecord) return;
-    const quantity = Number(scanQuantity);
-    const cartQuantity =
-      item.cartQuantity + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
-    const complete = item.quantity === null || cartQuantity >= item.quantity;
-    const scanNote = [
-      item.note,
-      `Scanned ${scanRecord.displayName}${scanRecord.brand ? ` by ${scanRecord.brand}` : ''}`,
-      Number.isFinite(quantity) && quantity > 0 ? `Cart quantity: ${quantity}` : '',
-      scanRecord.canonicalGtin ? `GTIN ${scanRecord.canonicalGtin}` : '',
-    ]
-      .filter(Boolean)
-      .join(' · ')
-      .slice(0, 240);
-    const changed = {
-      ...item,
-      note: scanNote,
-      cartLabel: scanRecord.displayName,
-      cartQuantity,
-      cartUnit: item.unit,
-      shoppingState: (unpackMode && complete
-        ? 'sourced'
-        : complete
-          ? 'in_cart'
-          : 'to_buy') as ShoppingState,
-      checked: unpackMode && complete,
-    };
-    updateLocal(item.id, changed);
-    if (await save(changed)) {
-      setLastChecked({ item: changed, previous: item });
-      if (unpackMode) {
-        const candidate = rankPantryMatches(scanRecord.displayName, stockedPantryProducts)[0];
-        updateIntakeDraft(item, {
-          productId: candidate?.productId ?? item.pantry?.productId ?? '',
-          quantity: String(cartQuantity),
-        });
-      }
-      showToast(
-        !complete
-          ? `${formatQuantity(cartQuantity, item.unit)} recorded; the remainder stays on your list.`
-          : unpackMode
-            ? `${item.item} identified and ready to unpack into Pantry.`
-            : `${item.item} identified and moved to In cart.`,
-        'success',
-      );
-      setScanOpen(false);
-      setScanRecord(null);
-      setBarcode('');
-      setScanQuantity('1');
-    } else updateLocal(item.id, item);
-  };
-
-  const addScannedItem = async () => {
-    if (!scanRecord) return;
-    const quantity = Number(scanQuantity);
-    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10_000) {
-      setScanStatus('Enter a quantity from 0 to 10,000.');
-      return;
-    }
-    setBusy('scan-add');
-    try {
-      const itemName = scanRecord.genericName?.trim() || scanRecord.displayName;
-      const response = await fetch(`/api/v1/shopping-lists/${list.id}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quantity: '',
-          unit: '',
-          item: itemName,
-          note: [
-            `Scanned ${scanRecord.displayName}${scanRecord.brand ? ` by ${scanRecord.brand}` : ''}`,
-            scanRecord.canonicalGtin ? `GTIN ${scanRecord.canonicalGtin}` : '',
-          ]
-            .filter(Boolean)
-            .join(' · ')
-            .slice(0, 240),
-          checked: unpackMode,
-          shoppingState: unpackMode ? 'sourced' : 'in_cart',
-          cartQuantity: quantity,
-          cartUnit: 'each',
-          cartLabel: scanRecord.displayName,
-        }),
-      });
-      const body = (await response.json().catch(() => null)) as { item?: Item } | null;
-      if (!response.ok || !body?.item) throw new Error('Could not add the scanned item.');
-      setItems((current) => [...current, body.item!]);
-      setLastChecked({ item: body.item, previous: null });
-      setScanOpen(false);
-      setScanRecord(null);
-      setBarcode('');
-      setScanQuantity('1');
-      showToast(
-        `${itemName} added to ${unpackMode ? 'Pantry unpacking' : 'Add to cart'}.`,
-        'success',
-      );
-    } catch (error) {
-      setScanStatus(error instanceof Error ? error.message : 'Could not add the scanned item.');
-    } finally {
-      setBusy('');
-    }
   };
 
   const openSubstitute = (item: Item) => {
@@ -2825,6 +2662,9 @@ export function ShoppingListEditor({
         className={styles.workflowDialog}
         ref={scanDialogRef}
         aria-labelledby="shopping-scan-title"
+        onCancel={(event) => {
+          if (scanLocked) event.preventDefault();
+        }}
         onClose={() => setScanOpen(false)}
       >
         <header>
@@ -2837,123 +2677,29 @@ export function ShoppingListEditor({
               <p>Identify a product, then match it to the right item and quantity.</p>
             </div>
           </div>
-          <button type="button" aria-label="Close scan mode" onClick={() => setScanOpen(false)}>
+          <button
+            type="button"
+            disabled={scanLocked}
+            aria-label="Close scan mode"
+            onClick={() => setScanOpen(false)}
+          >
             <X />
           </button>
         </header>
-        <div className={styles.dialogBody}>
-          {scanOpen ? <BarcodeScanner onDetected={(value) => void lookupBarcode(value)} /> : null}
-          <form
-            className={styles.barcodeForm}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void lookupBarcode(barcode);
-            }}
-          >
-            <label>
-              <span>Enter barcode</span>
-              <span>
-                <Barcode />
-                <input
-                  inputMode="numeric"
-                  value={barcode}
-                  onChange={(event) => setBarcode(event.target.value)}
-                  placeholder="UPC, EAN, or GTIN"
-                />
-              </span>
-            </label>
-            <button
-              type="submit"
-              aria-busy={busy === 'scan'}
-              disabled={busy === 'scan' || !barcode.trim()}
-            >
-              {busy === 'scan' ? 'Looking up…' : 'Look up'}
-            </button>
-          </form>
-          {scanStatus ? (
-            <p className={styles.dialogStatus} role="status">
-              {scanStatus}
-            </p>
-          ) : null}
-          {scanRecord ? (
-            <section className={styles.scanResult}>
-              <div>
-                <span className={styles.productThumb}>
-                  {scanRecord.images[0] ? (
-                    <Image
-                      src={scanRecord.images[0].url}
-                      alt=""
-                      width={56}
-                      height={56}
-                      unoptimized
-                    />
-                  ) : (
-                    <PackageOpen />
-                  )}
-                </span>
-                <span>
-                  <small>Product identified</small>
-                  <strong>{scanRecord.displayName}</strong>
-                  <span>{[scanRecord.brand, scanRecord.quantity].filter(Boolean).join(' · ')}</span>
-                </span>
-              </div>
-              <label>
-                {unpackMode ? 'Quantity purchased in this scan' : 'Quantity found in this scan'}
-                <input
-                  min="1"
-                  step="1"
-                  inputMode="numeric"
-                  value={scanQuantity}
-                  onChange={(event) => setScanQuantity(event.target.value)}
-                />
-              </label>
-              <p className={styles.scanQuantityHint}>
-                {scanMatches.length
-                  ? 'This amount adds to the quantity already recorded for the matched item.'
-                  : 'The scanned product name is saved with this quantity.'}
-              </p>
-              <div className={styles.matchList}>
-                <h3>{scanMatches.length ? 'Match to your list' : 'No close list match found'}</h3>
-                {scanMatches.length ? (
-                  scanMatches.map((match) => {
-                    const item = items.find((entry) => entry.id === match.id);
-                    return item ? (
-                      <button
-                        key={match.id}
-                        type="button"
-                        onClick={() => void applyScanMatch(item)}
-                      >
-                        <span>
-                          <strong>{item.item}</strong>
-                          <small>{match.score >= 0.9 ? 'Exact match' : 'Suggested match'}</small>
-                        </span>
-                        <span>Move to cart →</span>
-                      </button>
-                    ) : null;
-                  })
-                ) : (
-                  <div className={styles.scanNoMatch}>
-                    <p>
-                      Add this product as a new list item. Its generic name stays on the list, and
-                      the scanned brand is kept as the item you put in the cart.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={busy === 'scan-add'}
-                      onClick={() => void addScannedItem()}
-                    >
-                      {busy === 'scan-add'
-                        ? 'Adding…'
-                        : unpackMode
-                          ? 'Add scanned item for unpacking'
-                          : 'Add scanned item to cart'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-          ) : null}
-        </div>
+        <ShoppingScanReview
+          key={list.id}
+          listId={list.id}
+          items={items}
+          open={scanOpen}
+          onLockedChange={setScanLocked}
+          onSaved={(saved) =>
+            setItems((current) =>
+              current.some((item) => item.id === saved.id)
+                ? current.map((item) => (item.id === saved.id ? saved : item))
+                : [...current, saved],
+            )
+          }
+        />
       </dialog>
 
       <dialog

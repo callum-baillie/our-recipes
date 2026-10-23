@@ -1,4 +1,5 @@
 import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
+import { prepareIdempotentMutation, executeIdempotentMutation } from '@/lib/api-idempotency';
 import { z } from 'zod';
 import { FoodDataError, foodCatalogImportInputSchema } from '@/lib/domain/food-data';
 import {
@@ -26,7 +27,18 @@ export async function POST(request: Request) {
   const actor = actorFromPrincipal(access.principal);
 
   try {
-    const input = inputSchema.parse(await readFoodDataJson(request));
+    const raw = await readFoodDataJson(request);
+    const input = inputSchema.parse(raw);
+    const prepared = await prepareIdempotentMutation(
+      new Request(request.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': input.operationId },
+        body: JSON.stringify(raw),
+      }),
+      access.principal,
+      access.requestId,
+    );
+    if (prepared.response) return prepared.response;
     const { batches, ...catalogInput } = input;
     const replay = replayFoodCatalogImport(
       catalogInput,
@@ -48,8 +60,9 @@ export async function POST(request: Request) {
       input.selection.catalogRef,
       true,
     );
-    return withApiRequestId(
-      foodDataJson(
+    return executeIdempotentMutation(
+      prepared.context,
+      () =>
         importFoodCatalogRecord({
           input: catalogInput,
           record,
@@ -58,9 +71,8 @@ export async function POST(request: Request) {
           destination: 'pantry',
           batches,
         }),
-        { status: 201 },
-      ),
       access.requestId,
+      201,
     );
   } catch (error) {
     return withApiRequestId(foodDataApiError(error), access.requestId);

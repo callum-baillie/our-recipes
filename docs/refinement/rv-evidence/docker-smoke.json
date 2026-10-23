@@ -1,0 +1,20 @@
+{
+  "image": "bord:rv-f2ff37c",
+  "version": "1.0.0-rc.19",
+  "schemaVersion": "0075_ai_chat_privacy_scope",
+  "nonRoot": true,
+  "runtimePathsClean": true,
+  "persistentRestart": true,
+  "backupCreatedDownloadedValidatedRestored": true,
+  "restoredSessionsRevoked": true,
+  "interruptedRecoveryBlocksRuntimeAndStartup": true,
+  "backupBytes": 57802,
+  "backupSha256": "373c1d221f9032508e5852ec4dc25413030888b88e1ffdc97bcc95b9f5f02ae2",
+  "sourceRevision": "f2ff37c9a630fed809719f6db885385fff7b8efe",
+  "platform": "linux/amd64",
+  "imageId": "sha256:afc11c0d6e3ee4c235386aa64ab151e447095d00e318c86eb12aeb11bc3e2e50",
+  "containerNode": "v24.22.1",
+  "next": "16.4.1",
+  "volume": "Unique disposable mkdtemp synthetic bind mount; removed after smoke",
+  "scope": "Local amd64 only; not registry publication, arm64 acceptance or operator-volume/Unraid deployment"
+}

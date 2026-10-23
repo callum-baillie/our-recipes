@@ -1,0 +1,8 @@
+{
+  "revision": "fd6d35ea60c8a9fa1f7bc78937b815812ceb8ccc",
+  "run": "https://github.com/callum-baillie/our-recipes/actions/runs/39827234486",
+  "viewport": "390x844",
+  "state": "Real Plan settings dialog; deferred initial focus returned to Close plan settings after Shift+Tab had wrapped to Close settings.",
+  "reproduction": "Deterministic queued-animation-frame regression fails before the shared hook correction and passes afterward.",
+  "classification": "Observed CI failure before correction, not a supplied baseline or physical-device capture."
+}

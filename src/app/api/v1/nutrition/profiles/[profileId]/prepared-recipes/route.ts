@@ -1,3 +1,4 @@
+import { getPrivateNutritionProfile } from '@/lib/services/nutrition-profile-service';
 import { NextResponse } from 'next/server';
 
 import {
@@ -22,6 +23,9 @@ export async function GET(request: Request, context: Context) {
   try {
     const profileId = parseNutritionProfileId((await context.params).profileId);
     return NextResponse.json({
+      subject: {
+        displayName: getPrivateNutritionProfile(profileId, auth.principal.id).displayName,
+      },
       preparedRecipes: listPreparedRecipeInstances(profileId, auth.principal.id),
       workspace: getPreparedServingWorkspace(profileId, auth.principal.id),
     });

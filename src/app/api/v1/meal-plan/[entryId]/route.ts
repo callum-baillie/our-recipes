@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getAppPreferences } from '@/lib/services/app-preferences-service';
+import { mealTypeLabel, MEAL_OPTIONS } from '@/lib/domain/meal-types';
 
 import { authorizeApi, requireTrustedSessionMutation, withApiRequestId } from '@/lib/api-auth';
 import { mealPlanEntryUpdateSchema, mealPlanStatusUpdateSchema } from '@/lib/domain/planning';
@@ -18,7 +20,21 @@ export async function GET(request: Request, context: { params: Promise<{ entryId
   if (authorization.response) return authorization.response;
   const meal = getPlannedMeal((await context.params).entryId);
   return meal
-    ? withApiRequestId(NextResponse.json({ meal }), authorization.requestId)
+    ? withApiRequestId(
+        NextResponse.json({
+          meal: {
+            ...meal,
+            mealLabel: mealTypeLabel(meal.meal, [
+              ...MEAL_OPTIONS,
+              ...getAppPreferences().mealPlan.customMealTypes.map((type) => ({
+                ...type,
+                defaultVisible: true,
+              })),
+            ]),
+          },
+        }),
+        authorization.requestId,
+      )
     : jsonError(404, 'planned_meal_not_found', 'That planned meal no longer exists.');
 }
 

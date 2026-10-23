@@ -131,6 +131,17 @@ export function AiAssistantDrawer({
   const closeRef = useRef<HTMLButtonElement>(null);
   const adjustingViewport = useRef(false);
 
+  const settleConversationScroll = useCallback((list: HTMLDivElement) => {
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused !== list && list.contains(focused)) {
+      // Review controls own the reading position while they have keyboard focus.
+      // Resizing/enlarging text must not scroll their action above the viewport.
+      focused.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      return;
+    }
+    if (stickToBottom.current) list.scrollTop = list.scrollHeight;
+  }, []);
+
   function pauseFollowing(list: HTMLDivElement, towardLatest = false) {
     const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
     if (list.scrollHeight <= list.clientHeight || (towardLatest && remaining <= 1)) return;
@@ -165,8 +176,7 @@ export function AiAssistantDrawer({
         drawer.dataset.keyboardOpen = String(
           layoutHeight - height > 150 && (viewport?.scale ?? 1) === 1,
         );
-        if (stickToBottom.current && messagesRef.current)
-          messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+        if (messagesRef.current) settleConversationScroll(messagesRef.current);
         settledFrame = window.requestAnimationFrame(() => {
           adjustingViewport.current = false;
         });
@@ -184,7 +194,7 @@ export function AiAssistantDrawer({
       viewport?.removeEventListener('scroll', resize);
       window.removeEventListener('resize', resize);
     };
-  }, [open]);
+  }, [open, settleConversationScroll]);
 
   const newThread = useCallback(async () => {
     setStatusError(false);
@@ -304,19 +314,19 @@ export function AiAssistantDrawer({
 
   useEffect(() => {
     const list = messagesRef.current;
-    if (stickToBottom.current && list) list.scrollTop = list.scrollHeight;
-  }, [messages, actions, jobs, appActions, busy, open]);
+    if (list) settleConversationScroll(list);
+  }, [messages, actions, jobs, appActions, busy, open, settleConversationScroll]);
 
   useEffect(() => {
     const list = messagesRef.current;
     if (!open || !list || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => {
-      if (stickToBottom.current) list.scrollTop = list.scrollHeight;
+      settleConversationScroll(list);
     });
     observer.observe(list);
     if (messageContentRef.current) observer.observe(messageContentRef.current);
     return () => observer.disconnect();
-  }, [open]);
+  }, [open, settleConversationScroll]);
 
   const activeJobIds = jobs
     .filter(isActiveJob)
@@ -855,6 +865,12 @@ export function AiAssistantDrawer({
                 stickToBottom.current = true;
                 setNewResponse(false);
               }
+            }}
+            onFocusCapture={(event) => {
+              if (event.target === event.currentTarget) return;
+              // Focusing a review/link is reading intent, even before overflow.
+              readingScroll.current = { lastTop: event.currentTarget.scrollTop };
+              stickToBottom.current = false;
             }}
             onScroll={(event) => {
               const el = event.currentTarget;

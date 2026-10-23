@@ -49,3 +49,24 @@ The IDs are distinct concepts even where existing converged data uses identical 
 A test-only, no-auth-configured seam remains for existing isolated domain fixtures. Configured installations always require the authenticated account. Direct real-session integration fixtures exercise signed-cookie-only, Child/adult, Parent/admin, guardian/Child and revoked-session cases, including the real proxy policy.
 
 `GET /api/v1/ai/summaries` is also a private signed-in-account result: it requires the account's own active profile. `POST` refresh always targets the linked account and returns its named recipient. It cannot refresh another person's summaries because the global viewing profile changed. The first-party routes remain listed in `docs/openapi-internal-routes.json`; this contract documents their supported web/native semantics without adding a duplicate external integration endpoint.
+
+## Delayed execution and retained AI evidence (RV follow-up)
+
+An approved delayed task owns an immutable effective configuration snapshot:
+workload, model, reasoning, prompt content/version, permitted personal presentation
+text and execution limits. A later default change does not rewrite that approval.
+The common execution resolver still enforces current account/workload access,
+override revocation and tighter token/deadline limits. A same-model reasoning
+change remains a constrained option; revoking overrides cannot be bypassed by
+keeping the model ID. Legacy scheduled work without a recoverable approved
+snapshot requires a new reviewed task. There is no independent administrator
+`allowPersonalInstructions` switch in this implementation; account/workload and
+sharing policy remain enforced, rather than inventing an unsupported setting.
+
+Conversation history can contain model echoes or tool evidence that cannot be
+safely redacted by deleting an initial context object. A server-only, metadata-only
+thread baseline records the sharing and authority scope. A contraction pauses
+future provider transmission, including resumed turns. It does not retract content
+already transmitted. An old thread with retained evidence but no baseline remains
+readable and requires a new conversation for further provider work. This scope
+metadata is not exposed in thread-list responses.

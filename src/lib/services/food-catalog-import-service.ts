@@ -4,6 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
+import { isSessionConfirmationAbandoned } from '@/lib/api-idempotency';
 import {
   foodCatalogImportOperations,
   foodNutrientValues,
@@ -50,7 +51,7 @@ function jsonList(values: string[]) {
   return JSON.stringify([...new Set(values.map((value) => value.trim()).filter(Boolean))]);
 }
 
-function parseCatalogBatch(value: unknown) {
+export function parseCatalogBatch(value: unknown) {
   const candidate = {
     ...(typeof value === 'object' && value ? value : {}),
     productId: '00000000-0000-0000-0000-000000000000',
@@ -197,6 +198,19 @@ export function importFoodCatalogRecord(args: {
   const parsedBatches = destination === 'pantry' ? (args.batches ?? []).map(parseCatalogBatch) : [];
   const now = new Date();
   const result = database.transaction((transaction) => {
+    if (
+      destination === 'pantry' &&
+      args.actorUserId &&
+      isSessionConfirmationAbandoned({
+        userId: args.actorUserId,
+        profileId: actorProfileId,
+        operationId: input.operationId,
+        path: '/api/v1/pantry/catalog-imports',
+      })
+    )
+      throw new PantryConflictError(
+        'This confirmation was closed after review and cannot execute again.',
+      );
     const identifier = record.canonicalGtin
       ? transaction
           .select()
@@ -437,12 +451,46 @@ export function replayFoodCatalogImport(
   };
 }
 
+export function replayCatalogShoppingItem(args: {
+  input: unknown;
+  listId: string;
+  actorProfileId: string;
+  actorUserId: string;
+}) {
+  const input = foodCatalogShoppingInputSchema.parse(args.input);
+  ensureDatabase();
+  const operation = getDatabase()
+    .select()
+    .from(foodCatalogImportOperations)
+    .where(eq(foodCatalogImportOperations.id, input.operationId))
+    .get();
+  if (!operation) return null;
+  const requestDigest = digest({
+    input,
+    listId: args.listId,
+    actorUserId: args.actorUserId,
+    operation: 'catalog-shopping-item',
+  });
+  if (operation.actorProfileId !== args.actorProfileId || operation.requestDigest !== requestDigest)
+    throw new PantryConflictError(
+      'That confirmation belongs to a different person or shopping selection.',
+    );
+  return JSON.parse(operation.result) as {
+    productId: string;
+    itemId: string;
+    listId: string;
+    batchIds: string[];
+    reusedProduct: boolean;
+  };
+}
+
 /** Confirm a reviewed catalog identity and a shopping match in one durable local transaction. */
 export async function confirmCatalogShoppingItem(args: {
   input: unknown;
   listId: string;
   actorProfileId: string;
   actorUserId: string;
+  beforeCommit?: () => void;
 }) {
   const input = foodCatalogShoppingInputSchema.parse(args.input);
   const {
@@ -462,31 +510,24 @@ export async function confirmCatalogShoppingItem(args: {
     actorUserId: args.actorUserId,
     operation: 'catalog-shopping-item',
   });
-  const replay = () => {
-    const operation = database
-      .select()
-      .from(foodCatalogImportOperations)
-      .where(eq(foodCatalogImportOperations.id, input.operationId))
-      .get();
-    if (!operation) return null;
-    if (
-      operation.actorProfileId !== args.actorProfileId ||
-      operation.requestDigest !== requestDigest
-    )
-      throw new PantryConflictError(
-        'That confirmation belongs to a different person or shopping selection.',
-      );
-    return JSON.parse(operation.result) as {
-      productId: string;
-      itemId: string;
-      listId: string;
-      batchIds: string[];
-      reusedProduct: boolean;
-    };
-  };
+  const replay = () => replayCatalogShoppingItem({ ...args, input });
   // Authorization is performed by the caller before this scope-bound replay. No provider is needed.
   const acknowledged = replay();
   if (acknowledged) return { ...acknowledged, replayed: true };
+  const assertActive = () => {
+    if (
+      isSessionConfirmationAbandoned({
+        userId: args.actorUserId,
+        profileId: args.actorProfileId,
+        operationId: input.operationId,
+        path: `/api/v1/shopping-lists/${args.listId}/catalog-items`,
+      })
+    )
+      throw new PantryConflictError(
+        'This confirmation was closed after review and cannot execute again.',
+      );
+  };
+  assertActive();
   const list = getShoppingList(args.listId);
   if (!list || list.archivedAt) throw new PantryConflictError('Choose an available shopping list.');
   if (
@@ -512,6 +553,8 @@ export async function confirmCatalogShoppingItem(args: {
         ).record
       : null;
   return database.transaction(() => {
+    args.beforeCommit?.();
+    assertActive();
     const currentReplay = replay();
     if (currentReplay) return { ...currentReplay, replayed: true };
     const currentList = getShoppingList(args.listId);

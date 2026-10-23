@@ -101,9 +101,9 @@ test('household inventory adds duplicates, edits one, resumes a draft and reflow
     JSON.stringify(
       {
         baseRevision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
-        testedState: 'Uncommitted My Kitchen implementation',
+        testedState: 'v1.0.0-rc.21 integrated release candidate',
         buildId: readFileSync('.next/BUILD_ID', 'utf8').trim(),
-        sourceDigest: JSON.parse(readFileSync('docs/my-kitchen/source-manifest.json', 'utf8'))
+        sourceDigest: JSON.parse(readFileSync('docs/refinement/rc21-source-manifest.json', 'utf8'))
           .sourceDigest,
         capturedAt: new Date().toISOString(),
         provider: 'No provider calls',

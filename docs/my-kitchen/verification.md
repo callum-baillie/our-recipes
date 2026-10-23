@@ -89,3 +89,7 @@ The checks below supersede earlier candidate counts and statements that the work
 - K01–K30 status remains as listed in [the acceptance register](acceptance.md); several scenarios are partial. `adb devices -l` is empty and `xcrun` is unavailable. Live model interpretation, native-device accessibility, production household-volume recovery and physical appliance safety/timing remain unverified. No paid provider call was made.
 
 See [the release publication receipt](../refinement/rc20-release.md) for the exact commit, GitHub tag/release and resulting image workflow checks.
+
+## RC21 integrated release candidate
+
+The current integrated release candidate retains the RC20 kitchen migrations/features and adds the RV recovery/privacy/focus work. Its cross-release test results, additive migration and known limitations are recorded in the [RC21 integration receipt](../refinement/rc21-integration.md). The fresh My Kitchen browser manifests point to that receipt's [RC21 source manifest](../refinement/rc21-source-manifest.json); the RC20 hashes and screenshots above remain historical.

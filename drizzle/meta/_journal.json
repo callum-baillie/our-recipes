@@ -575,6 +575,13 @@
       "when": 1792627200003,
       "tag": "0080_kitchen_physical_uses",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "6",
+      "when": 1792713600000,
+      "tag": "0081_ai_chat_privacy_scope",
+      "breakpoints": true
     }
   ]
 }

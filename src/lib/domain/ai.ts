@@ -228,7 +228,13 @@ export const aiConnectionStatusSchema = z
   })
   .strict();
 
-export const aiOperationAuditStatusSchema = z.enum(['requested', 'succeeded', 'failed']);
+export const aiOperationAuditStatusSchema = z.enum([
+  'requested',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'outcome_unknown',
+]);
 
 export const aiOperationAuditSchema = z
   .object({

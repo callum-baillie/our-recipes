@@ -200,16 +200,22 @@ export async function prepareRecipeImageCandidate(
       .run();
   });
   let storageKey: string | null = null;
+  let providerStarted = false;
+  let providerCompleted = false;
   try {
     const generated = await withAiExecutionContext({ signal }, () =>
       executeAiWorkload(
         owner.profileId,
         'image_generation',
-        (options) =>
-          getAiProvider().generateRecipeImage(
+        async (options) => {
+          providerStarted = true;
+          const result = await getAiProvider().generateRecipeImage(
             recipeImageInput(recipePayloadFromDetail(recipe)),
             options,
-          ),
+          );
+          providerCompleted = true;
+          return result;
+        },
         { ...setting, imageQuality: quality, imageSize: size },
       ),
     );
@@ -237,7 +243,12 @@ export async function prepareRecipeImageCandidate(
     const result = find(owner, recipeId, input.operationId);
     if (result.status !== 'ready') await removeRecipeImage(storageKey);
     return publicCandidate(result);
-  } catch {
+  } catch (error) {
+    const explicitFailure =
+      error instanceof Error &&
+      'generationOutcome' in error &&
+      error.generationOutcome === 'failed';
+    const unknown = providerStarted && !providerCompleted && !explicitFailure;
     if (storageKey) await removeRecipeImage(storageKey).catch(() => undefined);
     getDatabase().transaction((transaction) => {
       const current = transaction
@@ -245,21 +256,26 @@ export async function prepareRecipeImageCandidate(
         .from(recipeImageCandidates)
         .where(eq(recipeImageCandidates.id, input.operationId))
         .get();
-      if (current?.status === 'requested')
+      if (current?.status === 'requested') {
         transaction
           .update(recipeImageCandidates)
-          .set({ status: 'failed' })
+          .set({ status: unknown ? 'outcome_unknown' : 'failed' })
           .where(eq(recipeImageCandidates.id, input.operationId))
           .run();
-      transaction
-        .update(aiOperationAudits)
-        .set({
-          status: 'failed',
-          errorCode: signal?.aborted ? 'image_request_interrupted' : 'image_preview_failed',
-          completedAt: new Date(),
-        })
-        .where(eq(aiOperationAudits.id, auditId))
-        .run();
+        transaction
+          .update(aiOperationAudits)
+          .set({
+            status: unknown ? 'outcome_unknown' : 'failed',
+            errorCode: unknown
+              ? 'image_generation_outcome_unknown'
+              : signal?.aborted
+                ? 'image_request_interrupted'
+                : 'image_preview_failed',
+            completedAt: new Date(),
+          })
+          .where(eq(aiOperationAudits.id, auditId))
+          .run();
+      }
     });
     return publicCandidate(find(owner, recipeId, input.operationId));
   }
@@ -337,7 +353,7 @@ export async function discardRecipeImageCandidate(owner: Owner, recipeId: string
     .set({ status: 'discarded' })
     .where(eq(recipeImageCandidates.id, id))
     .run();
-  if (row.status === 'requested')
+  if (row.status === 'requested' || row.status === 'outcome_unknown')
     getDatabase()
       .update(aiOperationAudits)
       .set({ status: 'failed', errorCode: 'image_preview_discarded', completedAt: new Date() })

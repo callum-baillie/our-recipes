@@ -1,9 +1,9 @@
 {
-  "baseRevision": "45ed512b2d4909dac78ceb096d985dab85387d24",
-  "testedState": "My Kitchen v1.0.0-rc.20 release candidate",
-  "buildId": "P-ymvTDBCP6zYaTfrOsxl",
+  "baseRevision": "18da8cb113c7b82deb20ded7089cb9d3208688a9",
+  "testedState": "Uncommitted My Kitchen implementation",
+  "buildId": "vx4vWoujbArxz_3zlKlnf",
   "sourceDigest": "374f2b7ed5431b9b6582a2af5b14c2975a00c68d099fa32cd55a34dc3567b0b4",
-  "capturedAt": "2026-10-22T21:16:27.453Z",
+  "capturedAt": "2026-10-22T23:50:21.965Z",
   "provider": "No provider calls",
   "browser": "Chromium",
   "states": ["1440x1000", "390x844", "320x844", "390x560", "850x1000 at 200% root font"]

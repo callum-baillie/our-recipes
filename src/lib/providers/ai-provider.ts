@@ -123,6 +123,12 @@ export class AiProviderUnavailableError extends Error {
 
 export class AiProviderRequestError extends Error {
   readonly code = 'ai_provider_request_failed';
+  constructor(
+    message: string,
+    readonly generationOutcome: 'failed' | 'unknown' = 'failed',
+  ) {
+    super(message);
+  }
 }
 
 type OpenAiClient = {
@@ -460,7 +466,13 @@ export class OpenAiProvider implements AiProvider {
       };
     } catch (error) {
       if (error instanceof AiProviderRequestError) throw error;
-      throw new AiProviderRequestError('OpenAI could not generate a recipe image.');
+      const rejected =
+        error instanceof OpenAI.APIError &&
+        [400, 401, 403, 404, 422, 429].includes(error.status ?? 0);
+      throw new AiProviderRequestError(
+        'OpenAI could not generate a recipe image.',
+        rejected ? 'failed' : 'unknown',
+      );
     }
   }
 }

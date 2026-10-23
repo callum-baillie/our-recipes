@@ -12,6 +12,7 @@ import {
   AiAccessDeniedError,
   aiUserIdForProfile,
   canAccountUseAi,
+  getEffectiveAiPolicy,
 } from './ai-access-service';
 
 import {
@@ -63,9 +64,11 @@ export const AI_BATCH_MIN_ITEMS = Math.min(
 
 type AiJobRow = typeof aiJobs.$inferSelect;
 type AiJobItemRow = typeof aiJobItems.$inferSelect;
+import { UNKNOWN_AI_OUTCOMES as UNKNOWN_OUTCOMES } from '../../../shared/mobile-domain/ai-job-outcome';
 
 type RecipeImageJobInput = AiImageGenerationInput & { recipeId: string; expectedRevision?: number };
 type RecipeGenerationJobInput = {
+  personalInstructions?: string;
   promptGuidance?: string;
   promptVersion?: string;
   maxOutputTokens?: number;
@@ -101,6 +104,7 @@ export type AiBatchClient = {
     metadata: Record<string, string>;
     signal?: AbortSignal;
     timeout?: number;
+    assertAuthorized: () => void;
   }): Promise<{ batchId: string; inputFileId: string }>;
   retrieve(batchId: string): Promise<BatchSnapshot>;
   read(fileId: string): Promise<string>;
@@ -136,6 +140,7 @@ const imageItemSchema = z
   .strict();
 
 const imageOptionsSchema = z.object({
+  personalInstructions: z.string().max(2000).default(''),
   imageQuality: z.enum(['low', 'medium', 'high']).default('low'),
   imageSize: z.enum(['1024x1024', '1536x1024', '1024x1536']).default('1024x1024'),
   promptGuidance: z.string().max(12000).optional(),
@@ -148,6 +153,7 @@ function savedImageOptions(job: AiJobRow) {
 
 const recipeItemSchema = z
   .object({
+    personalInstructions: z.string().max(2000).default(''),
     images: z.array(aiRecipeImageSchema).max(4).optional(),
     label: z.string().max(2048).optional(),
     promptGuidance: z.string().max(12000).optional(),
@@ -348,6 +354,21 @@ function itemCounts(items: AiJobItemRow[]) {
 
 function publicJob(job: AiJobRow, items: AiJobItemRow[]) {
   const counts = itemCounts(items);
+  const candidateIds = new Set(
+    job.kind === 'recipe_images' && items.length
+      ? getDatabase()
+          .select({ id: recipeImageCandidates.id })
+          .from(recipeImageCandidates)
+          .where(
+            inArray(
+              recipeImageCandidates.id,
+              items.map((item) => item.id),
+            ),
+          )
+          .all()
+          .map((row) => row.id)
+      : [],
+  );
   return {
     id: job.id,
     kind: job.kind,
@@ -370,10 +391,7 @@ function publicJob(job: AiJobRow, items: AiJobItemRow[]) {
         label: payload.recipeTitle ?? payload.label ?? `Recipe ${item.position + 1}`,
         status: item.status,
         errorCode: item.errorCode,
-        candidateId:
-          job.kind === 'recipe_images' && item.status === 'succeeded'
-            ? ((parseJson(item.result ?? '{}') as { candidateId?: string }).candidateId ?? null)
-            : null,
+        candidateId: candidateIds.has(item.id) ? item.id : null,
       };
     }),
   };
@@ -476,12 +494,23 @@ export function enqueueRecipeImageJob(input: {
   threadId?: string | null;
   actionId?: string | null;
   images: RecipeImageJobInput[];
+  approvedOptions?: ReturnType<typeof savedImageOptions> & { model: string };
 }) {
   ensureDatabase();
   assertAiExecutionActive();
   if (!input.images.length) return null;
   const now = new Date();
-  const setting = getAiWorkloadSetting(input.profileId, 'image_generation');
+  if (input.approvedOptions)
+    resolveAiExecutionOptions(input.profileId, 'image_generation', input.approvedOptions);
+  // Validate against current policy, but persist raw approved guidance. The resolver
+  // composes personal guidance for transmission; saving that would append it twice.
+  const setting = {
+    ...getAiWorkloadSetting(input.profileId, 'image_generation'),
+    ...input.approvedOptions,
+  };
+  const promptVersion =
+    input.approvedOptions?.promptVersion ??
+    `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`;
   if (!setting.enabled)
     throw new AiJobForbiddenError('Image generation is disabled for this account.');
   if (!getAiDataPolicy(input.profileId).shareSharedRecipes)
@@ -520,7 +549,10 @@ export function enqueueRecipeImageJob(input: {
         payload: JSON.stringify({
           ownerUserId: aiUserIdForProfile(input.profileId),
           ...imageOptionsSchema.parse(setting),
-          promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
+          personalInstructions:
+            input.approvedOptions?.personalInstructions ??
+            getEffectiveAiPolicy(input.profileId).instructions,
+          promptVersion,
         }),
         result: null,
         sourceDigest: digest(images),
@@ -545,7 +577,7 @@ export function enqueueRecipeImageJob(input: {
         threadId: input.threadId ?? null,
         actionId: input.actionId ?? null,
         model: setting.model,
-        promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
+        promptVersion,
         image,
         now,
       });
@@ -562,7 +594,7 @@ export function enqueueRecipeImageJob(input: {
           model: setting.model,
           quality: setting.imageQuality ?? 'low',
           size: setting.imageSize ?? '1024x1024',
-          promptVersion: `${RECIPE_IMAGE_PROMPT_VERSION}:${setting.promptVersion ?? 'default'}`,
+          promptVersion,
           auditId,
           createdAt: now,
         })
@@ -604,6 +636,7 @@ export function enqueueRecipeBatchGenerationJob(input: {
   if (!input.recipes.length || input.recipes.length > 50)
     throw new AiJobStateError('Choose 1 to 50 recipes for a background task.');
   const setting = getAiWorkloadSetting(input.profileId, 'recipe_generation');
+  if (!setting.enabled) throw new AiJobForbiddenError('Recipe generation is disabled.');
   const now = new Date();
   const id = randomUUID();
   getDatabase().transaction(() => {
@@ -640,6 +673,8 @@ export function enqueueRecipeBatchGenerationJob(input: {
     input.recipes.forEach((submitted, position) => {
       const recipe = {
         ...submitted,
+        personalInstructions:
+          submitted.personalInstructions ?? getEffectiveAiPolicy(input.profileId).instructions,
         promptGuidance: submitted.promptGuidance ?? setting.promptGuidance,
         promptVersion: submitted.promptVersion ?? setting.promptVersion,
         maxOutputTokens: Math.min(
@@ -702,34 +737,57 @@ export function enqueueRecipeBatchGenerationJob(input: {
   return getAiJob(id, input.profileId);
 }
 
-class OpenAiBatchClient implements AiBatchClient {
-  private readonly client: OpenAI;
+class AiBatchNotSubmittedError extends Error {}
 
-  constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey, maxRetries: 0, timeout: 120_000 });
+export class OpenAiBatchClient implements AiBatchClient {
+  private readonly client: Pick<OpenAI, 'files' | 'batches'>;
+
+  constructor(apiKey: string, client?: Pick<OpenAI, 'files' | 'batches'>) {
+    this.client = client ?? new OpenAI({ apiKey, maxRetries: 0, timeout: 120_000 });
   }
 
   async submit(input: Parameters<AiBatchClient['submit']>[0]) {
-    const file = await this.client.files.create(
-      {
-        file: await toFile(Buffer.from(input.lines, 'utf8'), 'bord-ai-batch.jsonl', {
-          type: 'application/jsonl',
-        }),
-        purpose: 'batch',
-      },
-      { signal: input.signal, timeout: input.timeout, maxRetries: 0 },
-    );
-    input.signal?.throwIfAborted();
-    const batch = await this.client.batches.create(
-      {
-        input_file_id: file.id,
-        endpoint: input.endpoint,
-        completion_window: '24h',
-        metadata: input.metadata,
-      },
-      { signal: input.signal, timeout: input.timeout, maxRetries: 0 },
-    );
-    return { batchId: batch.id, inputFileId: file.id };
+    let uploadedFileId: string | undefined;
+    let paidSubmissionStarted = false;
+    try {
+      const upload = await toFile(Buffer.from(input.lines, 'utf8'), 'bord-ai-batch.jsonl', {
+        type: 'application/jsonl',
+      });
+      input.signal?.throwIfAborted();
+      input.assertAuthorized();
+      const file = await this.client.files.create(
+        { file: upload, purpose: 'batch' },
+        { signal: input.signal, timeout: input.timeout, maxRetries: 0 },
+      );
+      uploadedFileId = file.id;
+      // Upload can outlive authorization. Revalidate before initiating paid work.
+      input.signal?.throwIfAborted();
+      input.assertAuthorized();
+      paidSubmissionStarted = true;
+      const batch = await this.client.batches.create(
+        {
+          input_file_id: file.id,
+          endpoint: input.endpoint,
+          completion_window: '24h',
+          metadata: input.metadata,
+        },
+        { signal: input.signal, timeout: input.timeout, maxRetries: 0 },
+      );
+      return { batchId: batch.id, inputFileId: file.id };
+    } catch (error) {
+      if (paidSubmissionStarted) throw error;
+      if (uploadedFileId)
+        await this.client.files
+          .delete(uploadedFileId, {
+            timeout: Math.min(input.timeout ?? 15000, 15000),
+            maxRetries: 0,
+          })
+          .catch(() => undefined);
+      throw new AiBatchNotSubmittedError(
+        'The paid batch submission was not started. Review current permissions and settings before trying again.',
+        { cause: error },
+      );
+    }
   }
 
   async retrieve(batchId: string): Promise<BatchSnapshot> {
@@ -906,18 +964,38 @@ function updateItemSuccess(item: AiJobItemRow, result: unknown) {
 
 function updateItemFailure(item: AiJobItemRow, errorCode: string) {
   const now = new Date();
-  getDatabase()
-    .update(aiJobItems)
-    .set({ status: 'failed', errorCode, updatedAt: now, completedAt: now })
-    .where(eq(aiJobItems.id, item.id))
-    .run();
-  if (item.auditId) {
+  const uncertain = UNKNOWN_OUTCOMES.includes(errorCode);
+  getDatabase().transaction(() => {
+    // Candidate state follows the acknowledged provider outcome. A terminal failure
+    // must not look like work is still pending, and a discard is never resurrected.
     getDatabase()
-      .update(aiOperationAudits)
-      .set({ status: 'failed', errorCode, completedAt: now })
-      .where(eq(aiOperationAudits.id, item.auditId))
+      .update(recipeImageCandidates)
+      .set({ status: uncertain ? 'outcome_unknown' : 'failed' })
+      .where(
+        and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
+      )
       .run();
-  }
+    getDatabase()
+      .update(aiJobItems)
+      .set({ status: 'failed', errorCode, updatedAt: now, completedAt: now })
+      .where(eq(aiJobItems.id, item.id))
+      .run();
+    if (item.auditId) {
+      getDatabase()
+        .update(aiOperationAudits)
+        .set({
+          status: uncertain
+            ? 'outcome_unknown'
+            : errorCode === 'cancelled'
+              ? 'cancelled'
+              : 'failed',
+          errorCode,
+          completedAt: now,
+        })
+        .where(eq(aiOperationAudits.id, item.auditId))
+        .run();
+    }
+  });
 }
 
 async function attachRecipeImage(
@@ -943,25 +1021,31 @@ async function attachRecipeImage(
     await removeRecipeImage(stored.storageKey);
     return;
   }
-  const updated = getDatabase()
-    .update(recipeImageCandidates)
-    .set({ status: 'ready', ...stored, altText })
-    .where(
-      and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
-    )
-    .run();
-  if (updated.changes !== 1) {
-    await removeRecipeImage(stored.storageKey);
-    return;
-  }
-  updateItemSuccess(item, {
-    recipeId: image.recipeId,
-    candidateId: item.id,
-    sourceRevision: image.expectedRevision,
+  const updated = getDatabase().transaction(() => {
+    if (!ownsActiveLease(job)) return false;
+    const result = getDatabase()
+      .update(recipeImageCandidates)
+      .set({ status: 'ready', ...stored, altText })
+      .where(
+        and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
+      )
+      .run();
+    if (result.changes !== 1) return false;
+    updateItemSuccess(item, {
+      recipeId: image.recipeId,
+      candidateId: item.id,
+      sourceRevision: image.expectedRevision,
+    });
+    return true;
   });
+  if (!updated) {
+    await removeRecipeImage(stored.storageKey);
+  }
 }
 
 async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
+  let providerStarted = false;
+  let providerCompleted = false;
   try {
     assertJobAiAccess(job);
     if (
@@ -978,21 +1062,28 @@ async function processDirectImage(item: AiJobItemRow, job: AiJobRow) {
       executeAiWorkload(
         job.profileId,
         'image_generation',
-        (options) => getAiProvider().generateRecipeImage(image, options),
+        async (options) => {
+          providerStarted = true;
+          const result = await getAiProvider().generateRecipeImage(image, options);
+          providerCompleted = true;
+          return result;
+        },
         { model: job.model, ...savedImageOptions(job) },
       ),
     );
     await attachRecipeImage(item, image, generated.bytes, job, generated.altText);
-  } catch {
+  } catch (error) {
     if (ownsActiveLease(job)) {
-      getDatabase()
-        .update(recipeImageCandidates)
-        .set({ status: 'failed' })
-        .where(
-          and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
-        )
-        .run();
-      updateItemFailure(item, 'image_generation_failed');
+      const knownFailure =
+        error instanceof Error &&
+        'generationOutcome' in error &&
+        error.generationOutcome === 'failed';
+      updateItemFailure(
+        item,
+        providerStarted && !providerCompleted && !knownFailure
+          ? 'image_generation_outcome_unknown'
+          : 'image_generation_failed',
+      );
     }
   }
 }
@@ -1082,6 +1173,9 @@ async function finishJob(job: AiJobRow) {
   if (!ownsActiveLease(job)) return;
   const latest = state.items;
   const counts = itemCounts(latest);
+  const unknownOutcome = latest.find((item) =>
+    UNKNOWN_OUTCOMES.includes(item.errorCode ?? ''),
+  )?.errorCode;
   const proposal = job.kind === 'recipe_batch_generation' ? await finishRecipeProposal(job) : null;
   const now = new Date();
   const finished = getDatabase()
@@ -1090,7 +1184,7 @@ async function finishJob(job: AiJobRow) {
       status: counts.failedItems || !counts.completedItems ? 'failed' : 'completed',
       actionId: proposal?.id ?? job.actionId,
       result: JSON.stringify({ ...counts, actionId: proposal?.id ?? job.actionId }),
-      errorCode: counts.failedItems ? 'partial_failure' : null,
+      errorCode: unknownOutcome ?? (counts.failedItems ? 'partial_failure' : null),
       leaseToken: null,
       leaseExpiresAt: null,
       updatedAt: now,
@@ -1121,7 +1215,7 @@ async function finishJob(job: AiJobRow) {
         threadId: job.threadId,
         role: 'assistant',
         model: job.model,
-        content: `${counts.completedItems} of ${counts.totalItems} image previews prepared.${failedNames.length ? ` Could not generate: ${failedNames.join(', ')}. Review the task details and retry only the unfinished items; retrying may incur charges.` : ' Review each image before selecting it for the matching recipe.'}`,
+        content: `${counts.completedItems} of ${counts.totalItems} image previews prepared.${failedNames.length ? ` No preview available for: ${failedNames.join(', ')}. ${unknownOutcome ? 'The provider outcome is unknown; reconcile this original operation before starting more paid work.' : 'Review the task details and retry only the unfinished items; retrying may incur charges.'}` : ' Review each image before selecting it for the matching recipe.'}`,
         createdAt: now,
       })
       .run();
@@ -1152,6 +1246,37 @@ async function runDirectJob(job: AiJobRow, items: AiJobItemRow[]) {
 async function submitBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
   const lines = batchLines(job, items);
   if (!lines) return finishJob(job);
+  const approvedPolicy = getEffectiveAiPolicy(job.profileId);
+  const assertAuthorized = () => {
+    assertAiExecutionActive();
+    if (!ownsActiveLease(job))
+      throw new AiJobStateError('This task no longer owns its execution lease.');
+    assertJobAiAccess(job);
+    const current = jobWithItems(job.id);
+    if (
+      current.job.model !== job.model ||
+      current.job.payload !== job.payload ||
+      current.items.length !== items.length ||
+      current.items.some(
+        (item, index) =>
+          item.id !== items[index]?.id ||
+          item.payload !== items[index]?.payload ||
+          item.status !== items[index]?.status,
+      )
+    )
+      throw new AiJobStateError('The reviewed batch changed before submission.');
+    if (job.kind === 'recipe_images' && !getAiDataPolicy(job.profileId).shareSharedRecipes)
+      throw new AiJobForbiddenError('Recipe sharing is disabled for this account.');
+    const currentPolicy = getEffectiveAiPolicy(job.profileId);
+    if (
+      currentPolicy.requestTimeoutSeconds < approvedPolicy.requestTimeoutSeconds ||
+      currentPolicy.generationsPerTenMinutes < approvedPolicy.generationsPerTenMinutes ||
+      batchLines(job, items) !== lines
+    )
+      throw new AiJobStateError(
+        'AI limits or reviewed options changed. Prepare a new batch before submission.',
+      );
+  };
   const submitted = await withAiExecutionContext(
     {
       parentJobId: job.id,
@@ -1178,19 +1303,31 @@ async function submitBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
       executeAiWorkload(
         job.profileId,
         job.kind === 'recipe_images' ? 'image_generation' : 'recipe_generation',
-        (options) => {
+        async (options) => {
+          assertAuthorized();
           getDatabase()
             .update(aiJobs)
             .set({ errorCode: 'provider_submission_pending' })
             .where(eq(aiJobs.id, job.id))
             .run();
-          return getAiBatchClient().submit({
-            endpoint: endpointFor(job),
-            lines,
-            metadata: { bord_ai_job_id: job.id, bord_ai_job_kind: job.kind },
-            signal: options.signal,
-            timeout: options.requestTimeoutSeconds * 1000,
-          });
+          try {
+            return await getAiBatchClient().submit({
+              endpoint: endpointFor(job),
+              lines,
+              metadata: { bord_ai_job_id: job.id, bord_ai_job_kind: job.kind },
+              signal: options.signal,
+              timeout: options.requestTimeoutSeconds * 1000,
+              assertAuthorized,
+            });
+          } catch (error) {
+            if (error instanceof AiBatchNotSubmittedError)
+              getDatabase()
+                .update(aiJobs)
+                .set({ errorCode: 'provider_submission_not_started' })
+                .where(and(eq(aiJobs.id, job.id), eq(aiJobs.leaseToken, job.leaseToken!)))
+                .run();
+            throw error;
+          }
         },
         { model: job.model, ...(job.kind === 'recipe_images' ? savedImageOptions(job) : {}) },
       ),
@@ -1294,6 +1431,7 @@ async function reconcileCompletedBatch(
 async function pollBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
   if (!job.providerBatchId) throw new Error('The submitted job has no provider batch ID.');
   const snapshot = await getAiBatchClient().retrieve(job.providerBatchId);
+  if (!ownsActiveLease(job)) return;
   if (snapshot.status === 'completed') return reconcileCompletedBatch(job, snapshot, items);
   if (
     snapshot.status === 'failed' ||
@@ -1330,19 +1468,68 @@ async function pollBatchJob(job: AiJobRow, items: AiJobItemRow[]) {
 }
 
 function recoverExpiredLeases(now: Date) {
-  getDatabase()
-    .update(aiJobs)
-    .set({
-      status: 'failed',
-      errorCode: 'worker_interrupted_review_before_retry',
-      completedAt: now,
-      leaseToken: null,
-      leaseExpiresAt: null,
-      nextAttemptAt: now,
-      updatedAt: now,
-    })
+  const interrupted = getDatabase()
+    .select()
+    .from(aiJobs)
     .where(and(eq(aiJobs.status, 'running'), lt(aiJobs.leaseExpiresAt, now)))
-    .run();
+    .all();
+  getDatabase().transaction(() => {
+    for (const job of interrupted) {
+      const items = getDatabase()
+        .select()
+        .from(aiJobItems)
+        .where(and(eq(aiJobItems.jobId, job.id), eq(aiJobItems.status, 'pending')))
+        .all();
+      for (const item of items) updateItemFailure(item, 'worker_interrupted_review_before_retry');
+    }
+    getDatabase()
+      .update(aiJobs)
+      .set({
+        status: 'failed',
+        errorCode: 'worker_interrupted_review_before_retry',
+        completedAt: now,
+        leaseToken: null,
+        leaseExpiresAt: null,
+        nextAttemptAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(aiJobs.status, 'running'), lt(aiJobs.leaseExpiresAt, now)))
+      .run();
+  });
+}
+
+/** Repair pre-fix terminal rows without restarting provider work. */
+function reconcileTerminalImageCandidates() {
+  const rows = getDatabase()
+    .select({ item: aiJobItems, job: aiJobs })
+    .from(recipeImageCandidates)
+    .innerJoin(aiJobItems, eq(aiJobItems.id, recipeImageCandidates.id))
+    .innerJoin(aiJobs, eq(aiJobs.id, aiJobItems.jobId))
+    .where(
+      and(
+        eq(recipeImageCandidates.status, 'requested'),
+        eq(aiJobs.kind, 'recipe_images'),
+        inArray(aiJobs.status, ['failed', 'cancelled']),
+      ),
+    )
+    .limit(100)
+    .all();
+  for (const { item, job } of rows) {
+    if (job.status === 'cancelled')
+      getDatabase()
+        .update(recipeImageCandidates)
+        .set({ status: 'discarded' })
+        .where(
+          and(eq(recipeImageCandidates.id, item.id), eq(recipeImageCandidates.status, 'requested')),
+        )
+        .run();
+    updateItemFailure(
+      item,
+      job.status === 'cancelled'
+        ? 'cancelled'
+        : (item.errorCode ?? job.errorCode ?? 'image_generation_failed'),
+    );
+  }
 }
 
 function claim(job: AiJobRow): AiJobRow | null {
@@ -1412,9 +1599,11 @@ async function runOneAiJob(candidate: AiJobRow) {
         .get()?.errorCode === 'provider_submission_pending';
     const failure = submissionUnknown
       ? 'provider_submission_outcome_unknown'
-      : error instanceof AiAccessDeniedError || error instanceof AiJobForbiddenError
-        ? 'ai_disabled'
-        : 'worker_failed';
+      : error instanceof AiBatchNotSubmittedError
+        ? 'provider_submission_not_started'
+        : error instanceof AiAccessDeniedError || error instanceof AiJobForbiddenError
+          ? 'ai_disabled'
+          : 'worker_failed';
     if (job.status !== 'submitted' && ownsActiveLease(job))
       items
         .filter((item) => item.status === 'pending')
@@ -1448,6 +1637,7 @@ export async function runDueAiJobs(): Promise<void> {
     ensureDatabase();
     const now = new Date();
     recoverExpiredLeases(now);
+    reconcileTerminalImageCandidates();
     const due = getDatabase()
       .select()
       .from(aiJobs)
@@ -1527,9 +1717,9 @@ function retryJobTransaction(jobId: string, profileId: string) {
   if (job.status !== 'failed' && job.status !== 'cancelled') {
     throw new AiJobStateError('Only failed or cancelled background tasks can be retried.');
   }
-  if (job.errorCode === 'provider_submission_outcome_unknown')
+  if (UNKNOWN_OUTCOMES.includes(job.errorCode ?? ''))
     throw new AiJobStateError(
-      'The provider may have accepted this paid batch. Reconcile its provider outcome before starting another batch; this request will not be submitted again.',
+      'The provider may have accepted this paid request. Reconcile its outcome before starting another paid request; this operation will not be submitted again.',
     );
   const previousResult = job.result ? (parseJson(job.result) as { retryJobId?: string }) : null;
   if (previousResult?.retryJobId) return getAiJob(previousResult.retryJobId, profileId);
@@ -1570,7 +1760,12 @@ function retryJobTransaction(jobId: string, profileId: string) {
       throw new AiJobStateError(
         'A recipe changed or this legacy request has no reviewed revision. Prepare a new image review.',
       );
-    const retry = enqueueRecipeImageJob({ profileId, threadId: job.threadId, images });
+    const retry = enqueueRecipeImageJob({
+      profileId,
+      threadId: job.threadId,
+      images,
+      approvedOptions: { model: job.model, ...savedImageOptions(job) },
+    });
     if (!retry) throw new AiJobStateError('There is no unfinished work to retry.');
     getDatabase()
       .update(aiJobs)

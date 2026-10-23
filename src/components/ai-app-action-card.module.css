@@ -161,3 +161,28 @@
 .editor input[type='checkbox'] {
   justify-self: start;
 }
+
+.reviewFacts {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.625rem 0;
+}
+.reviewFacts > div {
+  display: grid;
+  grid-template-columns: minmax(5rem, 0.4fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+.reviewFacts dt {
+  font-weight: 600;
+}
+.reviewFacts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 480px) {
+  .reviewFacts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.125rem;
+  }
+}

@@ -93,6 +93,7 @@
   scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent;
   scrollbar-gutter: stable;
   overflow-anchor: none;
+  scroll-padding-block: 1rem;
 }
 
 .messages::-webkit-scrollbar {

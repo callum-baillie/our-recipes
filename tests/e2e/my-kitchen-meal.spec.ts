@@ -185,9 +185,13 @@ test('a complete dinner conflicts on one cooker, sequences, then uses two physic
       `${dir}/manifest.json`,
       JSON.stringify(
         {
+          baseRevision: JSON.parse(
+            readFileSync('docs/refinement/rc21-source-manifest.json', 'utf8'),
+          ).baseRevision,
           buildId: readFileSync('.next/BUILD_ID', 'utf8').trim(),
-          sourceDigest: JSON.parse(readFileSync('docs/my-kitchen/source-manifest.json', 'utf8'))
-            .sourceDigest,
+          sourceDigest: JSON.parse(
+            readFileSync('docs/refinement/rc21-source-manifest.json', 'utf8'),
+          ).sourceDigest,
           capturedAt: new Date().toISOString(),
           browser: 'Chromium',
           provider: 'No provider calls',

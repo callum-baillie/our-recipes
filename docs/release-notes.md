@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.0-rc.21
+
+- Integrate My Kitchen with the outstanding reviewed-action, privacy-boundary, pantry/scanner recovery and modal-focus work on the current main line.
+- Restore the VeSync onboarding handoff cookie, keep profile switching aligned with the existing passphrase flow, and test real persisted cooking-session navigation.
+- Add additive migration `0081_ai_chat_privacy_scope`; existing `0074`–`0080` My Kitchen migration history remains unchanged. Back up household data before upgrading.
+- Verification passed: `pnpm verify` (1,190 tests, 9 skipped), 19 release-browser journeys plus 3 performance checks, 23 RV browser journeys, 4 My Kitchen browser journeys, 81 native tests and both native bundle exports. Local Docker backup/restore and interrupted-recovery smoke passed.
+- This remains a prerelease. The [RC21 integration receipt](refinement/rc21-integration.md) records remaining partial K01–K30 items, inherited native dependency advisories, and device/provider/production-host limits.
+
 ## 1.0.0-rc.20
 
 - Add **My Kitchen**, a household inventory for distinct physical appliances, cookware, facilities, sizes, capabilities, attachments, availability and resource limits. Multiple identical items keep separate IDs; unknown measurements stay unknown.

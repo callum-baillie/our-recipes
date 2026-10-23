@@ -6,10 +6,11 @@ import {
   createRequestGeneration,
   catalogContextKey,
 } from '../../shared/mobile-domain/catalog-measures';
-import { barcodeReviewChoices } from '../../shared/mobile-domain/catalog';
+import { barcodeReviewChoices, shoppingScanConfirmation } from '../../shared/mobile-domain/catalog';
 import {
   scannerRecovery,
   sameScannerActor,
+  scannerRecoveryMode,
   type ScannerOperation,
   type RecoveryStorage,
 } from '../../shared/mobile-domain/scanner-recovery';
@@ -107,6 +108,43 @@ function memoryStorage() {
   return { storage, values };
 }
 describe('native write-ahead recovery', () => {
+  it('inspects local Pantry receipts instead of resending potentially expired legacy commands', () => {
+    expect(scannerRecoveryMode(operation)).toBe('inspect_only');
+    expect(scannerRecoveryMode({ ...operation, path: '/api/v1/pantry/catalog-imports' })).toBe(
+      'exact_retry',
+    );
+  });
+  it('retains original unknown evidence across archival, acknowledgement and process restart', async () => {
+    const { storage } = memoryStorage();
+    const journal = scannerRecovery(storage, 'scope', operation.instanceUrl, 'account');
+    await journal.write(operation);
+    await journal.archiveUnknown(operation.operationId);
+    expect(await journal.read()).toEqual(operation);
+    await journal.acknowledge(operation.operationId);
+    const restarted = scannerRecovery(storage, 'scope', operation.instanceUrl, 'account');
+    expect(await restarted.read()).toBeNull();
+    expect(await restarted.closedUnknown()).toEqual([operation]);
+  });
+  it('does not clear uncertainty when closed-history storage fails', async () => {
+    const { storage } = memoryStorage();
+    const journal = scannerRecovery(
+      {
+        ...storage,
+        async setItem(key: string, value: string) {
+          if (key.endsWith('.closed')) throw new Error('history unavailable');
+          await storage.setItem(key, value);
+        },
+      },
+      'scope',
+      operation.instanceUrl,
+      'account',
+    );
+    await journal.write(operation);
+    await expect(journal.archiveUnknown(operation.operationId)).rejects.toThrow(
+      'history unavailable',
+    );
+    expect(await journal.read()).toEqual(operation);
+  });
   it('survives a new journal instance and preserves exact ID/payload; another account/actor cannot replay', async () => {
     const { storage } = memoryStorage();
     await scannerRecovery(storage, 'scope', operation.instanceUrl, 'account').write(operation);
@@ -118,6 +156,13 @@ describe('native write-ahead recovery', () => {
     ).read();
     expect(restored).toEqual(operation);
     expect(sameScannerActor(restored!, operation.instanceUrl, operation.actor)).toBe(true);
+    expect(
+      sameScannerActor(restored!, operation.instanceUrl, {
+        ...operation.actor,
+        userId: 'another-account-with-the-same-viewed-profile',
+      }),
+    ).toBe(false);
+    expect(restored!.actor).toEqual(operation.actor);
     expect(
       sameScannerActor(restored!, operation.instanceUrl, {
         ...operation.actor,
@@ -183,6 +228,39 @@ describe('native purchase quantity dimensions', () => {
       requested: 'Amount not recorded (g)',
       purchaseQuantity: '',
       purchaseUnit: '',
+    });
+  });
+});
+
+describe('shared web/native scan confirmation intent', () => {
+  it('keeps explicit purchase dimensions independent of demand and old cart totals', () => {
+    const localProduct = { id: 'saved', displayName: 'Oats', brand: '', defaultInventoryUnit: 'g' };
+    const common = {
+      operationId: 'operation',
+      record: null,
+      localProduct,
+      quantity: '1',
+      unit: 'g',
+    };
+    const replacement = shoppingScanConfirmation({
+      ...common,
+      item: { id: 'demand-two-each', updatedAt: '2026-10-20T00:00:00.000Z' },
+    });
+    expect(replacement).toEqual({
+      operationId: 'operation',
+      localProductId: 'saved',
+      cartIntent: 'replace_existing',
+      itemId: 'demand-two-each',
+      expectedUpdatedAt: '2026-10-20T00:00:00.000Z',
+      cartQuantity: 1,
+      cartUnit: 'g',
+    });
+    expect(shoppingScanConfirmation(common)).toEqual({
+      operationId: 'operation',
+      localProductId: 'saved',
+      cartIntent: 'separate_entry',
+      cartQuantity: 1,
+      cartUnit: 'g',
     });
   });
 });

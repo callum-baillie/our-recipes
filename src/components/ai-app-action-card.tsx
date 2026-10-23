@@ -1,5 +1,6 @@
 'use client';
-import { isVisibleReviewField } from '../../shared/mobile-domain/proposal-review';
+import { actionReviewLines } from '../../shared/mobile-domain/app-action-review';
+import { reviewValues } from '../../shared/mobile-domain/proposal-review';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,35 +9,6 @@ import type { AppActionReview } from '@/lib/services/ai-app-action-service';
 import { InlineAlert } from './inline-alert';
 import { ButtonSpinner } from './skeleton';
 import styles from './ai-app-action-card.module.css';
-function ReviewValue({ value }: { value: unknown }) {
-  if (value === null || value === undefined) return <span>Not set</span>;
-  if (Array.isArray(value))
-    return (
-      <ol>
-        {value.map((item, index) => (
-          <li key={index}>
-            <ReviewValue value={item} />
-          </li>
-        ))}
-      </ol>
-    );
-  if (typeof value === 'object')
-    return (
-      <dl className={styles.reviewValues}>
-        {Object.entries(value)
-          .filter(([key]) => isVisibleReviewField(key))
-          .map(([key, item]) => (
-            <div key={key}>
-              <dt>{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}</dt>
-              <dd>
-                <ReviewValue value={item} />
-              </dd>
-            </div>
-          ))}
-      </dl>
-    );
-  return <span>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}</span>;
-}
 
 export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
   const router = useRouter();
@@ -66,6 +38,8 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
     Math.max(0, proposal.actions.length - results.length) +
     results.filter((result) => result.state === 'not-attempted').length;
   const images = proposal.actions.every((action) => action.path.endsWith('/images/generate'));
+  const needsFreshReview =
+    !images && proposal.actions.some((action) => action.review?.schemaVersion !== 1);
   async function decide(decision: 'apply' | 'dismiss') {
     setPending(decision);
     setError('');
@@ -139,24 +113,60 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
         <Icon size={17} aria-hidden="true" />
         <div>
           <strong>
-            {action.parameters.recipeId ? (
+            {action.review?.subject.href ? (
+              <Link className="inline-link" href={action.review.subject.href}>
+                {action.review.subject.label}
+              </Link>
+            ) : action.review ? (
+              action.review.subject.label
+            ) : action.parameters.recipeId && action.recordLabel ? (
               <Link
                 className="inline-link"
                 href={`/recipes/${encodeURIComponent(action.parameters.recipeId)}`}
               >
-                {action.recordLabel ?? action.summary.split('. ')[0]}
+                {action.recordLabel}
               </Link>
             ) : (
-              (action.recordLabel ?? action.summary.split('. ')[0])
+              (action.recordLabel ?? 'Saved action')
             )}
           </strong>
           {image && !action.recordLabel ? (
             <span>Recipe title unavailable in this saved proposal.</span>
           ) : null}
-          <span>
-            {action.changeLabel ??
-              (action.method === 'DELETE' ? 'Remove' : action.method === 'POST' ? 'Add' : 'Update')}
-          </span>
+          <span>{action.review?.effect ?? action.changeLabel ?? action.summary}</span>
+          {action.review ? (
+            <>
+              <dl className={styles.reviewFacts}>
+                {actionReviewLines(action.review).map((line, lineIndex) => (
+                  <div key={lineIndex}>
+                    <dt>{line.label}</dt>
+                    <dd>{line.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {action.review.caveats.map((caveat, caveatIndex) => (
+                <p key={caveatIndex}>{caveat}</p>
+              ))}
+            </>
+          ) : !image ? (
+            <p>
+              Target details are unavailable in this older proposal. Ask chat to prepare a fresh
+              review before applying it.
+            </p>
+          ) : null}
+          {!image && action.body != null && (
+            <details>
+              <summary>Full submitted changes</summary>
+              <dl className={styles.reviewFacts}>
+                {reviewValues(action.body).map((line, lineIndex) => (
+                  <div key={lineIndex}>
+                    <dt>{line.label}</dt>
+                    <dd>{line.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          )}
           {!!action.bindings?.length && (
             <span>
               {action.bindings
@@ -166,12 +176,6 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
                 )
                 .join(' · ')}
             </span>
-          )}
-          {!image && (
-            <details>
-              <summary>Details</summary>
-              <ReviewValue value={{ record: action.parameters, changes: action.body }} />
-            </details>
           )}
         </div>
       </li>
@@ -213,7 +217,7 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
         <div className={styles.actions}>
           <button
             type="button"
-            disabled={pending !== null || editBusy}
+            disabled={pending !== null || editBusy || needsFreshReview}
             onClick={() => void decide('apply')}
           >
             {pending === 'apply' && <ButtonSpinner />}

@@ -164,7 +164,11 @@ export function RecipeImageGenerator({
       } else if (body.candidate.status === 'discarded') {
         remember(null);
         setMessage('Preview discarded. This does not undo any provider work or charge.');
-      } else if (body.candidate.status === 'requested')
+      } else if (body.candidate.status === 'outcome_unknown')
+        setMessage(
+          'The provider outcome is unknown. This request will not be generated again automatically. Keep its identity for reconciliation; discarding does not undo provider work or charges.',
+        );
+      else if (body.candidate.status === 'requested')
         setMessage(
           'The request has not reported a final result. Check it again before starting another generation.',
         );

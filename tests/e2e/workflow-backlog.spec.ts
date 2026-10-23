@@ -230,12 +230,7 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await page.route('**/api/v1/cook-sessions', async (route) => {
     submitted = route.request().postDataJSON().targetServings;
     await startGate;
-    await route.fulfill({
-      json: {
-        session: { id: 'controlled-session', targetServings: submitted },
-        pantry: { recommendedConsumptions: [] },
-      },
-    });
+    await route.continue();
   });
   await page.getByRole('button', { name: 'Start cooking' }).click();
   await expect(page.getByLabel(/Cook for/)).toBeDisabled();

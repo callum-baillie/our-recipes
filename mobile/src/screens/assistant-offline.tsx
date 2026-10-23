@@ -1,3 +1,12 @@
+import {
+  isUnknownAiOutcome,
+  UNKNOWN_AI_OUTCOME_MESSAGE,
+  AI_BATCH_NOT_STARTED_MESSAGE,
+} from '../../../shared/mobile-domain/ai-job-outcome';
+import {
+  actionReviewLines,
+  type AppActionReviewMetadata,
+} from '../../../shared/mobile-domain/app-action-review';
 import { matchesChatOperation } from '../../../shared/mobile-domain/chat-recovery';
 import {
   editableProposalFields,
@@ -115,6 +124,7 @@ type AppProposal = {
   status: string;
   actions: {
     summary: string;
+    review?: AppActionReviewMetadata;
     recordLabel?: string;
     changeLabel?: string;
     body: unknown;
@@ -151,7 +161,9 @@ function AssistantConversation() {
     retained.current?.attachments ?? [],
   );
   const [appProposals, setAppProposals] = React.useState<AppProposal[]>([]);
-  const [jobs, setJobs] = React.useState<{ id: string; status: string; title?: string }[]>([]);
+  const [jobs, setJobs] = React.useState<
+    { id: string; status: string; title?: string; errorCode?: string | null }[]
+  >([]);
   const recoveryJournal = React.useRef<Awaited<ReturnType<typeof nativeChatRecovery>> | null>(null);
   const durableTurn = React.useRef<ChatOperationReference | null>(null);
   const [recoveryReady, setRecoveryReady] = React.useState(false);
@@ -1073,7 +1085,13 @@ function AssistantConversation() {
                   <Body>
                     {job.title ?? 'Background task'} · {job.status.replaceAll('_', ' ')}
                   </Body>
-                  <Body muted>Review the task for its saved results and application state.</Body>
+                  <Body muted>
+                    {isUnknownAiOutcome(job.errorCode)
+                      ? UNKNOWN_AI_OUTCOME_MESSAGE
+                      : job.errorCode === 'provider_submission_not_started'
+                        ? AI_BATCH_NOT_STARTED_MESSAGE
+                        : 'Review the task for its saved results and application state.'}
+                  </Body>
                   <Button
                     label="Review tasks in web app"
                     tone="secondary"
@@ -1563,21 +1581,43 @@ function NativeAppProposal({
       />
     );
   const reviewable = ['proposed', 'pending', 'ready'].includes(current.status);
+  const needsFreshReview =
+    !images && current.actions.some((action) => action.review?.schemaVersion !== 1);
   return (
     <Surface style={{ backgroundColor: tokens.color.sage }}>
       <Eyebrow>{current.status.replaceAll('_', ' ')}</Eyebrow>
       <EditorialText variant="section">{current.title}</EditorialText>
       {current.actions.map((action, index) => (
         <View key={index} style={{ gap: tokens.space.xs }}>
-          <Body>{action.summary}</Body>
-          {action.recordLabel ? <Body muted>{action.recordLabel}</Body> : null}
-          {action.changeLabel ? <Body muted>{action.changeLabel}</Body> : null}
+          <Body>{action.review?.subject.label ?? action.recordLabel ?? 'Saved action'}</Body>
+          <Body muted>{action.review?.effect ?? action.changeLabel ?? action.summary}</Body>
+          {action.review ? (
+            <>
+              {actionReviewLines(action.review).map((line, lineIndex) => (
+                <Body key={lineIndex}>
+                  {line.label}: {line.value}
+                </Body>
+              ))}
+              {action.review.caveats.map((caveat, caveatIndex) => (
+                <Body muted key={caveatIndex}>
+                  {caveat}
+                </Body>
+              ))}
+            </>
+          ) : (
+            <Body muted>
+              Target details are unavailable in this older proposal. Prepare a fresh review before
+              applying it.
+            </Body>
+          )}
+          {action.body != null && !action.path?.endsWith('/images/generate') ? (
+            <NativeReviewDetails value={action.body} />
+          ) : null}
           {action.bindings?.map((binding, i) => (
             <Body muted key={i}>
               Uses {binding.result.split('.')[0]} created in step {binding.fromStep + 1}.
             </Body>
           ))}
-          <NativeReviewDetails value={action.body} />
         </View>
       ))}
 
@@ -1735,7 +1775,7 @@ function NativeAppProposal({
                   ? 'Start paid image generation'
                   : 'Apply reviewed changes'
             }
-            disabled={disabled || !!pending || (images && !paidConsent)}
+            disabled={disabled || !!pending || needsFreshReview || (images && !paidConsent)}
             onPress={() => {
               Alert.alert(
                 images ? 'Start paid image generation?' : 'Apply these reviewed changes?',
