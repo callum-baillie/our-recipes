@@ -1,8 +1,9 @@
-Branch: integration/kitchen-complete
-RC21 integration commit: 83506a01412e4dd06f6ee7ca32e7a0274ba68ae2
+Branch: integration/kitchen-complete at f28bfc37f7f02f0b80d3184e93cc1b1d4e26afe5
+RC21 integration merge: 83506a01412e4dd06f6ee7ca32e7a0274ba68ae2
+RC21 release tag v1.0.0-rc.21: 10947b926bcccd728b25c902fe53f556217b267c
 Base: origin/main 18da8cb113c7b82deb20ded7089cb9d3208688a9
 Integrated branch: origin/refinement/rv-completion 8995acb014090e57f7f6b9cd772e9a3fc8039a18
 
 The RC21 candidate preserves the published RC20 My Kitchen source and adds the RV completion fixes. Fresh Chromium captures and the tested source digest are recorded in ../refinement/rc21-integration.md and ../refinement/rc21-source-manifest.json. The K01–K30 register remains authoritative for incomplete acceptance.
 
-GitHub publication status and the final release reference are recorded in ../refinement/rc21-integration.md.
+The GitHub release, multi-architecture image, latest-tag restore and follow-up workflow fix are recorded in ../refinement/rc21-integration.md. The release tag remains on the tested release commit; the workflow correction is on the integration branch.

@@ -22,4 +22,7 @@ The focused My Kitchen scenarios use a synthetic household and no live AI or foo
 - Version: `1.0.0-rc.21`.
 - Schema: `0081_ai_chat_privacy_scope` (83 applied migrations expected).
 - Base: current `origin/main` at `18da8cb`, with `origin/refinement/rv-completion` at `8995acb` integrated and conflicts resolved against the RC20 migration chain and newer dependencies.
-- The release tag, GitHub publication receipt, final commit and any hosted release-workflow result are appended after publication.
+- GitHub prerelease: [Bòrd v1.0.0-rc.21](https://github.com/callum-baillie/our-recipes/releases/tag/v1.0.0-rc.21), tag target `10947b926bcccd728b25c902fe53f556217b267c`.
+- [Hosted image workflow](https://github.com/callum-baillie/our-recipes/actions/runs/39876129709) passed on 2026-10-23: multi-architecture image build and native linux/amd64 and linux/arm64 container smoke checks. The published RC21 image index is `sha256:5e58dd6f0ab39998fe02407c6009f08e848a15c403790e64b5a74431203f62c2`.
+- The first hosted run exposed Docker metadata's default `latest=auto`: despite the explicit raw-tag rule evaluating false, it also published RC21 as `latest`. [A guarded restore run](https://github.com/callum-baillie/our-recipes/actions/runs/39877379362) reset `latest` to the RC20 image. Fresh registry inspection confirms `latest` and `v1.0.0-rc.20` both resolve to `sha256:ea2891af3b75e80b8abfb55d21b30a7bead6a3703f9de6d0e469f71d922bc574`; `v1.0.0-rc.21` remains on its separate digest above.
+- Follow-up commit `f28bfc37f7f02f0b80d3184e93cc1b1d4e26afe5` on `integration/kitchen-complete` disables Docker metadata's automatic latest flavor and adds a version-validated manual restore path. The published release tag remains at `10947b9`; it was not moved after publication.
