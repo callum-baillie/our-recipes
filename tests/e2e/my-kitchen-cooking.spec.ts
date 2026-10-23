@@ -119,7 +119,7 @@ test('session-only adaptation and dated restrictions survive reopening with hone
       {
         testedState: 'v1.0.0-rc.21 integrated release candidate',
         baseRevision: JSON.parse(readFileSync('docs/refinement/rc21-source-manifest.json', 'utf8'))
-          .baseRevision,
+          .testedRevision,
         sourceDigest: JSON.parse(readFileSync('docs/refinement/rc21-source-manifest.json', 'utf8'))
           .sourceDigest,
         buildId: readFileSync('.next/BUILD_ID', 'utf8').trim(),

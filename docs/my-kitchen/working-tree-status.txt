@@ -1,77 +1,8 @@
-Branch: refinement/post-review-completion
-Base: 45ed512b2d4909dac78ceb096d985dab85387d24
-All changes uncommitted; index unchanged.
+Branch: integration/kitchen-complete
+RC21 integration commit: 83506a01412e4dd06f6ee7ca32e7a0274ba68ae2
+Base: origin/main 18da8cb113c7b82deb20ded7089cb9d3208688a9
+Integrated branch: origin/refinement/rv-completion 8995acb014090e57f7f6b9cd772e9a3fc8039a18
 
- M docs/openapi.yaml
- M drizzle/meta/_journal.json
- M mobile/src/data/recipe-edit.ts
- M mobile/src/screens/settings-screens.tsx
- M shared/mobile-domain/meal-entry.ts
- M src/app/account/page.tsx
- M src/app/recipes/[recipeId]/page.tsx
- M src/components/account-nav.tsx
- M src/components/add-recipe-dialog.tsx
- M src/components/ai-settings-form.tsx
- M src/components/api-key-manager.tsx
- M src/components/cooking-mode.tsx
- M src/components/meal-entry-editor.tsx
- M src/components/settings-nav.tsx
- M src/lib/api-auth.ts
- M src/lib/db/schema.ts
- M src/lib/domain/ai-assistant.ts
- M src/lib/domain/auth.ts
- M src/lib/domain/integration-routes.ts
- M src/lib/domain/permissions.ts
- M src/lib/domain/planning.ts
- M src/lib/domain/profile-goals.ts
- M src/lib/domain/recipe.ts
- M src/lib/release.ts
- M src/lib/services/ai-app-action-service.ts
- M src/lib/services/ai-app-operation-catalog.ts
- M src/lib/services/ai-chat-service.ts
- M src/lib/services/ai-context-service.ts
- M src/lib/services/ai-job-service.ts
- M src/lib/services/ai-kitchen-context-service.ts
- M src/lib/services/ai-settings-service.ts
- M src/lib/services/planning-service.ts
- M src/lib/services/recipe-service.ts
- M tests/integration/ai-account-settings.test.ts
- M tests/integration/ai-operation-contracts.test.ts
-?? docs/my-kitchen/README.md
-?? docs/my-kitchen/acceptance.md
-?? docs/my-kitchen/api.md
-?? docs/my-kitchen/source-manifest.json
-?? docs/my-kitchen/verification.md
-?? docs/my-kitchen/working-tree-status.txt
-?? drizzle/0074_my_kitchen.sql
-?? mobile/app/my-kitchen.tsx
-?? mobile/src/screens/my-kitchen-screen.tsx
-?? screenshots/my-kitchen/desktop.png
-?? screenshots/my-kitchen/editor-error-320-short.png
-?? screenshots/my-kitchen/enlarged.png
-?? screenshots/my-kitchen/manifest.json
-?? screenshots/my-kitchen/mobile.png
-?? screenshots/my-kitchen/reflow-320.png
-?? screenshots/my-kitchen/short.png
-?? src/app/api/v1/account/cooking-preferences/route.ts
-?? src/app/api/v1/kitchen/catalog/route.ts
-?? src/app/api/v1/kitchen/check/route.ts
-?? src/app/api/v1/kitchen/claims/route.ts
-?? src/app/api/v1/kitchen/route.ts
-?? src/app/my-kitchen/page.tsx
-?? src/components/cooking-preferences-form.tsx
-?? src/components/kitchen-claims-review.tsx
-?? src/components/my-kitchen.module.css
-?? src/components/my-kitchen.tsx
-?? src/components/recipe-kitchen-check.tsx
-?? src/lib/domain/cooking-preferences.ts
-?? src/lib/domain/kitchen-catalog.ts
-?? src/lib/domain/kitchen-feasibility.ts
-?? src/lib/domain/kitchen.ts
-?? src/lib/domain/recipe-equipment.ts
-?? src/lib/services/ai-equipment-context-service.ts
-?? src/lib/services/cooking-preferences-service.ts
-?? src/lib/services/kitchen-inventory-service.ts
-?? tests/e2e/my-kitchen.spec.ts
-?? tests/integration/my-kitchen.test.ts
-?? tests/unit/my-kitchen.test.ts
+The RC21 candidate preserves the published RC20 My Kitchen source and adds the RV completion fixes. Fresh Chromium captures and the tested source digest are recorded in ../refinement/rc21-integration.md and ../refinement/rc21-source-manifest.json. The K01–K30 register remains authoritative for incomplete acceptance.
+
+GitHub publication status and the final release reference are recorded in ../refinement/rc21-integration.md.

@@ -1,7 +1,8 @@
 {
+  "baseRevision": "83506a01412e4dd06f6ee7ca32e7a0274ba68ae2",
   "buildId": "vx4vWoujbArxz_3zlKlnf",
-  "sourceDigest": "374f2b7ed5431b9b6582a2af5b14c2975a00c68d099fa32cd55a34dc3567b0b4",
-  "capturedAt": "2026-10-22T23:50:12.783Z",
+  "sourceDigest": "805459132192c2301e3b6f583be63efa00e073a4231ffe90b19142a66bcd5065",
+  "capturedAt": "2026-10-23T00:02:28.293Z",
   "browser": "Chromium",
   "provider": "No provider calls",
   "scope": "One owned episode, two recipes, two physical bases; estimates only"
