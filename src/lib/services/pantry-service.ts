@@ -1672,7 +1672,7 @@ export function undoPantryConsumptionEventsInTransaction(
   transaction: AppTransaction,
   eventIds: string[],
   actorProfileId: string,
-  relatedCookSessionId: string,
+  relatedCookSessionId: string | null,
 ): string[] {
   if (!eventIds.length) throw new PantryValidationError('There are no Pantry deductions to undo.');
   const events = transaction

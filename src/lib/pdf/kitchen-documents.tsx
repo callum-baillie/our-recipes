@@ -1,4 +1,4 @@
-import { Document, Fixed, Page, View } from '@formepdf/react';
+import { Document, Fixed, Page, QrCode, View } from '@formepdf/react';
 import { Badge } from './pdfcn/components/badge/badge';
 import { PdfCard } from './pdfcn/components/card/card';
 import { Divider } from './pdfcn/components/divider/divider';
@@ -37,6 +37,7 @@ export type ScheduleMeal = {
   note: string;
   status: string;
   cardKey: string | null;
+  scannerCode?: string;
 };
 export type MealPrintSchedule = { start: string; end: string; meals: ScheduleMeal[] };
 const ink = '#26372b';
@@ -249,6 +250,22 @@ function RecipeCard({
           ))}
         </Stack>
       ) : null}
+      {!card.adapted &&
+      (card.servings ?? base) &&
+      (card.servings ?? base)! > 0 &&
+      (card.servings ?? base)! <= 100 ? (
+        <Stack direction="horizontal" align="center" gap="md" style={{ marginBottom: 12 }}>
+          <View wrap={false} style={{ padding: 6 }}>
+            <QrCode
+              data={`BORD:1:RECIPE:${card.recipeId}:${card.servings ?? base}:${card.revision}`}
+              size={64}
+            />
+          </View>
+          <Text variant="xs" color="mutedForeground" noMargin>
+            Scan to record cooking immediately · ingredients will be deducted
+          </Text>
+        </Stack>
+      ) : null}
       {options.includeImage && card.image ? (
         <PdfImage
           src={card.image}
@@ -436,6 +453,16 @@ function MealLine({ meal, options }: { meal: ScheduleMeal; options: PdfExportOpt
         <Text variant="xs" color="mutedForeground" noMargin>
           {meal.context}
         </Text>
+      ) : null}
+      {meal.scannerCode ? (
+        <Stack direction="horizontal" align="center" gap="sm" style={{ marginTop: 3 }}>
+          <View wrap={false} style={{ padding: 4 }}>
+            <QrCode data={meal.scannerCode} size={52} />
+          </View>
+          <Text variant="xs" color="mutedForeground" noMargin>
+            Scan to record this planned cooking immediately
+          </Text>
+        </Stack>
       ) : null}
       {options.includeNotes && meal.note ? (
         <Text variant="xs" color="mutedForeground" noMargin>

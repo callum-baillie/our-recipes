@@ -415,7 +415,7 @@ describe('RV04 additive privacy migration', () => {
       await getSqliteDatabase().backup(path);
       const old = new Database(path);
       old.exec(
-        'ALTER TABLE ai_chat_threads DROP COLUMN privacy_scope_json; DELETE FROM __drizzle_migrations WHERE created_at >= 1792713600000;',
+        'DROP TABLE scanner_station_controls; DROP TABLE scanner_station_events; DROP TABLE scanner_operations; DROP TABLE scanner_stations; ALTER TABLE ai_chat_threads DROP COLUMN privacy_scope_json; DELETE FROM __drizzle_migrations WHERE created_at >= 1792713600000;',
       );
       old.close();
       resetDatabaseForTests();

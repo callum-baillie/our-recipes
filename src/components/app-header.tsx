@@ -64,6 +64,7 @@ function matchesPath(pathname: string, href: string): boolean {
 const primaryLinks = [
   { href: '/recipes', label: 'Recipebook' },
   { href: '/pantry', label: 'Pantry' },
+  { href: '/scanner', label: 'Scanner' },
   { href: '/nutrition', label: 'Nutrition' },
   { href: '/planner', label: 'Planner' },
   { href: '/lists', label: 'Lists' },

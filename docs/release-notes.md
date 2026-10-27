@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.0-rc.23
+
+- Merge the scanner-station work (`scanner/companion-v2`) into the main line: bound scanner stations, the headless pantry package import API, scanner cards page, and QR codes on printed recipe cards and meal plans so a scan records cooking immediately.
+- Add additive migration `0082_scanner_stations` (84 applied migrations expected). The Tower household database already has it applied by the scanner build, so the upgrade runs no new migration there. Back up before upgrading.
+- Includes everything in rc.22. The PDF QR codes are carried onto the redesigned pdfcn recipe card and meal plan layouts.
+- This remains a prerelease. See the rc.22 entry below for the verification caveats; the merged result was re-checked with TypeScript, lint, unit and integration tests.
+
 ## 1.0.0-rc.22
 
 - Redesign the recipe details page: the sidebar now starts level with the photo, with a full-width hero, a combined servings and timings strip, a clearer ingredient and method layout, and consistent cards for pantry, equipment, nutrition, tags, notes, management and revision history.

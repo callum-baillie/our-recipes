@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
   // The development server is intentionally reachable from phones on the
   // local network. Next blocks its client runtime for non-localhost hosts
   // unless each trusted development origin is listed explicitly.
-  allowedDevOrigins: ['127.0.0.1', '192.168.0.22', 'recipes.tower', 'our-recipes.dev.app.devbox'],
+  allowedDevOrigins: ['127.0.0.1', '192.168.0.22', 'recipes.tower', '*.dev.app.devbox'],
   images: {
     remotePatterns: [
       {

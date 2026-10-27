@@ -2835,6 +2835,70 @@ export const cookingEpisodeOperations = sqliteTable('cooking_episode_operations'
   intentHash: text('intent_hash').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
+export const scannerOperations = sqliteTable('scanner_operations', {
+  id: text('id').primaryKey(),
+  stationId: text('station_id').notNull(),
+  userId: text('user_id').notNull(),
+  profileId: text('profile_id')
+    .notNull()
+    .references(() => profiles.id),
+  intentHash: text('intent_hash').notNull(),
+  result: text('result', { mode: 'json' })
+    .$type<import('@/lib/domain/scanner').ScannerResult>()
+    .notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  undoneBy: text('undone_by'),
+  command: text('command', { mode: 'json' }).$type<unknown>(),
+  bindingId: text('binding_id'),
+  outcome: text('outcome').notNull().default('succeeded'),
+  httpStatus: integer('http_status').notNull().default(200),
+});
+
+export const scannerStations = sqliteTable('scanner_stations', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  bindingId: text('binding_id').notNull().unique(),
+  apiKeyId: text('api_key_id').notNull().unique(),
+  userId: text('user_id').notNull(),
+  profileId: text('profile_id')
+    .notNull()
+    .references(() => profiles.id),
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  state: text('state', { mode: 'json' }).$type<
+    import('@/lib/domain/scanner-station').ScannerState
+  >(),
+  lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const scannerStationEvents = sqliteTable('scanner_station_events', {
+  id: text('id').primaryKey(),
+  stationId: text('station_id')
+    .notNull()
+    .references(() => scannerStations.id),
+  bootId: text('boot_id').notNull(),
+  sequence: integer('sequence').notNull(),
+  payload: text('payload', { mode: 'json' })
+    .$type<import('@/lib/domain/scanner-station').ScannerEvent>()
+    .notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+export const scannerStationControls = sqliteTable('scanner_station_controls', {
+  id: text('id').primaryKey(),
+  stationId: text('station_id')
+    .notNull()
+    .references(() => scannerStations.id),
+  bootId: text('boot_id').notNull(),
+  stateRevision: integer('state_revision').notNull(),
+  command: text('command', { mode: 'json' })
+    .$type<import('@/lib/domain/scanner-station').ScannerControl>()
+    .notNull(),
+  status: text('status').notNull().default('pending'),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
 export const kitchenAcceptedPlans = sqliteTable('kitchen_accepted_plans', {
   id: text('id')
     .primaryKey()

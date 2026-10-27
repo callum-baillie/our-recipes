@@ -240,6 +240,11 @@
     "reason": "First-party VeSync onboarding and scale connection management."
   },
   {
+    "method": "POST",
+    "path": "/setup/interview",
+    "reason": "First-party first-run onboarding chat; only reachable before a household exists."
+  },
+  {
     "method": "GET",
     "path": "/nutrition/profiles/{profileId}/scale",
     "reason": "First-party VeSync onboarding and scale connection management."

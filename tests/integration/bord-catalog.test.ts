@@ -14,6 +14,7 @@ import {
   foodProviderRateLimits,
   foodProviderSnapshots,
   pantryBatches,
+  scannerStations,
   shoppingLists,
   shoppingListItems,
 } from '@/lib/db/schema';
@@ -63,7 +64,17 @@ import {
   enrichCatalogProducts,
 } from '@/lib/services/catalog-food-context-service';
 import { intakePurchasedShoppingItem } from '@/lib/services/pantry-grocery-cooking-service';
-import { createPantryLocation } from '@/lib/services/pantry-service';
+import {
+  scannerContext,
+  lookupScanner,
+  executeScannerRequest,
+} from '@/lib/services/scanner-station-service';
+import type { RequestPrincipal } from '@/lib/services/auth-service';
+import {
+  createPantryLocation,
+  ensureDefaultPantryLocations,
+  listPantryLocations,
+} from '@/lib/services/pantry-service';
 import { pantryPurchaseIntakeSchema } from '@/lib/domain/pantry-grocery-cooking';
 import { pantryLocationInputSchema } from '@/lib/domain/pantry';
 import { shoppingPurchaseDraft, cartDemandCoverage } from '@/lib/domain/shopping-cart';
@@ -727,6 +738,109 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     fixture.state.unavailable = true;
     expect((await lookupFoodByBarcode('04006381333931', 'en')).preferred).toBeNull();
     expect(fixture.calls.every((c) => c.key === 'synthetic-read-key')).toBe(true);
+  });
+  it('automatically imports an exact barcode as counted packages and replays without the catalog', async () => {
+    fixture.state.productsDisabled = true;
+    fixture.state.barcodeMatch = true;
+    fixture.state.barcodeValue = '041498926526';
+    ensureDefaultPantryLocations(actor);
+    const locationId = listPantryLocations().find((l) => l.storageType === 'pantry')!.id;
+    const p: RequestPrincipal = {
+      kind: 'session',
+      userId: 'scanner-package-owner',
+      profileId: actor,
+      linkedProfileId: actor,
+      role: 'admin',
+      accountRole: 'admin',
+      activeProfileRole: 'admin',
+      sessionId: null,
+      apiKeyId: null,
+    };
+    getDatabase()
+      .insert(scannerStations)
+      .values({
+        id: 'pantry-reader',
+        name: 'Pantry reader',
+        bindingId: randomUUID(),
+        apiKeyId: 'fixture-key',
+        userId: p.userId,
+        profileId: actor,
+        createdAt: new Date(),
+      })
+      .run();
+    const context = scannerContext(p, 'pantry-reader'),
+      lookup = await lookupScanner(p, {
+        stationId: 'pantry-reader',
+        barcode: '041498926526',
+        locationId,
+      });
+    if (!('catalogAdd' in lookup) || !lookup.catalogAdd)
+      throw Error('Expected exact catalog preparation');
+    const command = {
+      type: 'pantry_catalog_add',
+      barcode: '041498926526',
+      packages: 1,
+      locationId,
+      selection: lookup.catalogAdd.selection,
+    };
+    const input = {
+      contractVersion: 2,
+      operationId: randomUUID(),
+      stationId: context.stationId,
+      instanceId: context.instanceId,
+      bindingId: context.bindingId,
+      command,
+    };
+    const first = await executeScannerRequest(p, input);
+    expect(first.status).toBe(200);
+    expect(first.result).toMatchObject({ quantity: 1, unit: 'package', outcome: 'succeeded' });
+    const batches = getDatabase().select().from(pantryBatches).all();
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toMatchObject({
+      quantityRemaining: 1,
+      unit: 'package',
+      useByDate: null,
+      bestBeforeDate: null,
+    });
+    fixture.state.unavailable = true;
+    expect((await executeScannerRequest(p, input)).result).toMatchObject({
+      ...first.result,
+      replayed: true,
+    });
+    expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(1);
+    fixture.state.unavailable = false;
+    const known = await lookupScanner(p, {
+      stationId: context.stationId,
+      barcode: '041498926526',
+      locationId,
+    });
+    expect(known.kind).toBe('local');
+    expect(known.prepared).toMatchObject({ packageAmount: 1, packageUnit: 'package' });
+    fixture.state.unavailable = true;
+    const addedAgain = await executeScannerRequest(p, {
+      ...input,
+      operationId: randomUUID(),
+      command: { type: 'pantry_add', barcode: '041498926526', packages: 1, locationId },
+      prepared: known.prepared,
+    });
+    expect(addedAgain.status).toBe(200);
+    expect(
+      getDatabase()
+        .select()
+        .from(pantryBatches)
+        .all()
+        .reduce((n, b) => n + (b.quantityRemaining ?? 0), 0),
+    ).toBe(2);
+  });
+  it('skips a disabled optional product pack and resolves USDA barcodes without a failing product request', async () => {
+    fixture.state.productsDisabled = true;
+    fixture.state.barcodeMatch = true;
+    const result = await lookupFoodByBarcode('04006381333931', 'en');
+    expect(result.preferred?.provider).toBe('usda_fdc');
+    expect(fixture.calls.some((c) => c.path === '/v1/products/resolve')).toBe(false);
+    expect(result.providerStatuses).toContainEqual(
+      expect.objectContaining({ provider: 'open_food_facts', status: 'disabled' }),
+    );
   });
   it('keeps local USDA barcodes working when the optional product pack is unavailable', async () => {
     fixture.state.productsUnavailable = true;

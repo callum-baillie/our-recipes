@@ -582,6 +582,13 @@
       "when": 1792713600000,
       "tag": "0081_ai_chat_privacy_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "6",
+      "when": 1793066400000,
+      "tag": "0082_scanner_stations",
+      "breakpoints": true
     }
   ]
 }

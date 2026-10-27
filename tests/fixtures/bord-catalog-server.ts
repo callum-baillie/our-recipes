@@ -25,6 +25,7 @@ export async function startCatalogFixture() {
     productsUnavailable: false,
     productsDisabled: false,
     barcodeMatch: false,
+    barcodeValue: '4006381333931',
     guidanceUnavailable: false,
     mismatchEnrichment: false,
   };
@@ -107,7 +108,7 @@ export async function startCatalogFixture() {
         foods: [
           {
             ...syntheticUsda,
-            ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: '4006381333931' } : {}),
+            ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: state.barcodeValue } : {}),
           },
         ],
       });
@@ -221,7 +222,7 @@ export async function startCatalogFixture() {
               }
             : {
                 ...syntheticUsda,
-                ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: '4006381333931' } : {}),
+                ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: state.barcodeValue } : {}),
                 foodNutrients: [
                   { nutrient: { id: 1003, name: 'Protein', unitName: 'g' }, amount: state.protein },
                 ],
