@@ -1,5 +1,15 @@
 # Release notes
 
+## 1.0.0-rc.22
+
+- Redesign the recipe details page: the sidebar now starts level with the photo, with a full-width hero, a combined servings and timings strip, a clearer ingredient and method layout, and consistent cards for pantry, equipment, nutrition, tags, notes, management and revision history.
+- Refine the Export & print page into an options panel beside a document stage with a status pill and open, download and print actions.
+- Rebuild the recipe card, meal plan and pantry/grocery PDFs on more of the vendored pdfcn components (badge, card, divider, page header, image, stack, table) with the Bòrd logo in every page header.
+- Replace the multi-step onboarding wizards with a single setup chat and AI interview, unify button styles, add theme and palette refinements, restyle the account "How I cook" form, and redirect any page to onboarding when no database exists yet.
+- Improve food-data barcode lookup, catalog and store-address handling.
+- No schema change: the database stays at `0081_ai_chat_privacy_scope`. Back up before upgrading as usual.
+- Verification: Prettier, ESLint and TypeScript pass; unit tests pass; integration tests pass except `restore-interruption`, which failed once under load and passes when run alone. A contrast and accessibility audit across light/dark and five palettes is clean. End-to-end specs and the embedded PDF viewer in a real browser were not run for this candidate.
+
 ## 1.0.0-rc.21
 
 - Integrate My Kitchen with the outstanding reviewed-action, privacy-boundary, pantry/scanner recovery and modal-focus work on the current main line.
