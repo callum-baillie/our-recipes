@@ -43,13 +43,18 @@ async function homeThemeContrast(page: import('@playwright/test').Page): Promise
       return (first + 0.05) / (second + 0.05);
     };
 
-    const root = getComputedStyle(document.documentElement);
+    // `--page` may be a light-dark() expression, so resolve it to the colour actually rendered.
+    const probe = document.createElement('div');
+    probe.style.background = 'var(--page)';
+    document.body.append(probe);
+    const pageBackground = getComputedStyle(probe).backgroundColor;
+    probe.remove();
     const heading = document.querySelector('.home-hero h1');
     const planner = document.querySelector('.home-plan-card');
     if (!heading || !planner) throw new Error('Home contrast targets are missing.');
 
     return {
-      heading: contrast(getComputedStyle(heading).color, root.getPropertyValue('--page')),
+      heading: contrast(getComputedStyle(heading).color, pageBackground),
       planner: contrast(getComputedStyle(planner).color, getComputedStyle(planner).backgroundColor),
     };
   });
@@ -185,6 +190,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(mobileNavigation.locator('nav > a')).toHaveText([
     'Recipebook',
     'Pantry',
+    'Scanner',
     'Nutrition',
     'Planner',
     'Lists',
@@ -207,6 +213,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(primaryNavigation.locator(':scope > a')).toHaveText([
     'Recipebook',
     'Pantry',
+    'Scanner',
     'Nutrition',
     'Planner',
     'Lists',

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.23
+  version: 1.0.0-rc.24
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery

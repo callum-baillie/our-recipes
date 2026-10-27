@@ -257,15 +257,10 @@ button.assisted-review-trigger.assisted-review-trigger,
 }
 
 /* ------------------------------------------------------------------ */
-/* Entrance motion: pages, menus, dialogs, toasts.                      */
+/* Entrance motion: menus, dialogs, toasts. Pages stay still so layout and  */
+/* contrast measurements are stable from the first frame.                    */
 /* ------------------------------------------------------------------ */
 
-@keyframes ui-page-in {
-  from {
-    opacity: 0;
-    translate: 0 0.5rem;
-  }
-}
 @keyframes ui-fade-in {
   from {
     opacity: 0;
@@ -291,18 +286,6 @@ button.assisted-review-trigger.assisted-review-trigger,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
-  }
-
-  /* Opacity and translate only; no lingering transform that would re-parent fixed children. */
-  main {
-    animation: ui-page-in var(--motion-slow) var(--ease-out) backwards;
-  }
-  .planner-workspace-shell main {
-    animation: none;
-  }
-
   .profile-menu,
   details[open] > [class*='createMenuPanel'] {
     transform-origin: top right;

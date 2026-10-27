@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.0-rc.24
+
+- Supersedes rc.23, which has the same features and schema (`0082_scanner_stations`) but was found by the full browser journey run to have a page-entrance fade and global smooth scrolling that made contrast checks, layout measurements and scripted scrolling unreliable. Both are removed; dialog, menu and toast motion is unchanged.
+- Update the release browser journeys for the new "Scanner" navigation item and make their contrast helper resolve `light-dark()` theme tokens.
+- Verification: Prettier, ESLint, TypeScript, OpenAPI coverage and client smoke, unit tests (759), the full integration suite (524 passed, 9 skipped), and on a fresh release build all 15 release browser journey groups plus the 3 performance checks.
+
 ## 1.0.0-rc.23
 
 - Merge the scanner-station work (`scanner/companion-v2`) into the main line: bound scanner stations, the headless pantry package import API, scanner cards page, and QR codes on printed recipe cards and meal plans so a scan records cooking immediately.
