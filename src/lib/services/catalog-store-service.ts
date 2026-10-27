@@ -42,7 +42,7 @@ export function storeProjection(store: CatalogStore) {
     content_revision: store.content_revision,
     address: Object.fromEntries(
       Object.entries(store.address ?? {}).filter(
-        ([key, value]) =>
+        (entry): entry is [string, string] =>
           [
             'street',
             'city',
@@ -52,7 +52,10 @@ export function storeProjection(store: CatalogStore) {
             'postal_code',
             'country',
             'house_number',
-          ].includes(key) && typeof value === 'string',
+            'full',
+            'street_address',
+            'unit',
+          ].includes(entry[0]) && typeof entry[1] === 'string',
       ),
     ),
     latitude: store.latitude ?? null,

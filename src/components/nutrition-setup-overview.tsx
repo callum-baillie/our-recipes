@@ -104,7 +104,7 @@ export function NutritionWeightTrackerCard({
 
       {!disabled && canManageProfile ? (
         <div className={styles.weightActions}>
-          <button type="button" onClick={onRecordWeight}>
+          <button className="secondary-button compact" type="button" onClick={onRecordWeight}>
             <Scale size={16} aria-hidden="true" />
             {latest ? 'Record weight' : 'Record first weight'}
           </button>
@@ -144,7 +144,7 @@ export function NutritionSetupOverview({
             </p>
           </div>
           {canManageGoals ? (
-            <button type="button" onClick={onConfigureGoals}>
+            <button className="secondary-button compact" type="button" onClick={onConfigureGoals}>
               {hasConfiguredGoals ? 'Review goals' : 'Set daily nutrition goal'}
             </button>
           ) : (
@@ -162,7 +162,7 @@ export function NutritionSetupOverview({
             </p>
           </div>
           {canManageProfile && (
-            <button type="button" onClick={onRecordNutrition}>
+            <button className="secondary-button compact" type="button" onClick={onRecordNutrition}>
               Log food
             </button>
           )}

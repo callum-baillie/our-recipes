@@ -1,7 +1,13 @@
 import { expect, test, type Page, type BrowserContext } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { TEST_PASSPHRASE, signInWorkflowFixture } from './helpers/onboarding';
+import {
+  TEST_PASSPHRASE,
+  chatPick,
+  chatSay,
+  chatSkipOptional,
+  signInWorkflowFixture,
+} from './helpers/onboarding';
 import { appAxe } from './helpers/accessibility';
 const directory = 'screenshots/full-refinement/settings';
 
@@ -107,12 +113,15 @@ test('interview and onboarding retain drafts with named errors and keyboard choi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Add profile', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'New profile onboarding' });
-  const type = dialog.getByRole('combobox', { name: 'Profile type' });
-  await type.focus();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
-  await capture(page, 'onboarding-type-popup-mobile');
-  await page.keyboard.press('Enter');
+  const name = dialog.getByLabel('Display name', { exact: true });
+  await name.fill('   ');
+  await name.press('Enter');
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+  await expect(name).toBeFocused();
+  await capture(page, 'onboarding-invalid-name-mobile');
+  await name.fill('Controlled onboarding');
+  await name.press('Enter');
+  // An answered question is entered work: closing asks before discarding it.
   const dismissed = page.waitForEvent('dialog');
   const close = dialog.getByRole('button', { name: 'Close profile onboarding' }).click();
   const confirmation = await dismissed;
@@ -120,12 +129,7 @@ test('interview and onboarding retain drafts with named errors and keyboard choi
   await confirmation.dismiss();
   await close;
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel(/^Display name/).fill('   ');
-  await dialog.getByRole('button', { name: 'Continue', exact: true }).click();
-  const name = dialog.getByLabel(/^Display name/);
-  await expect(name).toHaveAttribute('aria-invalid', 'true');
-  await expect(name).toBeFocused();
-  await capture(page, 'onboarding-invalid-name-mobile');
+  await capture(page, 'onboarding-type-popup-mobile');
   expect((await appAxe(page).include('dialog').analyze()).violations).toEqual([]);
   await page.route('**/api/v1/profiles/onboarding', async (route) =>
     route.fulfill({
@@ -141,14 +145,13 @@ test('interview and onboarding retain drafts with named errors and keyboard choi
       },
     }),
   );
-  await name.fill('Controlled onboarding');
-  await dialog.getByLabel(/^Email/).fill('controlled-onboarding@example.test');
-  await dialog.getByLabel(/^Passphrase/).fill(TEST_PASSPHRASE);
-  await dialog.getByRole('button', { name: 'Continue', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await dialog.getByRole('button', { name: 'Continue', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Create profile', exact: true }).click();
-  await expect(dialog.getByRole('heading', { name: 'Save your recovery codes.' })).toBeVisible();
+  await chatSay(dialog, 'Email', 'controlled-onboarding@example.test');
+  await chatSay(dialog, 'Passphrase', TEST_PASSPHRASE);
+  await chatPick(dialog, /^Parent/u);
+  await chatPick(dialog, /^Adult/u);
+  await chatSkipOptional(dialog);
+  await chatPick(dialog, 'Create profile');
+  await expect(dialog.getByRole('heading', { name: 'Save your recovery codes' })).toBeVisible();
   const finish = dialog.getByRole('button', { name: 'Finish profile setup' });
   await expect(finish).toBeDisabled();
   await expect(dialog.getByRole('button', { name: 'Close profile onboarding' })).toBeDisabled();

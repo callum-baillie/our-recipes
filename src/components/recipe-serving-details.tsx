@@ -35,6 +35,8 @@ type InstructionSection = {
 };
 
 type RecipeServingDetailsProps = {
+  hero?: ReactNode;
+  nutritionPanels?: ReactNode;
   supporting?: ReactNode;
   preparation?: ReactNode;
   servings: string;
@@ -130,6 +132,7 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
     <>
       <div className="recipe-content-layout">
         <div className="recipe-cooking-content" id="recipe">
+          {props.hero}
           <dl className="recipe-facts">
             <div className="serving-fact">
               <dt>Serves</dt>
@@ -201,7 +204,6 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
               Return to original servings
             </button>
           )}
-          <div className="recipe-preparation">{props.preparation}</div>
           <div className="recipe-body">
             <section>
               <h2>Ingredients</h2>
@@ -248,8 +250,9 @@ export function RecipeServingDetails(props: RecipeServingDetailsProps) {
             </section>
           </div>
         </div>
-        <aside className="recipe-detail-sidebar">
-          {' '}
+        <aside className="recipe-detail-sidebar" aria-label="Recipe details">
+          {props.preparation ? <div className="recipe-preparation">{props.preparation}</div> : null}
+          {props.nutritionPanels}
           <details className="nutrition-panel" aria-busy={estimatingNutrition}>
             <summary className="nutrition-heading recipe-disclosure-summary">
               <span>

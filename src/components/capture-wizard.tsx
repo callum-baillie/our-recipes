@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, FileText, Link2, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, FileText, Link2, ShieldCheck, Sparkles } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 
 import { PageHeader } from '@/components/page-header';
@@ -253,7 +253,8 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
             : 'Import a public recipe link into an editable draft.'
         }
         leading={
-          <Link className="inline-link" href="/recipes">
+          <Link className="quiet-link editor-back-link" href="/recipes">
+            <ArrowLeft size={16} aria-hidden="true" />
             Back to recipes
           </Link>
         }

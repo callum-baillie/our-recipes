@@ -166,8 +166,8 @@
   height: 2.7rem;
   color: var(--on-accent);
   font-size: 0.82rem;
-  font-weight: 800;
-  border-radius: 0.45rem;
+  font-weight: var(--btn-weight, 600);
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--list-rust);
   box-shadow: 0 5px 14px rgb(154 66 42 / 15%);
 }
@@ -272,7 +272,7 @@
   padding: 0 1rem;
   color: var(--list-green-dark);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: var(--btn-weight, 600);
   white-space: nowrap;
   border: 1px solid var(--list-line);
   border-radius: 999px;
@@ -294,7 +294,7 @@
   padding-inline: 0.25rem;
   color: var(--muted);
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: var(--btn-weight, 600);
   border-radius: 999px;
   background: var(--paper-deep);
 }
@@ -365,7 +365,7 @@
   cursor: pointer;
   list-style: none;
   font-size: 0.87rem;
-  font-weight: 850;
+  font-weight: var(--btn-weight, 600);
 }
 
 .listSection > summary::-webkit-details-marker {
@@ -375,7 +375,7 @@
 .listSection > summary small {
   color: var(--muted);
   font-size: inherit;
-  font-weight: 600;
+  font-weight: var(--btn-weight, 600);
 }
 
 .mobileSectionTitle {
@@ -542,9 +542,9 @@
   padding: 0.35rem 0.5rem;
   color: var(--list-green-dark);
   font-size: 0.68rem;
-  font-weight: 750;
+  font-weight: var(--btn-weight, 600);
   border: 1px solid var(--list-line);
-  border-radius: 0.45rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -593,7 +593,7 @@
   padding: 0.35rem;
   cursor: pointer;
   list-style: none;
-  font-weight: 850;
+  font-weight: var(--btn-weight, 600);
 }
 
 .pantryMatchPanel {
@@ -623,14 +623,14 @@
   padding: 0.4rem 0.55rem;
   text-align: left;
   border: 1px solid var(--list-line);
-  border-radius: 0.4rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
 .pantryMatchPanel button span {
   color: var(--ink);
   font-size: 0.7rem;
-  font-weight: 750;
+  font-weight: var(--btn-weight, 600);
 }
 
 .pantryMatchPanel button small {
@@ -659,7 +659,7 @@
 .provenance summary,
 .intake summary {
   cursor: pointer;
-  font-weight: 700;
+  font-weight: var(--btn-weight, 600);
 }
 
 .pantryControls {
@@ -705,7 +705,7 @@
   padding: 0.5rem 0.65rem;
   font: inherit;
   border: 1px solid var(--list-line);
-  border-radius: 0.45rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -756,7 +756,7 @@
   padding: 0.45rem;
   font: inherit;
   border: 1px solid var(--list-line);
-  border-radius: 0.4rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -1051,7 +1051,7 @@
   min-height: 2.8rem;
   padding: 0 1rem;
   color: var(--on-accent);
-  border-radius: 0.55rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--list-rust);
 }
 
@@ -1130,7 +1130,7 @@
   padding: 0.65rem 0.75rem;
   text-align: left;
   border: 1px solid var(--line);
-  border-radius: 0.6rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -1272,7 +1272,7 @@
   min-height: 2.5rem;
   padding: 0 0.9rem;
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -1389,7 +1389,7 @@
   .mobileListMenuPanel form button {
     padding-inline: 0.75rem;
     color: var(--on-primary);
-    border-radius: 0.45rem;
+    border-radius: var(--btn-radius, 0.6rem);
     background: var(--list-green);
   }
 
@@ -1403,7 +1403,7 @@
     color: var(--ink);
     font-size: 0.78rem;
     text-align: left;
-    border-radius: 0.45rem;
+    border-radius: var(--btn-radius, 0.6rem);
   }
 
   .mobileListMenuPanel > a:hover,
@@ -1501,7 +1501,15 @@
   }
 
   .topGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topGrid > .addItem {
     display: none;
+  }
+
+  .storePanel select {
+    min-height: 2.75rem;
   }
 
   .toolbar {
@@ -1538,7 +1546,7 @@
     color: var(--list-green-dark);
     font-size: 0.72rem;
     border: 1px solid var(--list-line);
-    border-radius: 0.55rem;
+    border-radius: var(--btn-radius, 0.6rem);
     background: var(--field);
   }
 
@@ -1791,7 +1799,7 @@
     justify-content: center;
     min-height: 3.4rem;
     border: 1px solid var(--list-line);
-    border-radius: 0.55rem;
+    border-radius: var(--btn-radius, 0.6rem);
   }
 
   .mobileDock > .dockMetric {
@@ -1814,7 +1822,7 @@
     gap: 0.55rem;
     color: var(--on-accent);
     font-size: 0.76rem;
-    font-weight: 800;
+    font-weight: var(--btn-weight, 600);
     border-color: var(--list-rust);
     background: var(--list-rust);
   }
@@ -1924,16 +1932,16 @@
   padding: 0.5rem 0.8rem;
   background: none;
   border: 0;
-  border-radius: 0.4rem;
+  border-radius: var(--btn-radius, 0.6rem);
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: var(--btn-weight, 600);
   cursor: pointer;
 }
 .shoppingModeSwitch button[aria-pressed='true'] {
   background: var(--leaf);
-  color: white;
+  color: var(--on-primary);
 }
 .undoNotice {
   display: flex;
@@ -1950,7 +1958,7 @@
   background: none;
   border: 0;
   color: var(--leaf);
-  font-weight: 700;
+  font-weight: var(--btn-weight, 600);
   min-height: 2.5rem;
   cursor: pointer;
 }
@@ -2117,10 +2125,10 @@
   padding: 0.35rem 0.55rem;
   color: var(--list-green-dark);
   font-size: 0.85rem;
-  font-weight: 650;
+  font-weight: var(--btn-weight, 600);
   white-space: nowrap;
   border: 1px solid var(--list-line);
-  border-radius: 0.65rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -2183,9 +2191,9 @@
   padding: 0.4rem 0.55rem;
   color: var(--list-green-dark);
   font-size: 0.7rem;
-  font-weight: 750;
+  font-weight: var(--btn-weight, 600);
   border: 1px solid var(--list-line);
-  border-radius: 0.45rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--list-pale);
 }
 
@@ -2258,7 +2266,7 @@
 .cartQuantityForm footer button {
   min-height: 2.8rem;
   border: 1px solid var(--list-line);
-  border-radius: 0.55rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
 }
 
@@ -2276,7 +2284,7 @@
   margin: 0.5rem;
   padding: 0.5rem 0.8rem;
   color: var(--on-primary);
-  border-radius: 0.55rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--list-green);
 }
 
@@ -2425,9 +2433,9 @@
   min-height: 3rem;
   padding: 0.6rem 0.75rem;
   color: var(--on-primary);
-  font-weight: 750;
+  font-weight: var(--btn-weight, 600);
   border: 0;
-  border-radius: 0.55rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--list-green);
 }
 .scanQuantityHint {
@@ -2505,7 +2513,7 @@
   color: var(--ink);
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
   font: inherit;
   font-size: 0.85rem;
   text-decoration: none;
@@ -2544,7 +2552,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 0.6rem;
+  border-radius: var(--btn-radius, 0.6rem);
   color: var(--ink);
   background: var(--field);
 }

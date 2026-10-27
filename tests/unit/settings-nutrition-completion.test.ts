@@ -18,8 +18,13 @@ import {
 import { ListSettingsManager } from '@/components/list-settings-manager';
 import { KitchenInterview } from '@/components/kitchen-interview';
 import { AccountSecurityForm } from '@/components/account-security-form';
-import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { OnboardingChat } from '@/components/onboarding-chat/onboarding-chat';
 import { ProfileSettings, type Profile } from '@/components/profile-settings';
+async function answerText(label: string, value: string) {
+  const field = await screen.findByLabelText(label);
+  fireEvent.change(field, { target: { value } });
+  fireEvent.submit(field.closest('form')!);
+}
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
@@ -114,6 +119,13 @@ beforeEach(() => {
     setTimeout(callback, 0),
   );
   vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  // Automated browsers get the chat without its artificial typing pauses.
+  Object.defineProperty(navigator, 'webdriver', { value: true, configurable: true });
 });
 afterEach(() => {
   cleanup();
@@ -417,45 +429,36 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
     expect(screen.getByLabelText(/^Current password/).getAttribute('aria-invalid')).toBe('true');
   });
 
-  it('protects role/color-only onboarding changes and associates whitespace names with the actual field', async () => {
+  it('protects entered onboarding answers and ties a blank name to the actual field', async () => {
     const changed = vi.fn();
-    render(createElement(OnboardingWizard, { mode: 'profile', onDismissStateChange: changed }));
+    render(createElement(OnboardingChat, { mode: 'profile', onDismissStateChange: changed }));
+    const field = await screen.findByLabelText('Display name');
     await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(false));
-    const radios = screen.getAllByRole('radio', { name: /for the avatar/ });
-    fireEvent.click(radios.find((item) => item.getAttribute('aria-checked') === 'false')!);
-    await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(true));
-    fireEvent.change(screen.getByLabelText(/^Display name/), { target: { value: '   ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    const field = screen.getByLabelText(/^Display name/);
+    fireEvent.change(field, { target: { value: '   ' } });
+    fireEvent.submit(field.closest('form')!);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/needed to continue/);
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(document.activeElement).toBe(field);
+    expect(changed.mock.lastCall?.[0].dirty).toBe(false);
+    fireEvent.change(field, { target: { value: 'Jon' } });
+    fireEvent.submit(field.closest('form')!);
+    await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(true));
+    expect(await screen.findByLabelText('Email')).toBeTruthy();
   });
 
-  it('treats role-only and profile-type-only onboarding choices as entered work', async () => {
-    const changed = vi.fn();
-    const first = render(
-      createElement(OnboardingWizard, { mode: 'profile', onDismissStateChange: changed }),
-    );
-    await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(false));
-    fireEvent.change(screen.getByLabelText(/^Access role/), { target: { value: 'admin' } });
-    await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(true));
-    first.unmount();
-    changed.mockClear();
-    render(createElement(OnboardingWizard, { mode: 'profile', onDismissStateChange: changed }));
-    await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(false));
-    const type = screen.getByRole('combobox', { name: 'Profile type' });
-    fireEvent.keyDown(type, { key: 'ArrowDown' });
-    fireEvent.keyDown(type, { key: 'ArrowDown' });
-    fireEvent.keyDown(type, { key: 'Enter' });
-    await waitFor(() => expect(changed.mock.lastCall?.[0].dirty).toBe(true));
+  it('asks for access role and profile type only when an admin adds another profile', async () => {
+    render(createElement(OnboardingChat, { mode: 'profile' }));
+    await answerText('Display name', 'Jon');
+    await answerText('Email', 'jon@example.test');
+    await answerText('Passphrase', 'synthetic fixture passphrase');
+    expect(await screen.findByRole('button', { name: /Admin/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Child/ }));
+    // A child profile is always a dependent, so the profile-type question is skipped.
+    expect(await screen.findByRole('button', { name: 'US customary' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Dependent/ })).toBeNull();
   });
 
   it('keeps initial setup recovery completion visible until the codes are acknowledged', async () => {
-    vi.stubGlobal('matchMedia', () => ({
-      matches: false,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
     const fetcher = vi.fn().mockResolvedValue(
       Response.json({
         firstRecipeId: 'example-fixture',
@@ -466,25 +469,21 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
       }),
     );
     vi.stubGlobal('fetch', fetcher);
-    render(createElement(OnboardingWizard, { mode: 'initial' }));
-    fireEvent.change(screen.getByLabelText(/^Kitchen name/), {
-      target: { value: 'Fixture kitchen' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.change(screen.getByLabelText(/^Display name/), { target: { value: 'Avery' } });
-    fireEvent.change(screen.getByLabelText(/^Email/), {
-      target: { value: 'fixture@example.test' },
-    });
-    fireEvent.change(screen.getByLabelText(/^Passphrase/), {
-      target: { value: 'synthetic fixture passphrase' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Set up nutrition later' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add Stovies & open recipe' }));
-    await screen.findByRole('heading', { name: 'Save your recovery codes.' });
+    render(createElement(OnboardingChat, { mode: 'initial' }));
+    await answerText('Kitchen name', 'Fixture kitchen');
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this icon' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Looks good' }));
+    await answerText('Display name', 'Avery');
+    await answerText('Email', 'fixture@example.test');
+    await answerText('Passphrase', 'synthetic fixture passphrase');
+    fireEvent.click(await screen.findByRole('button', { name: 'US customary' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Fahrenheit' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Set up nutrition later/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip for now' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Use Example recipe/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'That’s everyone for now' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Stovies & open recipe' }));
+    await screen.findByRole('heading', { name: 'Save your recovery codes' });
     expect(router.push).not.toHaveBeenCalled();
     expect(router.refresh).not.toHaveBeenCalled();
     const finish = screen.getByRole('button', { name: 'Continue to sign in' });
@@ -497,6 +496,8 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
       '/sign-in?setup=1&callbackUrl=%2Frecipes%2Fexample-fixture',
     );
     expect(fetcher).toHaveBeenCalledTimes(1);
+    // Sign-in details reach only the setup route, never an AI route.
+    expect(String(fetcher.mock.calls[0]![0])).toBe('/api/v1/setup');
   });
 
   it('links an advanced measurement validation error to its retained field', async () => {

@@ -576,7 +576,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   </p>
                 </div>
                 {profile.canManageGoals && (
-                  <button type="button" onClick={() => setGoalsOpen(true)}>
+                  <button className="text-button" type="button" onClick={() => setGoalsOpen(true)}>
                     Edit goals
                   </button>
                 )}
@@ -589,10 +589,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                     nutrients; a goal is optional.
                   </p>
                   <button
+                    className="secondary-button"
                     type="button"
                     disabled={!profile.canManageProfile}
                     onClick={() => openRecord()}
                   >
+                    <Plus size={18} aria-hidden="true" />
                     Log food
                   </button>
                 </div>
@@ -994,10 +996,12 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
                   measured zero.
                 </p>
                 <button
+                  className="secondary-button"
                   type="button"
                   disabled={!profile.canManageProfile}
                   onClick={() => openRecord()}
                 >
+                  <Plus size={18} aria-hidden="true" />
                   Log food
                 </button>
               </div>

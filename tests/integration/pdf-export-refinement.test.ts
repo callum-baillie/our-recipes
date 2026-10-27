@@ -117,7 +117,7 @@ describe('read-only document exports', () => {
       const output = text(result.bytes);
       expect(output).toContain('For the dough');
       expect(output).toContain('For the topping');
-      expect(output).toContain('Energy: 0 kcal');
+      expect(output).toMatch(/ENERGY[^|]*CARBS[^|]*0 kcal 12 g not recorded/u);
       expect(output).toContain('not recorded');
       expect(output).toContain('Step 28:');
       expect(output).toContain('Recipe ·');

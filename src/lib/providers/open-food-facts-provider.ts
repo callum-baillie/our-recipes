@@ -4,6 +4,7 @@ import { getRuntimeConfig } from '@/lib/config';
 import {
   FoodDataError,
   normalizeGtin,
+  retailGtin,
   type FoodRecord,
   type NormalizedNutrient,
 } from '@/lib/domain/food-data';
@@ -270,7 +271,14 @@ export class OpenFoodFactsProvider implements FoodDataProvider {
     };
   }
   async lookupBarcode(canonicalGtin: string, language: string) {
-    return this.getDetails(canonicalGtin.replace(/^0+(?=\d{8,})/u, ''), language);
+    const result = await this.getDetails(retailGtin(canonicalGtin), language);
+    if (result.value && result.value.canonicalGtin !== canonicalGtin)
+      throw new FoodDataError(
+        'MALFORMED_RESPONSE',
+        'Open Food Facts returned a different barcode. Review the package or try another source.',
+        this.id,
+      );
+    return result;
   }
   async searchByName() {
     return { value: [], rateLimit: null, rateRemaining: null, retryAt: null };

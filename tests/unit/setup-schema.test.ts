@@ -35,20 +35,17 @@ const validSetup = {
 
 describe('setupSchema', () => {
   it('uses one customizable kitchen identity alongside the fixed Bòrd introduction', () => {
-    const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
+    const flow = readFileSync('src/components/onboarding-chat/flow.ts', 'utf8');
+    const chat = readFileSync('src/components/onboarding-chat/onboarding-chat.tsx', 'utf8');
     const setupSource = readFileSync('src/components/setup-wizard.tsx', 'utf8');
-    expect(source).toContain('<span>Kitchen name</span>');
-    expect(source).toContain('kitchenName,');
-    expect(source).toContain('kitchenIcon: brandIcon');
-    expect(source).not.toContain('<span>App name</span>');
-    expect(source).not.toContain('<span>Household name</span>');
-    expect(source).not.toContain('onKitchenNamePreviewChange');
-    expect(source).not.toContain('onBrandIconPreviewChange');
-    expect(setupSource).toContain('<BordLockup className="onboarding-brand-lockup" />');
-    expect(setupSource).toContain('<dt>bòrd</dt>');
-    expect(setupSource).toContain('<dd>Scottish Gaelic · noun</dd>');
-    expect(setupSource).toContain('<dd>Table</dd>');
-    expect(setupSource).toContain('A communal area where kin unite to eat and end the day.');
+    expect(flow).toContain("label: 'Kitchen name'");
+    expect(chat).toContain('kitchenName: state.kitchenName');
+    expect(chat).toContain('kitchenIcon: state.brandIcon');
+    expect(flow).not.toContain('App name');
+    expect(flow).not.toContain('Household name');
+    expect(setupSource).toContain('<BordLockup />');
+    expect(setupSource).toContain('Scottish Gaelic');
+    expect(flow).toContain('Bòrd is Scottish Gaelic for “table”');
   });
 
   it('accepts a complete household and first profile', () => {
@@ -102,20 +99,15 @@ describe('setupSchema', () => {
     ).toBe(false);
   });
 
-  it('returns an added profile to review without repeating the first-recipe step', () => {
-    const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
-    expect(source).toContain("currentStep === 'goals' && profileReviewMode");
-    expect(source).toContain("setStepIndex(steps.indexOf('review'))");
-  });
-
   it('uses US onboarding defaults and derives hidden regional settings from the browser', () => {
-    const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
+    const source = readFileSync('src/components/onboarding-chat/onboarding-chat.tsx', 'utf8');
+    const flow = readFileSync('src/components/onboarding-chat/flow.ts', 'utf8');
     expect(defaultProfileInput).toMatchObject({ units: 'imperial', temperatureUnit: 'F' });
     expect(source).toContain('navigator.language');
     expect(source).toContain('Intl.DateTimeFormat().resolvedOptions().timeZone');
-    expect(source).not.toContain('<span>Avatar URL');
-    expect(source).not.toContain('<span>Locale</span>');
-    expect(source).not.toContain('<span>Time zone</span>');
+    expect(flow).not.toContain('Avatar URL');
+    expect(flow).not.toContain("label: 'Locale'");
+    expect(flow).not.toContain("label: 'Time zone'");
   });
 
   it('preserves valid regional identifiers through personal profile editing', async () => {
@@ -235,17 +227,17 @@ describe('setupSchema', () => {
     expect(onboardingWeightKilograms('imperial', '150', '16')).toBeNull();
   });
 
-  it('keeps nutrition in a guided flow with explicit measurement and advanced options', () => {
-    const source = readFileSync('src/components/onboarding-wizard.tsx', 'utf8');
-    const nutrition = readFileSync('src/components/nutrition-onboarding-flow.tsx', 'utf8');
-    expect(source).toContain('<NutritionOnboardingFlow');
-    expect(nutrition).toContain('What are your measurements?');
-    expect(nutrition).toContain('aria-label="Height units"');
-    expect(nutrition).toContain('Feet &amp; inches');
-    expect(nutrition).toContain('Centimetres');
-    expect(nutrition).toContain('Advanced measurements');
-    expect(nutrition.match(/<MultiValueCombobox/gu)).toHaveLength(3);
-    expect(source).toContain('I saved these one-time codes somewhere private.');
+  it('runs onboarding as a single chat with guided nutrition and separate secret handling', () => {
+    const chat = readFileSync('src/components/onboarding-chat/onboarding-chat.tsx', 'utf8');
+    const flow = readFileSync('src/components/onboarding-chat/flow.ts', 'utf8');
+    const composer = readFileSync('src/components/onboarding-chat/composer.tsx', 'utf8');
+    expect(chat).toContain('I saved these one-time codes somewhere private.');
+    expect(flow).toContain('Connect a smart scale (VeSync)');
+    expect(flow).toContain('Enter my details manually');
+    expect(flow).toContain('Set up nutrition later');
+    expect(composer).toContain('Feet & inches');
+    expect(composer).toContain('Centimetres');
+    expect(flow.match(/listStep\(/gu)).toHaveLength(3);
   });
 
   it('requires complete inputs and consent before enabling estimated nutrition targets', () => {

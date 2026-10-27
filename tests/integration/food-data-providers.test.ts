@@ -88,6 +88,65 @@ describe('read-only food-data provider adapters', () => {
     });
   });
 
+  it('rejects an OFF barcode response for a different product', async () => {
+    const fetcher: typeof fetch = async () =>
+      Response.json({
+        status: 1,
+        product: { code: '4006381333931', product_name: 'Different product' },
+      });
+    await expect(
+      new OpenFoodFactsProvider(fetcher).lookupBarcode('00036000291452', 'en'),
+    ).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' });
+  });
+
+  it.each(['ALDI', 'Great Value', 'Kirkland Signature', 'National brand'])(
+    'accepts an exact branded UPC for %s without a brand allowlist',
+    async (brand) => {
+      vi.stubEnv('USDA_FDC_API_KEY', 'synthetic-key');
+      const fetcher: typeof fetch = async (_url, init) => {
+        expect(JSON.parse(String(init?.body)).query).toBe(
+          '"036000291452" OR "0036000291452" OR "00036000291452"',
+        );
+        return Response.json({
+          foods: [
+            {
+              fdcId: 456,
+              description: 'Synthetic oats',
+              dataType: 'Branded',
+              brandOwner: brand,
+              gtinUpc: '036000291452',
+              foodNutrients: [],
+            },
+          ],
+        });
+      };
+      const result = await new UsdaFoodDataProvider(fetcher).lookupBarcode('00036000291452');
+      expect(result.value).toMatchObject({ brand, canonicalGtin: '00036000291452' });
+    },
+  );
+
+  it('uses the local USDA mirror numeric index without hosted search syntax', async () => {
+    vi.stubEnv('USDA_FDC_API_KEY', 'synthetic-key');
+    vi.stubEnv('USDA_FDC_BASE_URL', 'http://catalog.example.test/fdc/v1');
+    const fetcher: typeof fetch = async (_url, init) => {
+      expect(JSON.parse(String(init?.body)).query).toBe('00041498926526');
+      return Response.json({
+        foods: [
+          {
+            fdcId: 123,
+            description: 'Synthetic own-label food',
+            dataType: 'Branded',
+            gtinUpc: '041498926526',
+            foodNutrients: [],
+          },
+        ],
+      });
+    };
+    expect(
+      (await new UsdaFoodDataProvider(fetcher).lookupBarcode('00041498926526')).value,
+    ).toMatchObject({ canonicalGtin: '00041498926526' });
+  });
+
   it('surfaces provider rate limits as stable errors and honours retry-after metadata', async () => {
     vi.stubEnv('USDA_FDC_API_KEY', 'test-server-key');
     const fetcher: typeof fetch = async () =>

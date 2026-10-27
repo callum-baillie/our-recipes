@@ -108,7 +108,7 @@
 }
 .primary {
   background: var(--leaf);
-  color: white;
+  color: var(--on-primary);
   border: 1px solid var(--leaf);
 }
 .secondary {

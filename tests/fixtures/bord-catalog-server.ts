@@ -23,6 +23,7 @@ export async function startCatalogFixture() {
     protein: 12,
     missingFood: false,
     productsUnavailable: false,
+    productsDisabled: false,
     barcodeMatch: false,
     guidanceUnavailable: false,
     mismatchEnrichment: false,
@@ -91,7 +92,7 @@ export async function startCatalogFixture() {
               name,
               {
                 implemented: true,
-                enabled: !state.disabled,
+                enabled: !state.disabled && !(name === 'products' && state.productsDisabled),
                 available: !(state.partial && name === 'products'),
                 stale: state.stale,
               },

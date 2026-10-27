@@ -808,12 +808,6 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
 .backup-review-dialog code {
   overflow-wrap: anywhere;
 }
-.profile-onboarding-dialog .onboarding-profile-identity {
-  align-items: start;
-}
-.profile-onboarding-dialog .onboarding-avatar-editor {
-  align-content: start;
-}
 .profile-onboarding-dialog .color-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(44px, 1fr));
@@ -827,14 +821,6 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   height: 44px;
   min-height: 44px;
   margin: 0;
-}
-@media (max-width: 700px) {
-  .profile-onboarding-dialog .onboarding-profile-identity-fields {
-    order: -1;
-  }
-  .profile-onboarding-dialog .onboarding-avatar-preview {
-    margin: 0;
-  }
 }
 .settings-passkey-create {
   display: flex;
@@ -881,11 +867,6 @@ body:has(.profile-settings-list) .settings-sidebar a[href='/settings/profiles'] 
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-}
-.onboarding-shell > .settings-form-fields > .onboarding-step {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
 }
 
 .settings-content .settings-choice-value {

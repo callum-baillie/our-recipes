@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Locator, Page } from '@playwright/test';
 
 export const TEST_PASSPHRASE = 'correct horse battery table';
 
@@ -38,6 +38,41 @@ export function onboardingEmail(kitchenName: string, displayName: string): strin
   return `${slug}@example.test`;
 }
 
+type ChatScope = Page | Locator;
+
+/** Types an answer into the onboarding chat and sends it with Enter. */
+export async function chatSay(scope: ChatScope, label: string | RegExp, value: string) {
+  const field = scope.getByLabel(label, { exact: typeof label === 'string' });
+  await field.fill(value);
+  await field.press('Enter');
+}
+
+/** Taps a quick reply or option card. Names match by substring, like a person reading the label. */
+export async function chatPick(scope: ChatScope, name: string | RegExp) {
+  await scope.getByRole('button', { name }).first().click();
+}
+
+/** Name, email and passphrase: the three questions every profile starts with. */
+export async function chatIdentity(
+  scope: ChatScope,
+  profile: { displayName: string; email: string; passphrase?: string },
+) {
+  await chatSay(scope, 'Display name', profile.displayName);
+  await chatSay(scope, 'Email', profile.email);
+  await chatSay(scope, 'Passphrase', profile.passphrase ?? TEST_PASSPHRASE);
+}
+
+/** Measurement choices and "later" for nutrition and goals, as a quick household would answer. */
+export async function chatSkipOptional(scope: ChatScope, options: { units?: boolean } = {}) {
+  if (options.units !== false) {
+    await chatPick(scope, 'US customary');
+    await chatPick(scope, 'Fahrenheit');
+  }
+  await chatPick(scope, 'Set up nutrition later');
+  await chatPick(scope, 'Skip for now');
+}
+
+/** Drives the first-run chat from the greeting to the recovery codes, then signs in. */
 export async function completeInitialOnboarding(
   page: Page,
   kitchenName: string,
@@ -45,21 +80,32 @@ export async function completeInitialOnboarding(
 ): Promise<void> {
   const email = onboardingEmail(kitchenName, displayName);
   await page.goto('/');
-  await page.getByLabel('Kitchen name').fill(kitchenName);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Display name').fill(displayName);
-  await page.getByRole('textbox', { name: /^Email\b/ }).fill(email);
-  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
+  await chatSay(page, 'Kitchen name', kitchenName);
+  await chatPick(page, 'Use this icon');
+  await chatPick(page, 'Looks good');
+  await chatIdentity(page, { displayName, email });
+  await chatSkipOptional(page);
+  await chatPick(page, /Use Example recipe/u);
+  await chatPick(page, 'That’s everyone for now');
+  await chatPick(page, 'Add Stovies & open recipe');
   await page.getByLabel('I saved these one-time codes somewhere private.').check();
   await page.getByRole('button', { name: 'Continue to sign in' }).click();
   await page.getByRole('textbox', { name: /^Email\b/ }).fill(email);
   await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
+}
+
+/** Adds a profile through the dialog chat (an admin adding someone to an existing kitchen). */
+export async function completeProfileOnboarding(
+  dialog: Locator,
+  profile: { displayName: string; email: string; role?: RegExp },
+): Promise<void> {
+  await chatIdentity(dialog, profile);
+  await chatPick(dialog, profile.role ?? /^Parent/u);
+  if (!profile.role || !/Child/u.test(profile.role.source)) await chatPick(dialog, /^Adult/u);
+  await chatSkipOptional(dialog);
+  await chatPick(dialog, 'Create profile');
+  await dialog.getByLabel('I saved these one-time codes somewhere private.').check();
+  await dialog.getByRole('button', { name: 'Finish profile setup' }).click();
 }

@@ -11,6 +11,7 @@ import { getShoppingList } from './planning-service';
 import { getSupermarketProfile, resolveShoppingAisle } from './list-settings-service';
 import { InventoryDocument, type InventoryPrintGroup } from '@/lib/pdf/kitchen-documents';
 import type { InventoryPdfExportInput } from '@/lib/domain/pdf-export';
+import { getPdfBrand } from '@/lib/pdf/brand';
 import { renderSerializedDoc } from '@formepdf/core';
 import { serialize } from '@formepdf/react';
 import { zipSync, strToU8 } from 'fflate';
@@ -104,8 +105,11 @@ async function render(
   options: PdfExportOptions,
   schedule?: MealPrintSchedule,
 ) {
+  const brand = await getPdfBrand();
   return renderSerializedDoc({
-    ...serialize(<KitchenDocument cards={cards} options={options} schedule={schedule} />),
+    ...serialize(
+      <KitchenDocument cards={cards} options={options} schedule={schedule} brand={brand} />,
+    ),
   });
 }
 async function bundle(
@@ -350,8 +354,17 @@ async function inventoryExport(
 ): Promise<KitchenExport> {
   if (groups.reduce((sum, group) => sum + group.rows.length, 0) > 2000)
     throw new PdfExportError('Print fewer than 2,000 items at a time.', 413);
+  const brand = await getPdfBrand();
   const bytes = await renderSerializedDoc({
-    ...serialize(<InventoryDocument title={title} groups={groups} options={options} note={note} />),
+    ...serialize(
+      <InventoryDocument
+        title={title}
+        groups={groups}
+        options={options}
+        note={note}
+        brand={brand}
+      />,
+    ),
   });
   return {
     bytes: options.format === 'zip' ? zipSync({ [`${exportFileStem(title)}.pdf`]: bytes }) : bytes,

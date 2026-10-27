@@ -3,6 +3,7 @@ import { usePreventRemove } from '@react-navigation/native';
 import { Linking, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { randomUUID } from 'expo-crypto';
+import { expandScannedBarcode } from '../../../shared/retail-barcode';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/auth/auth-context';
 import { useSync } from '@/sync/sync-context';
@@ -293,8 +294,13 @@ function ScannerReview() {
   };
   const onScanned = (result: BarcodeScanningResult) => {
     if (!scanLock.current) {
-      setBarcode(result.data);
-      void lookup(result.data);
+      try {
+        const barcode = expandScannedBarcode(result.data, result.type);
+        setBarcode(barcode);
+        void lookup(barcode);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Scan the barcode again.');
+      }
     }
   };
   const send = async (command: ScannerOperation) => {
@@ -627,7 +633,7 @@ function ScannerReview() {
                   setCameraState('error');
                   setMessage('Camera unavailable. Enter a barcode or retry.');
                 }}
-                barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a'] }}
+                barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
                 onBarcodeScanned={busy || !ready || cameraState !== 'ready' ? undefined : onScanned}
               />
             </View>

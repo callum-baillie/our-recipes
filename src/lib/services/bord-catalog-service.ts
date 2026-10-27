@@ -7,6 +7,7 @@ import {
   type FoodRecord,
   type ProviderStatus,
   normalizeGtin,
+  retailGtin,
 } from '@/lib/domain/food-data';
 import { BordCatalogClient } from '@/lib/providers/bord-catalog-client';
 import { normalizeCatalogUsdaFood } from '@/lib/providers/usda-food-data-provider';
@@ -218,6 +219,7 @@ export async function getCatalogFoodDetails(
 async function candidateFoods(
   candidates: Array<{ id: string; source_refs: Array<{ source_id: string; record_id: string }> }>,
   language: string,
+  expectedGtin?: string,
 ) {
   const selections = candidates
     .flatMap((candidate) =>
@@ -239,6 +241,11 @@ async function candidateFoods(
         ref.record_id,
         language,
       );
+      if (expectedGtin && result.record.canonicalGtin !== expectedGtin)
+        throw new FoodDataError(
+          'MALFORMED_RESPONSE',
+          'The catalog returned a different barcode. Review the package or try another source.',
+        );
       result.record.catalogRef!.canonical_product_id = ref.candidateId;
       result.record.providerMetadata.catalogRef = result.record.catalogRef;
       return result.record;
@@ -265,10 +272,24 @@ export async function lookupCatalogBarcode(gtin: string, language: string, compa
   const records: FoodRecord[] = [];
   const statuses: ProviderStatus[] = [];
   try {
+    const productPack = (await capabilities(client)).data.packs.products;
+    if (!productPack?.enabled || !productPack.available)
+      throw new FoodDataError(
+        !productPack?.enabled ? 'DISABLED' : 'INITIALIZING',
+        'The optional product catalog is unavailable.',
+      );
     const response = await client.resolve(normalized);
+    if (
+      response.data.length !== 1 ||
+      normalizeGtin(response.data[0]!.identifier.value).canonicalGtin !== normalized
+    )
+      throw new FoodDataError('MALFORMED_RESPONSE', 'The catalog resolved a different barcode.');
     const resolved = await candidateFoods(
-      response.data.flatMap((r) => r.candidates),
+      response.data.flatMap((r) =>
+        r.status === 'exact' || r.status === 'candidates' ? r.candidates : [],
+      ),
       language,
+      normalized,
     );
     records.push(...resolved.records);
     statuses.push(
@@ -283,7 +304,7 @@ export async function lookupCatalogBarcode(gtin: string, language: string, compa
   // This is another local catalog read, never an external-provider fallback.
   if (!records.length || compareUsda) {
     try {
-      const exact = normalized.replace(/^0+(?=\d{8,})/u, '');
+      const exact = retailGtin(normalized);
       const result = await client.usdaSearch(exact, 1, 'branded');
       const match = result.foods
         .map(normalizeCatalogUsdaFood)

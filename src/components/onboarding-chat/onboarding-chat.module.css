@@ -1,0 +1,763 @@
+/* One chat window for the whole of onboarding. Colors come from the palette tokens, so
+   every theme and dark mode is covered without per-theme overrides. */
+
+.shell {
+  --chat-radius: 1.25rem;
+  --bubble-radius: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: var(--chat-radius);
+  box-shadow: 0 24px 60px -28px rgb(36 31 22 / 38%);
+}
+
+/* Header ---------------------------------------------------------------- */
+
+.header {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.2rem 0.85rem;
+  align-items: center;
+  padding: 0.95rem 1.15rem 1.1rem;
+  background: var(--linen);
+  border-bottom: 1px solid var(--line);
+}
+.headerMark {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--on-primary);
+  background: var(--primary);
+  border-radius: 0.8rem;
+}
+.headerCopy {
+  min-width: 0;
+}
+.headerCopy :global(.eyebrow) {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+.headerCopy h2 {
+  margin: 0.1rem 0 0;
+  font-size: 1.12rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.progress {
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 3px;
+  overflow: hidden;
+  background: transparent;
+}
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 0 3px 3px 0;
+  transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Transcript ------------------------------------------------------------- */
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.15rem 1.15rem 0.6rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.list:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  max-width: 100%;
+  animation: chat-in 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.row.user {
+  justify-content: flex-end;
+}
+.botMark {
+  display: grid;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 0.15rem;
+  color: var(--on-primary);
+  background: var(--primary);
+  border-radius: 50%;
+}
+/* Consecutive assistant messages share one avatar. */
+.row.bot + .row.bot > .botMark {
+  visibility: hidden;
+}
+
+.bubble {
+  margin: 0;
+  max-width: min(36rem, 84%);
+  padding: 0.62rem 0.9rem;
+  font-size: 0.97rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.bot .bubble {
+  color: var(--ink);
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.3rem var(--bubble-radius) var(--bubble-radius) var(--bubble-radius);
+}
+.user .bubble {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-radius: var(--bubble-radius) 0.3rem var(--bubble-radius) var(--bubble-radius);
+}
+.bubble.muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-style: italic;
+}
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.5rem;
+}
+.typing em {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.dots {
+  display: inline-flex;
+  gap: 0.28rem;
+}
+.dots i {
+  width: 0.42rem;
+  height: 0.42rem;
+  background: var(--muted);
+  border-radius: 50%;
+  animation: chat-dot 1.1s ease-in-out infinite;
+}
+.dots i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.dots i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+/* Composer --------------------------------------------------------------- */
+
+.composer {
+  flex: 0 0 auto;
+  max-height: min(58%, 28rem);
+  padding: 0.8rem 1.15rem 1.05rem;
+  overflow-y: auto;
+  background: var(--linen);
+  border-top: 1px solid var(--line);
+  animation: chat-composer 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.composerForm,
+.choiceBlock,
+.finish {
+  display: grid;
+  gap: 0.6rem;
+}
+.waiting {
+  min-height: 3rem;
+  margin: 0;
+}
+.undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-self: start;
+  margin: 0 0 0.55rem;
+  padding: 0.15rem 0.1rem;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+.undo:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.inputRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.9rem;
+  padding: 0.7rem 0.95rem;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  border-radius: 1.45rem;
+  resize: none;
+}
+textarea.input {
+  border-radius: 1.2rem;
+  max-height: 9rem;
+  field-sizing: content;
+  min-height: 2.9rem;
+}
+.input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+.send,
+.iconButton {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.9rem;
+  height: 2.9rem;
+  color: var(--on-primary);
+  background: var(--primary);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 140ms ease,
+    box-shadow 220ms ease;
+}
+.send:hover {
+  box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--primary) 70%, transparent);
+  transform: translateY(-1px);
+}
+.send:active,
+.iconButton:active {
+  transform: scale(0.94);
+}
+.iconButton {
+  color: var(--ink);
+  background: var(--paper-deep);
+}
+.iconButton:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.iconButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.grow {
+  flex: 1 1 auto;
+}
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.9rem;
+  padding: 0.6rem 1.35rem;
+  color: var(--on-primary);
+  font: inherit;
+  font-size: 0.97rem;
+  font-weight: 650;
+  background: var(--primary);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease;
+}
+.cta:hover:not(:disabled) {
+  background: var(--primary-strong);
+  box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--primary) 80%, transparent);
+  transform: translateY(-1px);
+}
+.cta:active:not(:disabled) {
+  box-shadow: none;
+  transform: scale(0.98);
+}
+.cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cta[aria-busy='true']:disabled {
+  opacity: 0.85;
+}
+.doneButton {
+  flex: 0 0 auto;
+}
+.skip {
+  justify-self: start;
+  padding: 0.1rem 0.15rem;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.skip:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.fieldHint,
+.fieldError {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.fieldHint {
+  color: var(--muted);
+}
+.fieldError {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Choices ---------------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 1rem;
+  color: var(--primary);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+  background: var(--field);
+  border: 1.5px solid color-mix(in srgb, var(--primary) 55%, var(--line));
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.chip:hover:not(:disabled) {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.chip.on {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.cards,
+.multiGrid {
+  display: grid;
+  gap: 0.5rem;
+}
+.multiGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.optionCard {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  background: var(--field);
+  border: 1.5px solid var(--line);
+  border-radius: 0.95rem;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease;
+}
+.optionCard:hover:not(:disabled) {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.optionCard:active:not(:disabled) {
+  transform: scale(0.99);
+}
+.optionCard:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.optionCard.on {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+.optionCard.on svg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--primary);
+}
+.optionIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: 0.65rem;
+}
+.optionCopy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.optionCopy strong {
+  font-size: 0.97rem;
+  line-height: 1.3;
+}
+.optionCopy small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.optionScroll {
+  max-height: min(15.5rem, 32vh);
+  padding: 0.15rem;
+  margin: -0.15rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 0.18rem;
+  background: var(--paper-deep);
+  border-radius: 999px;
+}
+.segmented button {
+  padding: 0.35rem 0.9rem;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+.segmented button[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--linen);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 14%);
+}
+.unitField {
+  display: flex;
+  flex: 1 1 6rem;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Widgets ----------------------------------------------------------------- */
+
+.widget {
+  display: grid;
+  gap: 0.75rem;
+}
+.widgetScroll {
+  max-height: 15rem;
+  padding-right: 0.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--field);
+}
+.widgetScroll :global(.brand-icon-fieldset) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.widgetForm {
+  display: grid;
+  gap: 0.65rem;
+}
+.widgetTitle {
+  margin: 0;
+  font-weight: 700;
+}
+.widgetField {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.widgetField small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.widgetField .input {
+  border-radius: 0.8rem;
+}
+.widgetActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+/* Review + recovery ------------------------------------------------------ */
+
+.review,
+.codes {
+  width: min(100%, 36rem);
+  padding: 0.9rem 1rem;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.3rem var(--bubble-radius) var(--bubble-radius) var(--bubble-radius);
+}
+.reviewList {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+}
+.profileReview {
+  display: grid;
+  gap: 0.15rem;
+}
+.reviewRow {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.reviewRow dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 0.2rem;
+}
+.reviewRow dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.93rem;
+}
+.reviewKitchen,
+.reviewProfile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.reviewKitchen small,
+.reviewProfile small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.reviewProfile > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reviewActions {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+.avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: #fff;
+  font-weight: 700;
+  border-radius: 50%;
+}
+.reviewNote {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.7rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.reviewNote svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.codes {
+  display: grid;
+  gap: 0.6rem;
+  font-size: 0.93rem;
+}
+.codes p {
+  margin: 0;
+}
+.codesHeading {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.codes h4 {
+  margin: 0.4rem 0 0.25rem;
+  font-size: 0.95rem;
+}
+.codes ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.35rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.codes code {
+  display: block;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.85rem;
+  background: var(--paper-deep);
+  border-radius: 0.5rem;
+}
+
+/* Motion ------------------------------------------------------------------ */
+
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@keyframes chat-composer {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes chat-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-0.22rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .composer {
+    animation: none;
+  }
+  .dots i {
+    animation: none;
+    opacity: 0.7;
+  }
+  .progress span {
+    transition: none;
+  }
+}
+
+/* Small screens ------------------------------------------------------------ */
+
+@media (max-width: 640px) {
+  .shell {
+    --chat-radius: 0;
+    border-width: 0;
+    box-shadow: none;
+  }
+  .header {
+    padding: 0.8rem 0.95rem 0.95rem;
+  }
+  .list {
+    padding: 0.95rem 0.8rem 0.5rem;
+  }
+  .composer {
+    padding: 0.7rem 0.8rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+  }
+  .bubble {
+    max-width: 90%;
+  }
+  .multiGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reviewRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+}
+
+/* Inside the add-profile dialog the chat fills the dialog and clears its close button. */
+:global(.profile-onboarding-dialog) .shell {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+:global(.profile-onboarding-dialog) .header {
+  padding-right: 4.5rem;
+}

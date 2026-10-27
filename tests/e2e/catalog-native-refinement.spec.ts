@@ -43,7 +43,7 @@ const food = {
 
 async function signIn(page: import('@playwright/test').Page) {
   await page.goto('/');
-  if (await page.getByLabel('Kitchen name').count()) {
+  if ((await page.request.get('/api/v1/exports/recipes')).status() === 503) {
     await completeInitialOnboarding(page, 'Workflow refinement fixture', 'Maya');
     return;
   }

@@ -101,30 +101,36 @@ export default async function RecipeDetailPage({
         <a className="jump-to-recipe" href="#recipe">
           Jump to ingredients and method ↓
         </a>
-        <RecipeImageGallery
-          key={`${principal?.userId}:${actor.profileId}:${recipe.id}:${imageCandidate ?? ''}`}
-          recipeId={recipe.id}
-          recipeTitle={recipe.title}
-          revision={recipe.currentRevision}
-          profileId={actor.profileId ?? 'none'}
-          accountId={principal?.userId ?? 'signed-out'}
-          initialCandidateId={imageCandidate}
-          imagePolicy={{
-            enabled: imagePolicy.enabled,
-            model: imagePolicy.model,
-            quality: imagePolicy.imageQuality ?? 'low',
-            size: imagePolicy.imageSize ?? '1024x1024',
-            allowOverrides: imagePolicy.allowPersonalImageOverrides ?? false,
-          }}
-          images={recipe.images.map(({ id, altText, width, height }) => ({
-            id,
-            altText,
-            width,
-            height,
-          }))}
-        />
-        <RecipeNormalizedNutrition recipeId={recipe.id} nutrition={normalizedNutrition} />
         <RecipeServingDetails
+          hero={
+            <>
+              <RecipeImageGallery
+                key={`${principal?.userId}:${actor.profileId}:${recipe.id}:${imageCandidate ?? ''}`}
+                recipeId={recipe.id}
+                recipeTitle={recipe.title}
+                revision={recipe.currentRevision}
+                profileId={actor.profileId ?? 'none'}
+                accountId={principal?.userId ?? 'signed-out'}
+                initialCandidateId={imageCandidate}
+                imagePolicy={{
+                  enabled: imagePolicy.enabled,
+                  model: imagePolicy.model,
+                  quality: imagePolicy.imageQuality ?? 'low',
+                  size: imagePolicy.imageSize ?? '1024x1024',
+                  allowOverrides: imagePolicy.allowPersonalImageOverrides ?? false,
+                }}
+                images={recipe.images.map(({ id, altText, width, height }) => ({
+                  id,
+                  altText,
+                  width,
+                  height,
+                }))}
+              />
+            </>
+          }
+          nutritionPanels={
+            <RecipeNormalizedNutrition recipeId={recipe.id} nutrition={normalizedNutrition} />
+          }
           preparation={
             <>
               <RecipeKitchenCheck recipe={recipe} />

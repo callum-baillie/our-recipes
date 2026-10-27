@@ -10,7 +10,7 @@ import { AppDialog } from './app-dialog';
 
 import { RegionalChoice } from './regional-choice';
 import { kitchenInterviewQuestions, emptyKitchenInterview } from './kitchen-interview';
-import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { OnboardingChat } from '@/components/onboarding-chat/onboarding-chat';
 import {
   SettingsActionBar,
   SettingsPane,
@@ -410,12 +410,11 @@ function ProfileOnboardingDialog({
       >
         <X size={20} aria-hidden="true" />
       </button>
-      <OnboardingWizard
+      <OnboardingChat
         aiEnabled={aiEnabled}
         mode="profile"
         onDismissStateChange={setDismissal}
         onCommitted={onProfileCreated}
-        onCancel={closeDialog}
         onProfileCreated={() => {
           onProfileCreated();
           onClose();

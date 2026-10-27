@@ -73,6 +73,16 @@ function isPublicAuthPath(pathname: string): boolean {
   );
 }
 
+/** Pages that only make sense once a kitchen (and so at least one account) exists. */
+function isAccountPage(pathname: string): boolean {
+  return (
+    pathname === '/sign-in' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname === '/verify-email'
+  );
+}
+
 function isPublicOperationalPath(pathname: string): boolean {
   return (
     pathname === '/offline' ||
@@ -103,10 +113,13 @@ export async function proxy(request: NextRequest) {
   const configured = isAuthenticationConfigured();
   if (!configured) {
     const householdExists = Boolean(getHouseholdState().household);
+    // With no kitchen yet there is nothing to sign in to: every page leads to first-run setup.
+    if (!householdExists && isAccountPage(pathname)) return redirectTo(request, '/');
     const setupAllowed =
       isPublicAuthPath(pathname) ||
       pathname === '/api/v1/setup' ||
-      (!householdExists && pathname === '/api/v1/setup/vesync') ||
+      (!householdExists &&
+        (pathname === '/api/v1/setup/vesync' || pathname === '/api/v1/setup/interview')) ||
       (!householdExists && pathname === '/') ||
       (householdExists && (pathname === '/security-upgrade' || pathname === '/api/v1/auth/enroll'));
     if (setupAllowed) return migrateLegacyCookies(request, continueRequest(request));

@@ -76,7 +76,7 @@ function applyAppearance(palette: PaletteId, mode: ColorMode) {
   window.dispatchEvent(new Event(APPEARANCE_EVENT));
 }
 
-function AppearanceChoices({
+export function AppearanceChoices({
   compact = false,
   section,
 }: {

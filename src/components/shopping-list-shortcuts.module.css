@@ -9,7 +9,7 @@
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 0.6rem;
+  border-radius: var(--btn-radius, 0.6rem);
   padding: 0.65rem;
   min-height: 44px;
 }
@@ -47,7 +47,7 @@
   border: 1px solid var(--line);
   background: var(--field);
   color: var(--ink);
-  border-radius: 0.7rem;
+  border-radius: var(--btn-radius, 0.6rem);
   padding: 0.7rem;
   min-height: 44px;
 }
@@ -71,7 +71,7 @@
   background: var(--leaf);
   color: var(--on-primary);
   border: 0;
-  border-radius: 0.6rem;
+  border-radius: var(--btn-radius, 0.6rem);
   min-height: 44px;
 }
 @media (max-width: 600px) {

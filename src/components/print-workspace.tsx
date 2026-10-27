@@ -686,7 +686,13 @@ export function PrintWorkspace({
             <h2>Prepared document</h2>
             <a href="#print-options">Back to options</a>
           </header>
-          <p role="status">
+          <p
+            role="status"
+            className={styles.status}
+            data-state={
+              operation?.format === 'pdf' ? 'busy' : preview ? (stale ? 'stale' : 'ready') : 'idle'
+            }
+          >
             {operation?.format === 'pdf'
               ? `Preparing PDF · ${operation.identity}`
               : preview

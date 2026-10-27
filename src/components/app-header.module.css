@@ -111,18 +111,19 @@
 .desktopNavigation.desktopNavigation {
   flex: 1 1 20rem;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-start;
-  gap: clamp(0.35rem, 1vw, 0.8rem);
+  gap: clamp(0.1rem, 0.6vw, 0.6rem);
 }
 
 .desktopNavigation.desktopNavigation > a {
   min-height: 2.75rem;
-  padding: 0 1rem;
+  padding: 0 clamp(0.6rem, 1vw, 1rem);
   color: var(--ink);
   border-radius: 999px;
   font-size: 0.94rem;
   font-weight: 650;
+  white-space: nowrap;
   transition:
     color 0.16s ease,
     background-color 0.16s ease;
@@ -320,6 +321,22 @@
 
 .header.header :global(.profile-menu) {
   z-index: 30;
+}
+
+/* Between the mobile switch and a roomy laptop, trade labels for room so the nav never wraps. */
+@media (min-width: 1121px) and (max-width: 1259px) {
+  .header.header {
+    gap: 0.9rem;
+  }
+
+  .createMenu > summary {
+    min-width: 0;
+  }
+
+  .header.header :global(.profile-switcher) :global(.profile-name),
+  .controlDivider.controlDivider {
+    display: none;
+  }
 }
 
 @media (max-width: 1120px) {

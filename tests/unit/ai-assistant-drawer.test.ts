@@ -148,6 +148,11 @@ describe('AI assistant drawer', () => {
     );
     render(createElement(AiAssistantDrawer, { open: true, onClose: vi.fn() }));
     const link = await screen.findByRole('link', { name: 'Review saved recipe' });
+    // jsdom has no layout. Model a visible control so deferred modal focus respects it,
+    // including when worker load delays the opening animation frame until after this click.
+    vi.spyOn(link, 'getClientRects').mockReturnValue([
+      new DOMRect(0, 0, 120, 24),
+    ] as unknown as DOMRectList);
     const list = screen.getByRole('log', { name: 'Conversation' });
     Object.defineProperties(list, {
       scrollHeight: { configurable: true, value: 1200 },

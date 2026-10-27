@@ -2,6 +2,16 @@
   max-width: 68rem;
   margin-inline: auto;
 }
+.workspace > header {
+  margin-top: var(--workspace-top-space);
+}
+.navigation {
+  margin: 0;
+}
+.navigation a {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .workspace label {
   display: grid;
   gap: 0.4rem;

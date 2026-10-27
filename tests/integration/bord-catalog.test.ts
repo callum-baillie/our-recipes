@@ -746,6 +746,55 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     expect(getDatabase().select().from(foodProviderRateLimits).all()).toHaveLength(0);
     expect(getDatabase().select().from(pantryBatches).all()).toHaveLength(0);
   });
+  it('skips disabled product resolution while preserving exact local USDA barcode matches', async () => {
+    fixture.state.productsDisabled = true;
+    fixture.state.barcodeMatch = true;
+    const result = await lookupFoodByBarcode('04006381333931', 'en');
+    expect(result.preferred).toMatchObject({
+      provider: 'usda_fdc',
+      canonicalGtin: '04006381333931',
+      catalogRef: { source_revision: 'revision_1' },
+    });
+    expect(result.providerStatuses).toContainEqual(
+      expect.objectContaining({ provider: 'open_food_facts', status: 'disabled' }),
+    );
+    expect(fixture.calls.some((call) => call.path.startsWith('/v1/products/resolve'))).toBe(false);
+    expect(getDatabase().select().from(foodProviderRateLimits).all()).toHaveLength(0);
+  });
+  it('rejects a resolver response for a different scanned GTIN', async () => {
+    const result = await lookupFoodByBarcode('00036000291452', 'en');
+    expect(result.preferred).toBeNull();
+    expect(result.alternatives).toEqual([]);
+    expect(result.providerStatuses).toContainEqual(
+      expect.objectContaining({
+        provider: 'open_food_facts',
+        status: 'invalid_response',
+      }),
+    );
+    expect(fixture.calls.some((call) => call.path.startsWith('/v1/foods/open_food_facts/'))).toBe(
+      false,
+    );
+  });
+  it('rejects source details that no longer match the resolved barcode and tries local USDA', async () => {
+    fixture.state.barcodeMatch = true;
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      const response = await originalFetch(input, init);
+      if (!String(input).includes('/v1/products/resolve')) return response;
+      const body = await response.json();
+      body.data[0].identifier.value = '00036000291452';
+      return Response.json(body);
+    });
+    const result = await lookupFoodByBarcode('00036000291452', 'en');
+    expect(result.preferred).toBeNull();
+    expect(result.providerStatuses).toContainEqual(
+      expect.objectContaining({
+        provider: 'open_food_facts',
+        status: 'invalid_response',
+      }),
+    );
+    expect(fixture.calls.some((call) => call.path.startsWith('/fdc/v1/foods/search'))).toBe(true);
+  });
   it('isolates config, generation and normalizer caches and polls generation after five minutes', async () => {
     const now = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);

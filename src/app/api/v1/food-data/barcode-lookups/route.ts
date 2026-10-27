@@ -16,8 +16,14 @@ export async function POST(request: Request) {
       input.language,
       input.compareUsda,
     );
-    if (!result.preferred && !result.localProduct)
+    if (!result.preferred && !result.localProduct) {
+      if (!result.providerStatuses.some((provider) => provider.status === 'available'))
+        throw new FoodDataError(
+          'UNAVAILABLE',
+          'Food lookup is currently unavailable. Check food-data settings or enter the product manually.',
+        );
       throw new FoodDataError('NOT_FOUND', 'No exact product was found for that barcode.');
+    }
     return withApiRequestId(foodDataJson(result), access.requestId);
   } catch (error) {
     return withApiRequestId(foodDataApiError(error), access.requestId);

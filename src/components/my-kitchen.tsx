@@ -17,6 +17,7 @@ import {
   type KitchenState,
 } from '@/lib/domain/kitchen';
 import { KITCHEN_CATALOG, equipmentTemplate } from '@/lib/domain/kitchen-catalog';
+import { createClientUuid } from '@/lib/client/client-uuid';
 import { SettingsPageHeader } from './settings-page-header';
 import styles from './my-kitchen.module.css';
 
@@ -159,7 +160,7 @@ export function MyKitchen({
     if (confirm && kitchen.canManage) {
       const result = await send({
         kind: 'coverage',
-        operationId: crypto.randomUUID(),
+        operationId: createClientUuid(),
         expectedRevision: kitchen.revision,
         coverage: 'confirmed',
       });
@@ -249,7 +250,7 @@ export function MyKitchen({
     const command =
       retry.current?.fingerprint === fingerprint
         ? retry.current.command
-        : { ...details, operationId: crypto.randomUUID() };
+        : { ...details, operationId: createClientUuid() };
     retry.current = { fingerprint, command };
     sessionStorage.setItem(
       storageKey,
@@ -295,14 +296,10 @@ export function MyKitchen({
           onFinish={finishSetup}
         />
       ) : (
-        <p>
+        <nav className={`kitchen-quick-views ${styles.navigation}`} aria-label="My Kitchen tools">
           <Link href="/my-kitchen/setup">Optional guided setup · skip and resume any time</Link>
-        </p>
-      )}
-      {!guided && (
-        <p>
           <Link href="/my-kitchen/plan">Check a complete meal against My Kitchen</Link>
-        </p>
+        </nav>
       )}
       <div hidden={guided && setupStep !== 1}>
         <section className="settings-card">
@@ -331,7 +328,7 @@ export function MyKitchen({
                     kind: 'coverage',
                     coverage: 'confirmed',
                     expectedRevision: kitchen.revision,
-                    operationId: crypto.randomUUID(),
+                    operationId: createClientUuid(),
                   })
                 }
               >

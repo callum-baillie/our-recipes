@@ -12,15 +12,15 @@ import { defaultPrimitives } from './primitives';
  */
 export const professionalTheme: PdfcnTheme = {
   colors: {
-    accent: '#536b3d',
+    accent: '#4a6b3c',
     background: '#ffffff',
-    border: '#e4e4e7',
+    border: '#dfe5d6',
     destructive: '#dc2626',
     foreground: '#26372b',
     info: '#0ea5e9',
-    muted: '#f4f4f5',
-    mutedForeground: '#71717a',
-    primary: '#26372b',
+    muted: '#f2f5ee',
+    mutedForeground: '#5f6b58',
+    primary: '#4a6b3c',
     primaryForeground: '#ffffff',
     success: '#16a34a',
     warning: '#d97706',

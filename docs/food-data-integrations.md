@@ -10,6 +10,14 @@ Bòrd has a provider-neutral, read-only food-data layer for reviewed Pantry, rec
 
 Provider responses are validated and normalized before caching or presentation. Missing nutrients stay missing, zero stays zero, original nutrient identifiers and units are retained, and records are grouped only by a checksum-valid canonical GTIN. Provider records are not averaged or merged by name.
 
+### Barcode and own-label coverage
+
+UPC-A, EAN-8, EAN-13 and GTIN-14 share checksum-validated identity handling. Web and native cameras expand explicitly detected UPC-E codes to UPC-A before lookup; a manually entered eight-digit code is treated as EAN-8, so use the expanded UPC-A for manual UPC-E entry. Hosted USDA searches equivalent zero-padded representations in one request, then accepts only an exact canonical GTIN match. Local USDA mirrors retain their numeric exact-match query. Provider responses for a different barcode are rejected.
+
+Branded and supermarket own-label products, including Aldi, Great Value and other store brands, use the same lookup and review flow without a brand allowlist. This does **not** guarantee every UPC: USDA submissions are voluntary, Open Food Facts coverage varies, and a native catalog only exposes its published records. Missing products can be entered manually. A directory listing or product match does not establish stock at a selected branch. See [USDA branded-food documentation](https://fdc.nal.usda.gov/GBFPD_Documentation/) for source coverage.
+
+When no source can complete a barcode lookup, the API reports unavailability rather than presenting an outage as a confirmed missing product. Existing saved local products remain usable.
+
 ## Native catalog and store directory
 
 For source revisions, catalog-only mode and official branch linking, use the [native Bòrd Food API integration](bord-catalog-integration.md). Its settings remain server-only; existing USDA mirror configuration remains supported in direct mode.

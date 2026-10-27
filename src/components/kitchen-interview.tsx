@@ -10,53 +10,18 @@ const InterviewChat = dynamic(
 import { useRouter } from 'next/navigation';
 import type { Profile } from './profile-settings';
 import { SettingsPane } from './settings-primitives';
-import type { ProfileGoalContext } from '@/lib/domain/profile-goals';
 import { InlineAlert } from './inline-alert';
 import { ButtonSpinner } from './skeleton';
 import { AssistantLoadingSurface } from './assistant-loading-surface';
+import {
+  emptyKitchenInterview,
+  kitchenInterviewQuestions,
+  kitchenInterviewSuggestions,
+  type KitchenInterviewAnswers,
+} from '@/lib/domain/kitchen-interview-questions';
 
-type Answers = NonNullable<ProfileGoalContext['kitchenInterview']>;
-export const emptyKitchenInterview: Answers = {
-  taste: '',
-  snacks: '',
-  desserts: '',
-  routine: '',
-  favorites: '',
-  avoid: '',
-};
-export const kitchenInterviewQuestions: Array<{ key: keyof Answers; title: string; help: string }> =
-  [
-    {
-      key: 'taste',
-      title: 'Do you lean sweet, savory, or a little of both?',
-      help: 'Tell us about flavors you love. A sweet tooth is a preference, not a rule for every meal.',
-    },
-    {
-      key: 'snacks',
-      title: 'What do you like to snack on?',
-      help: 'Do you snack during the day, at night, or both? Fruit, yogurt, crackers, something else?',
-    },
-    {
-      key: 'desserts',
-      title: 'Do you usually have dessert?',
-      help: 'How often? Ice cream, cheesecake, pie, candy, or something else? It is fine to skip dessert.',
-    },
-    {
-      key: 'routine',
-      title: 'Which meals do you share with your household?',
-      help: 'Perhaps everyone shares dinner but has their own breakfast or lunch. Include cooking time, equipment, budget and routine preferences.',
-    },
-    {
-      key: 'favorites',
-      title: 'What meals would you happily eat again?',
-      help: 'Favorite cuisines, ingredients, comfort foods, and things you would like to try.',
-    },
-    {
-      key: 'avoid',
-      title: 'What should your assistant keep in mind?',
-      help: 'Foods you dislike, textures, or practical needs. Record allergies in your nutrition profile too; they always take priority.',
-    },
-  ];
+type Answers = KitchenInterviewAnswers;
+export { emptyKitchenInterview, kitchenInterviewQuestions };
 export function KitchenInterview({
   profile,
   aiEnabled = false,
@@ -293,14 +258,7 @@ export function KitchenInterview({
                 </p>
               )}
               <div className="button-row" aria-label="Optional answer suggestions">
-                {{
-                  taste: ['Mostly savory', 'A little of both', 'Sweet flavors'],
-                  snacks: ['Fruit or yogurt', 'Savory snacks', 'I rarely snack'],
-                  desserts: ['Occasionally', 'Most evenings', 'I usually skip dessert'],
-                  routine: ['Shared dinners', 'Quick weekday meals', 'Flexible routines'],
-                  favorites: ['Comfort food', 'Simple seasonal meals', 'Trying new cuisines'],
-                  avoid: ['Short cooking time', 'A modest budget', 'Texture preferences'],
-                }[question.key].map((suggestion) => (
+                {kitchenInterviewSuggestions[question.key].map((suggestion) => (
                   <button
                     type="button"
                     className="secondary-button compact"

@@ -4,6 +4,7 @@ import { ZXING_WASM_SHA256 } from 'barcode-detector/ponyfill';
 import { Camera, CameraOff, Flashlight, FlashlightOff } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useZxing } from 'react-zxing';
+import { expandScannedBarcode } from '../../shared/retail-barcode';
 
 import styles from '@/components/food-catalog-picker.module.css';
 
@@ -110,10 +111,18 @@ function ActiveBarcodeScanner({
     constraints: { video: { facingMode: { ideal: 'environment' } }, audio: false },
     onDecodeResult(result) {
       if (paused || disabled || performance.now() - lastAccepted.current < 1500) return;
+      let barcode: string;
+      try {
+        barcode = expandScannedBarcode(result.rawValue, result.format);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Scan the barcode again.');
+        return;
+      }
+      setError('');
       lastAccepted.current = performance.now();
       if (!rapid) setPaused(true);
       navigator.vibrate?.(80);
-      onDetected(result.rawValue);
+      onDetected(barcode);
     },
     onError(value) {
       const name = typeof value === 'object' && value !== null && 'name' in value ? value.name : '';

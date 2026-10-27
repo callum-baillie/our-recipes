@@ -2,31 +2,44 @@ import { appAxe as axe } from './helpers/accessibility';
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
 
-import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
+import {
+  chatPick,
+  chatSay,
+  completeProfileOnboarding,
+  onboardingEmail,
+  TEST_PASSPHRASE,
+  chatIdentity,
+  chatSkipOptional,
+} from './helpers/onboarding';
 
 test('first-run setup and household organization have no automatically detectable accessibility violations', async ({
   page,
 }, testInfo) => {
   testInfo.setTimeout(180_000);
+  // Entrance animations are decorative; axe must measure settled colors, not mid-fade ones.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByLabel('Kitchen name')).toBeVisible();
   const setupResults = await axe(page).analyze();
   expect(setupResults.violations).toEqual([]);
 
-  await page.getByLabel('Kitchen name').fill('The Garden Table');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Display name').fill('Callum');
-  await page
-    .getByRole('textbox', { name: /^Email\b/ })
-    .fill(onboardingEmail('The Garden Table', 'Callum'));
-  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
+  await chatSay(page, 'Kitchen name', 'The Garden Table');
+  await expect(page.getByRole('button', { name: 'Use this icon' })).toBeVisible();
+  const iconResults = await axe(page).analyze();
+  expect(iconResults.violations).toEqual([]);
+  await chatPick(page, 'Use this icon');
+  await chatPick(page, 'Looks good');
+  await chatIdentity(page, {
+    displayName: 'Callum',
+    email: onboardingEmail('The Garden Table', 'Callum'),
+  });
+  await chatSkipOptional(page);
+  await chatPick(page, /Use Example recipe/u);
+  await chatPick(page, 'That’s everyone for now');
+  const reviewResults = await axe(page).analyze();
+  expect(reviewResults.violations).toEqual([]);
+  await chatPick(page, 'Add Stovies & open recipe');
   await page.getByLabel('I saved these one-time codes somewhere private.').check();
   await page.getByRole('button', { name: 'Continue to sign in' }).click();
   await page
@@ -45,15 +58,10 @@ test('first-run setup and household organization have no automatically detectabl
   await expect(profileOnboarding).toBeVisible();
   const profileOnboardingResults = await axe(page).include('#profile-onboarding-dialog').analyze();
   expect(profileOnboardingResults.violations).toEqual([]);
-  await profileOnboarding.getByLabel('Display name').fill('Jon');
-  await profileOnboarding.getByRole('textbox', { name: /^Email\b/ }).fill('jon-a11y@example.test');
-  await profileOnboarding.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
-  await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();
-  await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
+  await completeProfileOnboarding(profileOnboarding, {
+    displayName: 'Jon',
+    email: 'jon-a11y@example.test',
+  });
 
   await page.goto('/recipes/new');
   await page.locator('.editor-optional').evaluateAll((nodes) =>

@@ -1,6 +1,7 @@
 import { DialogViewport } from '@/components/dialog-viewport';
 import type { Metadata, Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import Script from 'next/script';
 
 import { ACTIVE_PROFILE_COOKIE, getActorContext } from '@/lib/actor-context';
@@ -27,6 +28,8 @@ import './themes.css';
 import './refinements.css';
 import './settings-layout.css';
 import './auth-pages.css';
+import './ui-polish.css';
+import './recipe-detail.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,6 +127,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     '/reset-password',
     '/security-upgrade',
   ].includes(pathname);
+  // Defence in depth for the proxy: with no kitchen there is no account to sign in to.
+  if (!state.household && isSecuritySurface) redirect('/');
   const usesNormalPageShell =
     !isSecuritySurface &&
     pathname !== '/print' &&

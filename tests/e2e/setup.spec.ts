@@ -3,7 +3,13 @@ import sharp from 'sharp';
 
 import packageJson from '../../package.json';
 import { HEIC_FIXTURES } from './fixtures/heic-fixtures';
-import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
+import {
+  chatIdentity,
+  chatPick,
+  chatSay,
+  onboardingEmail,
+  TEST_PASSPHRASE,
+} from './helpers/onboarding';
 
 test('a fresh install exposes only setup and operational APIs', async ({ page }) => {
   await page.goto('/');
@@ -31,35 +37,30 @@ test('onboarding calculates a gradual target timeline only from entered measurem
 }) => {
   test.setTimeout(60_000);
   await page.goto('/');
-  await page.getByLabel('Kitchen name').fill('The Timeline Table');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Display name').fill('Maya');
-  await page
-    .getByRole('textbox', { name: /^Email\b/ })
-    .fill(onboardingEmail('The Timeline Table', 'Maya'));
-  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Enter my details manually' }).click();
-  await page.getByLabel('When were you born?').fill('1990-01-01');
-  await page.getByRole('button', { name: 'Female reference', exact: true }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Pounds', exact: true }).click();
-  await page.getByRole('button', { name: 'Feet & inches', exact: true }).click();
+  await chatSay(page, 'Kitchen name', 'The Timeline Table');
+  await chatPick(page, 'Use this icon');
+  await chatPick(page, 'Looks good');
+  await chatIdentity(page, {
+    displayName: 'Maya',
+    email: onboardingEmail('The Timeline Table', 'Maya'),
+  });
+  await chatPick(page, 'US customary');
+  await chatPick(page, 'Fahrenheit');
+  await chatPick(page, 'Enter my details manually');
+  await chatSay(page, 'Birthday', '1990-01-01');
+  await chatPick(page, 'Female reference');
   await page.getByLabel('Feet', { exact: true }).fill('5');
-  await page.getByLabel('Inches', { exact: true }).fill('8');
-  await page.getByLabel('Current weight').fill('200');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('radio', { name: /Lightly active/u }).check();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('radio', { name: /Lose weight/u }).check();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Target weight').fill('180');
-  await page.getByRole('radio', { name: /Moderate/u }).check();
-  await expect(page.getByText('Approximately 19 weeks')).toBeVisible();
-  await page.getByRole('button', { name: /as a review date/u }).click();
-  await expect(page.getByLabel('Target date')).not.toHaveValue('');
+  await chatSay(page, 'Inches', '8');
+  await chatSay(page, 'Current weight', '200');
+  await chatPick(page, /Lightly active/u);
+  await chatPick(page, 'No / prefer not to say');
+  await chatPick(page, /Lose weight/u);
+  await chatSay(page, 'Target weight', '180');
+  await chatPick(page, /Moderate/u);
+  await expect(page.getByText(/Approximately 19 weeks/u)).toBeVisible();
   await expect(page.getByText(/not a promised completion date/u)).toBeVisible();
+  await chatPick(page, /as a review date/u);
+  await expect(page.getByText(/^Use .* as a review date$/u).last()).toBeVisible();
 });
 
 test('a fresh household can complete the supported local release acceptance workflow', async ({
@@ -69,30 +70,44 @@ test('a fresh household can complete the supported local release acceptance work
   // longer than Playwright's default in a fresh Linux CI environment.
   testInfo.setTimeout(720_000);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Name your kitchen.' })).toBeVisible();
-  await page.getByLabel('Kitchen name').fill('The Garden Table');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Display name').fill('Callum');
-  await page
-    .getByRole('textbox', { name: /^Email\b/ })
-    .fill(onboardingEmail('The Garden Table', 'Callum'));
-  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await page.getByRole('checkbox', { name: /Feel organized at mealtime/u }).click();
-  await page
-    .getByLabel(/Why does this matter to you right now/u)
-    .fill('Plan calmer weekday meals and learn new recipes.');
-  await page
-    .getByLabel(/What tends to get in the way/u)
-    .fill('Busy evenings make last-minute decisions stressful.');
-  await page
-    .getByLabel(/Imagine this is working well/u)
-    .fill('Weeknight meals feel calm and planned.');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
+  await expect(
+    page.getByText('Bòrd is Scottish Gaelic for “table”', { exact: false }),
+  ).toBeVisible();
+  await chatSay(page, 'Kitchen name', 'The Garden Table');
+  await chatPick(page, 'Use this icon');
+  await chatPick(page, 'Looks good');
+  await chatIdentity(page, {
+    displayName: 'Callum',
+    email: onboardingEmail('The Garden Table', 'Callum'),
+  });
+  await chatPick(page, 'US customary');
+  await chatPick(page, 'Fahrenheit');
+  await chatPick(page, 'Set up nutrition later');
+  await chatPick(page, 'Let’s chat');
+  await chatPick(page, 'Feel organized at mealtime');
+  await chatPick(page, 'Done');
+  await chatSay(
+    page,
+    'Why does this matter to you right now?',
+    'Plan calmer weekday meals and learn new recipes.',
+  );
+  await chatSay(
+    page,
+    'What tends to get in the way?',
+    'Busy evenings make last-minute decisions stressful.',
+  );
+  await chatSay(
+    page,
+    'Imagine this is working well. What feels different?',
+    'Weeknight meals feel calm and planned.',
+  );
+  for (let skipped = 0; skipped < 6; skipped += 1) {
+    await chatPick(page, /^Skip$/u);
+  }
+  await chatPick(page, 'Nothing else');
+  await chatPick(page, /Use Example recipe/u);
+  await chatPick(page, 'That’s everyone for now');
+  await chatPick(page, 'Add Stovies & open recipe');
   await page.getByLabel('I saved these one-time codes somewhere private.').check();
   await page.getByRole('button', { name: 'Continue to sign in' }).click();
   await page
@@ -162,17 +177,24 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(page.getByRole('heading', { name: 'Household members & roles' })).toBeVisible();
   await page.getByRole('button', { name: 'Add profile', exact: true }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
-  await profileOnboarding.getByLabel('Display name').fill('Jon');
-  await profileOnboarding.getByRole('textbox', { name: /^Email\b/ }).fill('jon-setup@example.test');
-  await profileOnboarding.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await profileOnboarding.getByRole('checkbox', { name: /Cook at home more/u }).click();
-  await profileOnboarding
-    .getByLabel(/Why does this matter to you right now/u)
-    .fill('Bake more often.');
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
+  await chatIdentity(profileOnboarding, {
+    displayName: 'Jon',
+    email: 'jon-setup@example.test',
+  });
+  await chatPick(profileOnboarding, /^Parent/u);
+  await chatPick(profileOnboarding, /^Adult/u);
+  await chatPick(profileOnboarding, 'US customary');
+  await chatPick(profileOnboarding, 'Fahrenheit');
+  await chatPick(profileOnboarding, 'Set up nutrition later');
+  await chatPick(profileOnboarding, 'Let’s chat');
+  await chatPick(profileOnboarding, 'Cook at home more');
+  await chatPick(profileOnboarding, 'Done');
+  await chatSay(profileOnboarding, 'Why does this matter to you right now?', 'Bake more often.');
+  for (let skipped = 0; skipped < 8; skipped += 1) {
+    await chatPick(profileOnboarding, /^Skip$/u);
+  }
+  await chatPick(profileOnboarding, 'Nothing else');
+  await chatPick(profileOnboarding, 'Create profile');
   await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();
   await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
   await page

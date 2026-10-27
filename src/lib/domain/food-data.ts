@@ -152,6 +152,19 @@ export function normalizeGtin(raw: string): { value: string; canonicalGtin: stri
   return { value, canonicalGtin: value.padStart(14, '0') };
 }
 
+/** Remove GTIN-14 padding only at valid retail lengths; never send a truncated 9–11 digit UPC. */
+export function retailGtin(raw: string): string {
+  return gtinSearchCodes(raw)[0]!;
+}
+
+/** Sources may store the same identity as GTIN-8, UPC-A, EAN-13, or padded GTIN-14. */
+export function gtinSearchCodes(raw: string): string[] {
+  const { canonicalGtin } = normalizeGtin(raw);
+  return [8, 12, 13, 14]
+    .filter((length) => /^0*$/u.test(canonicalGtin.slice(0, 14 - length)))
+    .map((length) => canonicalGtin.slice(-length));
+}
+
 export const barcodeLookupInputSchema = z
   .object({
     barcode: z.string().trim().min(1).max(32),

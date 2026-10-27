@@ -71,7 +71,7 @@
   align-items: center;
   cursor: pointer;
   display: flex;
-  font-weight: 760;
+  font-weight: var(--btn-weight, 600);
   gap: 0.65rem;
   list-style: none;
 }
@@ -326,13 +326,13 @@
 .consume button {
   background: var(--accent);
   border: 0;
-  border-radius: 0.58rem;
+  border-radius: var(--btn-radius, 0.6rem);
   color: var(--on-accent);
   cursor: pointer;
   font: inherit;
-  font-size: 0.78rem;
-  font-weight: 760;
-  min-height: 2.7rem;
+  font-size: var(--btn-font, 0.9rem);
+  font-weight: var(--btn-weight, 600);
+  min-height: var(--btn-h, 2.75rem);
   padding: 0.65rem 1.25rem;
 }
 
@@ -751,7 +751,7 @@
 
 .filterDialogActions button {
   border: 1px solid var(--line-strong);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
   cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
@@ -797,15 +797,16 @@
   align-items: center;
   background: var(--pantry-surface);
   border: 1px solid var(--line-strong);
-  border-radius: 0.42rem;
+  border-radius: var(--btn-radius, 0.6rem);
   color: inherit;
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 650;
-  gap: 0.25rem;
+  font-size: var(--btn-font-compact, 0.82rem);
+  font-weight: var(--btn-weight, 600);
+  gap: 0.35rem;
+  min-height: var(--btn-h-compact, 2.5rem);
   padding: 0.48rem 1rem;
   white-space: nowrap;
   width: max-content;
@@ -1149,7 +1150,7 @@
 .rowMenuPanel details > summary {
   cursor: pointer;
   font-size: 0.76rem;
-  font-weight: 750;
+  font-weight: var(--btn-weight, 600);
   padding: 0.45rem 0;
 }
 
@@ -1207,14 +1208,14 @@
   gap: 0;
   justify-items: center;
   line-height: 1.55;
-  margin: 5rem auto;
+  margin: 3rem auto;
   max-width: 40rem;
   padding: clamp(1.75rem, 4vw, 2.5rem);
   text-align: center;
 }
 
 .empty h2 {
-  font-size: clamp(2rem, 5vw, 2.6rem);
+  font-size: clamp(1.45rem, 3.5vw, 1.75rem);
   margin: 0;
 }
 
@@ -1225,21 +1226,22 @@
 
 .empty button {
   align-items: center;
-  background: var(--pantry-green-deep);
-  border: 1px solid var(--pantry-green-deep);
-  border-radius: 0.6rem;
-  color: var(--page);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--btn-radius, 0.6rem);
+  color: var(--on-accent);
   cursor: pointer;
   display: inline-flex;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--btn-font, 0.9rem);
+  font-weight: var(--btn-weight, 600);
   gap: 0.45rem;
-  min-height: 2.65rem;
-  padding: 0.6rem 0.9rem;
+  min-height: var(--btn-h, 2.75rem);
+  padding: 0.6rem 1.1rem;
 }
 
 .empty button:hover {
-  background: color-mix(in srgb, var(--pantry-green) 88%, #fff);
+  background: var(--accent-strong, var(--accent));
 }
 
 .empty .emptySecondaryAction {
@@ -1618,7 +1620,7 @@
     padding: 1.5rem;
   }
   .empty h2 {
-    font-size: 1.75rem;
+    font-size: 1.45rem;
   }
 }
 
@@ -1655,7 +1657,7 @@
   min-height: 44px;
   background: var(--surface, #fffefb);
   border: 1px solid var(--line);
-  border-radius: 0.7rem;
+  border-radius: var(--btn-radius, 0.6rem);
   text-align: left;
   cursor: pointer;
   color: var(--ink);
@@ -1749,6 +1751,12 @@
 }
 .addDialogHeader {
   align-items: center;
+}
+/* At short heights, enlarged text can make the sticky heading cover the save button. */
+@media (max-height: 600px) {
+  .addDialogHeader {
+    position: static;
+  }
 }
 .addDialogHeader h2 {
   font-size: var(--panel-title-size);
@@ -1946,7 +1954,7 @@
   gap: 0.35rem;
   min-height: 44px;
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
   color: var(--ink);
   padding: 0.4rem 0.6rem;

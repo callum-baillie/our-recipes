@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { barcodeLookupInputSchema, normalizeGtin } from '@/lib/domain/food-data';
+import { barcodeLookupInputSchema, normalizeGtin, retailGtin } from '@/lib/domain/food-data';
 
 describe('food-data identity boundaries', () => {
+  it.each(['041498926526', '036000291452', '96385074', '4006381333931', '10012345678902'])(
+    'keeps a valid retail length and significant leading zeroes for %s',
+    (code) => {
+      expect(retailGtin(normalizeGtin(code).canonicalGtin)).toBe(code);
+    },
+  );
   it('preserves the displayed GTIN and compares through canonical GTIN-14', () => {
     expect(normalizeGtin('4006 3813-3393 1')).toEqual({
       value: '4006381333931',

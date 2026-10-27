@@ -3,20 +3,29 @@
   padding: var(--workspace-top-space) var(--page-gutter) 2rem;
   margin: auto;
 }
+
+/* What is being exported, in one quiet line. */
 .context {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem 1.5rem;
-  margin-bottom: 1rem;
+  margin: 0.25rem 0 1.25rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--linen);
 }
 .context p {
   margin: 0;
   overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
 }
 .context nav {
-  display: flex;
+  display: none;
   flex-wrap: wrap;
   gap: 1rem;
 }
@@ -26,17 +35,23 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary-strong);
 }
+
 .workspace {
   display: grid;
-  grid-template-columns: minmax(19rem, 23rem) minmax(0, 1fr);
+  grid-template-columns: minmax(19rem, 22.5rem) minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
 }
+
+/* ---- Options rail ---------------------------------------------------------------------- */
 .sidebar {
-  background: var(--field);
+  background: var(--linen);
   border: 1px solid var(--line);
-  border-radius: 0.7rem;
+  border-radius: 1rem;
   padding: 1rem;
   display: grid;
   gap: 1rem;
@@ -52,12 +67,16 @@
 }
 .sidebar h2,
 .formats h2 {
-  font: 650 1.05rem/1.4 var(--font-sans, system-ui);
+  font: 700 0.72rem/1.4 var(--font-sans, system-ui);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
   margin: 0;
 }
 .sidebar label:not(.check) {
   display: grid;
   gap: 0.4rem;
+  font-size: 0.9rem;
   font-weight: 650;
 }
 .sidebar select,
@@ -65,11 +84,11 @@
   width: 100%;
   min-width: 0;
   min-height: 44px;
-  padding: 0.65rem;
+  padding: 0.65rem 0.8rem;
   color: var(--ink);
-  background: var(--page);
-  border: 1px solid var(--line);
-  border-radius: 0.45rem;
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.65rem;
   font: inherit;
   font-weight: 400;
 }
@@ -78,44 +97,75 @@
   align-items: center;
   gap: 0.6rem;
   min-height: 44px;
+  padding: 0 0.4rem;
+  border-radius: 0.55rem;
+  font-size: 0.92rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-out);
+}
+.check:hover {
+  background: var(--surface-hover);
 }
 .check input {
   width: 1.1rem;
   height: 1.1rem;
   min-height: 0;
   flex-shrink: 0;
-  accent-color: var(--leaf);
+  accent-color: var(--primary);
 }
+
+/* Document type: a 2 × 2 grid of cards rather than a plain list. */
 .types {
   display: grid;
-  gap: 0.3rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 .types button {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  min-height: 44px;
-  padding: 0.65rem;
-  border: 0;
-  background: transparent;
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+  min-height: 4.1rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--line);
+  background: var(--field);
   color: var(--ink);
-  border-radius: 0.45rem;
+  border-radius: 0.8rem;
   text-align: left;
   font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.25;
+  transition:
+    background var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out);
+}
+.types button:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
 }
 .types svg {
   flex-shrink: 0;
+  color: var(--primary);
 }
 .types button[aria-pressed='true'] {
   background: var(--selection-surface);
+  border-color: var(--primary);
   color: var(--on-selection);
+  box-shadow: inset 0 0 0 1px var(--primary);
 }
+.types button[aria-pressed='true'] svg {
+  color: inherit;
+}
+
 .recipeChoices {
   max-height: 17rem;
   overflow: auto;
   padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--field);
 }
 .suboptions {
   padding-left: 0.75rem;
@@ -128,7 +178,7 @@
 .hint,
 .formats p {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   font-weight: 400;
   line-height: 1.5;
   margin: 0;
@@ -141,22 +191,29 @@
 }
 .selectionActions button {
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   min-height: 44px;
 }
 .prepare {
   display: grid;
   gap: 0.4rem;
-  padding: 0.5rem 0.15rem;
-  background: var(--field);
+  padding: 0.75rem 0.15rem 0.35rem;
+  background: var(--linen);
+  border-top: 1px solid var(--line);
 }
 .prepare button {
   width: 100%;
 }
+
+/* ---- Document stage -------------------------------------------------------------------- */
 .preview {
   min-width: 0;
   display: grid;
   gap: 0.85rem;
+  padding: 1.1rem 1.25rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--linen);
 }
 .preview > header {
   display: flex;
@@ -167,10 +224,55 @@
 }
 .preview > header h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
+}
+.preview > header a {
+  display: none;
 }
 .preview > p {
   margin: 0;
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  justify-self: start;
+  max-width: 100%;
+  padding: 0.3rem 0.8rem 0.3rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.status::before {
+  content: '';
+  flex: none;
+  inline-size: 0.55rem;
+  block-size: 0.55rem;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.status[data-state='ready']::before {
+  background: var(--primary);
+}
+.status[data-state='stale']::before {
+  background: var(--accent);
+}
+.status[data-state='busy']::before {
+  background: var(--primary);
+  animation: stage-pulse 1.1s ease-in-out infinite;
+}
+@keyframes stage-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status[data-state='busy']::before {
+    animation: none;
+  }
 }
 .outputActions {
   display: flex;
@@ -180,43 +282,73 @@
 .outputActions > * {
   justify-content: center;
 }
+
+.viewer {
+  border-top: 1px solid var(--line);
+  padding-top: 0.25rem;
+}
+.viewer > summary {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.previewDocument {
+  position: relative;
+  min-width: 0;
+  padding: clamp(0.5rem, 2vw, 1.25rem);
+  border-radius: 0.8rem;
+  background: var(--paper-deep);
+}
 .preview iframe {
   display: block;
   width: 100%;
-  height: 70dvh;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: #e8e8e8;
+  height: 76dvh;
+  min-height: 28rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
 }
 .empty {
   display: grid;
   place-content: center;
   justify-items: center;
+  gap: 0.25rem;
   text-align: center;
   min-height: 22rem;
-  background: var(--linen);
-  border: 1px dashed var(--line);
-  border-radius: 0.5rem;
+  color: var(--muted);
   padding: 1.5rem;
+}
+.empty svg {
+  color: var(--line-strong);
+}
+.empty h3 {
+  margin: 0.5rem 0 0;
+  color: var(--ink);
+  font-size: 1.1rem;
 }
 .empty p {
   max-width: 32rem;
+  margin: 0;
 }
 .error {
-  color: var(--danger, #a33);
-  padding: 0.8rem;
-  border: 1px solid currentColor;
-  border-radius: 0.45rem;
+  color: var(--accent-text);
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.7rem;
+  background: var(--accent-soft);
   overflow-wrap: anywhere;
 }
 .error p {
   margin: 0.2rem 0 0.5rem;
 }
-.disclosure > summary,
-.viewer > summary {
+.disclosure > summary {
   cursor: pointer;
   min-height: 44px;
   padding: 0.7rem 0.2rem;
+  font-size: 0.92rem;
   font-weight: 650;
 }
 .disclosure a {
@@ -229,6 +361,7 @@
 .disclosure li button {
   margin-left: 0.5rem;
 }
+
 .formats {
   gap: 0.75rem;
 }
@@ -246,10 +379,6 @@
 .formats a {
   justify-self: start;
 }
-.previewDocument {
-  position: relative;
-  min-width: 0;
-}
 .documentLoading {
   position: absolute;
   inset: 0;
@@ -260,6 +389,7 @@
 .preview {
   scroll-margin-top: 7rem;
 }
+
 @media (min-width: 801px) {
   .sidebar {
     max-height: calc(100dvh - 8rem - var(--app-notice-height, 0px));
@@ -271,19 +401,25 @@
   .prepare {
     position: sticky;
     bottom: -0.5rem;
-    box-shadow: 0 -0.4rem 0 var(--field);
+    box-shadow: 0 -0.4rem 0 var(--linen);
   }
 }
 @media (max-width: 800px) {
+  .context nav {
+    display: flex;
+  }
+  .preview > header a {
+    display: inline-flex;
+  }
   .workspace {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.5rem;
   }
-  .types {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  .preview {
+    padding: 1rem;
   }
   .preview iframe {
-    height: 55dvh;
+    height: 60dvh;
   }
   .sidebar select,
   .sidebar input {

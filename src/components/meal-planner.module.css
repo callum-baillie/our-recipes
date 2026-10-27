@@ -49,14 +49,15 @@
 .mealTabs button,
 .suggestionScope button,
 .alternativeKinds button {
-  min-height: 44px;
-  padding: 0.55rem 0.75rem;
+  min-height: var(--btn-h, 44px);
+  padding: 0.55rem 0.8rem;
   border: 1px solid var(--line);
-  border-radius: 0.55rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
   color: var(--ink);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--btn-font, 0.9rem);
+  font-weight: var(--btn-weight, 600);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -267,7 +268,7 @@
   padding: 0.35rem;
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 0.35rem;
+  border-radius: var(--btn-radius, 0.6rem);
 }
 .monthDay button span {
   display: block;
@@ -400,14 +401,15 @@
   justify-content: center;
   align-items: center;
   gap: 0.4rem;
-  min-height: 44px;
-  padding: 0.65rem;
+  min-height: var(--btn-h, 44px);
+  padding: 0.65rem 1rem;
   border: 1px solid var(--accent);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
   color: var(--on-accent);
   background: var(--accent);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--btn-font, 0.9rem);
+  font-weight: var(--btn-weight, 600);
   cursor: pointer;
 }
 .assistanceSection {
@@ -665,7 +667,7 @@
 .selectedButton {
   justify-self: start;
   font-size: 0.8rem;
-  font-weight: 650;
+  font-weight: var(--btn-weight, 600);
 }
 .selectedRecipe {
   border-color: var(--leaf);
@@ -701,7 +703,7 @@
   min-height: 44px;
   padding: 0.6rem;
   border: 1px solid var(--line);
-  border-radius: 0.4rem;
+  border-radius: var(--btn-radius, 0.6rem);
   background: var(--field);
   color: var(--ink);
   font: inherit;
@@ -996,7 +998,7 @@
   min-height: 44px;
   padding: 0.5rem;
   border: 1px dashed var(--line);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
   color: var(--muted);
   background: transparent;
   font: inherit;

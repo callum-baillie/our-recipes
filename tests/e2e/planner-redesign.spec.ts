@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { onboardingEmail, TEST_PASSPHRASE } from './helpers/onboarding';
+import { completeInitialOnboarding, completeProfileOnboarding } from './helpers/onboarding';
 
 const recipePayload = (title: string, category: string, item: string) => ({
   title,
@@ -37,43 +37,15 @@ test('planner assigns recipes by selected meal and scales the shopping list to d
   page,
 }) => {
   test.setTimeout(180_000);
-  await page.goto('/');
-  await page.getByLabel('Kitchen name').fill('Planner test kitchen');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Display name').fill('Callum');
-  await page
-    .getByRole('textbox', { name: /^Email\b/ })
-    .fill(onboardingEmail('Planner test kitchen', 'Callum'));
-  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Add Stovies & open recipe' }).click();
-  await page.getByLabel('I saved these one-time codes somewhere private.').check();
-  await page.getByRole('button', { name: 'Continue to sign in' }).click();
-  await page
-    .getByRole('textbox', { name: /^Email\b/ })
-    .fill(onboardingEmail('Planner test kitchen', 'Callum'));
-  await page.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await page.waitForURL((url) => url.pathname.startsWith('/recipes/'));
+  await completeInitialOnboarding(page, 'Planner test kitchen', 'Callum');
 
   await page.goto('/settings/profiles');
   await page.getByRole('button', { name: 'Add profile', exact: true }).click();
   const profileOnboarding = page.getByRole('dialog', { name: 'New profile onboarding' });
-  await profileOnboarding.getByLabel('Display name').fill('Julia');
-  await profileOnboarding
-    .getByRole('textbox', { name: /^Email\b/ })
-    .fill('julia-planner@example.test');
-  await profileOnboarding.getByLabel(/^\s*Passphrase/).fill(TEST_PASSPHRASE);
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Set up nutrition later' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Continue' }).click();
-  await profileOnboarding.getByRole('button', { name: 'Create profile' }).click();
-  await profileOnboarding.getByLabel('I saved these one-time codes somewhere private.').check();
-  await profileOnboarding.getByRole('button', { name: 'Finish profile setup' }).click();
+  await completeProfileOnboarding(profileOnboarding, {
+    displayName: 'Julia',
+    email: 'julia-planner@example.test',
+  });
 
   let pastaIngredientId = '';
   for (const payload of [

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Link2, Search, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
 import { InlineSkeleton } from '@/components/skeleton';
+import { formatStoreAddress } from '@/lib/domain/store-address';
 import styles from './catalog-store-link.module.css';
 
 type Store = {
@@ -132,7 +133,7 @@ export function CatalogStoreLink({
       {saved && (
         <div className={styles.saved}>
           <strong>{saved.name}</strong>
-          <span>{Object.values(saved.address).join(', ')}</span>
+          <span>{formatStoreAddress(saved.address)}</span>
           <small>
             Saved official details{saved.observedAt ? ` · Source observed ${saved.observedAt}` : ''}
             . Hours may have changed.
@@ -187,7 +188,7 @@ export function CatalogStoreLink({
               : 'Official details match your saved copy'}
           </strong>
           <span>
-            {review.store.name} · {Object.values(review.store.address).join(', ')}
+            {review.store.name} · {formatStoreAddress(review.store.address)}
           </span>
           {review.store.status && <span>Source status: {review.store.status}</span>}
           {review.store.hours && <span>{review.store.hours}</span>}
@@ -214,7 +215,19 @@ export function CatalogStoreLink({
           )}
         </div>
       )}
-      {status?.storeDirectoryEnabled && (
+      {status && !status.storeDirectoryEnabled && (
+        <p className={styles.help}>
+          Store search is not enabled on this installation. You can still save and select a custom
+          store for your shopping lists.
+        </p>
+      )}
+      {status?.storeDirectoryEnabled && status.state === 'not_configured' && (
+        <p className={styles.help}>
+          Connect the Bòrd Food API in your server configuration to find local branches. Your saved
+          stores remain available.
+        </p>
+      )}
+      {status?.storeDirectoryEnabled && status.state !== 'not_configured' && (
         <form
           className={styles.search}
           onSubmit={(event) => {
@@ -376,7 +389,7 @@ export function CatalogStoreLink({
         <div className={styles.result} key={store.id}>
           <div>
             <strong>{store.name}</strong>
-            <small>{Object.values(store.address).join(', ')}</small>
+            <small>{formatStoreAddress(store.address)}</small>
             <small>{store.status ?? 'Operating status unknown'}</small>
           </div>
           <button

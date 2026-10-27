@@ -66,11 +66,11 @@ describe('appearance system', () => {
     expect(css).toContain('.appearance-choices fieldset + fieldset');
   });
 
-  it('preserves the existing green surface values behind semantic aliases', () => {
+  it('keeps the green surface values behind semantic aliases', () => {
     const css = readFileSync('src/app/themes.css', 'utf8');
-    expect(css).toContain('--primary: light-dark(#536938, #b8d38d)');
-    expect(css).toContain('--page: light-dark(#faf7f0, #202920)');
-    expect(css).toContain('--linen: light-dark(#fffdf8, #273127)');
+    expect(css).toContain('--primary: light-dark(#4a6b3c, #a8c98b)');
+    expect(css).toContain('--page: light-dark(#f7f8f5, #191c15)');
+    expect(css).toContain('--linen: light-dark(#fdfdfd, #22261c)');
     expect(css).toContain('--tomato: var(--accent)');
     expect(css).toContain('--leaf: var(--primary)');
   });

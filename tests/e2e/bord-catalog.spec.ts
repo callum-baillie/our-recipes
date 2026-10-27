@@ -100,5 +100,43 @@ test('official store directory stays compact and preserves household edits on mo
   await expect(page.getByRole('textbox', { name: /^Store name/u })).toHaveValue(
     'Unsaved local label',
   );
+  const created = await page.request.post('/api/v1/shopping-lists', {
+    headers: { Origin: 'http://127.0.0.1:3100' },
+    data: { kind: 'manual', name: 'Store selection fixture' },
+  });
+  expect(created.status()).toBe(201);
+  const list = (await created.json()).list;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/lists/${list.id}`);
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
+  const storeChoice = page.getByRole('combobox', { name: 'Shopping at' });
+  await Promise.all([page.waitForEvent('load'), storeChoice.selectOption('')]);
+  await expect
+    .poll(async () => {
+      const response = await page.request.get(`/api/v1/shopping-lists/${list.id}`);
+      return (await response.json()).list.supermarketProfileId;
+    })
+    .toBeNull();
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
+  await Promise.all([page.waitForEvent('load'), storeChoice.selectOption(profile.id)]);
+  await expect
+    .poll(async () => {
+      const response = await page.request.get(`/api/v1/shopping-lists/${list.id}`);
+      return (await response.json()).list.supermarketProfileId;
+    })
+    .toBe(profile.id);
+  await page.reload();
+  await page.getByRole('button', { name: 'Manage list', exact: true }).click();
+  await expect(storeChoice).toHaveValue(profile.id);
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(storeChoice).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  expect(
+    (await appAxe(page).include('[aria-label="Supermarket for this list"]').analyze()).violations,
+  ).toEqual([]);
   expect(errors).toEqual([]);
 });

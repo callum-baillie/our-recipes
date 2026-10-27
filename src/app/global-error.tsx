@@ -10,8 +10,8 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
           display: 'grid',
           placeItems: 'center',
           padding: '1.5rem',
-          color: '#273126',
-          background: '#faf7f0',
+          color: '#232a1b',
+          background: '#f7f8f5',
           fontFamily: 'Inter, system-ui, sans-serif',
         }}
       >
@@ -32,7 +32,7 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
               minHeight: '2.75rem',
               padding: '0.65rem 1rem',
               color: '#fffdf8',
-              background: '#536938',
+              background: '#4a6b3c',
               border: 0,
               borderRadius: '0.6rem',
               cursor: 'pointer',

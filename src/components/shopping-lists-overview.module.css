@@ -141,13 +141,13 @@
 }
 
 .createForm > button {
-  min-height: 3.15rem;
-  padding: 0.7rem 1rem;
+  min-height: var(--btn-h, 2.75rem);
+  padding: 0.7rem 1.25rem;
   color: var(--on-accent);
-  font-weight: 850;
+  font-weight: var(--btn-weight, 600);
   background: var(--accent);
   border: 0;
-  border-radius: 0.48rem;
+  border-radius: var(--btn-radius, 0.6rem);
 }
 
 .createForm > button:disabled {
@@ -188,7 +188,7 @@
   min-height: 2.8rem;
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: var(--btn-radius, 0.6rem);
 }
 
 .searchField {
@@ -220,8 +220,8 @@
   min-height: 2.5rem;
   padding: 0.55rem 1rem;
   color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: var(--btn-font-compact, 0.82rem);
+  font-weight: var(--btn-weight, 600);
   white-space: nowrap;
   background: var(--field);
   border: 1px solid var(--line);
@@ -418,9 +418,11 @@
   min-height: 44px;
   padding: 0.4rem 0.6rem;
   color: var(--ink);
-  font-size: 0.78rem;
+  font-size: var(--btn-font-compact, 0.82rem);
+  font-weight: var(--btn-weight, 600);
   background: transparent;
   border: 0;
+  border-radius: var(--btn-radius, 0.6rem);
 }
 
 .cardActions > button + button {
@@ -466,7 +468,7 @@
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 0.35rem;
+  border-radius: var(--btn-radius, 0.6rem);
 }
 
 .cardActions details button:hover {
@@ -511,7 +513,7 @@
 }
 
 .emptyState h3 {
-  font-size: 1.3rem;
+  font-size: 1.4rem;
 }
 
 .emptyState p {

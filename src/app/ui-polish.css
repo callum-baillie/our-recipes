@@ -1,0 +1,398 @@
+/*
+ * Shared UI finishing layer. Loaded after every other global stylesheet so the
+ * workspace shell, interactive states, and motion feel the same on every route.
+ * Component modules still own their own layout; this file only normalizes what
+ * is meant to be common: page width, button/field states, and entrance motion.
+ */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 360ms;
+  --press-scale: 0.975;
+
+  /* One button geometry for the whole app. Feature modules read these with fallbacks. */
+  --btn-h: 2.75rem;
+  --btn-h-compact: 2.5rem;
+  --btn-radius: 0.6rem;
+  --btn-weight: 600;
+  --btn-font: 0.9rem;
+  --btn-font-compact: 0.82rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Workspace shell: every standard page shares the same width and gutter. */
+/* ------------------------------------------------------------------ */
+
+.recipe-page.recipebook-page,
+.workspace-page:not([data-width='focused']),
+.workspace-page.import-page {
+  max-width: var(--workspace-width);
+}
+
+/* The Import tab is part of the recipe book, so it keeps the tab bar aligned. */
+.workspace-page.import-page[data-width='focused'] {
+  max-width: var(--workspace-width);
+}
+
+/* Focused task pages (assist, capture) stay narrow but share the same rhythm. */
+.workspace-page[data-width='focused']:not(.import-page) {
+  max-width: var(--content-focused);
+}
+
+/* Onboarding review: summary rows must never be squeezed under the note below. */
+
+/* ------------------------------------------------------------------ */
+/* Buttons and controls: one hover / press / busy / disabled vocabulary. */
+/* ------------------------------------------------------------------ */
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.icon-button,
+.text-button {
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-base) var(--ease-out),
+    opacity var(--motion-fast) ease,
+    transform var(--motion-fast) var(--ease-out);
+}
+
+.primary-button:not(:disabled):not([aria-disabled='true']):hover {
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--tomato) 32%, transparent);
+}
+.danger-button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--tomato-dark) 86%, black);
+  transform: translateY(-1px);
+}
+.secondary-button:not(:disabled):hover,
+.icon-button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:not(:disabled):not([aria-disabled='true']):active,
+.secondary-button:not(:disabled):not([aria-disabled='true']):active,
+.danger-button:not(:disabled):active,
+.icon-button:not(:disabled):active {
+  box-shadow: none;
+  transform: translateY(0) scale(var(--press-scale));
+  transition-duration: 60ms;
+}
+.text-button:not(:disabled):active {
+  opacity: 0.7;
+}
+
+/* Shared geometry for the global button classes, so pages that use them match module buttons. */
+.primary-button,
+.secondary-button,
+.danger-button {
+  min-height: var(--btn-h);
+  border-radius: var(--btn-radius);
+  font-weight: var(--btn-weight);
+  letter-spacing: 0;
+}
+.primary-button.compact,
+.secondary-button.compact,
+.danger-button.compact {
+  min-height: var(--btn-h-compact);
+  font-size: var(--btn-font-compact);
+}
+.text-button {
+  font-weight: var(--btn-weight);
+}
+
+/* Module buttons that never set a weight inherit the page's body weight; give them the shared one.
+   The repeated [class] raises specificity so load order between stylesheets cannot undo it. */
+:is(
+    [class*='contextHeader'],
+    [class*='aisleNavigation'],
+    [class*='extraQuantityForm'],
+    [class*='pantryControlActions'],
+    [class*='cardActions'],
+    [class*='renameForm'],
+    [class*='archiveActions'],
+    [class*='empty']
+  )[class][class]
+  button,
+button.assisted-review-trigger.assisted-review-trigger,
+[class*='pantry-manager-module'][class*='__summary'][class] > button {
+  font-weight: var(--btn-weight);
+}
+
+/* Busy: every control that reports aria-busy gets a spinner unless it already has one. */
+@keyframes ui-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+:where(button, a, summary)[aria-busy='true'] {
+  cursor: progress;
+}
+:where(button, [role='button'])[aria-busy='true']:not(
+    :has(
+      [class*='buttonSpinner'],
+      [role='status'],
+      .button-spinner,
+      .animate-spin,
+      svg[class*='spin'],
+      svg[class*='loader']
+    )
+  )::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  margin-left: 0.5em;
+  border: 0.13em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ui-spin 0.72s linear infinite;
+}
+/* Disabled-while-busy reads as "working", not "unavailable". */
+:where(button)[aria-busy='true']:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+
+/* Fields: focus moves the border and glow, not just an outline. */
+:where(
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color']),
+  select,
+  textarea
+) {
+  transition:
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-base) var(--ease-out);
+}
+:where(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color']),
+    select,
+    textarea
+  ):hover:not(:disabled, :focus) {
+  border-color: var(--line-strong);
+}
+:where(
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color']),
+  select,
+  textarea
+):focus {
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--leaf) 16%, transparent);
+}
+:where(input, select, textarea)[aria-invalid='true']:focus {
+  border-color: var(--tomato);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tomato) 16%, transparent);
+}
+:where(input[type='checkbox'], input[type='radio']) {
+  accent-color: var(--leaf);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cards and navigation: quiet lift and image zoom on real affordances.  */
+/* ------------------------------------------------------------------ */
+
+.settings-overview-card.linked,
+.recipe-card,
+.recipe-summary-card {
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+.settings-overview-card.linked:hover,
+.recipe-summary-card:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-soft, var(--shadow));
+  transform: translateY(-2px);
+}
+.settings-overview-card.linked:active,
+.recipe-summary-card:active {
+  transform: translateY(0);
+  transition-duration: 60ms;
+}
+.settings-overview-card.linked > svg:last-child,
+.settings-overview-card.linked > span:last-child svg {
+  transition: transform var(--motion-base) var(--ease-out);
+}
+.settings-overview-card.linked:hover > svg:last-child,
+.settings-overview-card.linked:hover > span:last-child svg {
+  transform: translateX(3px);
+}
+.recipe-card-media img {
+  transition: transform 600ms var(--ease-out);
+}
+.recipe-summary-card:hover .recipe-card-media img {
+  transform: scale(1.035);
+}
+
+.recipebook-nav a,
+.settings-sidebar nav a {
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+
+/* Disclosures that live in settings panes open smoothly where supported. */
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details.settings-disclosure::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size var(--motion-base) var(--ease-out),
+      content-visibility var(--motion-base) allow-discrete;
+  }
+  details.settings-disclosure[open]::details-content {
+    block-size: auto;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Entrance motion: pages, menus, dialogs, toasts.                      */
+/* ------------------------------------------------------------------ */
+
+@keyframes ui-page-in {
+  from {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+}
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ui-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.4rem) scale(0.98);
+  }
+}
+@keyframes ui-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.985);
+  }
+}
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Opacity and translate only; no lingering transform that would re-parent fixed children. */
+  main {
+    animation: ui-page-in var(--motion-slow) var(--ease-out) backwards;
+  }
+  .planner-workspace-shell main {
+    animation: none;
+  }
+
+  .profile-menu,
+  details[open] > [class*='createMenuPanel'] {
+    transform-origin: top right;
+    animation: ui-pop-in var(--motion-base) var(--ease-out);
+  }
+
+  dialog[open] {
+    animation: ui-dialog-in var(--motion-base) var(--ease-out);
+  }
+  dialog[open]::backdrop {
+    animation: ui-fade-in var(--motion-base) ease;
+  }
+
+  .toast {
+    animation: ui-toast-in var(--motion-base) var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary-button,
+  .secondary-button,
+  .danger-button,
+  .icon-button,
+  .settings-overview-card.linked,
+  .recipe-card,
+  .recipe-summary-card,
+  .recipe-card-media img {
+    transition-duration: 0.01ms;
+  }
+  .primary-button:hover,
+  .secondary-button:hover,
+  .danger-button:hover,
+  .icon-button:hover,
+  .settings-overview-card.linked:hover,
+  .recipe-summary-card:hover,
+  .recipe-summary-card:hover .recipe-card-media img {
+    transform: none;
+  }
+}
+
+/* Paper is always light: printed pages and PDFs must not inherit a dark theme's pale-on-dark ink. */
+@media print {
+  :root,
+  :root[data-theme='dark'],
+  :root[data-theme='light'] {
+    color-scheme: light !important;
+  }
+}
+
+/* Dark-theme legibility fixes for chips and links that hard-coded dark ink or a fixed accent. */
+.recipe-taxonomy-detail-values span {
+  color: var(--ink);
+}
+:root[data-theme] .recipe-detail .recipe-tag-pill,
+:root:not([data-theme='light']) .recipe-detail .recipe-tag-pill {
+  color: var(--ink);
+}
+.danger-text-button,
+.recipe-maintenance-actions .danger-text-button {
+  color: var(--accent-text);
+}
+
+/* ---- Recipe grids: one card width wherever recipes are listed ------------------------- */
+.home-recipe-grid.recent-grid,
+.home-recipe-grid.all-recipes-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr));
+}
+
+/* ---- Empty states share one heading scale --------------------------------------------- */
+.collection-empty h2 {
+  font-size: 1.4rem;
+}
+
+/* ---- Kitchen interview pane: calm stack of copy and actions ---------------------------- */
+.settings-content .settings-pane-body > p {
+  max-width: 65ch;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.settings-content .settings-pane-body > .secondary-button,
+.settings-content .settings-pane-body > .primary-button {
+  margin-block: 0.25rem 0.5rem;
+}
+.settings-content .settings-row-copy h3 {
+  font-family: inherit;
+}
+.settings-content .settings-pane-body > p:first-child {
+  margin-top: 1rem;
+}
+.settings-content .settings-pane-body > .secondary-button:last-child {
+  margin-bottom: 1rem;
+}

@@ -4,6 +4,7 @@ import { getRuntimeConfig } from '@/lib/config';
 import {
   FoodDataError,
   normalizeGtin,
+  gtinSearchCodes,
   type FoodRecord,
   type NormalizedNutrient,
 } from '@/lib/domain/food-data';
@@ -262,7 +263,13 @@ export class UsdaFoodDataProvider implements FoodDataProvider {
     return result as ProviderResponse<FoodRecord[]>;
   }
   async lookupBarcode(canonicalGtin: string) {
-    const exact = canonicalGtin.replace(/^0+(?=\d{8,})/u, '');
+    const codes = gtinSearchCodes(canonicalGtin);
+    // Hosted FDC indexes the source's literal GTIN, including padding. Search all equivalent
+    // representations in one budgeted request. The local mirror uses an exact GTIN-14 index
+    // and deliberately does not interpret hosted search operators.
+    const hosted =
+      new URL(getRuntimeConfig().foodData.usda.baseUrl).hostname === 'api.nal.usda.gov';
+    const exact = hosted ? codes.map((code) => `"${code}"`).join(' OR ') : canonicalGtin;
     const result = await this.searchByName(exact, 1, 'branded');
     return {
       ...result,

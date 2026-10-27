@@ -70,7 +70,7 @@ function cacheId(provider: RemoteProviderId, operation: Operation, key: string) 
   const config = getRuntimeConfig().foodData;
   const endpoint = provider === 'usda_fdc' ? config.usda : config.openFoodFacts;
   return digest(
-    JSON.stringify([provider, operation, key, endpoint, config.mode, 'direct-normalizer-v1']),
+    JSON.stringify([provider, operation, key, endpoint, config.mode, 'direct-normalizer-v2']),
   );
 }
 
