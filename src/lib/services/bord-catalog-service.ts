@@ -265,6 +265,12 @@ export async function lookupCatalogBarcode(gtin: string, language: string, compa
   const records: FoodRecord[] = [];
   const statuses: ProviderStatus[] = [];
   try {
+    const session = await capabilities(client);
+    if (session.data.packs.products?.enabled === false)
+      throw new FoodDataError(
+        'DISABLED',
+        'The optional product pack is disabled. USDA lookup remains available.',
+      );
     const response = await client.resolve(normalized);
     const resolved = await candidateFoods(
       response.data.flatMap((r) => r.candidates),

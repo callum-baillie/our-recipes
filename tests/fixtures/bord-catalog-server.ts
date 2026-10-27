@@ -23,7 +23,9 @@ export async function startCatalogFixture() {
     protein: 12,
     missingFood: false,
     productsUnavailable: false,
+    productsDisabled: false,
     barcodeMatch: false,
+    barcodeValue: '4006381333931',
     guidanceUnavailable: false,
     mismatchEnrichment: false,
   };
@@ -91,7 +93,7 @@ export async function startCatalogFixture() {
               name,
               {
                 implemented: true,
-                enabled: !state.disabled,
+                enabled: !state.disabled && !(name === 'products' && state.productsDisabled),
                 available: !(state.partial && name === 'products'),
                 stale: state.stale,
               },
@@ -106,7 +108,7 @@ export async function startCatalogFixture() {
         foods: [
           {
             ...syntheticUsda,
-            ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: '4006381333931' } : {}),
+            ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: state.barcodeValue } : {}),
           },
         ],
       });
@@ -220,7 +222,7 @@ export async function startCatalogFixture() {
               }
             : {
                 ...syntheticUsda,
-                ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: '4006381333931' } : {}),
+                ...(state.barcodeMatch ? { dataType: 'Branded', gtinUpc: state.barcodeValue } : {}),
                 foodNutrients: [
                   { nutrient: { id: 1003, name: 'Protein', unitName: 'g' }, amount: state.protein },
                 ],

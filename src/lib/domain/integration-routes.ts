@@ -9,6 +9,20 @@ export type IntegrationRoute = {
 // Explicit allowlist shared by the proxy, route authorization, and API documentation.
 // Personal nutrition, account security, backups, and AI assistant conversations stay session-only.
 export const integrationRoutes: IntegrationRoute[] = [
+  { path: '/scanner/cards', resource: 'pantry', methods: { GET: 'read' } },
+  { path: '/scanner/context', resource: 'pantry', methods: { GET: 'read' } },
+  { path: '/scanner/lookups', resource: 'pantry', methods: { POST: 'read' } },
+  { path: '/scanner/operations/{operationId}', resource: 'pantry', methods: { GET: 'read' } },
+  // Command-specific permissions are enforced after validated command parsing.
+  { path: '/scanner/operations', resource: 'pantry', methods: { POST: 'read' } },
+  { path: '/scanner/stations/{stationId}/sync', resource: 'pantry', methods: { POST: 'read' } },
+  {
+    path: '/scanner/stations/{stationId}/controls',
+    resource: 'pantry',
+    methods: { POST: 'update' },
+  },
+  { path: '/scanner/stations/{stationId}', resource: 'pantry', methods: { GET: 'read' } },
+  { path: '/scanner/stations', resource: 'pantry', methods: { GET: 'read', POST: 'create' } },
   { path: '/food-data/confirmations/recovery', resource: 'pantry', methods: { POST: 'create' } },
   {
     path: '/shopping-lists/{listId}/catalog-items',

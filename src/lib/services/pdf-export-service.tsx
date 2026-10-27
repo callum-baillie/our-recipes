@@ -229,6 +229,14 @@ export function exportMealPlanPdf(input: MealPlanPdfExportInput) {
         }
         return {
           id: meal.id,
+          scannerCode:
+            meal.recipeId &&
+            meal.kind === 'recipe' &&
+            !meal.recipeOverride &&
+            meal.effectiveStatus !== 'cooked' &&
+            getRecipe(meal.recipeId)?.currentRevision === meal.recipeRevision
+              ? `BORD:1:RECIPE:${meal.recipeId}:${meal.servings}:${meal.recipeRevision}:${meal.id}`
+              : undefined,
           date: meal.plannedFor,
           slot: meal.meal,
           slotLabel: mealTypeLabel(meal.meal, types),

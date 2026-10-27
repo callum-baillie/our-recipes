@@ -34,7 +34,7 @@ const measureSelectionKey = (record: FoodRecord) =>
   ]);
 
 type LocalProduct = { id: string; displayName: string; brand: string; variant?: string };
-type PickerContext = 'pantry' | 'recipe' | 'nutrition';
+type PickerContext = 'pantry' | 'recipe' | 'nutrition' | 'product';
 type PickerTab = 'scan' | 'barcode' | 'search';
 
 function message(body: unknown, fallback: string) {
@@ -570,7 +570,9 @@ export function FoodCatalogPicker({
                 <p>
                   {context === 'recipe'
                     ? `Choose food data for “${defaultQuery || 'this ingredient'}”. Linking keeps its recipe quantity, unit and note; no stock is added.`
-                    : 'Review provider data before adding it to Bòrd.'}
+                    : context === 'product'
+                      ? 'Save a reviewed product without adding stock. Package and location defaults can be reviewed before the captured scan is applied.'
+                      : 'Review provider data before adding it to Bòrd.'}
                 </p>
               </div>
               <button
@@ -787,7 +789,9 @@ export function FoodCatalogPicker({
                     ? 'No local match. Some food providers are unavailable; retry or continue with manual entry.'
                     : context === 'pantry'
                       ? 'No matching food found. Refine your search or enter the item details manually.'
-                      : 'No matching food found. Refine your search or close to continue with manual ingredient entry.'}
+                      : context === 'product'
+                        ? 'No matching product found. Refine your search or create it manually in Pantry.'
+                        : 'No matching food found. Refine your search or close to continue with manual ingredient entry.'}
                 </p>
               ) : null}
               {savingImport ? (
@@ -1109,7 +1113,13 @@ export function FoodCatalogPicker({
               </p>
               <button className={styles.confirmButton} disabled={busy} aria-busy={busy}>
                 {busy ? <ButtonSpinner /> : null}
-                {busy ? 'Adding…' : context === 'pantry' ? 'Add Item' : 'Create and link product'}
+                {busy
+                  ? 'Adding…'
+                  : context === 'pantry'
+                    ? 'Add Item'
+                    : context === 'product'
+                      ? 'Save product without stock'
+                      : 'Create and link product'}
               </button>
             </form>
           ) : null}

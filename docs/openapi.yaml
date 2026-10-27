@@ -16,6 +16,361 @@ servers:
 security:
   - SessionCookie: []
 paths:
+  /scanner/context:
+    get:
+      operationId: readScannerContext
+      summary: Read the instance and actor binding for a registered scanner
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: stationId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/lookups:
+    post:
+      operationId: lookupScannerProduct
+      summary: Read local product, exact package defaults or catalog candidates
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScannerLookup' }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/operations:
+    post:
+      operationId: executeScannerOperation
+      summary: Execute or replay one immutable actor-bound scanner operation
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScannerBoundOperation' }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScannerReceipt' }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          description: Terminal bound review receipt or an unacknowledged state conflict
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ScannerReceipt' }
+                  - {
+                      type: object,
+                      required: [error],
+                      properties: { error: { type: object, additionalProperties: true } },
+                    }
+
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/operations/{operationId}:
+    get:
+      operationId: readScannerReceipt
+      summary: Read the permanent result of an owned scanner operation
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScannerReceipt' }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          description: Terminal bound review receipt or an unacknowledged state conflict
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ScannerReceipt' }
+                  - {
+                      type: object,
+                      required: [error],
+                      properties: { error: { type: object, additionalProperties: true } },
+                    }
+
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/stations:
+    get:
+      operationId: listScannerStations
+      summary: List stations owned by the signed-in account
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+    post:
+      operationId: registerScannerStation
+      summary: Register a dedicated key and station as its signed-in admin owner
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScannerRegistration' }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/stations/{stationId}:
+    get:
+      operationId: readScannerStation
+      summary: Read station state, receipts and feedback as its signed-in owner
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: stationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/stations/{stationId}/controls:
+    post:
+      operationId: controlScannerStation
+      summary: Send a short-lived boot and revision guarded control
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: stationId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScannerControlRequest' }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/stations/{stationId}/sync:
+    post:
+      operationId: syncScannerStation
+      summary: Synchronize durable feedback and control acknowledgements
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: stationId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScannerSync' }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
+  /scanner/cards:
+    get:
+      operationId: printScannerCards
+      summary: Download printable recipe, batch, location or control QR cards
+      description: >-
+        Scanner contract v2 binds instance, station, actor and key. UUID and frozen intent must
+        survive uncertain delivery. Recipe cards record cooking immediately. Product preparation
+        freezes exact saved package defaults; rejected operations retain permanent review receipts.
+        Personal nutrition intake remains session-only and separate from cooking.
+      security:
+        - SessionCookie: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema: { type: string, enum: [controls, locations, recipe, batch] }
+        - name: id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Acknowledged result; inspect outcome, replay status and binding
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '400': { description: 'Malformed bounded input' }
+        '401': { description: 'Authentication required' }
+        '403': { description: 'Account, profile, scope, origin or binding rejected' }
+        '404': { description: 'Owned resource unavailable' }
+        '409':
+          {
+            description: 'Terminal review receipt or stale state; inspect outcome before correcting',
+          }
+        '413': { description: 'Request or response exceeds scanner limits' }
+        '429': { description: 'Rate or print limit; retain intent and respect Retry-After' }
   /kitchen:
     get:
       operationId: readKitchenInventory
@@ -4486,6 +4841,2056 @@ components:
       required: false
       schema: { type: boolean, default: false }
   schemas:
+    ScannerReceipt:
+      {
+        'type': 'object',
+        'required': ['operationId', 'type', 'message'],
+        'properties':
+          {
+            'contractVersion': { 'type': 'integer', 'const': 2 },
+            'operationId': { 'type': 'string', 'format': 'uuid' },
+            'stationId': { 'type': 'string' },
+            'bindingId': { 'type': 'string', 'format': 'uuid' },
+            'instanceId': { 'type': 'string', 'format': 'uuid' },
+            'type': { 'type': 'string' },
+            'outcome': { 'type': 'string', 'enum': ['succeeded', 'needs_review'] },
+            'message': { 'type': 'string' },
+            'replayed': { 'type': 'boolean' },
+            'recordedAt': { 'type': 'string', 'format': 'date-time' },
+            'undoable': { 'type': 'boolean' },
+            'productName': { 'type': 'string' },
+            'quantity': { 'type': 'number' },
+            'unit': { 'type': 'string' },
+            'cookSessionId': { 'type': 'string', 'format': 'uuid' },
+            'batchId': { 'type': 'string', 'format': 'uuid' },
+            'error':
+              {
+                'type': 'object',
+                'properties': { 'code': { 'type': 'string' }, 'message': { 'type': 'string' } },
+              },
+          },
+        'additionalProperties': true,
+        'description': 'A v2 receipt includes the complete instance/station/actor binding and outcome. Legacy replay-only receipts may lack v2 metadata. Match the binding, UUID and type before acknowledging delivery.',
+      }
+    ScannerBoundOperation:
+      {
+        'type': 'object',
+        'properties':
+          {
+            'contractVersion': { 'type': 'number', 'const': 2 },
+            'operationId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'stationId': { 'type': 'string', 'pattern': '^[a-zA-Z0-9_-]{1,64}$' },
+            'instanceId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'bindingId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'command':
+              {
+                'anyOf':
+                  [
+                    {
+                      'oneOf':
+                        [
+                          {
+                            'type': 'object',
+                            'properties':
+                              {
+                                'type': { 'type': 'string', 'const': 'recipe' },
+                                'recipeId':
+                                  {
+                                    'type': 'string',
+                                    'format': 'uuid',
+                                    'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                  },
+                                'expectedRevision':
+                                  {
+                                    'type': 'integer',
+                                    'exclusiveMinimum': 0,
+                                    'maximum': 9007199254740991,
+                                  },
+                                'servings':
+                                  { 'type': 'number', 'exclusiveMinimum': 0, 'maximum': 100 },
+                                'mealPlanEntryId':
+                                  {
+                                    'type': 'string',
+                                    'format': 'uuid',
+                                    'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                  },
+                              },
+                            'required': ['type', 'recipeId', 'expectedRevision', 'servings'],
+                            'additionalProperties': false,
+                          },
+                          {
+                            'type': 'object',
+                            'properties':
+                              {
+                                'type':
+                                  { 'type': 'string', 'enum': ['pantry_add', 'pantry_remove'] },
+                                'barcode': { 'type': 'string', 'pattern': "^\\d{8,14}$" },
+                                'packages':
+                                  { 'type': 'integer', 'exclusiveMinimum': 0, 'maximum': 100 },
+                                'locationId':
+                                  {
+                                    'type': 'string',
+                                    'format': 'uuid',
+                                    'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                  },
+                              },
+                            'required': ['type', 'barcode', 'packages'],
+                            'additionalProperties': false,
+                          },
+                          {
+                            'type': 'object',
+                            'properties':
+                              {
+                                'type': { 'type': 'string', 'const': 'undo' },
+                                'targetOperationId':
+                                  {
+                                    'type': 'string',
+                                    'format': 'uuid',
+                                    'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                  },
+                              },
+                            'required': ['type', 'targetOperationId'],
+                            'additionalProperties': false,
+                          },
+                        ],
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'pantry_catalog_add' },
+                          'barcode': { 'type': 'string', 'pattern': "^\\d{8,14}$" },
+                          'packages': { 'type': 'integer', 'minimum': 1, 'maximum': 99 },
+                          'locationId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'selection':
+                            {
+                              'type': 'object',
+                              'properties':
+                                {
+                                  'provider':
+                                    { 'type': 'string', 'enum': ['open_food_facts', 'usda_fdc'] },
+                                  'recordId':
+                                    { 'type': 'string', 'minLength': 1, 'maxLength': 160 },
+                                  'catalogRef':
+                                    {
+                                      'type': 'object',
+                                      'properties':
+                                        {
+                                          'transport_id':
+                                            { 'type': 'string', 'const': 'bord_food_api' },
+                                          'source_id':
+                                            {
+                                              'type': 'string',
+                                              'enum': ['usda_fdc', 'open_food_facts'],
+                                            },
+                                          'source_record_id':
+                                            { 'type': 'string', 'minLength': 1, 'maxLength': 160 },
+                                          'source_revision':
+                                            { 'type': 'string', 'minLength': 1, 'maxLength': 160 },
+                                          'catalog_generation':
+                                            { 'type': 'string', 'minLength': 1, 'maxLength': 160 },
+                                          'canonical_product_id':
+                                            {
+                                              'anyOf':
+                                                [
+                                                  {
+                                                    'type': 'string',
+                                                    'minLength': 1,
+                                                    'maxLength': 160,
+                                                  },
+                                                  { 'type': 'null' },
+                                                ],
+                                            },
+                                        },
+                                      'required':
+                                        [
+                                          'transport_id',
+                                          'source_id',
+                                          'source_record_id',
+                                          'source_revision',
+                                          'catalog_generation',
+                                          'canonical_product_id',
+                                        ],
+                                      'additionalProperties': false,
+                                    },
+                                  'expectedCanonicalGtin':
+                                    {
+                                      'default': null,
+                                      'anyOf':
+                                        [
+                                          {
+                                            'type': 'string',
+                                            'minLength': 14,
+                                            'maxLength': 14,
+                                            'pattern': "^\\d{14}$",
+                                          },
+                                          { 'type': 'null' },
+                                        ],
+                                    },
+                                },
+                              'required': ['provider', 'recordId'],
+                            },
+                        },
+                      'required': ['type', 'barcode', 'packages', 'locationId', 'selection'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'batch_action' },
+                          'batchId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'action':
+                            {
+                              'oneOf':
+                                [
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'consume' },
+                                        'quantity':
+                                          {
+                                            'type': 'number',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 1000000,
+                                          },
+                                        'unit':
+                                          { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                        'reason':
+                                          {
+                                            'default': 'Manual consumption',
+                                            'type': 'string',
+                                            'maxLength': 160,
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type', 'quantity', 'unit'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'consume_one' },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'mark_empty' },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'open' },
+                                        'openedDate':
+                                          {
+                                            'default': '',
+                                            'anyOf':
+                                              [
+                                                { 'type': 'string', 'const': '' },
+                                                {
+                                                  'type': 'string',
+                                                  'pattern': "^\\d{4}-\\d{2}-\\d{2}$",
+                                                },
+                                              ],
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'move' },
+                                        'locationId':
+                                          {
+                                            'type': 'string',
+                                            'format': 'uuid',
+                                            'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type', 'locationId'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'freeze' },
+                                        'frozenDate':
+                                          {
+                                            'default': '',
+                                            'anyOf':
+                                              [
+                                                { 'type': 'string', 'const': '' },
+                                                {
+                                                  'type': 'string',
+                                                  'pattern': "^\\d{4}-\\d{2}-\\d{2}$",
+                                                },
+                                              ],
+                                          },
+                                        'locationId':
+                                          {
+                                            'default': '',
+                                            'anyOf':
+                                              [
+                                                { 'type': 'string', 'const': '' },
+                                                {
+                                                  'type': 'string',
+                                                  'format': 'uuid',
+                                                  'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                },
+                                              ],
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'thaw' },
+                                        'thawedDate':
+                                          {
+                                            'default': '',
+                                            'anyOf':
+                                              [
+                                                { 'type': 'string', 'const': '' },
+                                                {
+                                                  'type': 'string',
+                                                  'pattern': "^\\d{4}-\\d{2}-\\d{2}$",
+                                                },
+                                              ],
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'correct' },
+                                        'quantityRemaining':
+                                          {
+                                            'anyOf':
+                                              [
+                                                { 'type': 'null' },
+                                                {
+                                                  'type': 'number',
+                                                  'minimum': 0,
+                                                  'maximum': 1000000,
+                                                },
+                                              ],
+                                          },
+                                        'unit':
+                                          { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                        'approximateState':
+                                          {
+                                            'default': null,
+                                            'anyOf':
+                                              [
+                                                { 'type': 'null' },
+                                                {
+                                                  'type': 'string',
+                                                  'enum':
+                                                    [
+                                                      'full',
+                                                      'three_quarters',
+                                                      'half',
+                                                      'quarter',
+                                                      'almost_empty',
+                                                      'unknown',
+                                                    ],
+                                                },
+                                              ],
+                                          },
+                                        'reason':
+                                          { 'type': 'string', 'minLength': 1, 'maxLength': 160 },
+                                      },
+                                    'required':
+                                      [
+                                        'expectedVersion',
+                                        'type',
+                                        'quantityRemaining',
+                                        'unit',
+                                        'reason',
+                                      ],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'discard' },
+                                        'reason':
+                                          { 'default': '', 'type': 'string', 'maxLength': 160 },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'donate' },
+                                        'reason':
+                                          { 'default': '', 'type': 'string', 'maxLength': 160 },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'split' },
+                                        'quantity':
+                                          {
+                                            'type': 'number',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 1000000,
+                                          },
+                                        'unit':
+                                          { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                        'locationId':
+                                          {
+                                            'default': '',
+                                            'anyOf':
+                                              [
+                                                { 'type': 'string', 'const': '' },
+                                                {
+                                                  'type': 'string',
+                                                  'format': 'uuid',
+                                                  'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                },
+                                              ],
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type', 'quantity', 'unit'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'combine' },
+                                        'targetBatchId':
+                                          {
+                                            'type': 'string',
+                                            'format': 'uuid',
+                                            'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                          },
+                                        'targetExpectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                      },
+                                    'required':
+                                      [
+                                        'expectedVersion',
+                                        'type',
+                                        'targetBatchId',
+                                        'targetExpectedVersion',
+                                      ],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'restore' },
+                                        'quantityRemaining':
+                                          {
+                                            'default': null,
+                                            'anyOf':
+                                              [
+                                                { 'type': 'null' },
+                                                {
+                                                  'type': 'number',
+                                                  'minimum': 0,
+                                                  'maximum': 1000000,
+                                                },
+                                              ],
+                                          },
+                                        'unit':
+                                          { 'default': '', 'type': 'string', 'maxLength': 30 },
+                                        'approximateState':
+                                          {
+                                            'default': null,
+                                            'anyOf':
+                                              [
+                                                { 'type': 'null' },
+                                                {
+                                                  'type': 'string',
+                                                  'enum':
+                                                    [
+                                                      'full',
+                                                      'three_quarters',
+                                                      'half',
+                                                      'quarter',
+                                                      'almost_empty',
+                                                      'unknown',
+                                                    ],
+                                                },
+                                              ],
+                                          },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                  {
+                                    'type': 'object',
+                                    'properties':
+                                      {
+                                        'expectedVersion':
+                                          {
+                                            'type': 'integer',
+                                            'exclusiveMinimum': 0,
+                                            'maximum': 9007199254740991,
+                                          },
+                                        'note':
+                                          { 'default': '', 'type': 'string', 'maxLength': 500 },
+                                        'type': { 'type': 'string', 'const': 'undo' },
+                                      },
+                                    'required': ['expectedVersion', 'type'],
+                                  },
+                                ],
+                            },
+                        },
+                      'required': ['type', 'batchId', 'action'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'stocktake' },
+                          'counts':
+                            {
+                              'minItems': 1,
+                              'maxItems': 50,
+                              'type': 'array',
+                              'items':
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'batchId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'expectedVersion':
+                                        {
+                                          'type': 'integer',
+                                          'exclusiveMinimum': 0,
+                                          'maximum': 9007199254740991,
+                                        },
+                                      'quantityRemaining':
+                                        { 'type': 'number', 'minimum': 0, 'maximum': 1000000 },
+                                      'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                    },
+                                  'required':
+                                    ['batchId', 'expectedVersion', 'quantityRemaining', 'unit'],
+                                  'additionalProperties': false,
+                                },
+                            },
+                        },
+                      'required': ['type', 'counts'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'shopping_add' },
+                          'listId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'productId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'quantity':
+                            { 'type': 'number', 'exclusiveMinimum': 0, 'maximum': 1000000 },
+                          'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                        },
+                      'required': ['type', 'listId', 'productId', 'quantity', 'unit'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'shopping_intake' },
+                          'listId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'itemId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'expectedUpdatedAt':
+                            {
+                              'type': 'string',
+                              'format': 'date-time',
+                              'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            },
+                          'productId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'locationId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'quantity':
+                            { 'type': 'number', 'exclusiveMinimum': 0, 'maximum': 1000000 },
+                          'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                          'complete': { 'default': false, 'type': 'boolean' },
+                        },
+                      'required':
+                        [
+                          'type',
+                          'listId',
+                          'itemId',
+                          'expectedUpdatedAt',
+                          'productId',
+                          'locationId',
+                          'quantity',
+                          'unit',
+                        ],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'leftover' },
+                          'cookSessionId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'productId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'locationId':
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                          'quantity':
+                            { 'type': 'number', 'exclusiveMinimum': 0, 'maximum': 1000000 },
+                          'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                          'useByDate': { 'type': 'string', 'pattern': "^\\d{4}-\\d{2}-\\d{2}$" },
+                        },
+                      'required':
+                        ['type', 'cookSessionId', 'productId', 'locationId', 'quantity', 'unit'],
+                      'additionalProperties': false,
+                    },
+                  ],
+              },
+            'prepared':
+              {
+                'type': 'object',
+                'properties':
+                  {
+                    'productId':
+                      {
+                        'type': 'string',
+                        'format': 'uuid',
+                        'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                      },
+                    'defaultsRevision': { 'type': 'string', 'pattern': '^[a-f0-9]{64}$' },
+                    'packageAmount':
+                      { 'type': 'number', 'exclusiveMinimum': 0, 'maximum': 1000000 },
+                    'packageUnit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                    'locationId':
+                      {
+                        'type': 'string',
+                        'format': 'uuid',
+                        'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                      },
+                  },
+                'required': ['productId', 'defaultsRevision', 'packageAmount', 'packageUnit'],
+                'additionalProperties': false,
+              },
+            'supersedesOperationId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+          },
+        'required':
+          ['contractVersion', 'operationId', 'stationId', 'instanceId', 'bindingId', 'command'],
+        'additionalProperties': false,
+      }
+    ScannerSync:
+      {
+        'type': 'object',
+        'properties':
+          {
+            'instanceId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'bindingId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'state':
+              {
+                'type': 'object',
+                'properties':
+                  {
+                    'bootId':
+                      {
+                        'type': 'string',
+                        'format': 'uuid',
+                        'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                      },
+                    'revision': { 'type': 'integer', 'minimum': 0, 'maximum': 9007199254740991 },
+                    'mode':
+                      {
+                        'type': 'string',
+                        'enum': ['idle', 'add', 'remove', 'lookup', 'stocktake'],
+                      },
+                    'packages': { 'type': 'integer', 'minimum': 1, 'maximum': 99 },
+                    'locationId':
+                      {
+                        'anyOf':
+                          [
+                            {
+                              'type': 'string',
+                              'format': 'uuid',
+                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                            },
+                            { 'type': 'null' },
+                          ],
+                      },
+                    'action':
+                      {
+                        'default': null,
+                        'anyOf': [{ 'type': 'string', 'maxLength': 30 }, { 'type': 'null' }],
+                      },
+                    'expiresAt':
+                      { 'anyOf': [{ 'type': 'number', 'minimum': 0 }, { 'type': 'null' }] },
+                    'readerConnected': { 'type': 'boolean' },
+                    'queueCount': { 'type': 'integer', 'minimum': 0, 'maximum': 9007199254740991 },
+                    'reviewCount': { 'type': 'integer', 'minimum': 0, 'maximum': 9007199254740991 },
+                  },
+                'required':
+                  [
+                    'bootId',
+                    'revision',
+                    'mode',
+                    'packages',
+                    'locationId',
+                    'expiresAt',
+                    'readerConnected',
+                    'queueCount',
+                    'reviewCount',
+                  ],
+                'additionalProperties': false,
+              },
+            'events':
+              {
+                'maxItems': 50,
+                'type': 'array',
+                'items':
+                  {
+                    'type': 'object',
+                    'properties':
+                      {
+                        'bootId':
+                          {
+                            'type': 'string',
+                            'format': 'uuid',
+                            'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                          },
+                        'sequence':
+                          { 'type': 'integer', 'exclusiveMinimum': 0, 'maximum': 9007199254740991 },
+                        'operationId':
+                          {
+                            'anyOf':
+                              [
+                                {
+                                  'type': 'string',
+                                  'format': 'uuid',
+                                  'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                },
+                                { 'type': 'null' },
+                              ],
+                          },
+                        'status':
+                          {
+                            'type': 'string',
+                            'enum':
+                              [
+                                'info',
+                                'captured',
+                                'lookup',
+                                'queued',
+                                'sending',
+                                'uncertain',
+                                'saved',
+                                'review',
+                                'blocked',
+                              ],
+                          },
+                        'message': { 'type': 'string', 'maxLength': 1000 },
+                        'time': { 'type': 'number', 'minimum': 0 },
+                        'barcode': { 'type': 'string', 'maxLength': 512 },
+                        'batchId':
+                          {
+                            'type': 'string',
+                            'format': 'uuid',
+                            'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                          },
+                        'command':
+                          {
+                            'anyOf':
+                              [
+                                {
+                                  'oneOf':
+                                    [
+                                      {
+                                        'type': 'object',
+                                        'properties':
+                                          {
+                                            'type': { 'type': 'string', 'const': 'recipe' },
+                                            'recipeId':
+                                              {
+                                                'type': 'string',
+                                                'format': 'uuid',
+                                                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                              },
+                                            'expectedRevision':
+                                              {
+                                                'type': 'integer',
+                                                'exclusiveMinimum': 0,
+                                                'maximum': 9007199254740991,
+                                              },
+                                            'servings':
+                                              {
+                                                'type': 'number',
+                                                'exclusiveMinimum': 0,
+                                                'maximum': 100,
+                                              },
+                                            'mealPlanEntryId':
+                                              {
+                                                'type': 'string',
+                                                'format': 'uuid',
+                                                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                              },
+                                          },
+                                        'required':
+                                          ['type', 'recipeId', 'expectedRevision', 'servings'],
+                                        'additionalProperties': false,
+                                      },
+                                      {
+                                        'type': 'object',
+                                        'properties':
+                                          {
+                                            'type':
+                                              {
+                                                'type': 'string',
+                                                'enum': ['pantry_add', 'pantry_remove'],
+                                              },
+                                            'barcode':
+                                              { 'type': 'string', 'pattern': "^\\d{8,14}$" },
+                                            'packages':
+                                              {
+                                                'type': 'integer',
+                                                'exclusiveMinimum': 0,
+                                                'maximum': 100,
+                                              },
+                                            'locationId':
+                                              {
+                                                'type': 'string',
+                                                'format': 'uuid',
+                                                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                              },
+                                          },
+                                        'required': ['type', 'barcode', 'packages'],
+                                        'additionalProperties': false,
+                                      },
+                                      {
+                                        'type': 'object',
+                                        'properties':
+                                          {
+                                            'type': { 'type': 'string', 'const': 'undo' },
+                                            'targetOperationId':
+                                              {
+                                                'type': 'string',
+                                                'format': 'uuid',
+                                                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                              },
+                                          },
+                                        'required': ['type', 'targetOperationId'],
+                                        'additionalProperties': false,
+                                      },
+                                    ],
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'pantry_catalog_add' },
+                                      'barcode': { 'type': 'string', 'pattern': "^\\d{8,14}$" },
+                                      'packages':
+                                        { 'type': 'integer', 'minimum': 1, 'maximum': 99 },
+                                      'locationId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'selection':
+                                        {
+                                          'type': 'object',
+                                          'properties':
+                                            {
+                                              'provider':
+                                                {
+                                                  'type': 'string',
+                                                  'enum': ['open_food_facts', 'usda_fdc'],
+                                                },
+                                              'recordId':
+                                                {
+                                                  'type': 'string',
+                                                  'minLength': 1,
+                                                  'maxLength': 160,
+                                                },
+                                              'catalogRef':
+                                                {
+                                                  'type': 'object',
+                                                  'properties':
+                                                    {
+                                                      'transport_id':
+                                                        {
+                                                          'type': 'string',
+                                                          'const': 'bord_food_api',
+                                                        },
+                                                      'source_id':
+                                                        {
+                                                          'type': 'string',
+                                                          'enum': ['usda_fdc', 'open_food_facts'],
+                                                        },
+                                                      'source_record_id':
+                                                        {
+                                                          'type': 'string',
+                                                          'minLength': 1,
+                                                          'maxLength': 160,
+                                                        },
+                                                      'source_revision':
+                                                        {
+                                                          'type': 'string',
+                                                          'minLength': 1,
+                                                          'maxLength': 160,
+                                                        },
+                                                      'catalog_generation':
+                                                        {
+                                                          'type': 'string',
+                                                          'minLength': 1,
+                                                          'maxLength': 160,
+                                                        },
+                                                      'canonical_product_id':
+                                                        {
+                                                          'anyOf':
+                                                            [
+                                                              {
+                                                                'type': 'string',
+                                                                'minLength': 1,
+                                                                'maxLength': 160,
+                                                              },
+                                                              { 'type': 'null' },
+                                                            ],
+                                                        },
+                                                    },
+                                                  'required':
+                                                    [
+                                                      'transport_id',
+                                                      'source_id',
+                                                      'source_record_id',
+                                                      'source_revision',
+                                                      'catalog_generation',
+                                                      'canonical_product_id',
+                                                    ],
+                                                  'additionalProperties': false,
+                                                },
+                                              'expectedCanonicalGtin':
+                                                {
+                                                  'default': null,
+                                                  'anyOf':
+                                                    [
+                                                      {
+                                                        'type': 'string',
+                                                        'minLength': 14,
+                                                        'maxLength': 14,
+                                                        'pattern': "^\\d{14}$",
+                                                      },
+                                                      { 'type': 'null' },
+                                                    ],
+                                                },
+                                            },
+                                          'required': ['provider', 'recordId'],
+                                        },
+                                    },
+                                  'required':
+                                    ['type', 'barcode', 'packages', 'locationId', 'selection'],
+                                  'additionalProperties': false,
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'batch_action' },
+                                      'batchId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'action':
+                                        {
+                                          'oneOf':
+                                            [
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'consume' },
+                                                    'quantity':
+                                                      {
+                                                        'type': 'number',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 1000000,
+                                                      },
+                                                    'unit':
+                                                      {
+                                                        'type': 'string',
+                                                        'minLength': 1,
+                                                        'maxLength': 30,
+                                                      },
+                                                    'reason':
+                                                      {
+                                                        'default': 'Manual consumption',
+                                                        'type': 'string',
+                                                        'maxLength': 160,
+                                                      },
+                                                  },
+                                                'required':
+                                                  ['expectedVersion', 'type', 'quantity', 'unit'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'consume_one' },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'mark_empty' },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'open' },
+                                                    'openedDate':
+                                                      {
+                                                        'default': '',
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'string', 'const': '' },
+                                                            {
+                                                              'type': 'string',
+                                                              'pattern': "^\\d{4}-\\d{2}-\\d{2}$",
+                                                            },
+                                                          ],
+                                                      },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'move' },
+                                                    'locationId':
+                                                      {
+                                                        'type': 'string',
+                                                        'format': 'uuid',
+                                                        'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                      },
+                                                  },
+                                                'required':
+                                                  ['expectedVersion', 'type', 'locationId'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'freeze' },
+                                                    'frozenDate':
+                                                      {
+                                                        'default': '',
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'string', 'const': '' },
+                                                            {
+                                                              'type': 'string',
+                                                              'pattern': "^\\d{4}-\\d{2}-\\d{2}$",
+                                                            },
+                                                          ],
+                                                      },
+                                                    'locationId':
+                                                      {
+                                                        'default': '',
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'string', 'const': '' },
+                                                            {
+                                                              'type': 'string',
+                                                              'format': 'uuid',
+                                                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                            },
+                                                          ],
+                                                      },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'thaw' },
+                                                    'thawedDate':
+                                                      {
+                                                        'default': '',
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'string', 'const': '' },
+                                                            {
+                                                              'type': 'string',
+                                                              'pattern': "^\\d{4}-\\d{2}-\\d{2}$",
+                                                            },
+                                                          ],
+                                                      },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'correct' },
+                                                    'quantityRemaining':
+                                                      {
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'null' },
+                                                            {
+                                                              'type': 'number',
+                                                              'minimum': 0,
+                                                              'maximum': 1000000,
+                                                            },
+                                                          ],
+                                                      },
+                                                    'unit':
+                                                      {
+                                                        'type': 'string',
+                                                        'minLength': 1,
+                                                        'maxLength': 30,
+                                                      },
+                                                    'approximateState':
+                                                      {
+                                                        'default': null,
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'null' },
+                                                            {
+                                                              'type': 'string',
+                                                              'enum':
+                                                                [
+                                                                  'full',
+                                                                  'three_quarters',
+                                                                  'half',
+                                                                  'quarter',
+                                                                  'almost_empty',
+                                                                  'unknown',
+                                                                ],
+                                                            },
+                                                          ],
+                                                      },
+                                                    'reason':
+                                                      {
+                                                        'type': 'string',
+                                                        'minLength': 1,
+                                                        'maxLength': 160,
+                                                      },
+                                                  },
+                                                'required':
+                                                  [
+                                                    'expectedVersion',
+                                                    'type',
+                                                    'quantityRemaining',
+                                                    'unit',
+                                                    'reason',
+                                                  ],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'discard' },
+                                                    'reason':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 160,
+                                                      },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'donate' },
+                                                    'reason':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 160,
+                                                      },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'split' },
+                                                    'quantity':
+                                                      {
+                                                        'type': 'number',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 1000000,
+                                                      },
+                                                    'unit':
+                                                      {
+                                                        'type': 'string',
+                                                        'minLength': 1,
+                                                        'maxLength': 30,
+                                                      },
+                                                    'locationId':
+                                                      {
+                                                        'default': '',
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'string', 'const': '' },
+                                                            {
+                                                              'type': 'string',
+                                                              'format': 'uuid',
+                                                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                            },
+                                                          ],
+                                                      },
+                                                  },
+                                                'required':
+                                                  ['expectedVersion', 'type', 'quantity', 'unit'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'combine' },
+                                                    'targetBatchId':
+                                                      {
+                                                        'type': 'string',
+                                                        'format': 'uuid',
+                                                        'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                      },
+                                                    'targetExpectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                  },
+                                                'required':
+                                                  [
+                                                    'expectedVersion',
+                                                    'type',
+                                                    'targetBatchId',
+                                                    'targetExpectedVersion',
+                                                  ],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type':
+                                                      { 'type': 'string', 'const': 'restore' },
+                                                    'quantityRemaining':
+                                                      {
+                                                        'default': null,
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'null' },
+                                                            {
+                                                              'type': 'number',
+                                                              'minimum': 0,
+                                                              'maximum': 1000000,
+                                                            },
+                                                          ],
+                                                      },
+                                                    'unit':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 30,
+                                                      },
+                                                    'approximateState':
+                                                      {
+                                                        'default': null,
+                                                        'anyOf':
+                                                          [
+                                                            { 'type': 'null' },
+                                                            {
+                                                              'type': 'string',
+                                                              'enum':
+                                                                [
+                                                                  'full',
+                                                                  'three_quarters',
+                                                                  'half',
+                                                                  'quarter',
+                                                                  'almost_empty',
+                                                                  'unknown',
+                                                                ],
+                                                            },
+                                                          ],
+                                                      },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                              {
+                                                'type': 'object',
+                                                'properties':
+                                                  {
+                                                    'expectedVersion':
+                                                      {
+                                                        'type': 'integer',
+                                                        'exclusiveMinimum': 0,
+                                                        'maximum': 9007199254740991,
+                                                      },
+                                                    'note':
+                                                      {
+                                                        'default': '',
+                                                        'type': 'string',
+                                                        'maxLength': 500,
+                                                      },
+                                                    'type': { 'type': 'string', 'const': 'undo' },
+                                                  },
+                                                'required': ['expectedVersion', 'type'],
+                                              },
+                                            ],
+                                        },
+                                    },
+                                  'required': ['type', 'batchId', 'action'],
+                                  'additionalProperties': false,
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'stocktake' },
+                                      'counts':
+                                        {
+                                          'minItems': 1,
+                                          'maxItems': 50,
+                                          'type': 'array',
+                                          'items':
+                                            {
+                                              'type': 'object',
+                                              'properties':
+                                                {
+                                                  'batchId':
+                                                    {
+                                                      'type': 'string',
+                                                      'format': 'uuid',
+                                                      'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                                    },
+                                                  'expectedVersion':
+                                                    {
+                                                      'type': 'integer',
+                                                      'exclusiveMinimum': 0,
+                                                      'maximum': 9007199254740991,
+                                                    },
+                                                  'quantityRemaining':
+                                                    {
+                                                      'type': 'number',
+                                                      'minimum': 0,
+                                                      'maximum': 1000000,
+                                                    },
+                                                  'unit':
+                                                    {
+                                                      'type': 'string',
+                                                      'minLength': 1,
+                                                      'maxLength': 30,
+                                                    },
+                                                },
+                                              'required':
+                                                [
+                                                  'batchId',
+                                                  'expectedVersion',
+                                                  'quantityRemaining',
+                                                  'unit',
+                                                ],
+                                              'additionalProperties': false,
+                                            },
+                                        },
+                                    },
+                                  'required': ['type', 'counts'],
+                                  'additionalProperties': false,
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'shopping_add' },
+                                      'listId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'productId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'quantity':
+                                        {
+                                          'type': 'number',
+                                          'exclusiveMinimum': 0,
+                                          'maximum': 1000000,
+                                        },
+                                      'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                    },
+                                  'required': ['type', 'listId', 'productId', 'quantity', 'unit'],
+                                  'additionalProperties': false,
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'shopping_intake' },
+                                      'listId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'itemId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'expectedUpdatedAt':
+                                        {
+                                          'type': 'string',
+                                          'format': 'date-time',
+                                          'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                                        },
+                                      'productId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'locationId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'quantity':
+                                        {
+                                          'type': 'number',
+                                          'exclusiveMinimum': 0,
+                                          'maximum': 1000000,
+                                        },
+                                      'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                      'complete': { 'default': false, 'type': 'boolean' },
+                                    },
+                                  'required':
+                                    [
+                                      'type',
+                                      'listId',
+                                      'itemId',
+                                      'expectedUpdatedAt',
+                                      'productId',
+                                      'locationId',
+                                      'quantity',
+                                      'unit',
+                                    ],
+                                  'additionalProperties': false,
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'leftover' },
+                                      'cookSessionId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'productId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'locationId':
+                                        {
+                                          'type': 'string',
+                                          'format': 'uuid',
+                                          'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                        },
+                                      'quantity':
+                                        {
+                                          'type': 'number',
+                                          'exclusiveMinimum': 0,
+                                          'maximum': 1000000,
+                                        },
+                                      'unit': { 'type': 'string', 'minLength': 1, 'maxLength': 30 },
+                                      'useByDate':
+                                        { 'type': 'string', 'pattern': "^\\d{4}-\\d{2}-\\d{2}$" },
+                                    },
+                                  'required':
+                                    [
+                                      'type',
+                                      'cookSessionId',
+                                      'productId',
+                                      'locationId',
+                                      'quantity',
+                                      'unit',
+                                    ],
+                                  'additionalProperties': false,
+                                },
+                              ],
+                          },
+                        'submission': { 'type': 'string', 'enum': ['not_submitted', 'attempted'] },
+                      },
+                    'required': ['sequence', 'operationId', 'status', 'message', 'time'],
+                    'additionalProperties': false,
+                  },
+              },
+            'reviewOperationIds':
+              {
+                'default': [],
+                'maxItems': 50,
+                'type': 'array',
+                'items':
+                  {
+                    'type': 'string',
+                    'format': 'uuid',
+                    'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                  },
+              },
+            'acknowledgements':
+              {
+                'maxItems': 8,
+                'type': 'array',
+                'items':
+                  {
+                    'type': 'object',
+                    'properties':
+                      {
+                        'id':
+                          {
+                            'type': 'string',
+                            'format': 'uuid',
+                            'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                          },
+                        'status': { 'type': 'string', 'enum': ['applied', 'rejected'] },
+                      },
+                    'required': ['id', 'status'],
+                    'additionalProperties': false,
+                  },
+              },
+          },
+        'required': ['instanceId', 'bindingId', 'state', 'events', 'acknowledgements'],
+        'additionalProperties': false,
+      }
+    ScannerControlRequest:
+      {
+        'type': 'object',
+        'properties':
+          {
+            'id':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'bootId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'stateRevision': { 'type': 'integer', 'minimum': 0, 'maximum': 9007199254740991 },
+            'command':
+              {
+                'oneOf':
+                  [
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'control': { 'type': 'string', 'const': 'mode' },
+                          'mode':
+                            {
+                              'type': 'string',
+                              'enum': ['idle', 'add', 'remove', 'lookup', 'stocktake'],
+                            },
+                        },
+                      'required': ['control', 'mode'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties': { 'control': { 'type': 'string', 'const': 'reset' } },
+                      'required': ['control'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'control': { 'type': 'string', 'const': 'quantity' },
+                          'packages': { 'type': 'integer', 'minimum': 1, 'maximum': 99 },
+                        },
+                      'required': ['control', 'packages'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'control': { 'type': 'string', 'const': 'location' },
+                          'locationId':
+                            {
+                              'anyOf':
+                                [
+                                  {
+                                    'type': 'string',
+                                    'format': 'uuid',
+                                    'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                  },
+                                  { 'type': 'null' },
+                                ],
+                            },
+                        },
+                      'required': ['control', 'locationId'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'control': { 'type': 'string', 'const': 'action' },
+                          'action':
+                            {
+                              'type': 'string',
+                              'enum':
+                                [
+                                  'open',
+                                  'freeze',
+                                  'thaw',
+                                  'move',
+                                  'mark_empty',
+                                  'discard',
+                                  'donate',
+                                ],
+                            },
+                        },
+                      'required': ['control', 'action'],
+                      'additionalProperties': false,
+                    },
+                  ],
+              },
+          },
+        'required': ['id', 'bootId', 'stateRevision', 'command'],
+        'additionalProperties': false,
+      }
+    ScannerLookup:
+      {
+        'type': 'object',
+        'properties':
+          {
+            'stationId': { 'type': 'string', 'pattern': '^[a-zA-Z0-9_-]{1,64}$' },
+            'barcode': { 'type': 'string', 'maxLength': 512 },
+            'batchId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+            'locationId':
+              {
+                'type': 'string',
+                'format': 'uuid',
+                'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+              },
+          },
+        'required': ['stationId'],
+        'additionalProperties': false,
+      }
+    ScannerRegistration:
+      {
+        'type': 'object',
+        'properties':
+          {
+            'id': { 'type': 'string', 'pattern': '^[a-zA-Z0-9_-]{1,64}$' },
+            'name': { 'type': 'string', 'minLength': 1, 'maxLength': 80 },
+            'apiKeyId': { 'type': 'string', 'minLength': 1, 'maxLength': 256 },
+            'scannerQuota': { 'default': false, 'type': 'boolean' },
+          },
+        'required': ['id', 'name', 'apiKeyId'],
+        'additionalProperties': false,
+      }
     KitchenMeasurement:
       type: object
       additionalProperties: false

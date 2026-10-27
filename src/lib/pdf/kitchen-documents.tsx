@@ -1,4 +1,4 @@
-import { Document, Page, View, Image, Fixed } from '@formepdf/react';
+import { Document, Page, View, Image, Fixed, QrCode } from '@formepdf/react';
 import { Heading } from './pdfcn/components/heading/heading';
 import { Text } from './pdfcn/components/text/text';
 import { PageFooter } from './pdfcn/components/page-footer/page-footer';
@@ -29,6 +29,7 @@ export type ScheduleMeal = {
   note: string;
   status: string;
   cardKey: string | null;
+  scannerCode?: string;
 };
 export type MealPrintSchedule = { start: string; end: string; meals: ScheduleMeal[] };
 const ink = '#26372b';
@@ -75,6 +76,20 @@ function RecipeCard({ card, options }: { card: RecipePrintCard; options: PdfExpo
       <Heading level={1} style={{ fontSize: 29, marginBottom: 8 }}>
         {recipe.title}
       </Heading>
+      {!card.adapted &&
+      (card.servings ?? base) &&
+      (card.servings ?? base)! > 0 &&
+      (card.servings ?? base)! <= 100 ? (
+        <View wrap={false} style={{ marginBottom: 12, padding: 10 }}>
+          <QrCode
+            data={`BORD:1:RECIPE:${card.recipeId}:${card.servings ?? base}:${card.revision}`}
+            size={78}
+          />
+          <Text style={{ fontSize: 8 }}>
+            Scan to record cooking immediately · ingredients will be deducted
+          </Text>
+        </View>
+      ) : null}
       {options.includeImage && card.image ? (
         <Image
           src={card.image}
@@ -278,6 +293,14 @@ function SchedulePages({
                           {meal.context}
                         </Text>
                       ) : null}
+                      {meal.scannerCode ? (
+                        <View style={{ padding: 8 }}>
+                          <QrCode data={meal.scannerCode} size={64} />
+                          <Text style={{ fontSize: 8 }}>
+                            Scan to record this planned cooking immediately
+                          </Text>
+                        </View>
+                      ) : null}
                       {options.includeNotes && meal.note ? (
                         <Text variant="xs" color="mutedForeground" noMargin>
                           {meal.note}
@@ -298,6 +321,14 @@ function SchedulePages({
                           <Text variant="xs" color="mutedForeground" noMargin>
                             {meal.context}
                           </Text>
+                        ) : null}
+                        {meal.scannerCode ? (
+                          <View style={{ padding: 8 }}>
+                            <QrCode data={meal.scannerCode} size={64} />
+                            <Text style={{ fontSize: 8 }}>
+                              Scan to record this planned cooking immediately
+                            </Text>
+                          </View>
                         ) : null}
                         {options.includeNotes && meal.note ? (
                           <Text variant="xs" color="mutedForeground" noMargin>
