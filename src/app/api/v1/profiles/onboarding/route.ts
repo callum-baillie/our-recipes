@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { SCALE_ONBOARDING_COOKIE } from '@/lib/services/nutrition-scale-service';
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 import { auth } from '@/lib/auth/server';
 import { getRuntimeConfig } from '@/lib/config';
@@ -60,7 +61,9 @@ export async function POST(request: Request) {
           },
           headers: request.headers,
         })
-        .catch((error) => console.error('Could not queue the verification email.', error));
+        .catch((error) =>
+          logger.child('auth').error('Could not queue the verification email.', { error }),
+        );
     }
     return NextResponse.json(
       { ...result, requiresEmailVerification: requireEmailVerification },

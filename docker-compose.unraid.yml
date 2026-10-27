@@ -12,6 +12,8 @@ services:
       AUTH_REQUIRE_EMAIL_VERIFICATION: ${AUTH_REQUIRE_EMAIL_VERIFICATION:-true}
       COOKIE_SECRET: replace-with-a-unique-secret-of-at-least-32-characters
       TZ: America/Los_Angeles
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
       HOMEPAGE_INTEGRATION_TOKEN: ${HOMEPAGE_INTEGRATION_TOKEN:-}
       BACKUP_DIR: /backup
       BACKUP_INTERVAL_HOURS: 24

@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -84,7 +85,9 @@ export async function POST(request: Request) {
           SCOTTISH_STOVIES_IMAGE_ALT,
         );
       } catch (error) {
-        console.error('The example Stovies recipe was created without its optional image.', error);
+        logger
+          .child('setup')
+          .warn('The example Stovies recipe was created without its optional image.', { error });
       }
     }
     const requireEmailVerification = getRuntimeConfig().auth.requireEmailVerification;
@@ -110,7 +113,9 @@ export async function POST(request: Request) {
             body: { email, callbackURL: '/sign-in?verified=1' },
             headers: request.headers,
           })
-          .catch((error) => console.error('Could not queue a profile verification email.', error));
+          .catch((error) =>
+            logger.child('auth').error('Could not queue a profile verification email.', { error }),
+          );
       }
     }
     return response;

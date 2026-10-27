@@ -30,6 +30,10 @@ curl http://127.0.0.1:3000/api/v1/health
 
 The image briefly starts its entrypoint as root to initialize ownership of the dedicated `/data` mount and the exact configured `BACKUP_DIR`, then drops to UID/GID `1001` and binds the app to port `3000` inside the container. SQLite, images, migration locks, and safe backup configuration remain below `/data`; completed bundles and pre-migration safety copies go to `BACKUP_DIR` (default `/data/backups`). The runner executes `scripts/container-migrate.mjs` before `server.js`; the script holds a migration lock and takes a pre-migration SQLite safety copy when a database already exists.
 
+## Logging
+
+The server writes one JSON line per event: debug and info to stdout, warn and error to stderr. Container tools such as Dozzle read that stream through the Docker socket, so nothing needs to be pushed anywhere. `LOG_LEVEL` is `debug`, `info` (default), `warn`, `error` or `silent`; `LOG_FORMAT=text` gives a plain one-line form for reading in a terminal. Set `LOG_LEVEL=debug` temporarily to see every request the sign-in gate accepts, redirects or refuses. Messages never include credentials, cookies, API keys or email addresses; fields under sensitive names are redacted.
+
 ## Health and persistence proof
 
 When a Docker daemon is available, run:
@@ -40,7 +44,7 @@ pnpm test:docker
 
 The script builds the image, checks its reported version/current migrations and non-root application process, and rejects unexpected credential/data paths in the runtime filesystem. It creates a synthetic household and recipe in a temporary bind-mounted volume, creates/downloads/validates a backup, restores it after another recipe is added, verifies session revocation and restored contents, then destroys/recreates the container and verifies persistence. It removes only the container and temporary host directory it creates. It binds its test port to loopback and disables email verification and external food lookup. No real household volume is used.
 
-Set `DOCKER_SKIP_BUILD=true` and `DOCKER_IMAGE=ghcr.io/callum-baillie/bord:v1.0.0-rc.24` to inspect an already pulled release image. Its version must match `package.json`, or the explicit `DOCKER_EXPECTED_VERSION` when checking another version. The release workflow runs this disposable check on native amd64 and arm64 runners after publication; image build success and runtime smoke success remain separate results.
+Set `DOCKER_SKIP_BUILD=true` and `DOCKER_IMAGE=ghcr.io/callum-baillie/bord:v1.0.0-rc.25` to inspect an already pulled release image. Its version must match `package.json`, or the explicit `DOCKER_EXPECTED_VERSION` when checking another version. The release workflow runs this disposable check on native amd64 and arm64 runners after publication; image build success and runtime smoke success remain separate results.
 
 On 2026-07-13, this workspace ran the smoke command successfully against Docker Engine 29.6.1: the image built, `/api/v1/health` passed, first-run setup succeeded, and `setupComplete` persisted after recreation of its temporary bind-mounted container. It is a Linux container/persistence validation, not proof of Unraid share ownership, reverse proxy, or LAN exposure; review those separately on the target host.
 

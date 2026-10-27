@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 import { auth } from '@/lib/auth/server';
@@ -51,7 +52,9 @@ export async function POST(request: Request) {
             body: { email: entry.credentials.email, callbackURL: '/sign-in?verified=1' },
             headers: request.headers,
           })
-          .catch((error) => console.error('Could not queue a verification email.', error));
+          .catch((error) =>
+            logger.child('auth').error('Could not queue a verification email.', { error }),
+          );
       }
     }
     return NextResponse.json({

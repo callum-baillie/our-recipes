@@ -14,6 +14,10 @@ import {
   isAuthenticationConfigured,
 } from '@/lib/services/auth-service';
 import { getHouseholdState } from '@/lib/services/household-service';
+import { createLogger } from '@/lib/logger';
+
+const requestLogger = createLogger('http');
+const SLOW_GATE_MS = 1_000;
 
 const LEGACY_COOKIE_NAMES = {
   bord_active_profile: 'our_recipes_active_profile',
@@ -99,7 +103,36 @@ function redirectTo(request: NextRequest, pathname: string): NextResponse {
   return NextResponse.redirect(target);
 }
 
+/**
+ * Logs what the gate decides. The route handler runs after this returns, so its own status and
+ * duration are not visible here: refusals and redirects are logged with their status, and a slow
+ * gate (session lookup) is flagged.
+ */
 export async function proxy(request: NextRequest) {
+  const started = performance.now();
+  const { pathname } = request.nextUrl;
+  try {
+    const response = await handleRequest(request);
+    const elapsedMs = Math.round(performance.now() - started);
+    const passedThrough = response.headers.has('x-middleware-next');
+    const fields = { method: request.method, path: pathname, status: response.status, elapsedMs };
+    if (!passedThrough && response.status >= 400) requestLogger.warn('request refused', fields);
+    else if (!passedThrough) requestLogger.debug('request redirected', fields);
+    else if (elapsedMs >= SLOW_GATE_MS) requestLogger.warn('slow request gate', fields);
+    else requestLogger.debug('request accepted', fields);
+    return response;
+  } catch (error) {
+    requestLogger.error('request gate failed', {
+      method: request.method,
+      path: pathname,
+      elapsedMs: Math.round(performance.now() - started),
+      error,
+    });
+    throw error;
+  }
+}
+
+async function handleRequest(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   if (isPublicAsset(pathname) || isPublicOperationalPath(pathname)) {
     return migrateLegacyCookies(request, continueRequest(request));

@@ -7,6 +7,7 @@ import { appRoleCan } from '@/lib/domain/permissions';
 import { currentAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
 import { RECIPE_IMAGE_PROMPT_VERSION } from '@/lib/domain/recipe-image-generation';
 import 'server-only';
+import { logger } from '@/lib/logger';
 import {
   assertProfileAiEnabled,
   AiAccessDeniedError,
@@ -1829,8 +1830,10 @@ export async function wakeAiJobWorker(): Promise<void> {
   if (process.env.NODE_ENV !== 'production' || process.env.AI_WORKER_ENABLED === 'false') return;
   if (process.env.QUEUE_BACKEND === 'redis') {
     const { wakeTaskQueue } = await import('./task-queue-service');
-    await wakeTaskQueue().catch(() =>
-      console.error('Task queued in SQLite, but Redis could not be reached.'),
+    await wakeTaskQueue().catch((error) =>
+      logger.child('tasks').error('Task queued in SQLite, but Redis could not be reached.', {
+        error,
+      }),
     );
     return;
   }
@@ -1847,7 +1850,11 @@ export function startAiJobWorker(): void {
   if (process.env.QUEUE_BACKEND === 'redis') {
     void import('./task-queue-service')
       .then((module) => module.startTaskQueue())
-      .catch(() => console.error('Redis task queue could not start. Check queue configuration.'));
+      .catch((error) =>
+        logger
+          .child('tasks')
+          .error('Redis task queue could not start. Check queue configuration.', { error }),
+      );
     return;
   }
   const run = () =>
@@ -1856,7 +1863,7 @@ export function startAiJobWorker(): void {
         module.enqueueScheduledPlans();
         await runDueAiJobs();
       })
-      .catch(() => console.error('Background task tick failed.'));
+      .catch((error) => logger.child('tasks').error('Background task tick failed.', { error }));
   globalThis.bordAiJobWorkerTimer = setInterval(run, POLL_MS);
   globalThis.bordAiJobWorkerTimer.unref?.();
   setTimeout(run, 1_000).unref?.();

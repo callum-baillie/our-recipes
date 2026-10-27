@@ -1,4 +1,5 @@
 import 'server-only';
+import { logger } from '@/lib/logger';
 
 import { and, asc, eq, lt } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
@@ -55,7 +56,7 @@ type FoodDataEvent = {
 
 let observer = (event: FoodDataEvent) => {
   if (process.env.NODE_ENV === 'production')
-    console.info(JSON.stringify({ event: 'food_data_provider', ...event }));
+    logger.child('food-data').info('provider lookup', { ...event });
 };
 
 function resultCount(value: CachedValue) {

@@ -1,4 +1,5 @@
 import 'server-only';
+import { logger } from '@/lib/logger';
 
 import Database from 'better-sqlite3';
 import { createHash, randomUUID } from 'node:crypto';
@@ -508,7 +509,11 @@ async function restoreValidatedBackup(id: string): Promise<{ safetyBackup: Backu
       await rm(directory, { recursive: true, force: true }).catch(() => {
         // Cleanup cannot turn an acknowledged replacement into a reported failure
         // or hide the actual restore/rollback error. Leave files for operator review.
-        console.error('Backup restoration left a staging directory that needs cleanup.');
+        logger
+          .child('backup')
+          .error('Backup restoration left a staging directory that needs cleanup.', {
+            directory,
+          });
       });
     };
     if (!preserveRecoveryDirectories) {

@@ -1,4 +1,5 @@
 import 'server-only';
+import { logger } from '@/lib/logger';
 import { Queue, Worker } from 'bullmq';
 import { runDueAiJobs } from './ai-job-service';
 import { enqueueScheduledPlans } from './task-scheduler-service';
@@ -55,8 +56,10 @@ export async function startTaskQueue() {
   state.worker.on('error', () => {
     state.connected = false;
   });
-  state.worker.on('failed', () => {
-    console.error('Task queue tick failed; durable task state remains in SQLite.');
+  state.worker.on('failed', (_job, error) => {
+    logger
+      .child('tasks')
+      .error('Task queue tick failed; durable task state remains in SQLite.', { error });
   });
   const schedule = () =>
     state

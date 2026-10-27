@@ -1,6 +1,7 @@
 import { withApiRequestId, authorizeCoreApi, actorFromPrincipal } from '@/lib/api-auth';
 
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 import {
   importClientConversionsSchema,
@@ -80,7 +81,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ImportValidationError)
       return withApiRequestId(jsonError(422, error.code, error.message), access.requestId);
-    console.error('Import processing failed before provider review.', error);
+    logger.child('imports').error('Import processing failed before provider review.', {
+      requestId: access.requestId,
+      error,
+    });
     return withApiRequestId(
       jsonError(
         500,

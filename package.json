@@ -1,6 +1,6 @@
 {
   "name": "bord",
-  "version": "1.0.0-rc.24",
+  "version": "1.0.0-rc.25",
   "private": true,
   "description": "A self-hosted household recipe manager for a local Unraid deployment.",
   "packageManager": "pnpm@11.13.1",

@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.0-rc.25
+
+- Add structured server logging. Every line is one JSON object (`time`, `level`, `service`, `component`, `msg` plus fields) on stdout for debug and info, and stderr for warn and error, so `docker logs` and Dozzle read the same stream and Dozzle can filter by level. Set `LOG_LEVEL` (`debug`, `info`, `warn`, `error`, `silent`; default `info`) and `LOG_FORMAT` (`json` or `text`; default `json`). Sensitive field names are redacted.
+- Replace the scattered `console` calls with the logger, log the server start with its version, log unhandled request errors, and log refused or redirected requests at `warn`/`debug`. A request gate that takes over a second logs `warn`.
+- Route Better Auth's own messages through the logger. A repeating API-key rate-limit error is reduced to one `warn` per minute.
+- No schema change (`0082_scanner_stations`).
+
 ## 1.0.0-rc.24
 
 - Supersedes rc.23, which has the same features and schema (`0082_scanner_stations`) but was found by the full browser journey run to have a page-entrance fade and global smooth scrolling that made contrast checks, layout measurements and scripted scrolling unreliable. Both are removed; dialog, menu and toast motion is unchanged.

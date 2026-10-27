@@ -1,4 +1,5 @@
 import 'server-only';
+import { createLogger } from '@/lib/logger';
 
 import { apiKey } from '@better-auth/api-key';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
@@ -17,6 +18,32 @@ import { sendAuthEmail } from '@/lib/auth/email';
 
 ensureDatabase();
 
+const authLogger = createLogger('auth');
+const lastThrottledAt = new Map<string, number>();
+
+/** Better Auth's own messages, routed through the shared logger so levels and format apply. */
+function logAuthEvent(
+  level: 'debug' | 'info' | 'warn' | 'error',
+  message: string,
+  ...args: unknown[]
+) {
+  const detail = args.find((arg) => arg instanceof Error) ?? args[0];
+  const code =
+    detail && typeof detail === 'object' && 'body' in detail
+      ? (detail as { body?: { code?: string } }).body?.code
+      : undefined;
+  // A client polling with a rate-limited API key repeats this every few seconds. Keep it visible
+  // as a single warning per minute instead of a stack of errors.
+  if (code === 'RATE_LIMITED') {
+    const now = Date.now();
+    if (now - (lastThrottledAt.get(message) ?? 0) < 60_000) return;
+    lastThrottledAt.set(message, now);
+    authLogger.warn(message, { code, note: 'repeats are suppressed for 60 seconds' });
+    return;
+  }
+  authLogger[level](message, detail === undefined ? {} : { detail });
+}
+
 const config = getRuntimeConfig();
 const authUrl = new URL(config.auth.baseUrl);
 // Backup restoration closes/reopens SQLite. Resolve root Drizzle methods at
@@ -33,6 +60,7 @@ const authentication = betterAuth({
   appName: 'Bòrd',
   baseURL: config.auth.baseUrl,
   secret: config.auth.secret,
+  logger: { level: 'debug', disableColors: true, log: logAuthEvent },
   trustedOrigins: [
     config.auth.baseUrl,
     'bord://',
@@ -64,8 +92,13 @@ const authentication = betterAuth({
         to: user.email,
         subject: 'Reset your Bòrd passphrase',
         text: `Use this one-time link to reset your Bòrd passphrase:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
-      }).catch(() =>
-        console.error('Could not send the password reset email. Check the configured transport.'),
+      }).catch((error) =>
+        authLogger.error(
+          'Could not send the password reset email. Check the configured transport.',
+          {
+            error,
+          },
+        ),
       );
     },
   },
@@ -95,8 +128,13 @@ const authentication = betterAuth({
           to: user.email,
           subject: 'Verify your Bòrd email',
           text: `Verify your email address to finish securing your Bòrd profile:\n\n${link.href}`,
-        }).catch(() =>
-          console.error('Could not send the verification email. Check the configured transport.'),
+        }).catch((error) =>
+          authLogger.error(
+            'Could not send the verification email. Check the configured transport.',
+            {
+              error,
+            },
+          ),
         );
       }),
   },

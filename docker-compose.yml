@@ -9,6 +9,8 @@ services:
       - '3000:3000'
     environment:
       DATA_DIR: /data
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
       DATABASE_URL: /data/bord.db
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
