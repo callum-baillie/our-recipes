@@ -8,14 +8,16 @@ import {
 } from '@/lib/domain/inventory-count';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Minus, Plus, Save, Trash2, Search, Check } from 'lucide-react';
+import { Minus, Package, Plus, Save, Trash2, Search, Check } from 'lucide-react';
 import { ButtonSpinner } from '@/components/skeleton';
+import { ProductImage, PhotoCredit } from '@/components/product-image';
 import { PageHeader } from './page-header';
 import { KitchenPrintDialog } from './kitchen-print-dialog';
 import styles from './pantry-inventory.module.css';
 type Stock = {
   id: string;
   name: string;
+  gtin?: string | null;
   location: string;
   unit: string;
   quantity: number | null;
@@ -323,7 +325,14 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
           return (
             <article key={batch.id}>
               <div>
-                <h2>{batch.name}</h2>
+                <div className={styles.nameRow}>
+                  <ProductImage
+                    className={styles.thumb}
+                    gtin={batch.gtin}
+                    fallback={<Package size={16} />}
+                  />
+                  <h2>{batch.name}</h2>
+                </div>
                 <p>
                   {batch.location} · Recorded:{' '}
                   {confirmed[batch.id]
@@ -494,6 +503,7 @@ export function PantryInventory({ batches, canEdit }: { batches: Stock[]; canEdi
         })}
       </div>
       {!visible.length && <p>No stock matches this view.</p>}
+      {batches.some((batch) => batch.gtin) && <PhotoCredit />}
       <footer className={styles.footer}>
         <span role="status">
           {!changed.length && message

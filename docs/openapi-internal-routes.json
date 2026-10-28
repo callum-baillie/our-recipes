@@ -353,5 +353,10 @@
     "method": "GET",
     "path": "/scanner/stations/{stationId}/session",
     "reason": "First-party scan list page: recent station scans with live batch state."
+  },
+  {
+    "method": "GET",
+    "path": "/food-data/images/{gtin}",
+    "reason": "First-party server-side proxy for barcode-matched product photos; the food API key never reaches the browser."
   }
 ]

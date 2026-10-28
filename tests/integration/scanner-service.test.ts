@@ -496,6 +496,7 @@ describe('scanner operations on real SQLite stock', () => {
       kind: 'added',
       state: 'saved',
       title: 'Test lentils',
+      gtin: barcode,
       canUndo: true,
       edited: false,
       batch: { quantity: 500, unit: 'g', status: 'unopened' },

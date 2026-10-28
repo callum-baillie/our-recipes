@@ -1,7 +1,14 @@
 import 'server-only';
 import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 import { getDatabase } from '@/lib/db/client';
-import { pantryBatches, pantryProducts, scannerOperations } from '@/lib/db/schema';
+import {
+  pantryBatches,
+  pantryProductIdentifiers,
+  pantryProducts,
+  scannerOperations,
+} from '@/lib/db/schema';
+import { normalizeGtin, retailGtin } from '@/lib/domain/food-data';
+import { productImageGtin } from '@/lib/domain/product-image';
 import { ScannerError } from '@/lib/domain/scanner';
 import type { ScanSessionEntry } from '@/lib/domain/scanner-session';
 import type { RequestPrincipal } from './auth-service';
@@ -25,6 +32,14 @@ const KINDS: Record<string, ScanSessionEntry['kind']> = {
   batch_action: 'adjusted',
   stocktake: 'adjusted',
 };
+
+function barcodeGtin(barcode: string | null) {
+  try {
+    return barcode ? retailGtin(normalizeGtin(barcode).canonicalGtin) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * A read-only view of what one station has recorded recently, newest first, with the live state
@@ -64,7 +79,9 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
             unit: pantryBatches.unit,
             locationId: pantryBatches.locationId,
             status: pantryBatches.status,
+            productId: pantryBatches.productId,
             name: pantryProducts.displayName,
+            brand: pantryProducts.brand,
           })
           .from(pantryBatches)
           .innerJoin(pantryProducts, eq(pantryProducts.id, pantryBatches.productId))
@@ -73,12 +90,24 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
       : []
     ).map((batch) => [batch.id, batch]),
   );
+  const productIds = [...new Set([...batches.values()].map((batch) => batch.productId))];
+  const identifiers = productIds.length
+    ? db
+        .select()
+        .from(pantryProductIdentifiers)
+        .where(inArray(pantryProductIdentifiers.productId, productIds))
+        .all()
+    : [];
   const entries: ScanSessionEntry[] = rows.map((row) => {
     const result = row.result;
     const batch = result.batchId ? batches.get(result.batchId) : undefined;
     const command = (row.command ?? {}) as { command?: { barcode?: unknown } };
     const barcode = typeof command.command?.barcode === 'string' ? command.command.barcode : null;
     const review = row.outcome === 'needs_review';
+    const gtin =
+      (batch
+        ? productImageGtin(identifiers.filter((item) => item.productId === batch.productId))
+        : null) ?? barcodeGtin(barcode);
     return {
       id: row.id,
       time: row.createdAt.toISOString(),
@@ -87,6 +116,8 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
       title: review ? 'Needs review' : (result.productName ?? batch?.name ?? result.message),
       detail: result.message,
       barcode,
+      gtin,
+      brand: batch?.brand ?? '',
       quantity: result.quantity ?? null,
       unit: result.unit ?? '',
       edited: !!batch && result.batchVersion !== undefined && batch.version !== result.batchVersion,

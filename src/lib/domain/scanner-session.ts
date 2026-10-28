@@ -7,6 +7,9 @@ export type ScanSessionEntry = {
   title: string;
   detail: string;
   barcode: string | null;
+  /** Checksum-valid retail barcode used to look up a product photo, if any. */
+  gtin: string | null;
+  brand: string;
   quantity: number | null;
   unit: string;
   /** The recorded transaction can still be reversed as a unit. */

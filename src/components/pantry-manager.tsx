@@ -40,10 +40,13 @@ import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 import { useToast } from '@/components/toast-provider';
 import type { FoodRecord } from '@/lib/domain/food-data';
 
+import { ProductImage, PhotoCredit } from '@/components/product-image';
+import { productImageGtin, type ProductIdentifier } from '@/lib/domain/product-image';
 import styles from './pantry-manager.module.css';
 
 type Product = {
   id: string;
+  identifiers?: ProductIdentifier[];
   displayName: string;
   brand: string;
   variant: string;
@@ -2272,9 +2275,11 @@ export function PantryManager({
                     <article className={styles.card} key={product.id}>
                       <div className={styles.rowMain}>
                         <div className={styles.productCell}>
-                          <span className={styles.productIcon} aria-hidden="true">
-                            <Package size={18} />
-                          </span>
+                          <ProductImage
+                            className={styles.productIcon}
+                            gtin={productImageGtin(product.identifiers)}
+                            fallback={<Package size={18} />}
+                          />
                           <div>
                             <h3>{product.displayName}</h3>
                             <p className={styles.productMeta}>
@@ -2364,9 +2369,11 @@ export function PantryManager({
                       <article className={styles.card} key={batch.id}>
                         <div className={styles.rowMain}>
                           <div className={styles.productCell}>
-                            <span className={styles.productIcon} aria-hidden="true">
-                              <Package size={18} />
-                            </span>
+                            <ProductImage
+                              className={styles.productIcon}
+                              gtin={productImageGtin(batch.product.identifiers)}
+                              fallback={<Package size={18} />}
+                            />
                             <div>
                               <h3>{batch.product.displayName}</h3>
                               {batch.product.brand || batch.product.variant ? (
@@ -3190,6 +3197,9 @@ export function PantryManager({
           </details>
         </aside>
       </div>
+      {dashboard.batches.some((batch) => productImageGtin(batch.product.identifiers)) && (
+        <PhotoCredit />
+      )}
     </div>
   );
 }

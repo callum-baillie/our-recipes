@@ -2,7 +2,7 @@
 
 Review-first food discovery includes the native Bòrd Food API and compatible direct Open Food Facts/USDA adapters, exact source revisions, measures, guidance, identified enrichment, store linking and optional scanning. See [bord-catalog-integration.md](bord-catalog-integration.md).
 
-This page summarizes the product for `1.0.0-rc.27`; the [current capability matrix](refinement/capability-matrix.md) and [verification register](refinement/README.md) record implementation and evidence separately. Bòrd is a self-hosted app
+This page summarizes the product for `1.0.0-rc.28`; the [current capability matrix](refinement/capability-matrix.md) and [verification register](refinement/README.md) record implementation and evidence separately. Bòrd is a self-hosted app
 for one household. Better Auth email/passphrase accounts control access; household profiles select
 preferences and preserve attribution inside a session and are not an independent authorization
 boundary.

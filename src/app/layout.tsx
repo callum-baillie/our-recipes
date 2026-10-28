@@ -10,6 +10,8 @@ import { AppFooter } from '@/components/app-footer';
 import { AppHeader } from '@/components/app-header';
 import { PwaRegistration } from '@/components/pwa-registration';
 import { ToastProvider } from '@/components/toast-provider';
+import { ProductPhotosProvider } from '@/components/product-photos';
+import { productPhotosConfigured } from '@/lib/services/product-image-service';
 import {
   APPEARANCE_COOKIE_KEYS,
   PALETTES,
@@ -168,23 +170,25 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         )}
       >
         <ToastProvider>
-          <DialogViewport />
-          {state.household && !isSecuritySurface && (!authConfigured || authSession) ? (
-            <AppHeader
-              kitchenName={state.household.kitchenName}
-              role={effectiveRole}
-              activeProfileId={actor.profileId}
-              profiles={state.profiles.map(({ id, displayName, color }) => ({
-                id,
-                displayName,
-                color,
-              }))}
-              kitchenIcon={kitchenIcon}
-            />
-          ) : null}
-          {children}
-          {!isSecuritySurface ? <AppFooter kitchenName={kitchenName} /> : null}
-          {!isSecuritySurface && (!authConfigured || authSession) ? <PwaRegistration /> : null}
+          <ProductPhotosProvider enabled={productPhotosConfigured()}>
+            <DialogViewport />
+            {state.household && !isSecuritySurface && (!authConfigured || authSession) ? (
+              <AppHeader
+                kitchenName={state.household.kitchenName}
+                role={effectiveRole}
+                activeProfileId={actor.profileId}
+                profiles={state.profiles.map(({ id, displayName, color }) => ({
+                  id,
+                  displayName,
+                  color,
+                }))}
+                kitchenIcon={kitchenIcon}
+              />
+            ) : null}
+            {children}
+            {!isSecuritySurface ? <AppFooter kitchenName={kitchenName} /> : null}
+            {!isSecuritySurface && (!authConfigured || authSession) ? <PwaRegistration /> : null}
+          </ProductPhotosProvider>
         </ToastProvider>
       </body>
     </html>

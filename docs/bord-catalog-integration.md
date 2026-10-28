@@ -10,6 +10,7 @@ Configure the **Bòrd server**, then restart it:
 BORD_FOOD_API_BASE_URL=http://bord-food-api:8080
 BORD_FOOD_API_KEY=your-server-read-key
 BORD_FOOD_API_TIMEOUT_MS=5000
+BORD_FOOD_API_IMAGE_TIMEOUT_MS=20000
 FOOD_DATA_MODE=catalog_only
 FOOD_DATA_ALLOW_REMOTE_FALLBACK=false
 STORE_DIRECTORY_ENABLED=true
@@ -131,3 +132,14 @@ Measures retain `amount`, `unit`, `modifier`, `description`, `gramWeight`, `form
 The source-review enrichment action accepts identified canonical product IDs. Free-text enrichment is not advertised. Missing source evidence, unavailable packs and failed requests remain distinct. Native store discovery uses a deliberate handoff to the same kitchen’s existing settings editor and its chain/area/proximity/pagination controls.
 
 Native scanner confirmations use an encrypted write-ahead journal bound to instance/account/original profile. Assistant recovery stores only owned server operation references. Neither reconnect nor restart resubmits work automatically. `/auth/context` provides minimal session actor binding and reviewed scanner write routes enforce the optional `X-Bord-Expected-Profile-Id` header. Exact receipts remain usable during provider outage after current authorization. See [post-review evidence](refinement/post-review-catalog.md).
+
+## Product photos
+
+When `BORD_FOOD_API_BASE_URL` and `BORD_FOOD_API_KEY` are set, Bòrd shows a product photo beside Pantry products and batches, the physical count page and the scan list. Without them nothing is requested and every product keeps its category icon.
+
+Photos come from the API's barcode-matched image cache (`GET /v1/product-images/{gtin}`; see `bord-food-api/docs/PRODUCT-IMAGES.md`). The browser never calls the API. It requests `/api/v1/food-data/images/{gtin}` on Bòrd, which needs a signed-in session or a Pantry-read key and forwards the request with the server-held `X-Api-Key`:
+
+- Matching uses only a checksum-valid retail barcode (UPC-A, EAN-13 or GTIN) saved on the product, preferring a verified one. Names are never used to guess a photo, and a USDA product does not imply a photo exists.
+- A cold lookup can take several seconds (6.55 s live), so photos use `BORD_FOOD_API_IMAGE_TIMEOUT_MS` (default 20 000), not the five-second catalog timeout. Bòrd runs at most three upstream photo requests at once, shares one request between callers for the same barcode, waits once for a short `Retry-After`, keeps recent results in memory and honors `ETag`/`If-None-Match`.
+- Only a JPEG of at most 2 MiB is relayed. A missing photo (404) is remembered for an hour; temporary failures (503), a rejected key (401) and rights blocks (403) are never remembered as "no photo". The page shows the placeholder meanwhile.
+- The photos are Open Food Facts images under CC BY-SA 3.0. Pages that show them display the attribution, the licence link and the note that they were resized and converted to JPEG.

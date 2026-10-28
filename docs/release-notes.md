@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.0-rc.28
+
+- Show barcode-matched product photos beside Pantry products and batches, on the physical count page and on the scan list. Photos come from the Bòrd Food API's image cache through a first-party, signed-in proxy (`/api/v1/food-data/images/{gtin}`), so the food API key never reaches the browser. Matching uses only a checksum-valid barcode saved on the product; products without a photo keep the category icon.
+- The proxy uses a separate 20-second timeout (`BORD_FOOD_API_IMAGE_TIMEOUT_MS`) because a cold lookup makes several upstream requests, runs at most three upstream photo requests at once, shares concurrent requests for the same barcode, waits once for a short `Retry-After`, relays only a bounded JPEG, honors `ETag`, and never remembers a temporary failure, rejected key or rights block as "no photo". Photos load only when the food API is configured. Pages that show them display the Open Food Facts attribution, the CC BY-SA 3.0 link and the resize/JPEG note.
+- Redesign the scan list as a till: a receipt of line items beside a register display with an item counter and the last scanned product. New items slide in, quantity changes bump, and removed items are struck through with a VOID stamp. Motion respects reduced-motion and never replays history. The list now polls once a second and announces changes. The "removed" total is now "voided".
+- Scanner companion 0.2.2 wakes its delivery worker as soon as a scan is queued instead of waiting for its next poll.
+- No schema change (`0082_scanner_stations`). Back up before upgrading as usual.
+- Verification: TypeScript, lint, Prettier and OpenAPI coverage pass; 212 test files / 1,311 tests pass (9 skipped); the release build and artifact check pass. A browser run against a mock food API with the real companion code path showed scans appearing in 0.2–1.0 s without a reload, photos loading through the proxy, a missing photo falling back, a busy photo retried once, quantity changes and removal, and no API key in any browser request. The mock food API was not the live service.
+
 ## 1.0.0-rc.27
 
 - Supersede rc.26 with a fixed-window API-key quota correction. Continuous companion heartbeats previously accumulated requests until an idle minute and periodically received HTTP 429 despite the configured per-minute quota. The pinned API-key package patch anchors the existing counter to its first request in each window, preserves atomic burst limits, and is applied in local and Docker installs.

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { getPantryDashboard } from '@/lib/services/pantry-service';
 import { PantryInventory } from '@/components/pantry-inventory';
+import { productImageGtin } from '@/lib/domain/product-image';
 export const dynamic = 'force-dynamic';
 export default async function PantryInventoryPage() {
   const principal = await getAuthenticatedSessionPrincipal(
@@ -16,6 +17,7 @@ export default async function PantryInventoryPage() {
       batches={pantry.batches.map((batch) => ({
         id: batch.id,
         name: batch.product.displayName,
+        gtin: productImageGtin(batch.product.identifiers),
         location: batch.location.path,
         unit: batch.unit,
         quantity: batch.quantityRemaining,

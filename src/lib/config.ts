@@ -45,6 +45,7 @@ const configSchema = z.object({
         .nullable(),
       apiKey: z.string().min(1).nullable(),
       timeoutMs: z.number().int().min(100).max(30_000),
+      imageTimeoutMs: z.number().int().min(1_000).max(60_000),
       storeDirectoryEnabled: z.boolean(),
     }),
     openFoodFacts: z.object({
@@ -174,6 +175,8 @@ export function getRuntimeConfig(): RuntimeConfig {
         baseUrl: process.env.BORD_FOOD_API_BASE_URL?.trim() || null,
         apiKey: process.env.BORD_FOOD_API_KEY?.trim() || null,
         timeoutMs: Number(process.env.BORD_FOOD_API_TIMEOUT_MS ?? '5000'),
+        // A cold image lookup makes several upstream requests (6.55 s live); never reuse timeoutMs.
+        imageTimeoutMs: Number(process.env.BORD_FOOD_API_IMAGE_TIMEOUT_MS ?? '20000'),
         storeDirectoryEnabled: environmentBoolean('STORE_DIRECTORY_ENABLED', false),
       },
       openFoodFacts: {
@@ -182,7 +185,7 @@ export function getRuntimeConfig(): RuntimeConfig {
         apiVersion: process.env.OPEN_FOOD_FACTS_API_VERSION ?? 'v3.6',
         userAgent:
           process.env.OPEN_FOOD_FACTS_USER_AGENT ??
-          'Bord/1.0.0-rc.27 (https://github.com/callum-baillie/our-recipes)',
+          'Bord/1.0.0-rc.28 (https://github.com/callum-baillie/our-recipes)',
         timeoutMs: Number(process.env.OPEN_FOOD_FACTS_TIMEOUT_MS ?? '5000'),
         requestsPerMinute: Number(process.env.OPEN_FOOD_FACTS_PRODUCT_RPM ?? '12'),
       },
