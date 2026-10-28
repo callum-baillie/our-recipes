@@ -8,7 +8,7 @@ Its optional OpenAI assistant can read permitted recipe, planning, and nutrition
 
 ## Release status
 
-**v1.0.0-rc.26** is a release candidate, not a public v1 tag. The [current refinement register](docs/refinement/README.md), [capability matrix](docs/refinement/capability-matrix.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish delivered behavior from device, live-provider and deployment checks. Please report issues through the [support and security guide](docs/support.md).
+**v1.0.0-rc.27** is a release candidate, not a public v1 tag. The [current refinement register](docs/refinement/README.md), [capability matrix](docs/refinement/capability-matrix.md), [release checklist](docs/release-checklist.md), and [release notes](docs/release-notes.md) distinguish delivered behavior from device, live-provider and deployment checks. Please report issues through the [support and security guide](docs/support.md).
 
 ## Install with Docker
 

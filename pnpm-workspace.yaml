@@ -31,3 +31,5 @@ minimumReleaseAgeExclude:
 # two clean installations. This changes local install mechanics only.
 nodeLinker: hoisted
 packageImportMethod: copy
+patchedDependencies:
+  '@better-auth/api-key@1.6.25': patches/@better-auth__api-key@1.6.25.patch

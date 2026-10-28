@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.0-rc.27
+
+- Supersede rc.26 with a fixed-window API-key quota correction. Continuous companion heartbeats previously accumulated requests until an idle minute and periodically received HTTP 429 despite the configured per-minute quota. The pinned API-key package patch anchors the existing counter to its first request in each window, preserves atomic burst limits, and is applied in local and Docker installs.
+- A real SQLite/Better Auth regression reproduces the old failure and verifies continuous traffic over three windows, rejected excess requests and a concurrent burst. No key, permission, environment, scanner queue or schema change is required.
+- Includes all rc.26 scanner, catalog and UI improvements. Companion remains 0.2.1. Existing dependency advisories and native-app TypeScript CI failure remain separate limitations.
+
 ## 1.0.0-rc.26
 
 - Refine the scanner station controls, responsive buttons and visible connection/loading states. Add a recent scan list with live batch quantities, corrections and guarded removal.

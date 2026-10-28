@@ -1,0 +1,23 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 80d7d4a3ed2fe0858801d0dafe95065e2e1cda72..c4f3dd1120cc7ada0c98828f630e0e9f2ed294f9 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1825,7 +1825,8 @@ async function consumeRateLimit(ctx, apiKey, opts) {
+ 				}
+ 			],
+ 			increment: { requestCount: 1 },
+-			set: { lastRequest: decision.now }
++			// Keep the first accepted request as the fixed-window anchor.
++			set: {}
+ 		});
+ 		if (incremented) return incremented;
+ 		const fresh = await ctx.context.adapter.findOne({
+@@ -1940,7 +1941,7 @@ function applyRateLimitToSnapshot(apiKey, opts) {
+ 			requestCount: 1
+ 		};
+ 		case "increment": return {
+-			lastRequest: decision.now,
++			lastRequest: apiKey.lastRequest,
+ 			requestCount: apiKey.requestCount + 1
+ 		};
+ 	}

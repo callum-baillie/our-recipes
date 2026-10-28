@@ -97,6 +97,38 @@ afterAll(() => {
 });
 
 describe('real authenticated integration access', () => {
+  it('renews API key windows during continuous heartbeats while enforcing each window quota', async () => {
+    const created = await createKey({ pantry: ['read'] });
+    db.getDatabase()
+      .update(schema.apikey)
+      .set({ rateLimitMax: 3, rateLimitTimeWindow: 60_000 })
+      .where(eq(schema.apikey.id, created.apiKey.id))
+      .run();
+    const started = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      // Steady traffic never leaves an idle minute. It must still get a new
+      // window, while a fourth request inside either window remains blocked.
+      for (const window of [0, 61_000, 122_000]) {
+        for (const offset of [0, 20_000, 40_000]) {
+          vi.setSystemTime(started + window + offset);
+          expect((await auth.api.verifyApiKey({ body: { key: created.secret } })).valid).toBe(true);
+        }
+        vi.setSystemTime(started + window + 50_000);
+        expect((await auth.api.verifyApiKey({ body: { key: created.secret } })).error?.code).toBe(
+          'RATE_LIMITED',
+        );
+      }
+      vi.setSystemTime(started + 183_000);
+      const burst = await Promise.all(
+        Array.from({ length: 8 }, () => auth.api.verifyApiKey({ body: { key: created.secret } })),
+      );
+      expect(burst.filter((result) => result.valid)).toHaveLength(3);
+      expect(burst.filter((result) => result.error?.code === 'RATE_LIMITED')).toHaveLength(5);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('rejects an old admin session and allows key creation after signing in again', async () => {
     const principal = await authentication.requireAdminSession(
       request('/admin/api-keys', { cookie }),
