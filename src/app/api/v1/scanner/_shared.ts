@@ -17,6 +17,7 @@ import {
   syncScannerStation,
   scannerReceipt,
 } from '@/lib/services/scanner-station-service';
+import { scannerSession } from '@/lib/services/scanner-session-service';
 
 async function body(request: Request, maximum: number) {
   const reader = request.body?.getReader();
@@ -87,6 +88,13 @@ export async function handleScanner(
       case 'station':
         result = scannerStationDetail(p, id);
         break;
+      case 'session': {
+        const since = new URL(request.url).searchParams.get('since');
+        if (since !== null && (!/^\d+$/u.test(since) || !Number.isSafeInteger(Number(since))))
+          throw new ScannerError('scanner_invalid_since', 'Use a valid scan list timestamp.', 400);
+        result = scannerSession(p, id, since === null ? undefined : Number(since));
+        break;
+      }
       case 'control':
         result = createScannerControl(p, id, await body(request, 8192));
         break;

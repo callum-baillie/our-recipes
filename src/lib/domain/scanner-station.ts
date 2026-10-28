@@ -118,6 +118,7 @@ export type ScannerControl = z.infer<typeof scannerControlSchema>;
 export const scannerStateSchema = z
   .object({
     bootId: uuid,
+    profile: z.enum(['add-only', 'extended']).optional(),
     revision: z.number().int().min(0),
     mode: z.enum(['idle', 'add', 'remove', 'lookup', 'stocktake']),
     packages: z.number().int().min(1).max(99),

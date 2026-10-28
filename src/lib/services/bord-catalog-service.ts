@@ -69,13 +69,15 @@ export function catalogProviderStatus(
                 ? 'not_configured'
                 : code === 'AUTH_FAILED'
                   ? 'authentication_failed'
-                  : code === 'MALFORMED_RESPONSE'
-                    ? 'invalid_response'
-                    : error
-                      ? 'temporarily_unavailable'
-                      : 'available',
+                  : code === 'RATE_LIMITED'
+                    ? 'rate_limited'
+                    : code === 'MALFORMED_RESPONSE'
+                      ? 'invalid_response'
+                      : error
+                        ? 'temporarily_unavailable'
+                        : 'available',
     capabilities: { exactBarcode: true, nameSearch: true, details: true, images: false },
-    retryAt: null,
+    retryAt: error instanceof FoodDataError ? (error.retryAt?.toISOString() ?? null) : null,
     remaining: null,
   };
 }
@@ -406,11 +408,22 @@ export async function searchCatalogFoods(
           ? 'INITIALIZING'
           : statuses.some((s) => s.status === 'rights_blocked')
             ? 'RIGHTS_BLOCKED'
-            : 'UNAVAILABLE',
+            : statuses.some((s) => s.status === 'authentication_failed')
+              ? 'AUTH_FAILED'
+              : statuses.some((s) => s.status === 'rate_limited')
+                ? 'RATE_LIMITED'
+                : 'UNAVAILABLE',
       'Catalog sources are not currently available.',
+      null,
+      statuses.find((s) => s.retryAt)?.retryAt
+        ? new Date(statuses.find((s) => s.retryAt)!.retryAt!)
+        : null,
     );
-  if (cache.size >= 100) cache.delete(cache.keys().next().value!);
-  cache.set(key, { until: Date.now() + 60_000, records, statuses });
+  // A partial outage must not survive recovery as a cached empty/partial search.
+  if (statuses.every((s) => ['available', 'disabled'].includes(s.status))) {
+    if (cache.size >= 100) cache.delete(cache.keys().next().value!);
+    cache.set(key, { until: Date.now() + 60_000, records, statuses });
+  }
   return { records, providerStatuses: statuses, cache: { hit: false, stale: false } };
 }
 export function clearCatalogStateForTests() {

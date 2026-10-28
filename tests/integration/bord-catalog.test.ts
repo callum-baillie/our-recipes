@@ -142,6 +142,17 @@ describe('native Bòrd catalog companion (synthetic loopback only)', () => {
     );
     return listSupermarketProfiles().find((p) => p.name === 'My weekly store')!;
   }
+  it('does not cache partial catalog outages after a source recovers', async () => {
+    fixture.state.productSearchUnavailable = true;
+    const partial = await searchFoodData('oats', 1, 'any');
+    expect(partial.records.length).toBeGreaterThan(0);
+    expect(partial.providerStatuses.some((s) => s.status === 'temporarily_unavailable')).toBe(true);
+    const calls = fixture.calls.length;
+    fixture.state.productSearchUnavailable = false;
+    const recovered = await searchFoodData('oats', 1, 'any');
+    expect(fixture.calls.length).toBeGreaterThan(calls);
+    expect(recovered.providerStatuses.every((s) => s.status === 'available')).toBe(true);
+  });
   it('T36: preserves profile UUID, custom route/aisle IDs, manual overrides and list relationships through link/rename/refresh/unlink', async () => {
     const saved = profile();
     rememberShoppingAisle(saved.id, 'bread', null, saved.sections[0]!.aisleId, actor);

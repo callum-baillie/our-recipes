@@ -34,6 +34,7 @@ import {
   createScannerControl,
   scannerStationDetail,
 } from '@/lib/services/scanner-station-service';
+import { scannerSession } from '@/lib/services/scanner-session-service';
 import { createManualShoppingList, getShoppingList } from '@/lib/services/planning-service';
 import { executeScannerOperation } from '@/lib/services/scanner-service';
 import type { ScannerOperationInput } from '@/lib/domain/scanner';
@@ -474,6 +475,70 @@ describe('scanner operations on real SQLite stock', () => {
       executeBoundScannerOperation(principal(), { ...corrected, operationId: randomUUID() }),
     ).toThrow('already has');
   });
+  it('lists a station scan with its live batch, and flags it once edited or undone', async () => {
+    const context = binding(),
+      lookup = await lookupScanner(principal(), {
+        stationId: context.stationId,
+        barcode,
+        locationId,
+      });
+    if (lookup.kind !== 'local' || !lookup.prepared) throw Error('fixture');
+    const add = bound(
+      context,
+      { type: 'pantry_add', barcode, packages: 1, locationId },
+      lookup.prepared,
+    );
+    executeBoundScannerOperation(principal(), add);
+    const first = scannerSession(principal(), 'test-kitchen');
+    expect(first.entries).toHaveLength(1);
+    expect(first.entries[0]).toMatchObject({
+      id: add.operationId,
+      kind: 'added',
+      state: 'saved',
+      title: 'Test lentils',
+      canUndo: true,
+      edited: false,
+      batch: { quantity: 500, unit: 'g', status: 'unopened' },
+    });
+    const batch = first.entries[0]!.batch!;
+    applyPantryBatchAction(
+      batch.id,
+      {
+        type: 'correct',
+        expectedVersion: batch.version,
+        quantityRemaining: 450,
+        unit: 'g',
+        approximateState: null,
+        reason: 'Corrected from scan list',
+        note: '',
+      },
+      actor.profileId,
+    );
+    expect(scannerSession(principal(), 'test-kitchen').entries[0]).toMatchObject({
+      edited: true,
+      batch: { quantity: 450 },
+    });
+    expect(scannerSession(principal(), 'test-kitchen', Date.now() + 60_000).entries).toEqual([]);
+    expect(() => scannerSession({ ...principal(), userId: 'other' }, 'test-kitchen')).toThrow(
+      'registered',
+    );
+    expect(() => scannerSession({ ...principal(), kind: 'api-key' }, 'test-kitchen')).toThrow(
+      'Sign in',
+    );
+    const second = bound(
+      context,
+      { type: 'pantry_add', barcode, packages: 1, locationId },
+      lookup.prepared,
+    );
+    executeBoundScannerOperation(principal(), second);
+    executeBoundScannerOperation(
+      principal(),
+      bound(context, { type: 'undo', targetOperationId: second.operationId }),
+    );
+    const after = scannerSession(principal(), 'test-kitchen').entries;
+    expect(after.map((e) => e.state).sort()).toEqual(['saved', 'undone']);
+    expect(after.some((e) => e.kind === 'other' && e.detail.startsWith('Undone'))).toBe(false);
+  });
   it('rejects stale defaults, cross-station actor/binding and insufficient key scopes', async () => {
     const context = binding(),
       lookup = await lookupScanner(principal(), {
@@ -632,6 +697,13 @@ describe('scanner operations on real SQLite stock', () => {
     expect(syncScannerStation(principal(), context.stationId, sync).acknowledgedSequences).toEqual([
       1,
     ]);
+    expect(syncScannerStation(principal(), context.stationId, sync)).toMatchObject({
+      contractVersion: 2,
+      stationId: context.stationId,
+      instanceId: context.instanceId,
+      bindingId: context.bindingId,
+      bootId,
+    });
     syncScannerStation(principal(), context.stationId, sync);
     expect(scannerStationDetail(principal(), context.stationId).events).toHaveLength(1);
     const control = {
@@ -641,6 +713,9 @@ describe('scanner operations on real SQLite stock', () => {
       command: { control: 'mode' as const, mode: 'add' as const },
     };
     createScannerControl(principal(), context.stationId, control);
+    expect(scannerStationDetail(principal(), context.stationId).controls).toContainEqual(
+      expect.objectContaining({ id: control.id, status: 'pending' }),
+    );
     expect(
       syncScannerStation(principal(), context.stationId, { ...sync, events: [] }).controls,
     ).toHaveLength(1);
@@ -650,9 +725,25 @@ describe('scanner operations on real SQLite stock', () => {
       events: [],
     };
     expect(syncScannerStation(principal(), context.stationId, restarted).controls).toHaveLength(0);
+    expect(scannerStationDetail(principal(), context.stationId).controls).toContainEqual(
+      expect.objectContaining({ id: control.id, status: 'rejected' }),
+    );
     expect(() =>
       createScannerControl(principal(), context.stationId, { ...control, id: randomUUID() }),
     ).toThrow('changed or disconnected');
+    syncScannerStation(principal(), context.stationId, {
+      ...restarted,
+      state: { ...restarted.state, profile: 'add-only' },
+    });
+    expect(() =>
+      createScannerControl(principal(), context.stationId, {
+        ...control,
+        id: randomUUID(),
+        bootId: restarted.state.bootId,
+        stateRevision: 0,
+        command: { control: 'mode', mode: 'remove' },
+      }),
+    ).toThrow('additions only');
   });
   it('rolls back every counted batch when one baseline is stale', () => {
     const context = binding();

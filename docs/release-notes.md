@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.0-rc.26
+
+- Refine the scanner station controls, responsive buttons and visible connection/loading states. Add a recent scan list with live batch quantities, corrections and guarded removal.
+- Prevent overlapping or obsolete station/status requests, bound request timeouts, and reconnect on return to the page or network recovery. Keep uncertain scanner operations for identical retries.
+- Report remote control acknowledgement, rejection and expiry; advertise add-only companions and hide unsupported hardware controls. Bind heartbeat replies to the station, household, queue binding and boot. Existing companions remain compatible; deploy Bòrd before the updated companion.
+- Retry transient food catalog reads once within the existing total deadline. Preserve initializing, disabled, rights, authentication and revision errors, and expose rate-limit retry times. No household write is automatically retried by the catalog client.
+- Companion 0.2.1 keeps heartbeats running during delivery backoff, recognizes temporary handshake failures, and retains feedback on mismatched acknowledgements. Queue identities and prepared commands remain unchanged.
+- No schema change (`0082_scanner_stations`, 84 migrations). Physical scanning, USB replug and host-reboot acceptance remain separate operator checks.
+
 ## 1.0.0-rc.25
 
 - Add structured server logging. Every line is one JSON object (`time`, `level`, `service`, `component`, `msg` plus fields) on stdout for debug and info, and stderr for warn and error, so `docker logs` and Dozzle read the same stream and Dozzle can filter by level. Set `LOG_LEVEL` (`debug`, `info`, `warn`, `error`, `silent`; default `info`) and `LOG_FORMAT` (`json` or `text`; default `json`). Sensitive field names are redacted.

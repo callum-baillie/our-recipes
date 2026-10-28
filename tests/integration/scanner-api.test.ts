@@ -5,6 +5,7 @@ import { prepareProfileEnrollment } from '@/lib/services/auth-service';
 import { completeSetupWithResult } from '@/lib/services/household-service';
 import { createAdminApiKey } from '@/lib/services/api-key-service';
 import { handleScanner } from '@/app/api/v1/scanner/_shared';
+import { GET as getScannerSession } from '@/app/api/v1/scanner/stations/[stationId]/session/route';
 import { auth } from '@/lib/auth/server';
 const origin = 'http://localhost:3000';
 let cookie: string,
@@ -219,4 +220,12 @@ it('accepts bounded telemetry without granting stock or nutrition write access',
     'kitchen',
   );
   expect(control.status).toBe(403);
+});
+it('rejects malformed scan-list timestamp filters', async () => {
+  for (const since of ['NaN', '-1', '1.2', '9007199254740992', '']) {
+    const response = await getScannerSession(request(`stations/kitchen/session?since=${since}`), {
+      params: Promise.resolve({ stationId: 'kitchen' }),
+    });
+    expect(response.status).toBe(400);
+  }
 });

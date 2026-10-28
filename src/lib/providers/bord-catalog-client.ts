@@ -27,6 +27,7 @@ const metaSchema = z.object({
   next_cursor: z.string().max(2048).nullable(),
 });
 const MAX_BYTES = 4 * 1024 * 1024;
+class TransientCatalogError extends FoodDataError {}
 
 function segment(id: string) {
   if (!id || id === '.' || id === '..' || id.length > 160)
@@ -58,6 +59,24 @@ export class BordCatalogClient {
       .digest('hex');
   }
   private async request<T>(path: string, schema: z.ZodType<T>, body?: unknown): Promise<T> {
+    // All routes in this client are reads, including resolve/enrich POSTs. Retry only
+    // transient transport/server failures, within one total request deadline.
+    const signal = AbortSignal.timeout(this.config.timeoutMs);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.requestOnce(path, schema, signal, body);
+      } catch (error) {
+        if (attempt > 0 || signal.aborted || !(error instanceof TransientCatalogError)) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, 150));
+      }
+    }
+  }
+  private async requestOnce<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    signal: AbortSignal,
+    body?: unknown,
+  ): Promise<T> {
     try {
       const response = await this.transport(new URL(path, this.base), {
         method: body === undefined ? 'GET' : 'POST',
@@ -66,10 +85,42 @@ export class BordCatalogClient {
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(this.config.timeoutMs),
+        signal,
         redirect: 'error',
         cache: 'no-store',
       });
+      // Reverse proxies often return HTML while a service restarts. Classify by
+      // HTTP status before parsing so this remains recoverable, not invalid JSON.
+      const transientStatus = [408, 425, 500, 502, 503, 504].includes(response.status);
+      if (transientStatus && !response.headers.get('content-type')?.includes('application/json')) {
+        await response.body?.cancel();
+        throw new TransientCatalogError(
+          'UNAVAILABLE',
+          'The food catalog is temporarily unavailable.',
+        );
+      }
+      if (
+        [401, 403, 429].includes(response.status) &&
+        (response.status === 429 ||
+          !response.headers.get('content-type')?.includes('application/json'))
+      ) {
+        const retry = response.headers.get('retry-after');
+        const retryTime =
+          retry && /^\d+$/u.test(retry)
+            ? Date.now() + Number(retry) * 1000
+            : Date.parse(retry ?? '');
+        await response.body?.cancel();
+        throw new FoodDataError(
+          response.status === 429 ? 'RATE_LIMITED' : 'AUTH_FAILED',
+          response.status === 429
+            ? 'The food catalog is busy. Try again shortly.'
+            : 'The food catalog could not authenticate this server.',
+          null,
+          Number.isFinite(retryTime) && retryTime > Date.now()
+            ? new Date(Math.min(retryTime, Date.now() + 86400000))
+            : null,
+        );
+      }
       if (Number(response.headers.get('content-length')) > MAX_BYTES) {
         await response.body?.cancel();
         throw new FoodDataError('MALFORMED_RESPONSE', 'The food catalog response is too large.');
@@ -100,6 +151,11 @@ export class BordCatalogClient {
       try {
         payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       } catch {
+        if (transientStatus)
+          throw new TransientCatalogError(
+            'UNAVAILABLE',
+            'The food catalog is temporarily unavailable.',
+          );
         throw new FoodDataError('MALFORMED_RESPONSE', 'The food catalog returned invalid JSON.');
       }
       if (!response.ok) {
@@ -131,7 +187,7 @@ export class BordCatalogClient {
           throw new FoodDataError('NOT_FOUND', 'This catalog record is unavailable.');
         if (response.status === 429)
           throw new FoodDataError('RATE_LIMITED', 'The food catalog is busy. Try again shortly.');
-        throw new FoodDataError(
+        throw new (transientStatus ? TransientCatalogError : FoodDataError)(
           'UNAVAILABLE',
           'The food catalog is temporarily unavailable. Your saved records are still available.',
         );
@@ -145,7 +201,7 @@ export class BordCatalogClient {
       return parsed.data;
     } catch (error) {
       if (error instanceof FoodDataError) throw error;
-      throw new FoodDataError(
+      throw new TransientCatalogError(
         error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)
           ? 'TIMEOUT'
           : 'UNAVAILABLE',

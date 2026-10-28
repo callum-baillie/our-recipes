@@ -1,14 +1,28 @@
 .main {
+  width: 100%;
   max-width: 1100px;
   margin: 0 auto;
   padding: 24px;
 }
-.main section,
-.main details {
+.main > section,
+.main > details {
   margin-block: 24px;
   padding: 20px;
-  border: 1px solid var(--border, #ccd3ca);
+  border: 1px solid var(--line);
   border-radius: 12px;
+  background: var(--linen);
+}
+.main h2 {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  font-weight: 750;
+}
+.main p {
+  line-height: 1.6;
+}
+.main summary {
+  cursor: pointer;
+  font-weight: 700;
 }
 .row {
   display: flex;
@@ -23,39 +37,82 @@
   gap: 6px;
   font-size: 0.9rem;
   max-width: 100%;
+  min-width: 0;
+  color: var(--label);
+}
+.row > label {
+  flex: 1 1 180px;
 }
 .main input,
 .main select {
   padding: 10px;
-  border: 1px solid var(--border, #ccd3ca);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   max-width: 100%;
-  background: var(--background, white);
+  background: var(--field);
   color: inherit;
 }
-.main button {
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  max-width: 100%;
+  flex-shrink: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  font-weight: 700;
   padding: 10px 14px;
-  border: 1px solid var(--border, #a9b9a3);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   cursor: pointer;
-  background: var(--background, white);
+  background: var(--field);
   color: inherit;
 }
-.main button[aria-pressed='true'] {
-  background: #345637;
-  color: white;
+.button:not(:disabled):hover {
+  border-color: var(--leaf);
+  background: var(--surface-hover);
 }
-.main button:disabled {
+.button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.button[aria-pressed='true'],
+.button[aria-pressed='true']:hover {
+  background: var(--leaf);
+  color: var(--on-accent, white);
+}
+.button:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
+}
+.status {
+  background: var(--intro) !important;
+}
+.connectionNote {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.controlFeedback {
+  padding: 10px 14px;
+  border: 1px solid var(--notice-border);
+  background: var(--leaf-pale);
+  border-radius: 8px;
+}
+.empty {
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
 }
 .main article {
   padding-block: 12px;
   border-bottom: 1px solid var(--border, #ccd3ca);
   overflow-wrap: anywhere;
 }
-.main article button {
-  margin: 8px;
+.main article > .button {
+  margin: 8px 8px 8px 0;
 }
 .mode {
   font-size: 1.7rem;
@@ -71,7 +128,7 @@
 .lookup {
   margin-top: 16px;
   padding: 12px;
-  background: var(--muted, #f1f4ed);
+  background: var(--paper);
   border-radius: 8px;
 }
 @media (max-width: 600px) {
@@ -87,6 +144,14 @@
   .row label {
     flex: 1 1 180px;
     min-width: 0;
+  }
+  .row > .button {
+    flex: 1 1 100%;
+    align-self: flex-end;
+  }
+  .main > section,
+  .main > details {
+    padding: 14px;
   }
   .main small {
     overflow-wrap: anywhere;

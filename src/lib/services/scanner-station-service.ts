@@ -87,7 +87,7 @@ export function scannerInstanceId() {
   if (!household) throw new ScannerError('scanner_setup_required', 'Set up a household first.');
   return household.id;
 }
-function ownedStation(p: RequestPrincipal, id: string) {
+export function ownedStation(p: RequestPrincipal, id: string) {
   stationIdSchema.parse(id);
   ensureDatabase();
   const station = getDatabase()
@@ -1070,7 +1070,7 @@ export function scannerStationList(p: RequestPrincipal) {
       stale: !s.lastSeenAt || Date.now() - s.lastSeenAt.getTime() > 15000,
     }));
 }
-function boundedRows<T>(rows: T[], maximum = 23000) {
+export function boundedRows<T>(rows: T[], maximum = 23000) {
   const selected: T[] = [];
   let bytes = 2;
   for (const row of rows) {
@@ -1104,6 +1104,21 @@ export function scannerStationDetail(p: RequestPrincipal, id: string) {
     instanceId: scannerInstanceId(),
     userId: station.userId,
     profileId: station.profileId,
+    controls: db
+      .select({
+        id: scannerStationControls.id,
+        status: scannerStationControls.status,
+        expiresAt: scannerStationControls.expiresAt,
+      })
+      .from(scannerStationControls)
+      .where(eq(scannerStationControls.stationId, id))
+      .orderBy(desc(scannerStationControls.createdAt))
+      .limit(8)
+      .all()
+      .map((c) => ({
+        ...c,
+        status: c.status === 'pending' && c.expiresAt.getTime() < Date.now() ? 'expired' : c.status,
+      })),
     operations: boundedRows(
       operations.map((o) => ({
         id: o.id,
@@ -1136,6 +1151,15 @@ export function createScannerControl(p: RequestPrincipal, id: string, raw: unkno
     })
     .strict()
     .parse(raw);
+  if (
+    station.state?.profile === 'add-only' &&
+    (input.command.control === 'action' ||
+      (input.command.control === 'mode' && !['idle', 'add'].includes(input.command.mode)))
+  )
+    throw new ScannerError(
+      'scanner_control_unsupported',
+      'This companion supports pantry additions only.',
+    );
   const db = getDatabase();
   return db.transaction(
     (tx) => {
@@ -1322,6 +1346,11 @@ export function syncScannerStation(p: RequestPrincipal, id: string, raw: unknown
       );
 
       return {
+        contractVersion: 2,
+        stationId: id,
+        instanceId: input.instanceId,
+        bindingId: input.bindingId,
+        bootId: input.state.bootId,
         resolvedReviewIds,
         acknowledgedSequences: input.events.map((e) => e.sequence),
         controls: deliver.slice(0, 8),

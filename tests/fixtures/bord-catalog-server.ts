@@ -23,6 +23,7 @@ export async function startCatalogFixture() {
     protein: 12,
     missingFood: false,
     productsUnavailable: false,
+    productSearchUnavailable: false,
     productsDisabled: false,
     barcodeMatch: false,
     barcodeValue: '4006381333931',
@@ -112,6 +113,8 @@ export async function startCatalogFixture() {
           },
         ],
       });
+    if (url.pathname === '/v1/products' && state.productSearchUnavailable)
+      return send(503, { error: { code: 'CATALOG_UNAVAILABLE' } });
     if (url.pathname === '/v1/products') return send(200, envelope([]));
     if (url.pathname === '/v1/products/resolve' && state.productsUnavailable)
       return send(503, { error: { code: 'CATALOG_NOT_READY' } });

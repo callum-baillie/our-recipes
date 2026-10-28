@@ -40,6 +40,8 @@ type Detail = {
   bindingId: string;
   stale: boolean;
   state: ScannerState | null;
+  lastSeenAt: string | null;
+  controls: { id: string; status: string }[];
   operations: Operation[];
   events: Event[];
 };
@@ -69,12 +71,16 @@ type Lookup = {
   };
   batches?: { id: string; version: number; quantity: number; unit: string; location: string }[];
 };
-async function api<T>(path: string, body?: unknown): Promise<T> {
+async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`/api/v1/scanner/${path}`, {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
+    redirect: 'error',
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(12000)])
+      : AbortSignal.timeout(15000),
   });
   const result = await response.json();
   if (!response.ok)
@@ -106,6 +112,16 @@ export function ScannerStation({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [connectionError, setConnectionError] = useState('');
+  const [controlAttempt, setControlAttempt] = useState<{ id: string; sentAt: number } | null>(null);
+  const [controlTimedOut, setControlTimedOut] = useState(false);
+  const controlId = controlAttempt?.id;
+  useEffect(() => {
+    if (!controlId) return;
+    const timer = setTimeout(() => setControlTimedOut(true), 12000);
+    return () => clearTimeout(timer);
+  }, [controlId]);
+  const refreshRequest = useRef<AbortController | null>(null);
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const [barcode, setBarcode] = useState('');
   const [batchId, setBatchId] = useState('');
@@ -120,20 +136,37 @@ export function ScannerStation({
   const [listId, setListId] = useState(shopping[0]?.id ?? '');
   const [productId, setProductId] = useState(products[0]?.id ?? '');
   const refresh = useCallback(async () => {
-    if (!stationId) return;
+    if (!stationId || refreshRequest.current) return;
+    const controller = new AbortController();
+    refreshRequest.current = controller;
     try {
-      const next = await api<Detail>(`stations/${stationId}`);
+      const next = await api<Detail>(`stations/${stationId}`, undefined, controller.signal);
+      if (controller.signal.aborted) return;
+      if (next.id !== stationId)
+        throw new Error('The station response did not match. Refresh to reconnect.');
       setDetail(next);
+      setConnectionError('');
     } catch (e) {
-      setError((e as Error).message);
+      if (!controller.signal.aborted) setConnectionError((e as Error).message);
+    } finally {
+      if (refreshRequest.current === controller) refreshRequest.current = null;
     }
   }, [stationId]);
   useEffect(() => {
     const first = setTimeout(() => void refresh(), 0);
-    const timer = setInterval(() => void refresh(), 2000);
+    const wake = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const timer = setInterval(wake, 2000);
+    window.addEventListener('online', wake);
+    document.addEventListener('visibilitychange', wake);
     return () => {
       clearTimeout(first);
       clearInterval(timer);
+      window.removeEventListener('online', wake);
+      document.removeEventListener('visibilitychange', wake);
+      refreshRequest.current?.abort();
+      refreshRequest.current = null;
     };
   }, [refresh]);
   const storageKey = detail ? `bord-scanner-attempt:${detail.bindingId}` : '';
@@ -212,14 +245,19 @@ export function ScannerStation({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(operation),
+      signal: AbortSignal.timeout(15000),
+      redirect: 'error',
     });
     const result = (await response.json()) as ScannerResult;
     if (
       result.operationId === operation.operationId &&
+      result.contractVersion === 2 &&
+      result.type === operation.command.type &&
       result.bindingId === operation.bindingId &&
       result.instanceId === operation.instanceId &&
       result.stationId === operation.stationId &&
-      ['succeeded', 'needs_review'].includes(result.outcome ?? '')
+      ((response.ok && result.outcome === 'succeeded') ||
+        (response.status >= 400 && response.status < 500 && result.outcome === 'needs_review'))
     ) {
       localStorage.removeItem(storageKey);
       pendingRef.current = null;
@@ -243,8 +281,11 @@ export function ScannerStation({
   function control(command: ScannerControl) {
     void task(async () => {
       if (!detail?.state) return;
+      const attempt = { id: createClientUuid(), sentAt: Date.now() };
+      setControlAttempt(attempt);
+      setControlTimedOut(false);
       await api(`stations/${detail.id}/controls`, {
-        id: createClientUuid(),
+        id: attempt.id,
         bootId: detail.state.bootId,
         stateRevision: detail.state.revision,
         command,
@@ -278,7 +319,21 @@ export function ScannerStation({
   }
   const state = detail?.state;
   const disabled = busy || !canEdit || !!pending || recoveredBinding !== detail?.bindingId;
-  const controlsDisabled = busy || !canEdit || !state || !!detail?.stale;
+  const controlStatus = controlAttempt
+    ? detail?.controls?.find((c) => c.id === controlAttempt.id)?.status
+    : null;
+  const waitingForControl =
+    !!controlAttempt && (!controlStatus || controlStatus === 'pending') && !controlTimedOut;
+  const controlFeedback = !controlAttempt
+    ? ''
+    : controlStatus === 'applied'
+      ? 'Station confirmed the control.'
+      : controlStatus === 'rejected' || controlStatus === 'expired' || !waitingForControl
+        ? 'Control was not confirmed. Check the station status before trying again.'
+        : 'Waiting for the station to confirm the control…';
+  const controlsDisabled =
+    busy || !canEdit || !state || !!detail?.stale || !!connectionError || waitingForControl;
+  const addOnly = state?.profile === 'add-only';
   const uniqueReviews =
     detail?.events.filter(
       (e, i, all) =>
@@ -302,6 +357,9 @@ export function ScannerStation({
             <Link className="text-button" href="/pantry">
               Pantry
             </Link>
+            <Link className="text-button" href="/scanner/session">
+              Scan list
+            </Link>
             <Link className="text-button" href="/scanner/cards">
               Print scanner cards
             </Link>
@@ -314,10 +372,17 @@ export function ScannerStation({
           value={stationId}
           disabled={!!pending || busy}
           onChange={(e) => {
+            refreshRequest.current?.abort();
+            refreshRequest.current = null;
             setStationId(e.target.value);
             setDetail(null);
             setLookup(null);
             setSupersedes(null);
+            setControlAttempt(null);
+            setConnectionError('');
+            setError('');
+            setMessage('');
+            setCountDraft(null);
           }}
         >
           <option value="">Choose station</option>
@@ -328,13 +393,25 @@ export function ScannerStation({
           ))}
         </select>
       </label>
+      {!stations.length && (
+        <p className={styles.empty}>Register a station below to connect your scanner companion.</p>
+      )}
+      {stationId && !detail && !connectionError && <p role="status">Connecting to the station…</p>}
+      {connectionError && (
+        <p role="alert" className={styles.error}>
+          Station status could not be refreshed. Saved scans are retained. {connectionError}{' '}
+          <button className={styles.button} type="button" onClick={() => void refresh()}>
+            Reconnect
+          </button>
+        </p>
+      )}
       {error && (
         <p role="alert" className={styles.error}>
           {error}
         </p>
       )}
       <p role="status" aria-live="polite">
-        {message}
+        {busy ? 'Working… Please wait.' : message}
       </p>
       {pending && (
         <section className={styles.warning}>
@@ -343,7 +420,11 @@ export function ScannerStation({
             Operation {pending.operationId}. Other browser changes are paused until its outcome is
             known. Retrying preserves this command.
           </p>
-          <button disabled={busy} onClick={() => void task(() => submit(pending.command))}>
+          <button
+            className={styles.button}
+            disabled={busy}
+            onClick={() => void task(() => submit(pending.command))}
+          >
             Retry saved operation
           </button>
         </section>
@@ -353,18 +434,27 @@ export function ScannerStation({
           <section className={styles.status} aria-label="Current scanner status">
             <h2>
               {detail.name} ·{' '}
-              {detail.stale
-                ? 'Offline / stale'
-                : state?.readerConnected
-                  ? 'Scanner connected'
-                  : 'Reader disconnected'}
+              {connectionError
+                ? 'Connection interrupted'
+                : detail.stale
+                  ? 'Offline / stale'
+                  : state?.readerConnected
+                    ? 'Scanner connected'
+                    : 'Reader disconnected'}
             </h2>
             <p className={styles.mode} aria-label="Station mode">
-              {detail.stale
+              {connectionError || detail.stale
                 ? 'Status unavailable'
                 : state?.action
                   ? `NEXT BATCH: ${state.action.toUpperCase()}`
                   : (state?.mode.toUpperCase() ?? 'IDLE')}
+            </p>
+            <p className={styles.connectionNote}>
+              {addOnly
+                ? 'Add-only companion · Products add to Pantry without opening this page.'
+                : 'Changes take effect when the companion confirms them.'}
+              {detail.lastSeenAt &&
+                ` · Last seen ${new Date(detail.lastSeenAt).toLocaleTimeString()}`}
             </p>
             <p>
               Next quantity: {state?.packages ?? 1} package(s) · Location:{' '}
@@ -377,8 +467,12 @@ export function ScannerStation({
                 : ''}
             </p>
             <div className={styles.row}>
-              {(['idle', 'add', 'remove', 'lookup', 'stocktake'] as const).map((mode) => (
+              {(addOnly
+                ? (['idle', 'add'] as const)
+                : (['idle', 'add', 'remove', 'lookup', 'stocktake'] as const)
+              ).map((mode) => (
                 <button
+                  className={styles.button}
                   key={mode}
                   disabled={controlsDisabled}
                   aria-pressed={!detail.stale && state?.mode === mode}
@@ -387,10 +481,19 @@ export function ScannerStation({
                   {mode.toUpperCase()}
                 </button>
               ))}
-              <button disabled={controlsDisabled} onClick={() => control({ control: 'reset' })}>
+              <button
+                className={styles.button}
+                disabled={controlsDisabled}
+                onClick={() => control({ control: 'reset' })}
+              >
                 Reset controls
               </button>
             </div>
+            {controlFeedback && (
+              <p role="status" className={styles.controlFeedback}>
+                {controlFeedback}
+              </p>
+            )}
             <div className={styles.row}>
               <label>
                 Next packages
@@ -399,9 +502,15 @@ export function ScannerStation({
                   type="number"
                   min="1"
                   max="99"
-                  defaultValue="1"
+                  defaultValue={state?.packages ?? 1}
+                  key={`${state?.bootId}:${state?.packages}`}
                   onBlur={(e) => {
-                    if (e.target.value && !controlsDisabled)
+                    if (
+                      e.target.validity.valid &&
+                      e.target.value &&
+                      !controlsDisabled &&
+                      Number(e.target.value) !== state?.packages
+                    )
                       control({ control: 'quantity', packages: Number(e.target.value) });
                   }}
                   disabled={controlsDisabled}
@@ -425,19 +534,22 @@ export function ScannerStation({
                 </select>
               </label>
             </div>
-            <div className={styles.row}>
-              {(['open', 'freeze', 'thaw', 'move', 'mark_empty', 'discard', 'donate'] as const).map(
-                (action) => (
+            {!addOnly && (
+              <div className={styles.row}>
+                {(
+                  ['open', 'freeze', 'thaw', 'move', 'mark_empty', 'discard', 'donate'] as const
+                ).map((action) => (
                   <button
+                    className={styles.button}
                     key={action}
                     disabled={controlsDisabled}
                     onClick={() => control({ control: 'action', action })}
                   >
                     Next batch: {action.replaceAll('_', ' ')}
                   </button>
-                ),
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </section>
           <section>
             <h2>Look up or review a scan</h2>
@@ -449,6 +561,7 @@ export function ScannerStation({
               <p>
                 Correcting {supersedes}{' '}
                 <button
+                  className={styles.button}
                   onClick={() => {
                     setSupersedes(null);
                     setReviewCommand(null);
@@ -506,7 +619,13 @@ export function ScannerStation({
                   ))}
                 </select>
               </label>
-              <button disabled={busy || (!barcode && !batchId)}>Look up</button>
+              <button
+                className={styles.button}
+                disabled={busy || (!barcode && !batchId)}
+                aria-busy={busy}
+              >
+                {busy ? 'Looking up…' : 'Look up'}
+              </button>
             </form>
             {supersedes && reviewCommand?.type === 'recipe' && (
               <form
@@ -553,7 +672,9 @@ export function ScannerStation({
                     required
                   />
                 </label>
-                <button disabled={disabled}>Submit corrected rejected card</button>
+                <button className={styles.button} disabled={disabled}>
+                  Submit corrected rejected card
+                </button>
               </form>
             )}
             {lookup && (
@@ -618,7 +739,9 @@ export function ScannerStation({
                           required
                         />
                       </label>
-                      <button disabled={disabled}>Save reviewed packages</button>
+                      <button className={styles.button} disabled={disabled}>
+                        Save reviewed packages
+                      </button>
                     </form>
                   </>
                 )}
@@ -643,6 +766,7 @@ export function ScannerStation({
                   <p key={b.id}>
                     {b.quantity} {b.unit} · {b.location}{' '}
                     <button
+                      className={styles.button}
                       onClick={() => {
                         setBatchId(b.id);
                         setBarcode('');
@@ -706,7 +830,9 @@ export function ScannerStation({
                       Reason / note
                       <input name="note" maxLength={240} />
                     </label>
-                    <button disabled={disabled}>Save batch action</button>
+                    <button className={styles.button} disabled={disabled}>
+                      Save batch action
+                    </button>
                   </form>
                 )}
                 {lookup.batch && (
@@ -761,7 +887,9 @@ export function ScannerStation({
                         required
                       />
                     </label>
-                    <button disabled={disabled}>Add count to draft</button>
+                    <button className={styles.button} disabled={disabled}>
+                      Add count to draft
+                    </button>
                   </form>
                 )}
               </div>
@@ -782,6 +910,7 @@ export function ScannerStation({
                   {c.name}: {c.original} → {c.quantityRemaining} {c.unit} · baseline revision{' '}
                   {c.expectedVersion}{' '}
                   <button
+                    className={styles.button}
                     disabled={disabled}
                     onClick={() =>
                       saveCountDraft({
@@ -795,6 +924,7 @@ export function ScannerStation({
                 </p>
               ))}
               <button
+                className={styles.button}
                 disabled={disabled || !countDraft.counts.length}
                 onClick={() =>
                   void task(async () => {
@@ -819,7 +949,11 @@ export function ScannerStation({
               >
                 Apply reviewed count draft
               </button>
-              <button disabled={busy || !!pending} onClick={() => saveCountDraft(null)}>
+              <button
+                className={styles.button}
+                disabled={busy || !!pending}
+                onClick={() => saveCountDraft(null)}
+              >
                 Clear local count draft
               </button>
             </section>
@@ -941,7 +1075,9 @@ export function ScannerStation({
               <label>
                 <input type="checkbox" name="complete" /> Finish shopping intake
               </label>
-              <button disabled={disabled}>Save reviewed workflow</button>
+              <button className={styles.button} disabled={disabled}>
+                Save reviewed workflow
+              </button>
             </form>
             <Link href="/nutrition">Review personal nutrition separately</Link>
           </section>
@@ -964,6 +1100,7 @@ export function ScannerStation({
                     {o.result.message} · {o.id}
                   </p>
                   <button
+                    className={styles.button}
                     disabled={disabled}
                     onClick={() =>
                       chooseReview(o.request?.supersedesOperationId ?? o.id, o.request?.command)
@@ -978,6 +1115,7 @@ export function ScannerStation({
                 <p>{e.message}</p>
                 {e.submission === 'not_submitted' ? (
                   <button
+                    className={styles.button}
                     disabled={disabled}
                     onClick={() => chooseReview(e.operationId!, e.command, e.barcode, e.batchId)}
                   >
@@ -1001,6 +1139,7 @@ export function ScannerStation({
                 <small>{o.id}</small>
                 {o.status === 'succeeded' && o.result.undoable && !o.undoneBy && (
                   <button
+                    className={styles.button}
                     disabled={disabled}
                     onClick={() =>
                       void task(() => submit({ type: 'undo', targetOperationId: o.id }))
@@ -1020,6 +1159,7 @@ export function ScannerStation({
                 <strong>{e.status.toUpperCase()}</strong> · {e.message}
                 {(e.barcode || e.batchId) && (
                   <button
+                    className={styles.button}
                     onClick={() => {
                       setBarcode(e.barcode ?? '');
                       setBatchId(e.batchId ?? '');
@@ -1082,7 +1222,9 @@ export function ScannerStation({
               <input type="checkbox" name="scannerQuota" defaultChecked /> Set this dedicated key to
               600 requests/minute for station heartbeats and scanning
             </label>
-            <button disabled={busy}>Register station</button>
+            <button className={styles.button} disabled={busy}>
+              Register station
+            </button>
           </form>
         </details>
       )}
