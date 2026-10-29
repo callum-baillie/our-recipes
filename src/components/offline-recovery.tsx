@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { useRef, useState } from 'react';
 import { BordIcon } from './bord-brand';
 import {
@@ -14,7 +17,7 @@ export function OfflineRecovery() {
     if (lock.current) return;
     lock.current = true;
     setChecking(true);
-    setStatus('Checking access to your kitchen…');
+    setStatus('Checking the Bòrd server…');
     const current = new URL(window.location.href);
     const target = offlineDestination(
       current.pathname === '/offline'
@@ -23,9 +26,10 @@ export function OfflineRecovery() {
       current.origin,
     );
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 8000);
+    let timer: number | undefined;
     try {
       if (!(await checkKitchenConnection())) throw new Error('Unavailable');
+      timer = window.setTimeout(() => controller.abort(), 8000);
       const response = await fetch(target, {
         cache: 'no-store',
         signal: controller.signal,
@@ -33,13 +37,13 @@ export function OfflineRecovery() {
       });
       if (!response.ok || response.headers.get('X-Bord-Offline') === '1')
         throw new Error('Unavailable');
-      setStatus('Kitchen reached. Opening your page…');
+      setStatus('Bòrd is available. Opening your page…');
       // Full navigation retries the requested page without resubmitting any write.
       window.location.assign(target);
     } catch {
       setKitchenConnection('unavailable');
       setStatus(
-        'Your kitchen is still unavailable. Check the network and that Bòrd is running, then try again. No changes have been queued.',
+        'The Bòrd server is still unavailable. Check the network and that Bòrd is running, then try again. No changes have been queued.',
       );
     } finally {
       window.clearTimeout(timer);
@@ -54,7 +58,7 @@ export function OfflineRecovery() {
           <BordIcon size={21} />
         </span>
         <p className="eyebrow">CONNECTION UNAVAILABLE</p>
-        <h1>We can’t reach your kitchen.</h1>
+        <h1>We can’t reach the Bòrd server.</h1>
         <p>
           Some recipe pages cached on this device may still be readable. Changes need a connection
           and are not queued.
@@ -67,7 +71,7 @@ export function OfflineRecovery() {
         >
           {checking ? 'Checking…' : 'Try again'}
         </button>
-        {status && <p role="status">{status}</p>}
+        {status && <ToastNotice>{status}</ToastNotice>}
       </section>
     </main>
   );

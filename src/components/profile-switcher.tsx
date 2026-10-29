@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import {
   ChevronDown,
   KeyRound,
@@ -311,11 +313,7 @@ export function ProfileSwitcher({
               aria-describedby={error ? 'profile-password-error' : undefined}
             />
           </label>
-          {error ? (
-            <p className="form-error" id="profile-password-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <ToastMessage message={error} tone="error" /> : null}
           <div className="dialog-actions">
             <button
               className="secondary-button"

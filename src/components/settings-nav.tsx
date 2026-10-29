@@ -21,6 +21,7 @@ const links = [
   { href: '/settings/recipes', label: 'Recipes', icon: ClipboardList },
   { href: '/settings/meal-plan', label: 'Meal plans', icon: ChefHat },
   { href: '/settings/lists', label: 'Lists', icon: ListChecks },
+  { href: '/settings/scanner', label: 'Scanner', icon: PackageOpen },
   { href: '/settings/pantry', label: 'Pantry', icon: PackageOpen },
   { href: '/settings/ai', label: 'AI settings', icon: Sparkles },
   { href: '/settings/automation', label: 'Background processing', icon: Workflow },

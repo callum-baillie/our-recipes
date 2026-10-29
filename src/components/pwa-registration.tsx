@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import packageInfo from '../../package.json';
 import { useToast } from '@/components/toast-provider';
@@ -44,39 +47,17 @@ export function PwaRegistration() {
     kitchenConnectionServerSnapshot,
   );
   const [updateReady, setUpdateReady] = useState<string | null>(null);
+  const [showInitialCheck, setShowInitialCheck] = useState(false);
+  useEffect(() => {
+    if (connection !== 'checking') return;
+    const timer = window.setTimeout(() => setShowInitialCheck(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, [connection]);
   const [reloading, setReloading] = useState(false);
   const registration = useRef<ServiceWorkerRegistration | null>(null);
   const reloadRequested = useRef(false);
   const navigated = useRef(false);
-  const notice = useRef<HTMLDivElement>(null);
   const performReload = useRef<(version: string) => void>(() => {});
-  useEffect(() => {
-    const element = notice.current;
-    if (!element) return;
-    const measure = () => {
-      document.documentElement.style.setProperty(
-        '--app-notice-height',
-        `${Math.ceil(element.getBoundingClientRect().height) + 24}px`,
-      );
-      const focused = document.activeElement;
-      if (
-        focused instanceof HTMLElement &&
-        focused.matches('input, select, textarea, button, a[href], [contenteditable="true"]') &&
-        !element.contains(focused) &&
-        !focused.closest('dialog[open]') &&
-        focused.getBoundingClientRect().bottom > element.getBoundingClientRect().top - 12
-      ) {
-        focused.scrollIntoView?.({ block: 'center', behavior: 'instant' });
-      }
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      document.documentElement.style.removeProperty('--app-notice-height');
-    };
-  }, [connection, updateReady]);
   useEffect(() => {
     const updated = takeUpdateMarker();
     if (updated) showToast(`Bòrd updated to ${updated}.`, 'success');
@@ -183,11 +164,19 @@ export function PwaRegistration() {
   }
   if (connection === 'available' && !updateReady) return null;
   return (
-    <div ref={notice} className="pwa-status-area">
-      {connection !== 'available' && (
-        <div className="offline-read-only-banner" role="status">
-          {connection === 'checking' ? 'Checking kitchen access…' : 'Kitchen unavailable.'} Changes
-          need a connection and are not queued.{' '}
+    <>
+      {connection !== 'available' && (connection !== 'checking' || showInitialCheck) && (
+        <ToastNotice>
+          {connection === 'checking'
+            ? 'Connecting to the Bòrd server…'
+            : connection === 'offline'
+              ? 'Your device is offline.'
+              : connection === 'server-error'
+                ? 'The Bòrd server responded, but is not ready.'
+                : 'Cannot reach the Bòrd server.'}{' '}
+          {connection === 'checking'
+            ? 'Checking that your household data is ready.'
+            : 'Saving needs a working connection. Changes are not queued for later. We’ll retry automatically.'}{' '}
           <button
             type="button"
             className="text-button"
@@ -196,10 +185,10 @@ export function PwaRegistration() {
           >
             Check connection
           </button>
-        </div>
+        </ToastNotice>
       )}
       {updateReady && (
-        <div className="app-update-notice" role="status">
+        <ToastNotice>
           <p>
             Bòrd update ready. Finish your current task before reloading; unsaved fields may be
             lost.
@@ -212,8 +201,8 @@ export function PwaRegistration() {
           >
             {reloading ? 'Reloading…' : 'Reload when ready'}
           </button>
-        </div>
+        </ToastNotice>
       )}
-    </div>
+    </>
   );
 }

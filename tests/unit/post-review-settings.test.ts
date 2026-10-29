@@ -14,7 +14,10 @@ import { taskSettingsSchema } from '@/lib/domain/task-settings';
 import { defaultProfileInput, personalProfileValues } from '@/lib/domain/setup';
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/account' }));
-vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+vi.mock('@/components/toast-provider', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/toast-provider')>()),
+  useToast: () => ({ showToast: vi.fn() }),
+}));
 vi.mock('@/lib/auth/client', () => ({ authClient: {} }));
 vi.mock('@/components/passkey-settings', () => ({ PasskeySettings: () => null }));
 const json = (value: object, status = 200) => Promise.resolve(Response.json(value, { status }));

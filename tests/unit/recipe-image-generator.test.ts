@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ToastProvider } from '@/components/toast-provider';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
@@ -63,7 +64,7 @@ afterEach(async () => {
 });
 async function render() {
   await act(async () =>
-    root.render(
+    renderWithToasts(
       createElement(RecipeImageGenerator, {
         recipeId,
         revision: 1,
@@ -163,3 +164,7 @@ describe('recipe image preview UI', () => {
     expect(sessionStorage.length).toBe(0);
   });
 });
+
+function renderWithToasts(ui: Parameters<typeof root.render>[0]) {
+  root.render(createElement(ToastProvider, null, ui));
+}

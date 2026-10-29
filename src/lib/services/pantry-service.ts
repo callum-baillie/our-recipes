@@ -22,6 +22,7 @@ import {
   type PantryProductInput,
   type PantryQuery,
 } from '@/lib/domain/pantry';
+import { normalizeGtin } from '@/lib/domain/food-data';
 import {
   areInventoryUnitsCompatible,
   convertInventoryQuantity,
@@ -459,6 +460,57 @@ export function getPantryProduct(
   return listPantryProducts(includeArchived).find((product) => product.id === productId) ?? null;
 }
 
+function insertPantryProductRows(
+  transaction: AppTransaction,
+  input: PantryProductInput,
+  productId: string,
+  now: Date,
+  actorProfileId: string,
+) {
+  const restockPolicy = resolvedRestockPolicy(input);
+  const normalizedName = normalizePantryName(input.displayName);
+  transaction
+    .insert(pantryProducts)
+    .values({
+      id: productId,
+      normalizedName,
+      displayName: input.displayName,
+      brand: input.brand,
+      variant: input.variant,
+      category: input.category,
+      subcategory: input.subcategory,
+      defaultInventoryUnit: normalizeInventoryUnit(input.defaultInventoryUnit),
+      defaultPackageAmount: input.defaultPackageAmount,
+      defaultPackageUnit: input.defaultPackageUnit
+        ? normalizeInventoryUnit(input.defaultPackageUnit)
+        : '',
+      defaultStorageType: input.defaultStorageType,
+      imageStorageKey: null,
+      dietaryTags: normalizedJsonList(input.dietaryTags),
+      allergens: normalizedJsonList(input.allergens),
+      storageInstructions: input.storageInstructions,
+      defaultShelfLifeDays: input.defaultShelfLifeDays,
+      shelfLifeAfterOpeningDays: input.shelfLifeAfterOpeningDays,
+      isStaple: input.isStaple,
+      preferredBrand: input.preferredBrand,
+      preferredStore: input.preferredStore,
+      minimumStock: input.minimumStock,
+      targetStock: input.targetStock,
+      reorderThreshold: input.reorderThreshold,
+      preferredPurchaseQuantity: input.preferredPurchaseQuantity,
+      stockUnit: input.stockUnit ? normalizeInventoryUnit(input.stockUnit) : '',
+      suggestGroceryRestock: input.suggestGroceryRestock,
+      ...restockPolicy,
+      archivedAt: input.archived ? now : null,
+      createdByProfileId: actorProfileId,
+      updatedByProfileId: actorProfileId,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  replaceAliases(transaction, productId, input.aliases, now);
+}
+
 export function createPantryProduct(
   input: PantryProductInput,
   actorProfileId: string,
@@ -480,50 +532,76 @@ export function createPantryProduct(
   if (duplicate) throw new PantryConflictError('That Pantry product already exists.');
   const now = new Date();
   const productId = randomUUID();
-  const restockPolicy = resolvedRestockPolicy(input);
-  db.transaction((transaction) => {
+  db.transaction((transaction) =>
+    insertPantryProductRows(transaction, input, productId, now, actorProfileId),
+  );
+  return listPantryProducts(true).find((product) => product.id === productId)!;
+}
+
+/**
+ * Names a retail barcode no provider could identify: one product, its verified barcode and the
+ * first stock batch are saved together, so later scans of the code resolve to this product.
+ */
+export function createPantryProductForBarcode(
+  input: {
+    barcode: string;
+    product: PantryProductInput;
+    batch: Omit<PantryBatchInput, 'productId'>;
+  },
+  actorProfileId: string,
+): { product: PantryProductView; batch: BatchRecord } {
+  ensureDatabase();
+  const db = getDatabase();
+  const { value, canonicalGtin } = normalizeGtin(input.barcode);
+  const normalizedName = normalizePantryName(input.product.displayName);
+  const productId = randomUUID();
+  const now = new Date();
+  const batch = db.transaction((transaction) => {
+    const saved = transaction
+      .select({ name: pantryProducts.displayName })
+      .from(pantryProductIdentifiers)
+      .innerJoin(pantryProducts, eq(pantryProducts.id, pantryProductIdentifiers.productId))
+      .where(eq(pantryProductIdentifiers.normalizedValue, canonicalGtin))
+      .get();
+    if (saved) throw new PantryConflictError(`This barcode is already saved as ${saved.name}.`);
+    const duplicate = transaction
+      .select({ id: pantryProducts.id })
+      .from(pantryProducts)
+      .where(
+        and(
+          eq(pantryProducts.normalizedName, normalizedName),
+          eq(pantryProducts.brand, input.product.brand),
+          eq(pantryProducts.variant, input.product.variant),
+        ),
+      )
+      .get();
+    if (duplicate)
+      throw new PantryConflictError(
+        'A Pantry product with that name already exists. Use a more specific name.',
+      );
+    insertPantryProductRows(transaction, input.product, productId, now, actorProfileId);
     transaction
-      .insert(pantryProducts)
+      .insert(pantryProductIdentifiers)
       .values({
-        id: productId,
-        normalizedName,
-        displayName: input.displayName,
-        brand: input.brand,
-        variant: input.variant,
-        category: input.category,
-        subcategory: input.subcategory,
-        defaultInventoryUnit: normalizeInventoryUnit(input.defaultInventoryUnit),
-        defaultPackageAmount: input.defaultPackageAmount,
-        defaultPackageUnit: input.defaultPackageUnit
-          ? normalizeInventoryUnit(input.defaultPackageUnit)
-          : '',
-        defaultStorageType: input.defaultStorageType,
-        imageStorageKey: null,
-        dietaryTags: normalizedJsonList(input.dietaryTags),
-        allergens: normalizedJsonList(input.allergens),
-        storageInstructions: input.storageInstructions,
-        defaultShelfLifeDays: input.defaultShelfLifeDays,
-        shelfLifeAfterOpeningDays: input.shelfLifeAfterOpeningDays,
-        isStaple: input.isStaple,
-        preferredBrand: input.preferredBrand,
-        preferredStore: input.preferredStore,
-        minimumStock: input.minimumStock,
-        targetStock: input.targetStock,
-        reorderThreshold: input.reorderThreshold,
-        preferredPurchaseQuantity: input.preferredPurchaseQuantity,
-        stockUnit: input.stockUnit ? normalizeInventoryUnit(input.stockUnit) : '',
-        suggestGroceryRestock: input.suggestGroceryRestock,
-        ...restockPolicy,
-        archivedAt: input.archived ? now : null,
-        createdByProfileId: actorProfileId,
-        updatedByProfileId: actorProfileId,
+        id: randomUUID(),
+        productId,
+        identifierType: value.length === 12 ? 'upc_a' : value.length === 13 ? 'ean_13' : 'gtin',
+        value,
+        normalizedValue: canonicalGtin,
+        source: 'household',
+        verified: true,
+        metadata: '{}',
         createdAt: now,
         updatedAt: now,
       })
       .run();
-    replaceAliases(transaction, productId, input.aliases, now);
+    return createPantryBatchInTransaction(
+      transaction,
+      { ...input.batch, productId },
+      actorProfileId,
+    ).batch;
   });
-  return listPantryProducts(true).find((product) => product.id === productId)!;
+  return { product: listPantryProducts(true).find((product) => product.id === productId)!, batch };
 }
 
 export function updatePantryProduct(
@@ -1924,4 +2002,38 @@ export function getPantryBatch(batchId: string): PantryBatchView | null {
       includeInactive: true,
     }).batches.find((batch) => batch.id === batchId) ?? null
   );
+}
+
+/** Explicit expiry disposal only; ordinary removals and reversed events are excluded. */
+export function getExpiredPantryWasteMetrics() {
+  ensureDatabase();
+  const events = getDatabase()
+    .select()
+    .from(pantryInventoryEvents)
+    .where(
+      and(
+        eq(pantryInventoryEvents.eventType, 'item_discarded'),
+        eq(pantryInventoryEvents.reason, 'Expired'),
+        isNull(pantryInventoryEvents.reversedByEventId),
+      ),
+    )
+    .all()
+    .filter((event) => {
+      try {
+        return !['discarded', 'donated', 'depleted'].includes(
+          JSON.parse(event.previousState).status,
+        );
+      } catch {
+        return false;
+      }
+    });
+  const quantities = new Map<string, number>();
+  for (const event of events) {
+    if (event.previousQuantity !== null)
+      quantities.set(event.unit, (quantities.get(event.unit) ?? 0) + event.previousQuantity);
+  }
+  return {
+    batches: new Set(events.map((event) => event.batchId)).size,
+    quantities: [...quantities].map(([unit, quantity]) => ({ unit, quantity })),
+  };
 }

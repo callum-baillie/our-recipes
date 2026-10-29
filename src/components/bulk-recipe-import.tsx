@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FileImage, Plus, Trash2 } from 'lucide-react';
@@ -218,11 +220,7 @@ export function BulkRecipeImport() {
           </SettingsActionBar>
         </>
       )}
-      {error && (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      )}
+      {error && <ToastMessage message={error} tone="error" />}
     </div>
   );
 }

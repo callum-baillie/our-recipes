@@ -4,9 +4,12 @@ export type ScanSessionEntry = {
   time: string;
   kind: 'added' | 'removed' | 'cooked' | 'adjusted' | 'other';
   state: 'saved' | 'undone' | 'review';
+  /** A review scan whose barcode has since been saved as a Pantry product. */
+  resolved: boolean;
   title: string;
   detail: string;
   barcode: string | null;
+  recipeHref?: string;
   /** Checksum-valid retail barcode used to look up a product photo, if any. */
   gtin: string | null;
   brand: string;
@@ -23,6 +26,8 @@ export type ScanSessionEntry = {
     unit: string;
     location: string;
     status: string;
+    /** Recorded best-before date, YYYY-MM-DD. */
+    bestBefore: string | null;
   } | null;
 };
 
@@ -32,6 +37,7 @@ export type ScanSession = {
   stale: boolean;
   readerConnected: boolean;
   mode: string;
+  mealControl?: { bootId: string; revision: number; plannedFor: string | null };
   bindingId: string;
   instanceId: string;
   serverTime: number;

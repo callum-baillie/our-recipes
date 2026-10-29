@@ -1,5 +1,9 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
+
 import { useEffect, useState } from 'react';
 
 import { LoadingIndicator } from '@/components/skeleton';
@@ -155,9 +159,9 @@ export function MealPlanPantryDemand({ demand }: { demand: PantryProjectedDemand
           <a href={`/lists/${listId}${restored ? '?restored=1' : ''}`}>Open grocery list</a>
         )}
         {restored ? (
-          <span role="status">Archived list restored with your edits intact.</span>
+          <ToastNotice>Archived list restored with your edits intact.</ToastNotice>
         ) : null}
-        {error && <span role="alert">{error}</span>}
+        {error && <ToastMessage message={error} tone="error" />}
       </div>
     </section>
   );

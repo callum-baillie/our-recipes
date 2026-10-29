@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { PageHeader } from '@/components/page-header';
 
 import { ChevronDown, ChevronUp, FolderPlus, Trash2 } from 'lucide-react';
@@ -181,11 +183,7 @@ export function CollectionManager({
           </form>
         </section>
 
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <ToastMessage message={error} tone="error" />}
 
         {collections.length ? (
           <section

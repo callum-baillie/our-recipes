@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { AiSummaryCards, type AiSummaryCardData } from './ai-summary-cards';
 import { SettingsMergeReview } from './settings-merge-review';
 import {
@@ -551,7 +553,7 @@ export function AiSettingsForm({
       )}
       {conflict && (
         <section aria-label="Review changed settings">
-          <p role="status">Privacy settings changed elsewhere. Your edits are retained.</p>
+          <ToastNotice>Privacy settings changed elsewhere. Your edits are retained.</ToastNotice>
           <button
             type="button"
             className="secondary-button"

@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { CatalogFoodContext } from '@/components/catalog-food-context';
 import { CatalogRetailEvidence } from '@/components/catalog-retail-evidence';
 
@@ -61,6 +63,8 @@ export function FoodCatalogPicker({
   launchLabel = 'Scan or search food data',
   embedded = false,
   initialTab = 'search',
+  activeTab,
+  onTabChange,
   searchSuggestions = [],
   onManualRequest,
   onImported,
@@ -73,6 +77,9 @@ export function FoodCatalogPicker({
   launchLabel?: string;
   embedded?: boolean;
   initialTab?: PickerTab;
+  /** Let the host own the lookup method; the picker then hides its own tab bar. */
+  activeTab?: PickerTab;
+  onTabChange?: (tab: PickerTab) => void;
   searchSuggestions?: string[];
   onManualRequest?: () => void;
   onSavingChange?: (saving: boolean) => void;
@@ -87,7 +94,14 @@ export function FoodCatalogPicker({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<PickerTab>(initialTab === 'barcode' ? 'search' : initialTab);
+  const [innerTab, setInnerTab] = useState<PickerTab>(
+    initialTab === 'barcode' ? 'search' : initialTab,
+  );
+  const tab = activeTab ?? innerTab;
+  const setTab = (next: PickerTab) => {
+    setInnerTab(next);
+    onTabChange?.(next);
+  };
   const [query, setQuery] = useState(defaultQuery);
   const [records, setRecords] = useState<FoodRecord[]>([]);
   const [localProducts, setLocalProducts] = useState<LocalProduct[]>([]);
@@ -606,25 +620,27 @@ export function FoodCatalogPicker({
           )}
           {!selected && !selectedLocal ? (
             <>
-              <div className={styles.tabs} role="tablist" aria-label="Food lookup method">
-                {(
-                  [
-                    ['scan', Camera, 'Scan'],
-                    ['search', Search, 'Search'],
-                  ] as const
-                ).map(([value, Icon, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === value}
-                    onClick={() => setTab(value)}
-                  >
-                    <Icon size={16} />
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {activeTab === undefined ? (
+                <div className={styles.tabs} role="tablist" aria-label="Food lookup method">
+                  {(
+                    [
+                      ['scan', Camera, 'Scan'],
+                      ['search', Search, 'Search'],
+                    ] as const
+                  ).map(([value, Icon, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === value}
+                      onClick={() => setTab(value)}
+                    >
+                      <Icon size={16} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {tab === 'scan' ? (
                 <BarcodeScanner
                   onSearchRequest={() => {
@@ -1123,11 +1139,7 @@ export function FoodCatalogPicker({
               </button>
             </form>
           ) : null}
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <ToastMessage message={error} tone="error" /> : null}
         </section>
       </div>
     );

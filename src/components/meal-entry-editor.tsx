@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Plus, Search, Trash2, X } from 'lucide-react';
 import { ButtonSpinner, InlineSkeleton } from '@/components/skeleton';
@@ -938,7 +940,7 @@ export function MealEntryEditor({
                 placeholder={kind === 'fast' ? 'Optional details' : ''}
               />
             </label>
-            {error ? <p role="alert">{error}</p> : null}
+            {error ? <ToastMessage message={error} tone="error" /> : null}
           </fieldset>
         </div>
         <footer>

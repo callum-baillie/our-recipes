@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { formatRecipeDuration } from '@/lib/domain/recipe-duration';
 import {
   plannerFocus,
@@ -532,12 +535,12 @@ function PlannedMealActions({
       </header>
       <div className={cardStyles.actionBody}>
         {unconfirmed ? (
-          <p role="alert">
+          <ToastNotice tone="error">
             A calendar change could not be confirmed. Refresh before making another change.{' '}
             <button type="button" onClick={() => window.location.reload()}>
               Refresh calendar
             </button>
-          </p>
+          </ToastNotice>
         ) : null}
         <button
           type="button"
@@ -2167,7 +2170,9 @@ export function MealPlanner({
                         Add
                       </button>
                     </fieldset>
-                    {preferencesError ? <p role="alert">{preferencesError}</p> : null}
+                    {preferencesError ? (
+                      <ToastNotice tone="error">{preferencesError}</ToastNotice>
+                    ) : null}
                     <button
                       className={settingsStyles.mealTypeSaveButton}
                       aria-busy={preferencesBusy}
@@ -2311,7 +2316,7 @@ export function MealPlanner({
           aria-label="Meal calendar"
         >
           {feedback ? (
-            <div className={styles.feedback} role="status">
+            <ToastNotice>
               <Check size={18} aria-hidden="true" /> {feedback}
               {feedbackDestination ? (
                 <Link
@@ -2321,17 +2326,17 @@ export function MealPlanner({
                   {feedbackDestination.label}
                 </Link>
               ) : null}
-            </div>
+            </ToastNotice>
           ) : null}
           {error ? (
-            <p className={styles.error} role="alert">
+            <ToastNotice tone="error">
               {error}{' '}
               {unconfirmedChange ? (
                 <button type="button" onClick={() => window.location.reload()}>
                   Refresh calendar
                 </button>
               ) : null}
-            </p>
+            </ToastNotice>
           ) : null}
 
           <section className={styles.mobilePlannerCommand} aria-label="Mobile planner controls">

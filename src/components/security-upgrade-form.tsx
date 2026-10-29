@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -195,11 +197,7 @@ export function SecurityUpgradeForm({ profiles }: { profiles: UpgradeProfile[] }
           </fieldset>
         );
       })}
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ToastMessage message={error} tone="error" /> : null}
       <button className="primary-button" type="submit" disabled={submitting} aria-busy={submitting}>
         {submitting ? <ButtonSpinner /> : null}
         {submitting ? 'Securing profiles…' : 'Complete security upgrade'}

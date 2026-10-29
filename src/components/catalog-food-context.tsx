@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { useEffect, useRef, useState } from 'react';
 import {
   catalogContextKey,
@@ -170,7 +172,7 @@ function ScopedCatalogFoodContext({
             storage duration.
           </p>
         ))}
-      {error && <p role="alert">{error}</p>}
+      {error && <ToastMessage message={error} tone="error" />}
     </details>
   );
 }

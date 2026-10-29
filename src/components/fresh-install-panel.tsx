@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -115,11 +117,7 @@ export function FreshInstallPanel() {
               placeholder={CONFIRMATION}
             />
           </SettingsField>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <ToastMessage message={error} tone="error" />}
           {pending && (
             <p role="status">
               Erasing app data… Closing this page does not cancel the server operation.

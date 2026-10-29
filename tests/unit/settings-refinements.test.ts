@@ -3,18 +3,19 @@ import {
   cleanup,
   configure,
   fireEvent,
-  render,
+  render as baseRender,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
 import { createElement } from 'react';
+import { ToastProvider } from '@/components/toast-provider';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   usePathname: () => '/settings/recipes',
 }));
-vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+
 vi.mock('@/lib/auth/client', () => ({ authClient: { signIn: { email: vi.fn() } } }));
 vi.mock('@/components/catalog-store-link', () => ({ CatalogStoreLink: () => null }));
 vi.mock('@/components/store-map-upload', () => ({
@@ -607,3 +608,7 @@ describe('settings drafts and boundaries', () => {
     ).toBe(false);
   });
 });
+
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}

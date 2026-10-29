@@ -1,16 +1,13 @@
 'use client';
-import {
-  createPantryAddOperation,
-  pantryAddOperationSchema,
-  resumePantryAddOperation,
-  type PantryAddOperation,
-} from '@/lib/client/pantry-add-operation';
+
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 import { AppDialog } from './app-dialog';
-import { DialogViewport } from './dialog-viewport';
+import { BatchStepper } from './quantity-stepper';
 import type { ComponentPropsWithoutRef } from 'react';
 import { KitchenPrintDialog } from './kitchen-print-dialog';
 import { PageHeader } from '@/components/page-header';
-import { DecisionAssistance } from '@/components/decision-assistance';
 import { AssistedReviewButton } from './assisted-review-button';
 import { SearchFacetBar, ResultsToolbar } from './search-facet-bar';
 
@@ -18,27 +15,31 @@ import {
   ArrowDownUp,
   Box,
   CalendarClock,
+  CalendarX,
   ChevronDown,
+  Eye,
   History,
   Leaf,
   MapPin,
   MoreHorizontal,
   Package,
   PackageOpen,
+  Pencil,
   Plus,
-  Search,
   Snowflake,
   Thermometer,
+  Trash2,
   Undo2,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { PageSkeleton } from '@/components/skeleton';
-import { FoodCatalogPicker } from '@/components/food-catalog-picker';
 import { useToast } from '@/components/toast-provider';
-import type { FoodRecord } from '@/lib/domain/food-data';
+import { expireBatch, removeBatch, undoBatch } from '@/lib/client/pantry-batch';
+import { HANDHELD_HREF, useScannerActivity } from '@/lib/client/scanner-activity';
 
 import { ProductImage, PhotoCredit } from '@/components/product-image';
 import { productImageGtin, type ProductIdentifier } from '@/lib/domain/product-image';
@@ -250,16 +251,6 @@ function RetainedForm({
       </fieldset>
     </form>
   );
-}
-
-function foodProviderLabel(provider: FoodRecord['provider']) {
-  return provider === 'usda_fdc' ? 'USDA FoodData Central' : 'Open Food Facts';
-}
-
-function suggestedInventoryUnit(record: FoodRecord) {
-  const amount = `${record.quantity} ${record.servingSize}`.toLocaleLowerCase();
-  const match = amount.match(/\d\s*(kg|ml|lb|oz|g|l)\b/u);
-  return match?.[1] ?? 'each';
 }
 
 async function messageFor(response: Response, fallback: string): Promise<string> {
@@ -840,162 +831,41 @@ export function PantryManager({
     initialPreferences.defaultGroup,
   );
   const [includeInactive, setIncludeInactive] = useState(false);
-  const [addProductId, setAddProductId] = useState('');
-  const [addItemOpen, setAddItemOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [removedBatch, setRemovedBatch] = useState<{
-    id: string;
-    name: string;
-    version: number;
-  } | null>(null);
-  const [catalogSaving, setCatalogSaving] = useState(false);
-  const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  const [manualProductName, setManualProductName] = useState('');
-  const [manualBrand, setManualBrand] = useState('');
-  const [manualCategory, setManualCategory] = useState('');
-  const [manualUnit, setManualUnit] = useState('each');
-  const [manualPackageUnit, setManualPackageUnit] = useState('');
-  const [manualSource, setManualSource] = useState('');
-  const [manualSearchResults, setManualSearchResults] = useState<FoodRecord[]>([]);
-  const [manualSearchBusy, setManualSearchBusy] = useState(false);
-  const [manualSearchError, setManualSearchError] = useState('');
-  const [manualSearchNotice, setManualSearchNotice] = useState('');
   const [mutationBusy, setBusy] = useState(false);
   const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const router = useRouter();
+  const scanner = useScannerActivity(accountId);
+  const unfinishedAdd = useSyncExternalStore(
+    subscribeAddRequest,
+    () => savedAddRequest(`bord:pantry-add:${accountId}:${profileId}`) !== null,
+    () => false,
+  );
   const busy = mutationBusy || needsRefresh;
   const [error, setError] = useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [memoryAddOperation, setMemoryAddOperation] = useState<PantryAddOperation | null>(null);
-  const [addOperationError, setAddOperationError] = useState('');
-  const addOperationLock = useRef(false);
-  const addOperationKey = `bord:pantry-add:${accountId}:${profileId}`;
-  const savedAdd = useSyncExternalStore(
-    subscribeAddRequest,
-    () => savedAddRequest(addOperationKey),
-    () => null,
-  );
-  let restoredAdd: PantryAddOperation | null = null;
-  try {
-    const parsed = pantryAddOperationSchema.safeParse(savedAdd ? JSON.parse(savedAdd) : null);
-    if (parsed.success) restoredAdd = parsed.data;
-  } catch {
-    /* Invalid local metadata never starts a write. */
-  }
-  const addOperation = memoryAddOperation ?? restoredAdd;
-  function rememberAdd(operation: PantryAddOperation | null) {
-    setMemoryAddOperation(operation);
-    try {
-      if (operation) sessionStorage.setItem(addOperationKey, JSON.stringify(operation));
-      else sessionStorage.removeItem(addOperationKey);
-      window.dispatchEvent(new Event('bord:pantry-add'));
-    } catch {
-      setAddOperationError(
-        'Keep this page open; the browser cannot retain this request after navigation.',
-      );
-    }
-  }
-  const additionRecovery = addOperation ? (
-    <section
-      className={styles.manualSearchNotice}
-      aria-label="Pantry addition recovery"
-      tabIndex={-1}
-    >
-      <strong>Pantry addition · {addOperation.label}</strong>
-      <p>
-        {addOperation.acknowledged.length} of {addOperation.batchKeys.length} batches confirmed.{' '}
-        {addOperation.uncertain ? 'The current request outcome is unknown.' : ''} Resume uses the
-        original reviewed amount and request keys; later form edits remain a separate draft.
-      </p>
-      <p role="status">{addOperation.message}</p>
-      {addOperationError && <p role="alert">{addOperationError}</p>}
-      {needsRefresh && (
-        <div>
-          <p role="alert">
-            Confirmed batches remain saved. Refresh Pantry before resuming this addition.
-          </p>
-          <button type="button" disabled={mutationBusy} onClick={() => void load()}>
-            Refresh Pantry
-          </button>
-        </div>
-      )}
-      <button
-        type="button"
-        disabled={busy || !canEdit}
-        onClick={() => void continueAdding(addOperation, false)}
-      >
-        {mutationBusy ? 'Adding batches…' : 'Resume this addition'}
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          if (
-            window.confirm(
-              `Close this request after reviewing Pantry? ${addOperation.acknowledged.length} batches are confirmed and remain saved.${addOperation.uncertain ? ' Another batch may also have been saved. Check the current records before adding it again.' : ''}`,
-            )
-          ) {
-            rememberAdd(null);
-            setAddOperationError('');
-            void load();
-          }
-        }}
-      >
-        Close request after reviewing Pantry
-      </button>
-    </section>
-  ) : null;
-  const addItemDialogRef = useRef<HTMLDialogElement>(null);
-  const manualEntryRef = useRef<HTMLDivElement>(null);
   const loadRequestRef = useRef(0);
-  const manualRequestRef = useRef(0);
-  const manualControllerRef = useRef<AbortController | null>(null);
 
-  function openAddItemDialog() {
-    setManualEntryOpen(false);
-    setAddItemOpen(true);
-  }
-
-  function closeAddItemDialog() {
-    if (busy || catalogSaving) return;
-    resetAddItemDialog();
-  }
-  function resetAddItemDialog() {
-    // Close the native surface before unmounting so it restores the invoking control.
-    if (addItemDialogRef.current?.open) addItemDialogRef.current.close();
-    manualControllerRef.current?.abort();
-    manualRequestRef.current++;
-    setManualSearchBusy(false);
-    setCatalogSaving(false);
-    setManualEntryOpen(false);
-    setAddItemOpen(false);
-    setAddProductId('');
-    setManualProductName('');
-    setManualBrand('');
-    setManualCategory('');
-    setManualUnit('each');
-    setManualPackageUnit('');
-    setManualSource('');
-    setManualSearchResults([]);
-    setManualSearchError('');
-    setManualSearchNotice('');
-  }
-
-  function showManualEntry() {
-    setManualEntryOpen(true);
-    window.requestAnimationFrame(() => {
-      manualEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      manualEntryRef.current
-        ?.querySelector<HTMLElement>('select, input')
-        ?.focus({ preventScroll: true });
-    });
-  }
-
+  // An addition that was sent but never confirmed stays on offer until it is settled.
   useEffect(() => {
-    const dialog = addItemDialogRef.current;
-    if (addItemOpen && dialog && !dialog.open) dialog.showModal();
-  }, [addItemOpen]);
-
+    if (!unfinishedAdd || !canEdit) return;
+    const close = showToast('An addition to your pantry did not finish confirming.', 'info', {
+      key: 'pantry-add-unfinished',
+      actions: [
+        {
+          label: 'Review it',
+          onClick: () => {
+            close();
+            router.push('/pantry/add?mode=manual');
+          },
+        },
+      ],
+    });
+    return close;
+  }, [unfinishedAdd, canEdit, showToast, router]);
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current;
     const query = new URLSearchParams({
@@ -1054,22 +924,6 @@ export function PantryManager({
     }
   }, [dashboard, selectedBatchId]);
 
-  useEffect(
-    () => () => {
-      manualRequestRef.current++;
-      manualControllerRef.current?.abort();
-    },
-    [],
-  );
-
-  const defaultLocationId =
-    dashboard?.locations.find(
-      (location) => location.storageType === 'pantry' && location.depth === 0,
-    )?.id ??
-    dashboard?.locations.find((location) => location.storageType === 'pantry')?.id ??
-    dashboard?.locations[0]?.id ??
-    '';
-  const productOptions = useMemo(() => dashboard?.products ?? [], [dashboard]);
   const categories = useMemo(
     () =>
       [
@@ -1126,92 +980,6 @@ export function PantryManager({
     setStatus('');
     setExpiry('');
     setIncludeInactive(false);
-  }
-
-  async function searchManualFood() {
-    const query = manualProductName.trim();
-    if (query.length < 2) {
-      setManualSearchError('Enter at least two characters to search food data.');
-      return;
-    }
-    manualControllerRef.current?.abort();
-    const controller = new AbortController();
-    manualControllerRef.current = controller;
-    const requestId = ++manualRequestRef.current;
-    setManualSearchBusy(true);
-    setManualSearchError('');
-    setManualSearchNotice('');
-    setManualSearchResults([]);
-    try {
-      const response = await fetch('/api/v1/food-data/searches', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, context: 'pantry', kind: 'any', page: 1 }),
-      });
-      if (requestId !== manualRequestRef.current) return;
-      if (!response.ok) {
-        setManualSearchError(await messageFor(response, 'Food search failed.'));
-        return;
-      }
-      const body = (await response.json()) as { records?: FoodRecord[] };
-      if (requestId !== manualRequestRef.current) return;
-      const records = body.records ?? [];
-      setManualSearchResults(records);
-      if (!records.length) setManualSearchNotice('No food-data matches were found.');
-    } catch {
-      if (controller.signal.aborted || requestId !== manualRequestRef.current) return;
-      setManualSearchError('Food search is temporarily unavailable.');
-    } finally {
-      if (requestId === manualRequestRef.current) setManualSearchBusy(false);
-    }
-  }
-
-  async function selectManualFood(record: FoodRecord) {
-    manualControllerRef.current?.abort();
-    const controller = new AbortController();
-    manualControllerRef.current = controller;
-    const requestId = ++manualRequestRef.current;
-    setManualSearchBusy(true);
-    setManualSearchError('');
-    setManualSearchNotice('');
-    try {
-      const response = await fetch('/api/v1/food-data/details', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: record.provider,
-          recordId: record.providerRecordId,
-          catalogRef: record.catalogRef,
-          language: navigator.language.slice(0, 2),
-        }),
-      });
-      if (requestId !== manualRequestRef.current) return;
-      if (!response.ok) {
-        setManualSearchError(await messageFor(response, 'Food details could not be loaded.'));
-        return;
-      }
-      const body = (await response.json()) as { record: FoodRecord };
-      if (requestId !== manualRequestRef.current) return;
-      const detail = body.record;
-      const nextUnit = suggestedInventoryUnit(detail);
-      setManualProductName(detail.displayName);
-      setManualBrand(detail.brand);
-      setManualCategory(detail.categories[0] ?? '');
-      setManualUnit(nextUnit);
-      setManualPackageUnit(nextUnit === 'each' ? '' : nextUnit);
-      setManualSource(foodProviderLabel(detail.provider));
-      setManualSearchResults([]);
-      setManualSearchNotice(
-        `Filled from ${foodProviderLabel(detail.provider)}. Review before adding.`,
-      );
-    } catch {
-      if (controller.signal.aborted || requestId !== manualRequestRef.current) return;
-      setManualSearchError('Food details are temporarily unavailable.');
-    } finally {
-      if (requestId === manualRequestRef.current) setManualSearchBusy(false);
-    }
   }
 
   async function mutate(
@@ -1338,82 +1106,6 @@ export function PantryManager({
     };
   }
 
-  async function continueAdding(operation: PantryAddOperation, closeOnSuccess: boolean) {
-    if (busy || addOperationLock.current || !canEdit) return;
-    addOperationLock.current = true;
-    setBusy(true);
-    setAddOperationError('');
-    let latest = operation;
-    try {
-      const result = await resumePantryAddOperation(operation, (next) => {
-        latest = next;
-        rememberAdd(next);
-      });
-      rememberAdd(null);
-      showToast(
-        `${result.acknowledged.length} Pantry ${result.acknowledged.length === 1 ? 'batch' : 'batches'} added.`,
-        'success',
-      );
-      if (closeOnSuccess) resetAddItemDialog();
-      setNeedsRefresh(true);
-      await load();
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : 'This addition could not be confirmed.';
-      rememberAdd({ ...latest, message });
-      setAddOperationError(message);
-      if (latest.acknowledged.length) {
-        setNeedsRefresh(true);
-        await load();
-      }
-      requestAnimationFrame(() => {
-        const recovery = addItemDialogRef.current?.querySelector<HTMLElement>(
-          '[aria-label="Pantry addition recovery"]',
-        );
-        recovery?.scrollIntoView({ block: 'nearest' });
-        recovery?.focus({ preventScroll: true });
-      });
-    } finally {
-      setBusy(false);
-      addOperationLock.current = false;
-    }
-  }
-  async function addItem(formData: FormData) {
-    if (addOperation || busy || !canEdit) return;
-    const productId = String(formData.get('productId') ?? '');
-    const unit = String(formData.get('unit') ?? 'each');
-    const batchCount = Number(formData.get('batchCount') ?? 1);
-    if (!Number.isInteger(batchCount) || batchCount < 1 || batchCount > 20) {
-      setAddOperationError('Choose between 1 and 20 separate batches.');
-      return;
-    }
-    const operation = createPantryAddOperation({
-      label: productId
-        ? (dashboard?.products.find((product) => product.id === productId)?.displayName ??
-          'Selected product')
-        : String(formData.get('productName') ?? ''),
-      productId,
-      product: productId
-        ? null
-        : {
-            displayName: formData.get('productName'),
-            brand: formData.get('brand'),
-            category: formData.get('category'),
-            defaultInventoryUnit: unit,
-            defaultPackageUnit: formData.get('packageUnit'),
-            defaultStorageType: formData.get('storageType'),
-            aliases: [],
-            isStaple: formData.get('isStaple') === 'on',
-            restockMode: 'none',
-            restockTrigger: 'below_target',
-          },
-      batch: batchPayload(formData),
-      batchCount,
-    });
-    rememberAdd(operation);
-    await continueAdding(operation, true);
-  }
-
   async function editProduct(product: Product, formData: FormData) {
     await mutate(
       `/api/v1/pantry/products/${product.id}`,
@@ -1500,6 +1192,32 @@ export function PantryManager({
     );
   }
 
+  /** Offer a short Undo after stock leaves the list. */
+  function offerUndo(name: string, batchId: string, version: number, message: string) {
+    const close = showToast(message, 'success', {
+      autoDismissMs: 9000,
+      actions: [
+        {
+          label: 'Undo stock change',
+          onClick: async () => {
+            close();
+            try {
+              await undoBatch({ id: batchId, version });
+              showToast(`${name} is back in your pantry.`, 'success');
+              await load();
+              router.refresh();
+            } catch (caught) {
+              showToast(
+                caught instanceof Error ? caught.message : 'That could not be undone.',
+                'error',
+              );
+            }
+          },
+        },
+      ],
+    });
+  }
+
   async function action(batch: Batch, body: Record<string, unknown>, success: string) {
     await mutate(
       `/api/v1/pantry/batches/${batch.id}/actions`,
@@ -1507,28 +1225,41 @@ export function PantryManager({
       success,
       'POST',
       (result) => {
-        if (body.type === 'undo') setRemovedBatch(null);
-        else if (result.batch && ['depleted', 'discarded', 'donated'].includes(result.batch.status))
-          setRemovedBatch({
-            id: result.batch.id,
-            name: batch.product.displayName,
-            version: result.batch.version,
-          });
+        if (
+          body.type !== 'undo' &&
+          result.batch &&
+          ['depleted', 'discarded', 'donated'].includes(result.batch.status)
+        )
+          offerUndo(
+            batch.product.displayName,
+            result.batch.id,
+            result.batch.version,
+            `${batch.product.displayName} changed to inactive stock.`,
+          );
       },
     );
   }
-  async function undoRemovedBatch() {
-    if (!removedBatch) return;
-    const restored = await mutate(
-      `/api/v1/pantry/batches/${removedBatch.id}/actions`,
-      { type: 'undo', expectedVersion: removedBatch.version, note: '' },
-      'Last stock change undone.',
-    );
-    if (restored) {
-      setRemovedBatch(null);
-      requestAnimationFrame(() =>
-        document.querySelector<HTMLInputElement>('input[aria-label="Search Pantry"]')?.focus(),
+
+  /** Edit mode: take a batch off the shelf, counted as expired or simply removed. */
+  async function retire(batch: Batch, kind: 'expired' | 'removed') {
+    if (rowBusy || !canEdit) return;
+    const name = batch.product.displayName;
+    setRowBusy(batch.id);
+    try {
+      const result = await (kind === 'expired' ? expireBatch(batch) : removeBatch(batch));
+      offerUndo(
+        name,
+        batch.id,
+        result.batch?.version ?? batch.version + 1,
+        kind === 'expired' ? `${name} marked as expired.` : `${name} removed from your pantry.`,
       );
+      await load();
+      // The expired-items total above is rendered on the server.
+      router.refresh();
+    } catch (caught) {
+      showToast(caught instanceof Error ? caught.message : 'That could not be saved.', 'error');
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -1561,409 +1292,37 @@ export function PantryManager({
   }
 
   return (
-    <div className={styles.page}>
-      <DialogViewport />
+    <div className={styles.page} data-editing={editing || undefined}>
       <PageHeader
         title="Pantry"
         eyebrow="HOUSEHOLD INVENTORY"
         description="Track stock, dates and storage."
         actions={
           <>
-            <button className="primary-button" type="button" onClick={openAddItemDialog}>
-              <Plus size={20} aria-hidden="true" /> Add item
-            </button>
-            <Link className="text-button" href="/pantry/inventory">
-              Count stock
+            <Link className="primary-button" href="/pantry/add">
+              <Plus size={20} aria-hidden="true" /> Add to pantry
             </Link>
+            {scanner && (scanner.live || scanner.toReview > 0) ? (
+              <Link
+                className={styles.scanChip}
+                href={HANDHELD_HREF}
+                data-live={scanner.live || undefined}
+              >
+                <span aria-hidden="true" />
+                {scanner.toReview > 0
+                  ? `Review scans · ${scanner.toReview}`
+                  : 'Handheld scanner · live'}
+              </Link>
+            ) : null}
             <KitchenPrintDialog kind="pantry" />
-            <a className="text-button" href="#pantry-management">
-              Manage pantry
-            </a>
           </>
         }
       />
-      {addItemOpen ? (
-        <dialog
-          ref={addItemDialogRef}
-          className={styles.addDialog}
-          aria-labelledby="add-pantry-item-title"
-          onCancel={(event) => {
-            if (busy || catalogSaving) event.preventDefault();
-            else closeAddItemDialog();
-          }}
-          onClose={closeAddItemDialog}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeAddItemDialog();
-          }}
-        >
-          <div className={styles.addDialogShell}>
-            <header className={styles.addDialogHeader}>
-              <div>
-                <h2 id="add-pantry-item-title">Add pantry item</h2>
-                <p>Find a food or enter the item details manually.</p>
-              </div>
-              <button
-                className={styles.addDialogClose}
-                type="button"
-                aria-label="Close add item dialog"
-                disabled={busy || catalogSaving}
-                onClick={closeAddItemDialog}
-              >
-                <X size={20} aria-hidden="true" />
-              </button>
-            </header>
-            <div className={styles.addPanelBody}>
-              {additionRecovery}
-              <FoodCatalogPicker
-                context="pantry"
-                onSavingChange={setCatalogSaving}
-                locations={dashboard.locations.map(({ id, path }) => ({ id, path }))}
-                disabled={!canEdit || !defaultLocationId}
-                embedded
-                initialTab="scan"
-                searchSuggestions={productOptions.map((product) => product.displayName)}
-                onManualRequest={showManualEntry}
-                onImported={(_product, options) => {
-                  showToast('Reviewed food data and Pantry batch added.', 'success');
-                  if (!options?.keepOpen) resetAddItemDialog();
-                  void load();
-                }}
-              />
-              {manualEntryOpen ? (
-                <div ref={manualEntryRef} className={styles.manualEntry}>
-                  <div className={styles.manualEntryHeading}>
-                    <strong>Enter details manually</strong>
-                    <span>Use this when a product is not available from food data providers.</span>
-                  </div>
-                  <RetainedForm disabled={busy} action={addItem} className={styles.form}>
-                    <label>
-                      <span>Existing product</span>
-                      <select
-                        name="productId"
-                        value={addProductId}
-                        onChange={(event) => setAddProductId(event.target.value)}
-                      >
-                        <option value="">Create a new product</option>
-                        {productOptions.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className={styles.manualSearchField}>
-                      <label htmlFor="manual-product-name">New product name</label>
-                      <div className={styles.manualSearchControl}>
-                        <input
-                          autoComplete="off"
-                          id="manual-product-name"
-                          list="add-item-product-options"
-                          name="productName"
-                          onChange={(event) => {
-                            setManualProductName(event.target.value);
-                            setManualSearchNotice('');
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Enter') return;
-                            event.preventDefault();
-                            void searchManualFood();
-                          }}
-                          placeholder="e.g. Chickpeas"
-                          value={manualProductName}
-                        />
-                        <button
-                          aria-label="Search food data for this product"
-                          disabled={manualSearchBusy || manualProductName.trim().length < 2}
-                          onClick={() => void searchManualFood()}
-                          title="Search USDA FoodData Central"
-                          type="button"
-                        >
-                          <Search size={18} aria-hidden="true" />
-                        </button>
-                      </div>
-                      <datalist id="add-item-product-options">
-                        {productOptions.map((product) => (
-                          <option key={product.id} value={product.displayName} />
-                        ))}
-                      </datalist>
-                    </div>
-                    {manualProductName.trim().length > 1 && (
-                      <DecisionAssistance
-                        headingLevel={3}
-                        embedded
-                        inputQuery={manualProductName}
-                        onChoose={(_card, choice) => {
-                          const product = productOptions.find((item) => item.id === choice);
-                          if (product) {
-                            setAddProductId(product.id);
-                            setManualSearchNotice(
-                              `Selected ${product.displayName}. Check quantity and storage, then add the item.`,
-                            );
-                          }
-                        }}
-                        initialTask="pantry_input"
-                        tasks={['pantry_input', 'clarification', 'nutrition_match']}
-                        title="Need help identifying this food?"
-                        description="Compare your entry with existing products or reference nutrition, using the name you entered."
-                      />
-                    )}
-                    {manualSearchError ? (
-                      <p className={styles.manualSearchError} role="alert">
-                        {manualSearchError}
-                      </p>
-                    ) : null}
-                    {manualSearchNotice ? (
-                      <p className={styles.manualSearchNotice} role="status">
-                        {manualSearchNotice}
-                      </p>
-                    ) : null}
-                    {manualSearchResults.length ? (
-                      <div className={styles.manualSearchResults} aria-label="Food search results">
-                        <span>Choose a result to fill the form</span>
-                        {manualSearchResults.map((record) => (
-                          <button
-                            key={`${record.provider}:${record.providerRecordId}`}
-                            onClick={() => void selectManualFood(record)}
-                            type="button"
-                          >
-                            <strong>{record.displayName}</strong>
-                            <small>
-                              {[record.brand, foodProviderLabel(record.provider)]
-                                .filter(Boolean)
-                                .join(' · ')}
-                            </small>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    <label>
-                      <span>Brand</span>
-                      <input
-                        name="brand"
-                        onChange={(event) => setManualBrand(event.target.value)}
-                        value={manualBrand}
-                      />
-                    </label>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Quantity</span>
-                        <input
-                          name="quantityRemaining"
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="Exact"
-                        />
-                      </label>
-                      <label>
-                        <span>Unit</span>
-                        <select
-                          name="unit"
-                          onChange={(event) => setManualUnit(event.target.value)}
-                          value={manualUnit}
-                        >
-                          {units.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {unit}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Original quantity</span>
-                        <input name="originalQuantity" type="number" min="0" step="any" />
-                      </label>
-                      <label>
-                        <span>Separate batches</span>
-                        <input name="batchCount" type="number" min="1" max="20" defaultValue="1" />
-                      </label>
-                    </div>
-                    <label>
-                      <span>Or approximate amount</span>
-                      <select name="approximateState" defaultValue="unknown">
-                        <option value="full">Full</option>
-                        <option value="three_quarters">Three quarters</option>
-                        <option value="half">Half</option>
-                        <option value="quarter">Quarter</option>
-                        <option value="almost_empty">Almost empty</option>
-                        <option value="unknown">Unknown</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Location</span>
-                      <select name="locationId" defaultValue={defaultLocationId} required>
-                        {dashboard.locations.map((location) => (
-                          <option key={location.id} value={location.id}>
-                            {location.path}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Shelf or sub-location</span>
-                      <input name="sublocation" placeholder="Upper shelf" />
-                    </label>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Package count</span>
-                        <input name="packageCount" type="number" min="0" step="any" />
-                      </label>
-                      <label>
-                        <span>Amount per package</span>
-                        <input name="amountPerPackage" type="number" min="0" step="any" />
-                      </label>
-                    </div>
-                    <label>
-                      <span>Package unit</span>
-                      <select
-                        name="packageUnit"
-                        onChange={(event) => setManualPackageUnit(event.target.value)}
-                        value={manualPackageUnit}
-                      >
-                        <option value="">Not recorded</option>
-                        {units.map((unit) => (
-                          <option key={unit}>{unit}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Best before</span>
-                        <input name="bestBeforeDate" type="date" />
-                      </label>
-                      <label>
-                        <span>Category</span>
-                        <input
-                          name="category"
-                          onChange={(event) => setManualCategory(event.target.value)}
-                          placeholder="Canned goods"
-                          value={manualCategory}
-                        />
-                      </label>
-                    </div>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Use by</span>
-                        <input name="useByDate" type="date" />
-                      </label>
-                      <label>
-                        <span>Sell by</span>
-                        <input name="sellByDate" type="date" />
-                      </label>
-                    </div>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Purchased</span>
-                        <input name="purchaseDate" type="date" />
-                      </label>
-                      <label>
-                        <span>Prepared</span>
-                        <input name="preparedDate" type="date" />
-                      </label>
-                    </div>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Date precision</span>
-                        <select name="expiryPrecision" defaultValue="unknown">
-                          <option value="exact">Exact</option>
-                          <option value="estimated">Estimated</option>
-                          <option value="month_only">Month only</option>
-                          <option value="unknown">Unknown</option>
-                        </select>
-                      </label>
-                      <label>
-                        <span>Status</span>
-                        <select name="status" defaultValue="unopened">
-                          <option value="unopened">Unopened</option>
-                          <option value="opened">Opened</option>
-                          <option value="frozen">Frozen</option>
-                          <option value="thawed">Thawed</option>
-                          <option value="reserved">Reserved</option>
-                        </select>
-                      </label>
-                    </div>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Opened</span>
-                        <input name="openedDate" type="date" />
-                      </label>
-                      <label>
-                        <span>Frozen</span>
-                        <input name="frozenDate" type="date" />
-                      </label>
-                    </div>
-                    <label>
-                      <span>Thawed</span>
-                      <input name="thawedDate" type="date" />
-                    </label>
-                    <div className={styles.formRow}>
-                      <label>
-                        <span>Price in cents</span>
-                        <input name="purchasePriceCents" type="number" min="0" step="1" />
-                      </label>
-                      <label>
-                        <span>Store or source</span>
-                        <input
-                          name="source"
-                          onChange={(event) => setManualSource(event.target.value)}
-                          value={manualSource}
-                        />
-                      </label>
-                    </div>
-                    <input name="storageType" type="hidden" value="pantry" />
-                    <label>
-                      <span>Notes</span>
-                      <textarea name="notes" rows={2} />
-                    </label>
-                    <label className={styles.checkbox}>
-                      <input name="isStaple" type="checkbox" /> Staple product
-                    </label>
-                    <label className={styles.checkbox}>
-                      <input name="excludeFromGrocery" type="checkbox" /> Exclude this batch from
-                      grocery calculations
-                    </label>
-                    {!addOperation && addOperationError ? (
-                      <p role="alert">{addOperationError}</p>
-                    ) : null}
-                    <button
-                      disabled={busy || !canEdit || !defaultLocationId || Boolean(addOperation)}
-                      type="submit"
-                    >
-                      {busy ? 'Saving…' : 'Add item'}
-                    </button>
-                  </RetainedForm>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </dialog>
-      ) : null}
-
-      {removedBatch && (
-        <div className={styles.batchUndoNotice} role="status">
-          <span>
-            {removedBatch.name} changed to inactive stock. You can undo its last stock change.
-          </span>
-          <button type="button" disabled={busy || !canEdit} onClick={() => void undoRemovedBatch()}>
-            <Undo2 size={16} /> Undo stock change
-          </button>
-          <button
-            type="button"
-            aria-label="Dismiss stock undo"
-            onClick={() => setRemovedBatch(null)}
-          >
-            <X size={18} />
-          </button>
-        </div>
-      )}
       {!canEdit ? (
         <p className={styles.profilePrompt}>Choose a household profile to change Pantry stock.</p>
       ) : null}
-      {!addItemOpen && additionRecovery}
       {needsRefresh ? (
-        <div className={styles.error} role="alert">
+        <ToastNotice tone="error">
           <p>
             The stock change was saved. Current Pantry values could not yet be refreshed. Stock
             actions are paused to protect their versions.
@@ -1971,13 +1330,9 @@ export function PantryManager({
           <button type="button" onClick={() => void load()} disabled={mutationBusy}>
             Refresh Pantry
           </button>
-        </div>
+        </ToastNotice>
       ) : null}
-      {error ? (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ToastMessage message={error} tone="error" /> : null}
       <section className={styles.summary} aria-label="Pantry summary">
         {summaryCards(dashboard)
           .filter((card) => card.value > 0 || card.label === 'On hand')
@@ -2228,12 +1583,31 @@ export function PantryManager({
           onSortChange={setSort}
           options={sortOptions.map(([value, label]) => ({ value, label }))}
           actions={
-            <AssistedReviewButton
-              task={view === 'essentials' ? 'restock' : 'pantry_review'}
-              tasks={['pantry_review', 'restock', 'pantry_input', 'clarification']}
-              title="Review pantry"
-              onApplied={() => void load()}
-            />
+            <>
+              <div className={styles.modeToggle} role="group" aria-label="Pantry mode">
+                <button type="button" aria-pressed={!editing} onClick={() => setEditing(false)}>
+                  <Eye size={15} aria-hidden="true" /> View
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={editing}
+                  disabled={!canEdit}
+                  title={canEdit ? undefined : 'Choose a household profile to edit stock'}
+                  onClick={() => {
+                    setEditing(true);
+                    if (view === 'essentials') setView('all');
+                  }}
+                >
+                  <Pencil size={15} aria-hidden="true" /> Edit
+                </button>
+              </div>
+              <AssistedReviewButton
+                task={view === 'essentials' ? 'restock' : 'pantry_review'}
+                tasks={['pantry_review', 'restock', 'pantry_input', 'clarification']}
+                title="Review pantry"
+                onApplied={() => void load()}
+              />
+            </>
           }
         />
       </div>
@@ -2987,6 +2361,49 @@ export function PantryManager({
                             </AppDialog>
                           )}
                         </div>
+                        {editing &&
+                          !['depleted', 'discarded', 'donated'].includes(batch.status) && (
+                            <div
+                              className={styles.editBar}
+                              data-busy={rowBusy === batch.id || undefined}
+                            >
+                              {batch.quantityRemaining !== null ? (
+                                <BatchStepper
+                                  batch={{
+                                    id: batch.id,
+                                    version: batch.version,
+                                    quantity: batch.quantityRemaining,
+                                    unit: batch.unit,
+                                  }}
+                                  label={batch.product.displayName}
+                                  disabled={!canEdit || rowBusy === batch.id}
+                                  onSaved={async () => {
+                                    await load();
+                                  }}
+                                  onError={(message) => showToast(message, 'error')}
+                                />
+                              ) : (
+                                <span className={styles.editNote}>Approximate amount</span>
+                              )}
+                              <button
+                                type="button"
+                                className={styles.expireButton}
+                                disabled={!canEdit || rowBusy !== null}
+                                onClick={() => void retire(batch, 'expired')}
+                              >
+                                <CalendarX size={15} aria-hidden="true" /> Expired
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.deleteButton}
+                                disabled={!canEdit || rowBusy !== null}
+                                aria-label={`Delete ${batch.product.displayName} from pantry`}
+                                onClick={() => void retire(batch, 'removed')}
+                              >
+                                <Trash2 size={15} aria-hidden="true" /> Delete
+                              </button>
+                            </div>
+                          )}
                       </article>
                     ))}
                   </div>
@@ -3014,9 +2431,9 @@ export function PantryManager({
                   Clear filters
                 </button>
               ) : (
-                <button type="button" onClick={openAddItemDialog}>
-                  <Plus size={18} aria-hidden="true" /> Add an item
-                </button>
+                <Link className="primary-button" href="/pantry/add">
+                  <Plus size={18} aria-hidden="true" /> Add to pantry
+                </Link>
               )}
             </div>
           )}

@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { Merge, Plus, Save, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
@@ -193,9 +195,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
         </form>
       </details>
       {error && failedOperation?.type === 'create' ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+        <ToastMessage message={error} tone="error" />
       ) : null}
       <div className={styles.search}>
         <label>
@@ -405,9 +405,7 @@ export function TagManager({ initialTags }: { initialTags: Tag[] }) {
               </form>
             ) : null}
             {error && failedOperation?.name === tag.name ? (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
+              <ToastMessage message={error} tone="error" />
             ) : null}
           </article>
         ))}

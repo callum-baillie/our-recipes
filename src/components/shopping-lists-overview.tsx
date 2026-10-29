@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { DismissibleDetails } from './dismissible-details';
 import { PageHeader } from '@/components/page-header';
 
@@ -337,7 +340,7 @@ export function ShoppingListsOverview({
                   Use as Next shop<small>New automatic-restock items go to this list.</small>
                 </span>
               </label>
-              {createError && <p role="alert">{createError}</p>}
+              {createError && <ToastNotice tone="error">{createError}</ToastNotice>}
               <button type="submit" aria-busy={busy === 'create'} disabled={busy !== null}>
                 {busy === 'create' ? <ButtonSpinner /> : null}
                 {busy === 'create' ? 'Creating…' : 'Create list'}
@@ -455,7 +458,9 @@ export function ShoppingListsOverview({
                         </dl>
                       </Link>
 
-                      {listErrors[list.id] && <p role="alert">{listErrors[list.id]}</p>}
+                      {listErrors[list.id] && (
+                        <ToastNotice tone="error">{listErrors[list.id]}</ToastNotice>
+                      )}
                       {editingId === list.id ? (
                         <form
                           className={styles.renameForm}

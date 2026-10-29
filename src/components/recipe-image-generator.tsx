@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -325,11 +327,7 @@ export function RecipeImageGenerator({
               ? 'An earlier image request is available to check. Checking does not start a new generation.'
               : '')}
       </p>
-      {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
+      {error && <ToastMessage message={error} tone="error" />}
     </section>
   );
 }

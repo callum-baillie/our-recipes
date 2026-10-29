@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -142,17 +144,7 @@ export function AccountSecurityForm() {
           >
             {revealed ? 'Hide passwords' : 'Show passwords'}
           </button>
-          {error && (
-            <p
-              ref={errorRef}
-              tabIndex={-1}
-              id="password-error"
-              role="alert"
-              className="form-error settings-inline-status"
-            >
-              {error}
-            </p>
-          )}
+          {error && <ToastMessage message={error} tone="error" />}
           <SettingsActionBar status={success}>
             <button className="primary-button" disabled={pending !== null} type="submit">
               <ShieldCheck size={16} />

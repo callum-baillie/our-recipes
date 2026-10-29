@@ -1,0 +1,292 @@
+.workspace {
+  align-items: start;
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+}
+
+/* --- Scanner sources (left on wide screens, above the list on phones) --- */
+.sources {
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 4.75rem;
+}
+
+.panel {
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.panel header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  justify-content: space-between;
+}
+
+.panel h2 {
+  align-items: center;
+  color: var(--label);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 0.45rem;
+  letter-spacing: 0.1em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.panel h2 svg {
+  color: var(--leaf);
+}
+
+.where {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 600;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.where select,
+.panel header > select {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.84rem;
+  max-width: 11rem;
+  min-height: 2.2rem;
+  min-width: 0;
+  padding: 0 0.5rem;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.note button {
+  background: none;
+  border: 0;
+  color: var(--leaf);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.status > span:first-child {
+  background: var(--line-strong);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 0.6rem;
+  width: 0.6rem;
+}
+
+.status[data-live] > span:first-child {
+  animation: breathe 2.4s ease-in-out infinite;
+  background: var(--success);
+}
+
+.status > span:last-child {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+/* --- Session list --- */
+.list {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.list > header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.list > header h2 {
+  align-items: center;
+  display: flex;
+  font-size: 1.15rem;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.list > header div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.list > header button {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  min-height: 2.25rem;
+  padding: 0 0.8rem;
+}
+
+.list > header button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.list > header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.count {
+  animation: pop 0.3s ease-out;
+  background: var(--leaf);
+  border-radius: 999px;
+  color: var(--linen);
+  font-size: 0.76rem;
+  min-width: 1.6rem;
+  padding: 0.05rem 0.5rem;
+  text-align: center;
+}
+
+.stack {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.meal {
+  align-items: center;
+  background: var(--warning-surface);
+  border: 1px solid var(--warning-border);
+  border-radius: 0.7rem;
+  color: var(--warning-ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  padding: 0.7rem 0.85rem;
+}
+
+.prompt {
+  align-items: center;
+  animation: rise 0.3s ease-out;
+  background: var(--linen);
+  border: 1px dashed var(--line-strong);
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  padding: clamp(2rem, 6vw, 4rem) 1.25rem;
+  text-align: center;
+}
+
+.prompt > svg {
+  animation: scan 2.6s ease-in-out infinite;
+  color: var(--leaf);
+}
+
+.prompt[data-offline='true'] > svg {
+  animation: none;
+  color: var(--muted);
+}
+
+.prompt h3 {
+  font-size: 1.15rem;
+  margin: 0.2rem 0 0;
+}
+
+.prompt p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 28rem;
+}
+
+.credit {
+  justify-self: end;
+}
+
+@keyframes breathe {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 18%, transparent);
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes scan {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 899px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On a phone the list sits between the camera and the handheld status, near where you scan. */
+  .sources {
+    display: contents;
+  }
+
+  .panel[data-kind='camera'] {
+    order: 1;
+  }
+
+  .list {
+    order: 2;
+  }
+
+  .panel[data-kind='handheld'] {
+    order: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt,
+  .prompt > svg,
+  .count,
+  .status[data-live] > span:first-child {
+    animation: none;
+  }
+}

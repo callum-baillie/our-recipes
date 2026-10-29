@@ -1,0 +1,415 @@
+/* --- Scanned item card --- */
+.item {
+  position: relative;
+}
+
+.card {
+  align-items: center;
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  column-gap: 0.75rem;
+  display: grid;
+  grid-template-areas:
+    'photo main stepper more'
+    'details details details details';
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  padding: 0.6rem 0.7rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.photo {
+  align-items: center;
+  background: color-mix(in srgb, var(--leaf-pale) 72%, var(--field));
+  border-radius: 0.6rem;
+  color: var(--leaf);
+  display: inline-flex;
+  grid-area: photo;
+  height: 2.9rem;
+  justify-content: center;
+  width: 2.9rem;
+}
+
+.main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.main h4 {
+  font-size: 0.95rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main p {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  gap: 0.1rem 0.6rem;
+  margin: 0.1rem 0 0;
+}
+
+.amount {
+  color: var(--muted);
+  font-size: 0.85rem;
+  grid-area: stepper;
+  margin: 0;
+}
+
+.stepperSlot {
+  grid-area: stepper;
+}
+
+.more {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  grid-area: more;
+  height: 2.25rem;
+  place-items: center;
+  width: 2.25rem;
+}
+
+.more:hover {
+  background: var(--surface-hover);
+}
+
+.more svg {
+  transition: transform 0.22s ease;
+}
+
+.more[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.voided {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* Expanding options: the grid-rows trick animates to the content's own height. */
+.details {
+  display: grid;
+  grid-area: details;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.24s ease;
+}
+
+.details[data-open] {
+  grid-template-rows: 1fr;
+}
+
+.details > div {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.details[data-open] > div {
+  overflow: visible;
+  padding-top: 0.7rem;
+}
+
+.details label,
+.field {
+  color: var(--label);
+  display: grid;
+  flex: 1 1 9rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  gap: 0.25rem;
+}
+
+.details input,
+.details select {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  min-height: 2.4rem;
+  min-width: 0;
+  padding: 0 0.55rem;
+}
+
+.remove {
+  align-items: center;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
+  border-radius: 0.5rem;
+  color: var(--danger);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0 0.8rem;
+}
+
+.remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+/* --- Unrecognised barcode card --- */
+.unnamed {
+  animation: rise 0.3s ease-out;
+  background: var(--warning-surface);
+  border: 1px solid var(--warning-border);
+  border-radius: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem 0.85rem;
+}
+
+.unnamedHead {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.tag {
+  background: color-mix(in srgb, var(--tomato) 14%, var(--linen));
+  border-radius: 0.6rem;
+  color: var(--tomato-dark);
+  display: grid;
+  flex: 0 0 auto;
+  height: 2.5rem;
+  place-items: center;
+  width: 2.5rem;
+}
+
+.unnamedHead h4 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.unnamedHead p {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  gap: 0.1rem 0.6rem;
+  margin: 0.1rem 0 0;
+}
+
+.unnamedHead code {
+  font-size: 0.78rem;
+}
+
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.nameRow label {
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+
+.nameRow input {
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.55rem;
+  box-sizing: border-box;
+  color: var(--ink);
+  font: inherit;
+  min-height: 2.6rem;
+  padding: 0 0.7rem;
+  width: 100%;
+}
+
+.nameRow button {
+  align-items: center;
+  background: var(--leaf);
+  border: 0;
+  border-radius: 0.55rem;
+  color: var(--linen);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 700;
+  gap: 0.4rem;
+  justify-content: center;
+  min-height: 2.6rem;
+  min-width: 5.5rem;
+  padding: 0 1rem;
+}
+
+.nameRow button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.moreToggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--label);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  gap: 0.25rem;
+  justify-self: start;
+  padding: 0;
+}
+
+.moreToggle svg {
+  transition: transform 0.22s ease;
+}
+
+.moreToggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.84rem;
+  margin: 0;
+}
+
+.credit {
+  justify-self: end;
+}
+
+/* --- Live motion --- */
+.item[data-motion='in'] .card {
+  animation: arrive 1.2s ease-out;
+}
+
+.item[data-motion='bump'] .card {
+  animation: flash 1s ease-out;
+}
+
+.item[data-motion='void'] .card {
+  animation: flash 1s ease-out;
+}
+
+.item[data-removed] .card {
+  opacity: 0.55;
+}
+
+.item[data-removed] h4 {
+  text-decoration: line-through;
+}
+
+@keyframes arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  25% {
+    border-color: var(--leaf);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--leaf) 18%, transparent);
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    border-color: var(--line);
+    box-shadow: none;
+  }
+}
+
+@keyframes flash {
+  0% {
+    background: color-mix(in srgb, var(--leaf) 16%, var(--linen));
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+  }
+}
+
+@keyframes breathe {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 18%, transparent);
+  }
+}
+
+@keyframes scan {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 560px) {
+  .card {
+    grid-template-areas:
+      'photo main more'
+      'photo stepper stepper'
+      'details details details';
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 0.4rem;
+  }
+
+  .stepperSlot {
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unnamed,
+  .item[data-motion] .card,
+  .looking .photo {
+    animation: none;
+  }
+
+  .details,
+  .more svg,
+  .moreToggle svg {
+    transition: none;
+  }
+}
+
+.looking .photo {
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.source {
+  background: var(--paper);
+  border-radius: 999px;
+  color: var(--label);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.45rem;
+  text-transform: uppercase;
+}
+
+/* The shared options panel names a grid area only the item card defines. */
+.unnamed .details {
+  grid-area: auto;
+}

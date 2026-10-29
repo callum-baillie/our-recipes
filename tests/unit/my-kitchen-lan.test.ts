@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { createElement } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ToastProvider } from '@/components/toast-provider';
+import { cleanup, fireEvent, render as baseRender, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MyKitchen } from '@/components/my-kitchen';
 import type { KitchenState } from '@/lib/domain/kitchen';
@@ -57,3 +58,7 @@ it('saves equipment and confirms inventory on LAN HTTP without crypto.randomUUID
     );
   expect(commands[0]!.operationId).not.toBe(commands[1]!.operationId);
 });
+
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}

@@ -1,4 +1,9 @@
 'use client';
+
+import type { ReactNode } from 'react';
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -90,6 +95,7 @@ async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promi
   return result as T;
 }
 export function ScannerStation({
+  children,
   stations,
   keys,
   products,
@@ -98,6 +104,7 @@ export function ScannerStation({
   canEdit,
   canRegister,
 }: {
+  children?: ReactNode;
   stations: Option[];
   keys: Option[];
   products: (Option & { unit: string })[];
@@ -350,22 +357,23 @@ export function ScannerStation({
   return (
     <main className={styles.main}>
       <PageHeader
-        title="Scanner station"
+        title="Scanner settings"
         description="Scan groceries into Pantry or record a recipe as cooked. A scanner beep means read; Saved means Bòrd completed the transaction."
         actions={
           <>
             <Link className="text-button" href="/pantry">
               Pantry
             </Link>
-            <Link className="text-button" href="/scanner/session">
+            <Link className="text-button" href="/pantry/add?mode=scan">
               Scan list
             </Link>
-            <Link className="text-button" href="/scanner/cards">
-              Print scanner cards
-            </Link>
+            <a className="text-button" href="/api/v1/scanner/cards?kind=controls">
+              Download wall action sheet
+            </a>
           </>
         }
       />
+      {children}
       <label>
         Station
         <select
@@ -398,18 +406,14 @@ export function ScannerStation({
       )}
       {stationId && !detail && !connectionError && <p role="status">Connecting to the station…</p>}
       {connectionError && (
-        <p role="alert" className={styles.error}>
+        <ToastNotice tone="error">
           Station status could not be refreshed. Saved scans are retained. {connectionError}{' '}
           <button className={styles.button} type="button" onClick={() => void refresh()}>
             Reconnect
           </button>
-        </p>
+        </ToastNotice>
       )}
-      {error && (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      )}
+      {error && <ToastMessage message={error} tone="error" />}
       <p role="status" aria-live="polite">
         {busy ? 'Working… Please wait.' : message}
       </p>
@@ -466,6 +470,23 @@ export function ScannerStation({
                 ? ` · Expires ${new Date(state.expiresAt * 1000).toLocaleTimeString()}`
                 : ''}
             </p>
+            {!addOnly && (
+              <label>
+                Next recipe meal date{' '}
+                <input
+                  type="date"
+                  value={state?.plannedFor ?? ''}
+                  disabled={controlsDisabled}
+                  onChange={(e) =>
+                    control({ control: 'meal_date', plannedFor: e.target.value || null })
+                  }
+                />
+                <small>
+                  Empty means today in the scanner profile’s timezone. Resets after the next recipe
+                  scan or control timeout.
+                </small>
+              </label>
+            )}
             <div className={styles.row}>
               {(addOnly
                 ? (['idle', 'add'] as const)
@@ -537,7 +558,16 @@ export function ScannerStation({
             {!addOnly && (
               <div className={styles.row}>
                 {(
-                  ['open', 'freeze', 'thaw', 'move', 'mark_empty', 'discard', 'donate'] as const
+                  [
+                    'open',
+                    'freeze',
+                    'thaw',
+                    'move',
+                    'mark_empty',
+                    'discard',
+                    'donate',
+                    'expired',
+                  ] as const
                 ).map((action) => (
                   <button
                     className={styles.button}
@@ -817,13 +847,20 @@ export function ScannerStation({
                     <label>
                       Reviewed batch action
                       <select name="action">
-                        {['open', 'freeze', 'thaw', 'move', 'mark_empty', 'discard', 'donate'].map(
-                          (a) => (
-                            <option key={a} value={a}>
-                              {a.replaceAll('_', ' ')}
-                            </option>
-                          ),
-                        )}
+                        {[
+                          'open',
+                          'freeze',
+                          'thaw',
+                          'move',
+                          'mark_empty',
+                          'discard',
+                          'donate',
+                          'expired',
+                        ].map((a) => (
+                          <option key={a} value={a}>
+                            {a.replaceAll('_', ' ')}
+                          </option>
+                        ))}
                       </select>
                     </label>
                     <label>
@@ -1195,7 +1232,7 @@ export function ScannerStation({
                   scannerQuota: data.get('scannerQuota') === 'on',
                 });
                 router.refresh();
-                router.push('/scanner');
+                router.push('/settings/scanner');
               });
             }}
           >

@@ -15,6 +15,24 @@ export const scannerPreparedSchema = z
   })
   .strict();
 export const scannerExtendedCommandSchema = z.union([
+  z
+    .object({
+      type: z.literal('undo_session'),
+      targetOperationIds: z
+        .array(uuid)
+        .min(1)
+        .max(50)
+        .refine((ids) => new Set(ids).size === ids.length),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('recipe_link'),
+      url: z.string().url().max(512),
+      scannedAt: z.string().datetime({ offset: true }),
+      plannedFor: z.string().date().optional(),
+    })
+    .strict(),
   scannerCommandSchema,
   z
     .object({
@@ -98,6 +116,7 @@ export const boundScannerOperationSchema = z
 export type BoundScannerOperation = z.infer<typeof boundScannerOperationSchema>;
 
 export const scannerControlSchema = z.discriminatedUnion('control', [
+  z.object({ control: z.literal('meal_date'), plannedFor: z.string().date().nullable() }).strict(),
   z
     .object({
       control: z.literal('mode'),
@@ -110,7 +129,16 @@ export const scannerControlSchema = z.discriminatedUnion('control', [
   z
     .object({
       control: z.literal('action'),
-      action: z.enum(['open', 'freeze', 'thaw', 'move', 'mark_empty', 'discard', 'donate']),
+      action: z.enum([
+        'open',
+        'freeze',
+        'thaw',
+        'move',
+        'mark_empty',
+        'discard',
+        'donate',
+        'expired',
+      ]),
     })
     .strict(),
 ]);
@@ -124,6 +152,7 @@ export const scannerStateSchema = z
     packages: z.number().int().min(1).max(99),
     locationId: uuid.nullable(),
     action: z.string().max(30).nullable().default(null),
+    plannedFor: z.string().date().nullable().optional(),
     expiresAt: z.number().nonnegative().nullable(),
     readerConnected: z.boolean(),
     queueCount: z.number().int().min(0),

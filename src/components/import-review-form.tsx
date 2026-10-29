@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { Minus, Plus, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -540,11 +542,7 @@ export function ImportReviewForm({
           />
         </label>
       </section>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ToastMessage message={error} tone="error" />}
       <button className="primary-button" type="submit" disabled={pending}>
         {pending ? (
           <LoadingIndicator label="Saving recipe" />

@@ -1,4 +1,8 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 import {
   SettingsField,
   SettingsPane,
@@ -170,7 +174,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
   return (
     <div className="settings-stack">
       {refreshError && (
-        <p role="alert">
+        <ToastNotice tone="error">
           {refreshError}{' '}
           <button
             type="button"
@@ -180,7 +184,7 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
           >
             Refresh connections
           </button>
-        </p>
+        </ToastNotice>
       )}
       <SettingsPane
         title="Connections"
@@ -255,13 +259,13 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
                 {account.nextSyncAt && <p>Next check: {date(account.nextSyncAt)}</p>}
                 <small>Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}.</small>
                 {!modalOpen && resultAccount === account.id && message && (
-                  <p role="status">{message}</p>
+                  <ToastMessage message={message} tone="info" />
                 )}
-                {!modalOpen && resultAccount === account.id && error && <p role="alert">{error}</p>}
+                {!modalOpen && resultAccount === account.id && error && (
+                  <ToastMessage message={error} tone="error" />
+                )}
                 {account.lastError && (
-                  <p role="alert" className={styles.error}>
-                    Needs attention: {account.lastError}
-                  </p>
+                  <ToastNotice tone="error">Needs attention: {account.lastError}</ToastNotice>
                 )}
               </SettingsItem>
             ))
@@ -311,16 +315,12 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
       {message &&
         !modalOpen &&
         (!resultAccount || !state.accounts.some((account) => account.id === resultAccount)) && (
-          <p role="status" className="settings-inline-status">
-            {message}
-          </p>
+          <ToastMessage message={message} tone="info" />
         )}
       {error &&
         !modalOpen &&
         (!resultAccount || !state.accounts.some((account) => account.id === resultAccount)) && (
-          <p role="alert" className="form-error">
-            {error}
-          </p>
+          <ToastMessage message={error} tone="error" />
         )}
       <dialog
         ref={dialog}
@@ -715,16 +715,8 @@ export function IntegrationsManager({ initial }: { initial: IntegrationState }) 
             </SettingsRow>
           </div>
         ) : null}
-        {message ? (
-          <p role="status" className={styles.notice}>
-            {message}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className={styles.error}>
-            {error}
-          </p>
-        ) : null}
+        {message ? <ToastMessage message={message} tone="info" /> : null}
+        {error ? <ToastMessage message={error} tone="error" /> : null}
       </dialog>
     </div>
   );

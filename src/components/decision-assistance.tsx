@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import Link from 'next/link';
 import { PageHeader } from './page-header';
 import { useRouter } from 'next/navigation';
@@ -192,7 +194,7 @@ export function SuggestionCard({
           ))}
         </div>
       </details>
-      {message && <p role="status">{message}</p>}
+      {message && <ToastMessage message={message} tone="info" />}
     </article>
   );
 }
@@ -634,11 +636,7 @@ export function DecisionAssistance({
             </button>
           ) : null}
           {pending ? <AsyncSkeleton label="Reviewing your kitchen" variant="rows" /> : null}
-          {message && (
-            <p className={styles.notice} role="status">
-              {message}
-            </p>
-          )}
+          {message && <ToastMessage message={message} tone="info" />}
           {notice && <p>{notice}</p>}
           {cards.some((card) => card.status === 'dismissed') && (
             <label className={styles.check}>

@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { Check, Clock3, ImageOff, Layers3, Sparkles, Users } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -241,7 +243,7 @@ function RecipeProposalCard({
                   ? 'Check this image request'
                   : 'Generate an image preview (paid)'}
             </button>
-            {imageError ? <p role="alert">{imageError}</p> : null}
+            {imageError ? <ToastNotice tone="error">{imageError}</ToastNotice> : null}
             {['failed', 'cancelled'].includes(text(image?.status)) ? (
               <>
                 <p>

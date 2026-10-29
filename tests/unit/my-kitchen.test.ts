@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 import { createElement } from 'react';
+import { ToastProvider } from '@/components/toast-provider';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MyKitchen } from '@/components/my-kitchen';
 import { equipmentTemplate } from '@/lib/domain/kitchen-catalog';
@@ -31,7 +32,7 @@ it('K25 renders malicious equipment names as data without executable markup', ()
     canManage: false,
     items: [item],
   };
-  const html = renderToStaticMarkup(
+  const html = renderWithToasts(
     createElement(MyKitchen, { initial: state, actorKey: 'account:actor', sharing: false }),
   );
   expect(html).toContain('&lt;script&gt;');
@@ -105,3 +106,7 @@ it('retains incomplete local measurement drafts without allowing them to be save
   expect(equipmentDraftSchema.parse(draft).measurements[0]!.value).toBe(0);
   expect(equipmentInputSchema.safeParse(draft).success).toBe(false);
 });
+
+function renderWithToasts(ui: Parameters<typeof renderToStaticMarkup>[0]) {
+  return renderToStaticMarkup(createElement(ToastProvider, null, ui));
+}

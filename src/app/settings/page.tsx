@@ -19,6 +19,13 @@ export const dynamic = 'force-dynamic';
 
 const categories = [
   {
+    href: '/settings/scanner',
+    eyebrow: 'SCANNER SETTINGS',
+    title: 'Scanner',
+    description: 'Set up hardware scanners, camera preferences, and print a wall action sheet.',
+    icon: PackageOpen,
+  },
+  {
     href: '/settings/profiles',
     eyebrow: 'PROFILE SETTINGS',
     title: 'Profiles & roles',

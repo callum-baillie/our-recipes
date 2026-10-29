@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { DismissibleDetails } from './dismissible-details';
 import { Archive, Copy, List, MoreHorizontal, Settings, X } from 'lucide-react';
 import Link from 'next/link';
@@ -130,7 +132,7 @@ export function ShoppingListMobileMenu({ listId, listName }: { listId: string; l
             </p>
           )}
         </form>
-        {actionError && <p role="alert">{actionError}</p>}
+        {actionError && <ToastNotice tone="error">{actionError}</ToastNotice>}
         {busy && (
           <p role="status">
             {busy === 'archive'

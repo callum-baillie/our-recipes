@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { BookmarkCheck, Heart, ThumbsDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -114,11 +116,7 @@ export function RecipeReactionButtons({
           Saving recipe reaction…
         </span>
       ) : null}
-      {error ? (
-        <span className="sr-only" role="alert">
-          {error}
-        </span>
-      ) : null}
+      {error ? <ToastMessage message={error} tone="error" /> : null}
     </div>
   );
 }

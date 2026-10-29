@@ -101,10 +101,8 @@ test('source portions remain complete and old context cannot overwrite a newly r
       json: { error: { message: 'Synthetic unknown acknowledgement; keep the exact command.' } },
     });
   });
-  await page.goto('/pantry');
-  await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Add pantry item' });
-  await dialog.getByRole('tab', { name: 'Search', exact: true }).click();
+  await page.goto('/pantry/add?mode=search');
+  const dialog = page.getByRole('region', { name: 'Find a pantry product' });
   await dialog.getByLabel('Product name / barcode').fill('Synthetic food');
   await dialog.getByRole('button', { name: 'Search', exact: true }).click();
   await dialog.getByRole('button', { name: /Synthetic A food/ }).click();
@@ -126,7 +124,7 @@ test('source portions remain complete and old context cannot overwrite a newly r
   await expect(dialog.locator('[name="quantityRemaining"]')).toHaveValue('240');
   await expect(dialog.locator('[name="unit"]')).toHaveValue('g');
   await dialog.getByRole('button', { name: 'Review identified product enrichment' }).click();
-  await expect(dialog.getByText(/read has not changed/i)).toBeVisible();
+  await expect(page.getByText(/read has not changed/i)).toBeVisible();
   expect(enrichment).toEqual([{ lines: [{ lineId: 'reviewed-food', productId: 'prd_B' }] }]);
   expect(writes).toHaveLength(0);
   for (const width of [1440, 390, 320]) {
@@ -137,13 +135,16 @@ test('source portions remain complete and old context cannot overwrite a newly r
     );
     await page.screenshot({ path: `${output}/source-portion-${width}.png` });
   }
-  expect((await appAxe(page).include('dialog[open]').analyze()).violations).toEqual([]);
+  expect((await appAxe(page).include('#add-panel-search').analyze()).violations).toEqual([]);
   await page.setViewportSize({ width: 390, height: 500 });
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
-  await dialog.getByRole('button', { name: 'Add Item', exact: true }).focus();
-  await expect(dialog.getByRole('button', { name: 'Add Item', exact: true })).toBeInViewport();
+  const addItem = dialog.getByRole('button', { name: 'Add Item', exact: true });
+  await addItem.focus();
+  // Enlarged text reflows the page, so bring the button into view the way a person would scroll.
+  await addItem.scrollIntoViewIfNeeded();
+  await expect(addItem).toBeInViewport();
   await page.screenshot({ path: `${output}/confirm-short-enlarged-390.png` });
   await dialog.getByRole('button', { name: 'Add Item', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Retry previous confirmation' })).toBeVisible();

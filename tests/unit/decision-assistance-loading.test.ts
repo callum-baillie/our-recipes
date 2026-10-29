@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as baseRender,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { createElement } from 'react';
+import { ToastProvider } from '@/components/toast-provider';
 import { afterEach, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -46,3 +54,7 @@ it('loads select choices, exposes a failed load, and clears the stale error on r
   );
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}

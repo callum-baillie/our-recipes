@@ -39,7 +39,7 @@ it('keeps dirty edits when another editor is declined, and retains the draft on 
   expect((screen.getByLabelText('Rename make-ahead-friendly') as HTMLInputElement).value).toBe(
     'new draft',
   );
-  expect(within(row('make-ahead-friendly')).getByRole('alert').textContent).toContain('Offline');
+  expect(screen.getByRole('alert').textContent).toContain('Offline');
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByLabelText('Rename make-ahead-friendly')).toBeNull();
 });

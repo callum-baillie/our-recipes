@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronDown, ChevronUp, Minus, Plus, Save, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -864,7 +866,7 @@ export function RecipeForm({
           </button>
         </aside>
       )}
-      {draftMessage && <p role="status">{draftMessage}</p>}
+      {draftMessage && <ToastNotice>{draftMessage}</ToastNotice>}
       {invalidFields.length > 0 && (
         <aside className="form-error" role="alert">
           <strong>Check these fields before saving</strong>
@@ -1266,11 +1268,7 @@ export function RecipeForm({
           />
         </label>
       </details>
-      {serverError && (
-        <p className="form-error" role="alert">
-          {serverError}
-        </p>
-      )}
+      {serverError && <ToastNotice tone="error">{serverError}</ToastNotice>}
       <button className="primary-button" type="submit" disabled={form.formState.isSubmitting}>
         {form.formState.isSubmitting ? (
           <LoadingIndicator label="Saving recipe" />

@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { ArrowLeft, ChevronLeft, FileText, Link2, ShieldCheck, Sparkles } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 
@@ -234,11 +236,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
           >
             <ChevronLeft size={16} aria-hidden="true" /> Edit URL
           </button>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <ToastMessage message={error} tone="error" />}
         </div>
       </section>
     );
@@ -340,11 +338,7 @@ export function CaptureWizard({ initialKind = 'text' }: { initialKind?: 'text' |
             </small>
           </span>
         </label>
-        {error && (
-          <p id={`${inputId}-error`} className="form-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <ToastMessage message={error} tone="error" />}
         <button
           className="primary-button"
           type="submit"

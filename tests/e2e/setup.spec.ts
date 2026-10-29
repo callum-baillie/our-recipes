@@ -861,7 +861,7 @@ test('a fresh household can complete the supported local release acceptance work
     await expect(page.getByRole('heading', { name: 'Weeknight tomato soup' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Tomato soup in a cream bowl' })).toBeVisible();
     await expect(
-      page.getByText(/Kitchen unavailable\. Changes need a connection and are not queued\./),
+      page.getByText(/Your device is offline\. Saving needs a working connection\./),
     ).toBeVisible();
   } finally {
     await page.context().setOffline(false);

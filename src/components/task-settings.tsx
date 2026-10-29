@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import {
   SettingsField,
   SettingsGroup,
@@ -511,7 +514,7 @@ export function TaskSettings({
         </SettingsGroup>
         {conflict && (
           <section aria-label="Review changed schedule">
-            <p role="status">The schedule changed elsewhere. Your edits are retained.</p>
+            <ToastNotice>The schedule changed elsewhere. Your edits are retained.</ToastNotice>
             <button
               type="button"
               className="secondary-button"
@@ -561,9 +564,11 @@ export function TaskSettings({
           ) : (
             <>
               {pollError && (
-                <p role="alert">{pollError} Last known tasks are retained; polling will retry.</p>
+                <ToastNotice tone="error">
+                  {pollError} Last known tasks are retained; polling will retry.
+                </ToastNotice>
               )}
-              {jobError && !errorJobId && <p role="alert">{jobError}</p>}
+              {jobError && !errorJobId && <ToastNotice tone="error">{jobError}</ToastNotice>}
               {!jobs.length && !jobError && !pollError && (
                 <SettingsEmpty>No background tasks yet.</SettingsEmpty>
               )}
@@ -573,7 +578,9 @@ export function TaskSettings({
             <article className={`settings-item ${styles.job}`} key={job.id}>
               <div>
                 <strong>{job.title}</strong>
-                {jobError && errorJobId === job.id && <p role="alert">{jobError}</p>}
+                {jobError && errorJobId === job.id && (
+                  <ToastNotice tone="error">{jobError}</ToastNotice>
+                )}
                 <p>
                   {job.status.replaceAll('_', ' ')} · {job.executionMode}
                   {job.totalItems ? ` · ${job.completedItems}/${job.totalItems} completed` : ''}
@@ -674,9 +681,7 @@ export function TaskSettings({
               onDecide={(...args) => void decide(...args)}
             />
             {reviewErrors[action.id] && (
-              <p role="alert" className="form-error">
-                {reviewErrors[action.id]}
-              </p>
+              <ToastNotice tone="error">{reviewErrors[action.id]}</ToastNotice>
             )}
           </div>
         ))}
@@ -694,7 +699,7 @@ export function TaskSettings({
           This can make paid AI requests for unfinished items. Successful results are kept. Work
           already sent before cancellation may still be billed by the provider.
         </p>
-        {jobError && <p role="alert">{jobError}</p>}
+        {jobError && <ToastNotice tone="error">{jobError}</ToastNotice>}
         <div className={styles.actions}>
           <button type="button" disabled={busy} onClick={() => retryDialog.current?.close()}>
             Keep current results

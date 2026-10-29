@@ -8,9 +8,9 @@ The renderer continues to use the vendored pdfcn components with Forme. Recipe c
 
 Meal schedules cover up to 56 days with separate recipe cards. Exports support 100 recipes, 500 scheduled meals or 2,000 inventory/list rows. PDF generation is bounded to four queued requests per server process. Recipe PDF/ZIP and calendar/Markdown/JSON-LD downloads remain available.
 
-## Pantry inventory
+## Pantry editing
 
-**Inventory mode** opens `/pantry/inventory`. Filter by shelf, count stock, save individual rows or all changed counts, and remove batches. Each write uses the batch's expected version. A concurrent edit is reported without silently replacing it. Unknown stock is never converted to zero by merely opening the screen. Removals preserve inventory history and use the normal restock reconciliation workflow.
+The Pantry page has **View** and **Edit** modes. Edit adds − / + steppers (taps are sent once they pause, using the batch's expected version), an **Expired** button and a **Delete** button to each active batch. Expired discards the batch with the reason "Expired", which is what the Expired items total counts; Delete removes it from the Pantry without counting it as waste. Both keep their history and offer a short Undo. There is no separate stock-count page; use Edit to correct quantities.
 
 ## Shopping
 

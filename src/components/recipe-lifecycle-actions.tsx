@@ -1,5 +1,9 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
+
 import { Archive, Copy, Star, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -159,7 +163,7 @@ export function RecipeLifecycleActions({
           </button>
         )}
       </div>
-      {error && <span role="alert">{error}</span>}
+      {error && <ToastMessage message={error} tone="error" />}
       {personalPreference && (
         <form
           className="recipe-personal-preference"
@@ -222,7 +226,7 @@ export function RecipeLifecycleActions({
               {pendingAction === 'preference' ? <ButtonSpinner /> : null}
               {pendingAction === 'preference' ? 'Saving…' : 'Save rating and note'}
             </button>
-            {preferenceSaved && <span role="status">Saved for your profile.</span>}
+            {preferenceSaved && <ToastNotice>Saved for your profile.</ToastNotice>}
           </div>
         </form>
       )}

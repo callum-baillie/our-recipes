@@ -1,4 +1,8 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 import { CookingEpisodeRestrictions } from './cooking-episode-restrictions';
 import type { CookingRestrictions } from '@/lib/domain/cooking-episode';
 import { CookingSessionAdaptation } from './cooking-session-adaptation';
@@ -813,7 +817,7 @@ export function CookingMode({
               <Plus size={16} /> Add timer
             </button>
           </div>
-          {timerError && <p role="alert">{timerError}</p>}
+          {timerError && <ToastNotice tone="error">{timerError}</ToastNotice>}
           <p role="status">
             {timers.some((timer) => timer.remaining === 0)
               ? 'Timer finished. Check your food.'
@@ -1214,13 +1218,13 @@ export function CookingMode({
                 Confirm Pantry changes and finish cooking
               </button>
             </div>
-            {finishStatus && <p role="status">{finishStatus}</p>}
+            {finishStatus && <ToastMessage message={finishStatus} tone="info" />}
           </AppDialog>
         </>
       )}
       {!showPantryConfirmation && finishStatus && (
         <div className={styles.finishStatus}>
-          <p role="status">{finishStatus}</p>
+          <ToastMessage message={finishStatus} tone="info" />
           {completedSessionId ? (
             <button type="button" onClick={() => void undoPantry()}>
               Undo Pantry deduction
@@ -1274,7 +1278,7 @@ export function CookingMode({
                 >
                   {preparedSaving ? 'Saving prepared batch…' : 'Create prepared Nutrition batch'}
                 </button>
-                {preparedStatus ? <p role="status">{preparedStatus}</p> : null}
+                {preparedStatus ? <ToastNotice>{preparedStatus}</ToastNotice> : null}
                 {preparedCreated ? (
                   <p>
                     <Link href="/nutrition?view=prepared">Review portions in Nutrition</Link>

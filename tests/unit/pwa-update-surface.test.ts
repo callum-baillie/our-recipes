@@ -3,7 +3,10 @@ import { createElement } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 const toast = vi.hoisted(() => ({ showToast: vi.fn() }));
-vi.mock('@/components/toast-provider', () => ({ useToast: () => toast }));
+vi.mock('@/components/toast-provider', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/toast-provider')>()),
+  useToast: () => toast,
+}));
 import { PwaRegistration } from '@/components/pwa-registration';
 afterEach(() => {
   cleanup();
@@ -100,7 +103,7 @@ it('keeps dirty and clean pages on the update notice until one explicit activati
     'Keep my entered work',
   );
   expect(post).not.toHaveBeenCalled();
-  expect(draft.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'instant' });
+  expect(draft.scrollIntoView).not.toHaveBeenCalled();
   expect(document.activeElement).toBe(draft);
   registration.waiting = { postMessage: post };
   fireEvent.click(screen.getByRole('button', { name: 'Reload when ready' }));

@@ -1,3 +1,10 @@
+import { getExpiredPantryWasteMetrics } from '@/lib/services/pantry-service';
+import { completePlannedRecipe } from '@/lib/services/meal-completion-service';
+import { appendManualProductNutritionRecord } from '@/lib/services/nutrition-recipe-calculation-service';
+import { appendNutritionMealAllocationVersion } from '@/lib/services/nutrition-intake-service';
+import { resolveNutritionHouseholdContext } from '@/lib/services/nutrition-household-profile-service';
+import { addMealPlanEntry } from '@/lib/services/planning-service';
+import { nutritionIntakeRevisions, nutritionIntakeNutrientValues } from '@/lib/db/schema';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -16,7 +23,7 @@ import {
   scannerStations,
 } from '@/lib/db/schema';
 import { pantryBatchInputSchema, pantryProductInputSchema } from '@/lib/domain/pantry';
-import { completeSetup } from '@/lib/services/household-service';
+import { addProfile, completeSetup } from '@/lib/services/household-service';
 import {
   applyPantryBatchAction,
   createPantryBatch,
@@ -168,6 +175,304 @@ describe('scanner operations on real SQLite stock', () => {
   afterEach(() => {
     resetDatabaseForTests();
     vi.unstubAllEnvs();
+  });
+
+  it('saves a supplied portion for review when no recipe nutrient data exists', () => {
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-10-28',
+        meal: 'dinner',
+        kind: 'recipe',
+        recipeId,
+        title: '',
+        servings: 2,
+        note: '',
+      },
+      actor.profileId,
+    );
+    const context = resolveNutritionHouseholdContext({
+      profileId: actor.profileId,
+      source: 'auth-session',
+    });
+    const result = completePlannedRecipe(
+      {
+        recipeId,
+        mealPlanEntryId: meal.id,
+        portions: [{ profileId: context.activeNutritionProfile.id, servings: 1 }],
+      },
+      context.actor,
+      actor.userId,
+    );
+    expect(result.nutritionReview).toContain('missing');
+    expect(result.loggedPortions).toBe(0);
+    expect(result.missingPortions).toEqual([]);
+    expect(getDatabase().select().from(nutritionIntakeRevisions).all()).toHaveLength(0);
+    expect(stock()).toBe(800);
+  });
+
+  it('logs distinct assigned portions for every linked household person', () => {
+    addProfile({
+      displayName: 'Second person',
+      color: '#637A45',
+      avatarUrl: '',
+      units: 'metric',
+      temperatureUnit: 'C',
+      locale: 'en-US',
+      timezone: 'America/Chicago',
+    });
+    appendManualProductNutritionRecord(productId, {
+      basisType: 'per_100g',
+      basisAmount: 100,
+      basisUnit: 'g',
+      confidence: 1,
+      completeness: 1,
+      values: [{ nutrientCode: 'protein', amount: 25 }],
+    });
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-10-28',
+        meal: 'dinner',
+        kind: 'recipe',
+        recipeId,
+        title: '',
+        servings: 2,
+        note: '',
+      },
+      actor.profileId,
+    );
+    const context = resolveNutritionHouseholdContext({
+      profileId: actor.profileId,
+      source: 'auth-session',
+    });
+    context.householdNutritionProfiles.forEach((person, index) =>
+      appendNutritionMealAllocationVersion(
+        person.id,
+        {
+          householdProfileId: actor.profileId,
+          compatibilityPrincipalId: context.compatibilityPrincipalId,
+        },
+        {
+          mealPlanEntryId: meal.id,
+          cookSessionId: null,
+          state: 'planned',
+          servings: index === 0 ? 0.5 : 1.5,
+          portionWeightGrams: null,
+          intakeSeriesId: null,
+          supersedesAllocationVersionId: null,
+          note: '',
+        },
+      ),
+    );
+    const result = completePlannedRecipe(
+      { recipeId, mealPlanEntryId: meal.id, portions: [] },
+      context.actor,
+      actor.userId,
+    );
+    expect(result.loggedPortions).toBe(2);
+    expect(result.missingPortions).toEqual([]);
+    expect(
+      getDatabase()
+        .select()
+        .from(nutritionIntakeRevisions)
+        .all()
+        .map((r) => r.servingCount)
+        .sort(),
+    ).toEqual([0.5, 1.5]);
+    expect(stock()).toBe(800);
+  });
+
+  it('logs the planned personal portion once, independently from the batch yield', () => {
+    appendManualProductNutritionRecord(productId, {
+      basisType: 'per_100g',
+      basisAmount: 100,
+      basisUnit: 'g',
+      confidence: 1,
+      completeness: 1,
+      values: [{ nutrientCode: 'protein', amount: 25 }],
+    });
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-10-28',
+        meal: 'dinner',
+        kind: 'recipe',
+        recipeId,
+        title: '',
+        servings: 2,
+        note: '',
+      },
+      actor.profileId,
+    );
+    const context = resolveNutritionHouseholdContext({
+      profileId: actor.profileId,
+      source: 'auth-session',
+    });
+    appendNutritionMealAllocationVersion(
+      context.activeNutritionProfile.id,
+      {
+        householdProfileId: actor.profileId,
+        compatibilityPrincipalId: context.compatibilityPrincipalId,
+      },
+      {
+        mealPlanEntryId: meal.id,
+        cookSessionId: null,
+        state: 'planned',
+        servings: 0.5,
+        portionWeightGrams: null,
+        intakeSeriesId: null,
+        supersedesAllocationVersionId: null,
+        note: '',
+      },
+    );
+    const input = { recipeId, mealPlanEntryId: meal.id, portions: [] };
+    const result = completePlannedRecipe(input, context.actor, actor.userId);
+    expect(result.loggedPortions).toBe(1);
+    expect(result.missingPortions).toEqual([]);
+    expect(stock()).toBe(800);
+    const intake = getDatabase().select().from(nutritionIntakeRevisions).all();
+    expect(intake).toHaveLength(1);
+    expect(intake[0]).toMatchObject({ servingCount: 0.5, mealPlanEntryId: meal.id });
+    const value = getDatabase()
+      .select()
+      .from(nutritionIntakeNutrientValues)
+      .all()
+      .find((v) => v.nutrientCode === 'protein');
+    expect(value?.amount).toBe(12.5);
+    expect(completePlannedRecipe(input, context.actor, actor.userId).loggedPortions).toBe(0);
+    expect(getDatabase().select().from(nutritionIntakeRevisions).all()).toHaveLength(1);
+    expect(stock()).toBe(800);
+  });
+
+  it('preserves explicitly skipped personal allocations without asking or logging them', () => {
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-10-28',
+        meal: 'dinner',
+        kind: 'recipe',
+        recipeId,
+        title: '',
+        servings: 2,
+        note: '',
+      },
+      actor.profileId,
+    );
+    const context = resolveNutritionHouseholdContext({
+      profileId: actor.profileId,
+      source: 'auth-session',
+    });
+    appendNutritionMealAllocationVersion(
+      context.activeNutritionProfile.id,
+      {
+        householdProfileId: actor.profileId,
+        compatibilityPrincipalId: context.compatibilityPrincipalId,
+      },
+      {
+        mealPlanEntryId: meal.id,
+        cookSessionId: null,
+        state: 'skipped',
+        servings: 1,
+        portionWeightGrams: null,
+        intakeSeriesId: null,
+        supersedesAllocationVersionId: null,
+        note: '',
+      },
+    );
+    const result = completePlannedRecipe(
+      { recipeId, mealPlanEntryId: meal.id, portions: [] },
+      context.actor,
+      actor.userId,
+    );
+    expect(result.missingPortions).toEqual([]);
+    expect(result.loggedPortions).toBe(0);
+    expect(getDatabase().select().from(nutritionIntakeRevisions).all()).toHaveLength(0);
+  });
+
+  it('asks for missing portions, then records the explicit answer without cooking again', () => {
+    appendManualProductNutritionRecord(productId, {
+      basisType: 'per_100g',
+      basisAmount: 100,
+      basisUnit: 'g',
+      confidence: 1,
+      completeness: 1,
+      values: [{ nutrientCode: 'protein', amount: 25 }],
+    });
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-10-28',
+        meal: 'dinner',
+        kind: 'recipe',
+        recipeId,
+        title: '',
+        servings: 2,
+        note: '',
+      },
+      actor.profileId,
+    );
+    const context = resolveNutritionHouseholdContext({
+      profileId: actor.profileId,
+      source: 'auth-session',
+    });
+    const input = { recipeId, mealPlanEntryId: meal.id, portions: [] };
+    const first = completePlannedRecipe(input, context.actor, actor.userId);
+    expect(first.missingPortions).toEqual([
+      { profileId: context.activeNutritionProfile.id, name: 'Tester' },
+    ]);
+    expect(first.loggedPortions).toBe(0);
+    const second = completePlannedRecipe(
+      { ...input, portions: [{ profileId: context.activeNutritionProfile.id, servings: 1 }] },
+      context.actor,
+      actor.userId,
+    );
+    expect(second.loggedPortions).toBe(1);
+    expect(second.cookSessionId).toBe(first.cookSessionId);
+    expect(stock()).toBe(800);
+    expect(() =>
+      completePlannedRecipe(
+        { ...input, portions: [{ profileId: context.activeNutritionProfile.id, servings: 1 }] },
+        context.actor,
+        actor.userId,
+      ),
+    ).toThrow('already has a planned portion');
+  });
+
+  it('rolls back cooking and nutrition when explicit portions exceed the recipe yield', () => {
+    appendManualProductNutritionRecord(productId, {
+      basisType: 'per_100g',
+      basisAmount: 100,
+      basisUnit: 'g',
+      confidence: 1,
+      completeness: 1,
+      values: [{ nutrientCode: 'protein', amount: 25 }],
+    });
+    const meal = addMealPlanEntry(
+      {
+        plannedFor: '2026-10-28',
+        meal: 'dinner',
+        kind: 'recipe',
+        recipeId,
+        title: '',
+        servings: 2,
+        note: '',
+      },
+      actor.profileId,
+    );
+    const context = resolveNutritionHouseholdContext({
+      profileId: actor.profileId,
+      source: 'auth-session',
+    });
+    expect(() =>
+      completePlannedRecipe(
+        {
+          recipeId,
+          mealPlanEntryId: meal.id,
+          portions: [{ profileId: context.activeNutritionProfile.id, servings: 3 }],
+        },
+        context.actor,
+        actor.userId,
+      ),
+    ).toThrow('unassigned servings');
+    expect(stock()).toBe(1000);
+    expect(getDatabase().select().from(cookSessions).all()).toHaveLength(0);
+    expect(getDatabase().select().from(nutritionIntakeRevisions).all()).toHaveLength(0);
   });
 
   it('records made and deducts the card yield once, including lost-response retries', () => {
@@ -408,6 +713,114 @@ describe('scanner operations on real SQLite stock', () => {
       ...(prepared ? { prepared } : {}),
     };
   }
+  it('matches a trusted recipe URL at dinner and keeps early scans in review', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
+      vi.stubEnv('APP_ORIGIN', 'https://bord.example');
+      const context = binding();
+      addMealPlanEntry(
+        {
+          plannedFor: '2026-10-27',
+          meal: 'dinner',
+          kind: 'recipe',
+          recipeId,
+          title: '',
+          servings: 2,
+          note: '',
+        },
+        actor.profileId,
+      );
+      const url = `https://bord.example/recipes/${recipeId}`;
+      const early = executeBoundScannerOperation(
+        principal(),
+        bound(context, { type: 'recipe_link', url, scannedAt: '2026-10-27T12:00:00Z' }),
+      );
+      expect(early.result.error?.code).toBe('scanner_meal_time_review');
+      expect(stock()).toBe(1000);
+      addMealPlanEntry(
+        {
+          plannedFor: '2026-10-27',
+          meal: 'lunch',
+          kind: 'recipe',
+          recipeId,
+          title: '',
+          servings: 2,
+          note: '',
+        },
+        actor.profileId,
+      );
+      const made = bound(context, { type: 'recipe_link', url, scannedAt: '2026-10-28T00:00:00Z' });
+      expect(executeBoundScannerOperation(principal(), made).status).toBe(200);
+      expect(executeBoundScannerOperation(principal(), made).result.replayed).toBe(true);
+      expect(stock()).toBe(800);
+      const foreign = executeBoundScannerOperation(
+        principal(),
+        bound(context, {
+          type: 'recipe_link',
+          url: `https://other.example/recipes/${recipeId}`,
+          scannedAt: '2026-10-28T00:00:00Z',
+        }),
+      );
+      expect(foreign.result.error?.code).toBe('scanner_recipe_link_invalid');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears a frozen grocery session atomically and refuses changed batches', async () => {
+    const context = binding();
+    const lookup = await lookupScanner(principal(), {
+      stationId: context.stationId,
+      barcode,
+      locationId,
+    });
+    if (lookup.kind !== 'local' || !lookup.prepared) throw Error('fixture');
+    const add = () =>
+      executeBoundScannerOperation(
+        principal(),
+        bound(context, { type: 'pantry_add', barcode, packages: 1, locationId }, lookup.prepared!),
+      ).result;
+    const first = add(),
+      second = add();
+    applyPantryBatchAction(
+      second.batchId!,
+      { type: 'open', expectedVersion: second.batchVersion!, note: '', openedDate: null },
+      actor.profileId,
+    );
+    const failed = executeBoundScannerOperation(
+      principal(),
+      bound(context, {
+        type: 'undo_session',
+        targetOperationIds: [first.operationId, second.operationId],
+      }),
+    );
+    expect(failed.result.outcome).toBe('needs_review');
+    expect(
+      getDatabase().select().from(pantryBatches).where(eq(pantryBatches.id, first.batchId!)).get()!
+        .status,
+    ).not.toBe('discarded');
+    const clear = bound(context, { type: 'undo_session', targetOperationIds: [first.operationId] });
+    expect(executeBoundScannerOperation(principal(), clear).status).toBe(200);
+    expect(executeBoundScannerOperation(principal(), clear).result.replayed).toBe(true);
+    expect(getExpiredPantryWasteMetrics().batches).toBe(0);
+    applyPantryBatchAction(
+      second.batchId!,
+      { type: 'discard', expectedVersion: second.batchVersion! + 1, reason: 'Expired', note: '' },
+      actor.profileId,
+    );
+    expect(getExpiredPantryWasteMetrics()).toMatchObject({
+      batches: 1,
+      quantities: [{ unit: 'g', quantity: 500 }],
+    });
+    applyPantryBatchAction(
+      second.batchId!,
+      { type: 'undo', expectedVersion: second.batchVersion! + 2, note: '' },
+      actor.profileId,
+    );
+    expect(getExpiredPantryWasteMetrics()).toEqual({ batches: 0, quantities: [] });
+  });
+
   it('replays a bound package operation after product edits without repeating stock', async () => {
     const context = binding(),
       lookup = await lookupScanner(principal(), {

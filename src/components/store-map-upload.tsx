@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useState } from 'react';
 import {
   GROCERY_ROUTE_PREFIX,
@@ -321,7 +323,7 @@ export function StoreMapUpload({ onUse }: { onUse: (sections: Section[]) => void
           </div>
         </>
       )}
-      {message && <p role="status">{message}</p>}
+      {message && <ToastMessage message={message} tone="info" />}
     </details>
   );
 }

@@ -49,6 +49,11 @@ You can also import [the Unraid template](unraid/bord.xml). Keep `/data` persist
 4. Run `pnpm db:migrate` and `pnpm dev`.
 5. Visit `http://localhost:3000` and complete the first-run form.
 
+Next 16.4's persistent Turbopack development cache is disabled in `next.config.ts` to avoid
+a restart/reload loop after reusing a checkout across server sessions. In-memory hot reload
+still works; cold starts may take longer. See [connection and reload troubleshooting](docs/connection-troubleshooting.md)
+before re-enabling the cache or diagnosing repeated loading screens.
+
 `DATA_DIR` defaults to `./data`; new installations default to `bord.db`. Container startup renames an unambiguous legacy `our-recipes.db` and its SQLite sidecars before opening SQLite; local development continues to resolve an existing legacy file safely. SQLite and normalized recipe photos live beneath this durable directory.
 
 ## Quality commands

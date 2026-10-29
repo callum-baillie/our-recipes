@@ -1,6 +1,6 @@
-import { CircleCheck, Info, TriangleAlert, CircleAlert } from 'lucide-react';
+'use client';
 import type { ReactNode } from 'react';
-import styles from './inline-alert.module.css';
+import { ToastNotice } from './toast-provider';
 
 export function InlineAlert({
   children,
@@ -9,13 +9,5 @@ export function InlineAlert({
   children: ReactNode;
   tone?: 'info' | 'success' | 'warning' | 'error';
 }) {
-  const Icon = { info: Info, success: CircleCheck, warning: TriangleAlert, error: CircleAlert }[
-    tone
-  ];
-  return (
-    <div className={styles.alert} data-tone={tone} role={tone === 'error' ? 'alert' : 'status'}>
-      <Icon size={18} aria-hidden="true" />
-      <div>{children}</div>
-    </div>
-  );
+  return <ToastNotice tone={tone}>{children}</ToastNotice>;
 }

@@ -1,4 +1,7 @@
 import 'server-only';
+import { recipeIdFromCardUrl } from './recipe-link-service';
+import { nutritionWallTime } from '@/lib/domain/nutrition-ui';
+import { getProfile } from './household-service';
 import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 import { getDatabase } from '@/lib/db/client';
 import {
@@ -20,7 +23,7 @@ import {
   scannerStationList,
 } from './scanner-station-service';
 
-const DEFAULT_WINDOW_MS = 12 * 60 * 60 * 1000;
+const DEFAULT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const KINDS: Record<string, ScanSessionEntry['kind']> = {
   pantry_add: 'added',
@@ -29,9 +32,18 @@ const KINDS: Record<string, ScanSessionEntry['kind']> = {
   leftover: 'added',
   pantry_remove: 'removed',
   recipe: 'cooked',
+  recipe_link: 'cooked',
   batch_action: 'adjusted',
   stocktake: 'adjusted',
 };
+
+function canonicalGtin(barcode: string) {
+  try {
+    return normalizeGtin(barcode).canonicalGtin;
+  } catch {
+    return null;
+  }
+}
 
 function barcodeGtin(barcode: string | null) {
   try {
@@ -79,6 +91,7 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
             unit: pantryBatches.unit,
             locationId: pantryBatches.locationId,
             status: pantryBatches.status,
+            bestBefore: pantryBatches.bestBeforeDate,
             productId: pantryBatches.productId,
             name: pantryProducts.displayName,
             brand: pantryProducts.brand,
@@ -98,10 +111,58 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
         .where(inArray(pantryProductIdentifiers.productId, productIds))
         .all()
     : [];
+  const reviewGtins = [
+    ...new Set(
+      rows.flatMap((row) => {
+        const code = (row.command as { command?: { barcode?: unknown } } | null)?.command?.barcode;
+        const canonical = typeof code === 'string' ? canonicalGtin(code) : null;
+        return row.outcome === 'needs_review' && canonical ? [canonical] : [];
+      }),
+    ),
+  ];
+  // A review scan is settled once its barcode belongs to a saved product.
+  const savedGtins = new Set(
+    (reviewGtins.length
+      ? db
+          .select({ gtin: pantryProductIdentifiers.normalizedValue })
+          .from(pantryProductIdentifiers)
+          .where(
+            and(
+              inArray(pantryProductIdentifiers.normalizedValue, reviewGtins),
+              eq(pantryProductIdentifiers.verified, true),
+            ),
+          )
+          .all()
+      : []
+    ).map((identifier) => identifier.gtin),
+  );
   const entries: ScanSessionEntry[] = rows.map((row) => {
     const result = row.result;
     const batch = result.batchId ? batches.get(result.batchId) : undefined;
-    const command = (row.command ?? {}) as { command?: { barcode?: unknown } };
+    const command = (row.command ?? {}) as {
+      command?: {
+        barcode?: unknown;
+        type?: string;
+        url?: string;
+        plannedFor?: string;
+        scannedAt?: string;
+      };
+    };
+    let recipeHref: string | undefined;
+    if (command.command?.type === 'recipe_link' && command.command.url) {
+      try {
+        const id = recipeIdFromCardUrl(command.command.url);
+        const date =
+          command.command.plannedFor ??
+          nutritionWallTime(
+            new Date(command.command.scannedAt ?? row.createdAt),
+            getProfile(p.linkedProfileId)?.timezone ?? 'UTC',
+          ).slice(0, 10);
+        recipeHref = `/recipes/${id}?madeDate=${date}`;
+      } catch {
+        /* Invalid links cannot become navigation targets. */
+      }
+    }
     const barcode = typeof command.command?.barcode === 'string' ? command.command.barcode : null;
     const review = row.outcome === 'needs_review';
     const gtin =
@@ -113,9 +174,11 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
       time: row.createdAt.toISOString(),
       kind: KINDS[result.type] ?? 'other',
       state: review ? 'review' : row.undoneBy ? 'undone' : 'saved',
+      resolved: review && !!barcode && savedGtins.has(canonicalGtin(barcode) ?? ''),
       title: review ? 'Needs review' : (result.productName ?? batch?.name ?? result.message),
       detail: result.message,
       barcode,
+      recipeHref,
       gtin,
       brand: batch?.brand ?? '',
       quantity: result.quantity ?? null,
@@ -130,6 +193,7 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
             unit: batch.unit,
             location: locations.get(batch.locationId) ?? '',
             status: batch.status,
+            bestBefore: batch.bestBefore,
           }
         : null,
     };
@@ -141,6 +205,14 @@ export function scannerSession(p: RequestPrincipal, id: string, since?: number) 
     stale: station?.stale ?? true,
     readerConnected: station?.state?.readerConnected ?? false,
     mode: station?.state?.mode ?? 'idle',
+    mealControl:
+      station?.state && station.state.profile === 'extended'
+        ? {
+            bootId: station.state.bootId,
+            revision: station.state.revision,
+            plannedFor: station.state.plannedFor ?? null,
+          }
+        : undefined,
     bindingId: owned.bindingId,
     instanceId: scannerInstanceId(),
     serverTime: now,

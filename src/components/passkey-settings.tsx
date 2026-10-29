@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, Plus, Trash2 } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
@@ -186,16 +188,8 @@ export function PasskeySettings() {
           ))
         )}
       </SettingsSubsection>
-      {error && (
-        <p role="alert" className="form-error settings-inline-status">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p role="status" className="settings-inline-status">
-          {message}
-        </p>
-      )}
+      {error && <ToastMessage message={error} tone="error" />}
+      {message && <ToastMessage message={message} tone="info" />}
     </SettingsPane>
   );
 }

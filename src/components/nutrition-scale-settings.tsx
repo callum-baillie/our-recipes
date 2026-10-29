@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { BodyCompositionEstimatePanel } from './body-composition-estimate';
 import { ButtonSpinner } from '@/components/skeleton';
 import type { CompositionEstimate } from '@/lib/domain/qn-body-composition';
@@ -207,7 +209,7 @@ export function NutritionScaleSettings({
       <Link className="inline-link" href="/nutrition?view=trends">
         View measurement trend
       </Link>
-      {message && <p role="status">{message}</p>}
+      {message && <ToastMessage message={message} tone="info" />}
     </section>
   );
 }

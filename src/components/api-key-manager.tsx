@@ -1,4 +1,8 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 import {
   SettingsField,
   SettingsPane,
@@ -255,10 +259,10 @@ export function ApiKeyManager({
         />
       ) : null}
       {needsSignIn ? (
-        <p className="setup-note" role="alert">
+        <ToastNotice tone="error">
           Your session has ended.{' '}
           <Link href="/sign-in?reauth=1&callbackUrl=%2Fsettings%2Fapi">Sign in to continue</Link>.
-        </p>
+        </ToastNotice>
       ) : null}
       {revealedSecret ? (
         <section
@@ -271,7 +275,7 @@ export function ApiKeyManager({
           <h2 id="new-api-key-heading">{revealedSecret.name}</h2>
           <p>This secret is shown once. Store it in the integration&apos;s server environment.</p>
           <code>{revealedSecret.value}</code>
-          {copyStatus && <p role="status">{copyStatus}</p>}
+          {copyStatus && <ToastNotice>{copyStatus}</ToastNotice>}
           <div className="settings-inline-actions">
             <button className="primary-button" type="button" onClick={copySecret}>
               <Copy size={16} aria-hidden="true" />
@@ -376,11 +380,7 @@ export function ApiKeyManager({
                   );
                 })}
               </fieldset>
-              {error && !errorKey ? (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
+              {error && !errorKey ? <ToastMessage message={error} tone="error" /> : null}
               <p>
                 Access to grant:{' '}
                 {Object.entries(permissions)
@@ -460,11 +460,7 @@ export function ApiKeyManager({
                         .join(' · ') || 'No permissions'}
                     </small>
                   </div>
-                  {error && errorKey === apiKey.id && (
-                    <p className="form-error" role="alert">
-                      {error}
-                    </p>
-                  )}
+                  {error && errorKey === apiKey.id && <ToastMessage message={error} tone="error" />}
                   <div className="settings-inline-actions">
                     {apiKey.enabled ? (
                       <>
@@ -620,11 +616,7 @@ function ApiKeyConfirmation({
           onChange={(event) => setPassphrase(event.target.value)}
         />
       </SettingsField>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ToastMessage message={error} tone="error" /> : null}
       <div className="settings-inline-actions">
         <button type="submit" className="primary-button" disabled={pending} aria-busy={pending}>
           {pending ? <ButtonSpinner /> : null}

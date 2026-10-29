@@ -44,7 +44,6 @@
 }
 .embedded {
   color: var(--ink);
-  overflow: clip;
 }
 .dialogHeader {
   position: sticky;
@@ -388,13 +387,8 @@
   margin-top: 1rem;
 }
 .embeddedFooter {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
   padding: 0.85rem 1.2rem 1rem;
   border-top: 1px solid var(--line);
-  background: color-mix(in srgb, var(--page) 94%, transparent);
-  backdrop-filter: blur(8px);
 }
 .embeddedFooter button {
   width: 100%;
@@ -699,4 +693,30 @@
   display: block;
   font-weight: 400;
   margin-top: 0.2rem;
+}
+
+/* Camera dropped straight into a page layout instead of a dialog body. */
+.flush .cameraStart,
+.flush .cameraFallback {
+  margin: 0;
+}
+.flush .cameraPanel {
+  padding: 0;
+}
+.flush .videoFrame {
+  aspect-ratio: 4 / 3;
+}
+
+/* Wider pages show search results in columns rather than one long stack. */
+@media (min-width: 720px) {
+  .embedded .results {
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  }
+}
+
+.flush .cameraStart {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.flush .cameraStart button {
+  grid-column: 1 / -1;
 }

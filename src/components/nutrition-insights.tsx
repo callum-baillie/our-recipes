@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { AiSummaryCards, type AiSummaryCardData } from './ai-summary-cards';
@@ -78,7 +80,7 @@ export function NutritionInsights({
         placement="nutrition"
         initialSummary={generated ?? initialSummary}
       />
-      {error && <p role="alert">{error}</p>}
+      {error && <ToastMessage message={error} tone="error" />}
     </section>
   );
 }

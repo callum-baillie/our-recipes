@@ -22,6 +22,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Next 16.4 can replay stale HMR restart messages from its persistent dev
+  // cache after a server restart (vercel/next.js#100251 and #100267).
+  // Keep in-memory hot reload, but start with fresh compiler state each run.
+  experimental: { turbopackFileSystemCacheForDev: false },
   // Household metadata is a cheap local read. Send it with the document so
   // refreshes never expose deferred/missing page titles to assistive technology.
   htmlLimitedBots: /.*/,

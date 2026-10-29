@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { useRef, useState } from 'react';
 import { SettingsMergeReview, settingsFieldLabel } from './settings-merge-review';
 import type { AiRuntimeSettings, AiUserPreferences } from '@/lib/domain/ai-runtime-settings';
@@ -651,7 +654,7 @@ export function AiRuntimeSettingsForm(props: Props) {
       )}
       {conflict && (
         <section aria-label="Review changed settings">
-          <p role="status">These settings changed elsewhere. Your edits are retained.</p>
+          <ToastNotice>These settings changed elsewhere. Your edits are retained.</ToastNotice>
           <button
             type="button"
             className="secondary-button"

@@ -1,3 +1,4 @@
+import { RecipeMadeButton } from '@/components/recipe-made-button';
 import { RecipeKitchenCheck } from '@/components/recipe-kitchen-check';
 import { getAuthenticatedSessionPrincipal } from '@/lib/services/auth-service';
 import { getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
@@ -44,7 +45,7 @@ export default async function RecipeDetailPage({
   searchParams,
 }: {
   params: Promise<{ recipeId: string }>;
-  searchParams: Promise<{ imageCandidate?: string | string[] }>;
+  searchParams: Promise<{ imageCandidate?: string | string[]; madeDate?: string }>;
 }) {
   const { recipeId } = await params;
   const requestedCandidate = (await searchParams).imageCandidate;
@@ -98,6 +99,13 @@ export default async function RecipeDetailPage({
             />
           }
         />
+        {principal && principal.role !== 'child' ? (
+          <RecipeMadeButton
+            key={`${recipe.id}:${(await searchParams).madeDate ?? 'current-day'}`}
+            recipeId={recipe.id}
+            initialDate={(await searchParams).madeDate}
+          />
+        ) : null}
         <a className="jump-to-recipe" href="#recipe">
           Jump to ingredients and method ↓
         </a>

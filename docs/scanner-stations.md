@@ -135,3 +135,86 @@ product added its exact 500 g package. No browser was used. The main CLI also ac
 retail code and saved stock without an ADD card. Current bridge checks: 27 passed; Bòrd full suite
 707 unit / 510 integration checks (9 skips), with 45 affected checks rerun after the canonical
 identifier regression fix. The release build, TypeScript, lint/format and artifact checks pass.
+
+## Scanner, recipe portions and notifications — 28 October 2026 (development)
+
+Scanner configuration now lives at `/settings/scanner`. Scanning happens on the **Scan**
+tab of **Add to pantry** (`/pantry/add?mode=scan`). The phone camera and a registered handheld
+scanner feed one list: every scan is added to the pantry at once, and scanning the same
+barcode again adds another. The camera only runs once the user opens it. Each line has a
+quantity stepper, location, best-before date and Remove. Repeat scans of a barcode no
+catalogue knows are grouped so it can be named once (`POST /api/v1/pantry/barcode-products`
+saves the product, its verified barcode and the first stock together). Pantry shows a shortcut
+to the tab only while a scanner is connected or scans await review. `/pantry/scans` and
+`/scanner/session` redirect there. The former scanner routes redirect. The primary
+Scanner navigation and “Print scanner cards” entry are removed. Settings offers a
+wall action sheet, location labels and labels identifying individual stock batches.
+Camera preferences (front/rear camera, vibration, interval between accepted scans)
+are saved in the current browser separately from the hardware receiver.
+
+Exported recipe cards contain an ordinary absolute recipe URL. A phone opens the
+recipe and its “I made this” flow; scanning the URL never mutates data through GET.
+The signed-in user chooses the planned date and occurrence. Marking made creates
+one cooking record, then logs each linked person's existing planned/served portion
+as a separate personal intake record. Missing portions are requested explicitly;
+skipped allocations remain skipped. Repeated confirmation does not recook or log
+an eaten allocation again. Stock deductions, cooking and supported nutrient records
+are transactional. Unmapped stock is left for review. Missing nutrition preserves
+explicitly supplied portions as planned and reports review, without fabricated totals.
+Adapted or stale recipe versions require the existing cooking review flow.
+
+The updated companion recognizes recipe URLs and captures the scan timestamp once.
+Bòrd validates the exact configured origin and matches one unmade planned occurrence
+on the selected day (otherwise the scanner account's local date). Dinner's default
+window is 16:00–21:00; other named meal windows are defined in `meal-completion.ts`.
+Ambiguous, late or out-of-window scans create review receipts. Prep, cook and rest
+minutes identify an early preparation window; preparation does not imply food was
+eaten. The Scan list can set the receiver's next recipe date through an acknowledged,
+revision-bound control. It resets after the recipe scan or the temporary-control timeout.
+Recipe completion receipts do not offer generic scanner undo: personal intake and
+cooking corrections remain separate review operations.
+
+The global notification region handles ordinary feedback and rich alerts. Ordinary
+messages expire; buttons and links keep actionable notices visible. Modal dialogs
+host the region while open so its actions remain usable. Field-level validation,
+loading indicators, task progress and persisted record details retain their local
+context. Missed planned meals from the last week and out-of-window recipe receipts
+prompt review. Scanner session acknowledgement is stored per browser/account/station,
+not in a shared household task queue. The recent scan view is bounded to seven days
+and 150 receipts; full station history remains separate.
+
+The wall sheet includes add/remove, lookup, stocktake, reset/pause, undo last,
+clear last grocery session, quantity multipliers, expiry, open/freeze/thaw/move,
+empty/discard/donate. Expiry uses the exact batch label and records an `Expired`
+disposal. Pantry metrics count non-reversed expiry batches and quantities grouped
+by stock unit. Undo removes the disposal from those metrics. Clear session freezes
+up to 50 acknowledged additions from the latest grocery session (30-minute gaps);
+if any batch has changed, the whole clear needs review. It does not delete receipt
+history or silently clear pending operations.
+
+### Receiver upgrade requirement
+
+These changes are source changes, not a production deployment. Upgrade Bòrd first,
+then deploy the matching companion changes from the sibling
+`bord-scanner-companion` checkout. Enable `SCANNER_PROFILE=extended` for recipe URLs
+and wall actions. Its default mode remains persistent ADD, with each separate product
+scan counted; temporary removal and action modes reset to ADD. Existing explicit
+add-only configurations remain add-only until changed. The receiver process must be
+running, but a browser page does not need to be open. Recipe-link commands require
+`recipes:read`, `mealPlans:update`, `pantry:read` and `pantry:update` permissions;
+these grant the narrow planned-meal completion action, not general private diary access.
+No migration SQL was changed and no paid provider call was made for this work.
+
+### Validation
+
+Verification uses synthetic SQLite households and deterministic provider data.
+Coverage includes per-person portions, missing/absent nutrient data, duplicate
+completion, rollback on over-allocation, exact origins and session-only phone writes,
+meal-time matching, frozen scanner retries, guarded session clearing and expiry undo.
+The phone flow and scanner settings were exercised in the collaborative browser at
+390px width. A generated recipe PDF was rendered and independently QR-decoded to
+its ordinary recipe URL. Validation passed: 788 unit checks (787 in the full run plus the new date-change
+regression), 537 integration checks (9 existing skips), and 45 companion checks.
+TypeScript, ESLint, formatting, OpenAPI validation/client smoke, release build and
+standalone artifact verification passed. Physical printed-sheet scanning, receiver
+deployment and Unraid behavior have not been tested for these new commands.

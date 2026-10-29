@@ -9454,3 +9454,66 @@ small[role='alert'] {
 .cooking-full-method li {
   padding: 0.75rem 0;
 }
+
+.toast[data-actionable='true'] {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.toast[data-actionable='true'] button {
+  grid-column: 2;
+  width: auto;
+  height: auto;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  color: var(--ink);
+  justify-self: start;
+}
+.toast-region {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+.toast[data-actionable='true'] {
+  pointer-events: auto;
+}
+.toast > div {
+  min-width: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.toast > div p {
+  margin: 0.25rem 0;
+}
+.toast a {
+  pointer-events: auto;
+  text-decoration: underline;
+}
+
+.recipe-made-panel {
+  display: grid;
+  gap: 1rem;
+}
+.recipe-made-panel > button {
+  justify-self: start;
+}
+.recipe-made-panel fieldset {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* Notices holding controls stay on screen until dismissed, with the usual close button. */
+.toast[data-dismissible='true'] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.toast[data-actionable='true'] button.toast-dismiss {
+  grid-column: 3;
+  grid-row: 1;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  justify-self: end;
+}

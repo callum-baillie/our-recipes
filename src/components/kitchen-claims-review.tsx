@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useState } from 'react';
 import type { Equipment } from '@/lib/domain/kitchen';
 type Claim = {
@@ -72,7 +74,7 @@ export function KitchenClaimsReview({
       <button className="secondary-button" disabled={busy} onClick={() => void load()}>
         Review active equipment
       </button>
-      <p role="status">{message}</p>
+      <ToastMessage message={message} tone="info" />
       {claims?.length === 0 && (
         <p>No tracked active phases. Untracked manual cooking is not conflict-verified.</p>
       )}

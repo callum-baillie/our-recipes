@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { validTimeZone } from '@/lib/domain/regional';
 import type { BodyMetrics } from '@/lib/domain/body-metrics';
 import { SettingsMergeReview, settingsFieldLabel } from './settings-merge-review';
@@ -1173,7 +1175,7 @@ export function NutritionProfileSettings({
                     </button>
                   </section>
                 ) : null}
-                {estimateStatus && <p role="status">{estimateStatus}</p>}
+                {estimateStatus && <ToastNotice>{estimateStatus}</ToastNotice>}
               </div>
             </SettingsGroup>
           </details>

@@ -1,0 +1,356 @@
+.form {
+  display: block;
+}
+
+.layout {
+  align-items: start;
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+}
+
+.steps {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.side {
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 4.75rem;
+}
+
+.summary {
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.summary h2 {
+  color: var(--label);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.summary dl {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.summary dl div {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.summary dt {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.summary dd {
+  font-size: 0.9rem;
+  font-weight: 650;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.summary p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin: 0;
+}
+
+.summary :global(.primary-button) {
+  width: 100%;
+}
+
+.step {
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.step h2 {
+  align-items: center;
+  display: flex;
+  font-size: 1rem;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.step h2 span {
+  background: var(--leaf);
+  border-radius: 50%;
+  color: var(--linen);
+  display: grid;
+  font-size: 0.78rem;
+  height: 1.55rem;
+  place-items: center;
+  width: 1.55rem;
+}
+
+.field {
+  color: var(--label);
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.field input,
+.field select,
+.field textarea,
+.unit select {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  box-sizing: border-box;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  min-height: 2.7rem;
+  padding: 0 0.7rem;
+  width: 100%;
+}
+
+.field textarea {
+  min-height: 4rem;
+  padding: 0.55rem 0.7rem;
+  resize: vertical;
+}
+
+.row {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.amount {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.unit select {
+  min-width: 6.5rem;
+  width: auto;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chips button {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-height: 2.3rem;
+  padding: 0 0.85rem;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.chips button:hover {
+  background: var(--surface-hover);
+}
+
+.chips button:active {
+  transform: scale(0.96);
+}
+
+.chips button[aria-checked='true'],
+.chips button[data-active] {
+  background: var(--leaf);
+  border-color: var(--leaf);
+  color: var(--linen);
+}
+
+.link,
+.lookup {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--leaf);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  justify-self: start;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.match {
+  animation: fade 0.25s ease-out;
+  background: var(--leaf-pale);
+  border-radius: 0.5rem;
+  color: var(--notice-ink);
+  font-size: 0.84rem;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+}
+
+.more {
+  background: var(--linen);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0 1.1rem;
+}
+
+.more summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-weight: 700;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 3rem;
+}
+
+.more summary::-webkit-details-marker {
+  display: none;
+}
+
+.more summary svg {
+  transition: transform 0.2s ease;
+}
+
+.more[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.moreGrid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  padding-bottom: 1.1rem;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.check {
+  align-items: center;
+  display: flex;
+  font-size: 0.88rem;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.recovery {
+  background: var(--warning-surface);
+  border: 1px solid var(--warning-border);
+  border-radius: 0.9rem;
+  color: var(--warning-ink);
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.1rem;
+}
+
+.recovery h2,
+.recovery p {
+  margin: 0;
+}
+
+.recovery div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 899px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On a phone the summary becomes a bar that stays in reach while the form scrolls. */
+  .side {
+    display: contents;
+  }
+
+  .summary {
+    bottom: 0.6rem;
+    box-shadow: 0 -6px 24px rgb(31 34 27 / 14%);
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0.7rem 0.8rem;
+    position: sticky;
+    z-index: 4;
+  }
+
+  .summary h2,
+  .summary dl div:not(:first-child) {
+    display: none;
+  }
+
+  .summary dd {
+    text-align: left;
+  }
+
+  .summary :global(.primary-button) {
+    width: auto;
+  }
+
+  .summary p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match {
+    animation: none;
+  }
+
+  .more summary svg,
+  .chips button {
+    transition: none;
+  }
+}

@@ -1,4 +1,5 @@
 import 'server-only';
+import { recipeCardUrl } from './recipe-link-service';
 
 import sharp from 'sharp';
 import { getAppPreferences } from './app-preferences-service';
@@ -105,6 +106,7 @@ async function render(
   options: PdfExportOptions,
   schedule?: MealPrintSchedule,
 ) {
+  for (const card of cards) card.recipeUrl = recipeCardUrl(card.recipeId);
   const brand = await getPdfBrand();
   return renderSerializedDoc({
     ...serialize(
@@ -239,7 +241,7 @@ export function exportMealPlanPdf(input: MealPlanPdfExportInput) {
             !meal.recipeOverride &&
             meal.effectiveStatus !== 'cooked' &&
             getRecipe(meal.recipeId)?.currentRevision === meal.recipeRevision
-              ? `BORD:1:RECIPE:${meal.recipeId}:${meal.servings}:${meal.recipeRevision}:${meal.id}`
+              ? recipeCardUrl(meal.recipeId)
               : undefined,
           date: meal.plannedFor,
           slot: meal.meal,

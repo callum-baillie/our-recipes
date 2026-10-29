@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { ImagePlus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -241,11 +243,7 @@ export function RecipeImageGallery({
           JPEG, PNG, WebP, HEIC, or HEIF · 10 MB max · HEIC/HEIF converts in this browser before
           upload, then every accepted photo is stored locally as a cleaned WebP.
         </p>
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <ToastMessage message={error} tone="error" />}
         <button className="text-button" type="submit" disabled={pending || converting || !file}>
           {pending || converting ? (
             <LoadingIndicator label="Preparing image" />

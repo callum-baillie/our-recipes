@@ -1,4 +1,5 @@
 import 'server-only';
+import { recipeCardUrl } from './recipe-link-service';
 import { Document, Page, View, Text, QrCode, serialize } from '@formepdf/react';
 import { renderSerializedDoc } from '@formepdf/core';
 import { z } from 'zod';
@@ -21,6 +22,8 @@ const controls = [
   ['Idle', 'BORD:1:MODE:IDLE'],
   ['Reset controls', 'BORD:1:RESET'],
   ['Undo last transaction', 'BORD:1:UNDO'],
+  ['Clear last grocery session (unchanged additions only)', 'BORD:2:CLEAR_SESSION'],
+  ['Expired batch · discard and track waste', 'BORD:2:ACTION:EXPIRED'],
   ['Next product ×2', 'BORD:1:QTY:2'],
   ['Next product ×3', 'BORD:1:QTY:3'],
   ['Open batch', 'BORD:2:ACTION:OPEN'],
@@ -54,10 +57,7 @@ export async function exportScannerCards(raw: unknown): Promise<KitchenExport> {
         'Set a numeric serving count from 1–100 on an active recipe before printing.',
       );
     cards = [
-      [
-        `${r.title} · ${servings} servings · revision ${r.currentRevision}`,
-        `BORD:1:RECIPE:${r.id}:${servings}:${r.currentRevision}`,
-      ],
+      [`${r.title} · ${servings} servings · revision ${r.currentRevision}`, recipeCardUrl(r.id)],
     ];
   }
   if (input.kind === 'batch') {
@@ -79,16 +79,25 @@ export async function exportScannerCards(raw: unknown): Promise<KitchenExport> {
       bytes: await renderSerializedDoc({
         ...serialize(
           <Document title="Bòrd scanner cards">
-            {cards.map(([title, code]) => (
-              <Page key={code} size="A5" margin={22}>
-                <Text style={{ fontSize: 17, marginBottom: 12 }}>{title}</Text>
-                <View style={{ padding: 14, backgroundColor: '#ffffff' }}>
-                  <QrCode data={code!} size={150} />
+            {Array.from({ length: Math.ceil(cards.length / 6) }, (_, page) => (
+              <Page key={page} size="A4" margin={24}>
+                <Text style={{ fontSize: 20, marginBottom: 8 }}>Pantry scanner actions</Text>
+                <Text style={{ fontSize: 10, marginBottom: 16 }}>
+                  Print at actual size. Scan an action, then the product or batch label. Extended
+                  companion profile required for actions other than adding.
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {cards.slice(page * 6, page * 6 + 6).map(([title, code]) => (
+                    <View key={code} style={{ width: '50%', padding: 12, marginBottom: 14 }}>
+                      <Text style={{ fontSize: 13, marginBottom: 8 }}>{title}</Text>
+                      <QrCode data={code!} size={110} />
+                      <Text style={{ fontSize: 7, marginTop: 6 }}>{code}</Text>
+                    </View>
+                  ))}
                 </View>
-                <Text style={{ fontSize: 8, marginTop: 12 }}>{code}</Text>
-                <Text style={{ fontSize: 9, marginTop: 14 }}>
-                  Recipe scans record cooking immediately. Product scans need ADD or REMOVE. A beep
-                  means read; wait for Bòrd to say Saved.
+                <Text style={{ fontSize: 9 }}>
+                  A beep means read; check Bòrd for the saved result. Undo reverses the last
+                  eligible transaction. Reset returns to the configured default mode.
                 </Text>
               </Page>
             ))}

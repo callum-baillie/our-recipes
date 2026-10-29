@@ -1,5 +1,9 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
+
 import { ArchiveRestore, Download, ShieldCheck } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { AppDialog } from './app-dialog';
@@ -227,16 +231,8 @@ export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
           )}
           {pending === 'create' ? 'Creating…' : 'Create backup'}
         </button>
-        {creationStatus && (
-          <p className="settings-local-status" role="status">
-            {creationStatus}
-          </p>
-        )}
-        {creationError && (
-          <p className="settings-local-status form-error" role="alert">
-            {creationError}
-          </p>
-        )}
+        {creationStatus && <ToastNotice>{creationStatus}</ToastNotice>}
+        {creationError && <ToastNotice tone="error">{creationError}</ToastNotice>}
       </SettingsRow>
       <SettingsRow
         title="Configured backup policy"
@@ -295,7 +291,7 @@ export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
         )}
       </SettingsSubsection>
       {historyError && (
-        <p role="alert">
+        <ToastNotice tone="error">
           {historyError}{' '}
           <button
             className="text-button"
@@ -304,7 +300,7 @@ export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
           >
             Refresh history
           </button>
-        </p>
+        </ToastNotice>
       )}
       {limit < backups.length && (
         <button
@@ -318,11 +314,7 @@ export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
       <p>
         {backups.length} saved {backups.length === 1 ? 'archive' : 'archives'}
       </p>
-      {error && !reviewOpen && (
-        <p className="form-error settings-inline-status" role="alert">
-          {error}
-        </p>
-      )}
+      {error && !reviewOpen && <ToastMessage message={error} tone="error" />}
       {reviewOpen && (
         <AppDialog
           onClose={closeReview}
@@ -345,11 +337,7 @@ export function BackupManager({ initialBackups, storage }: BackupManagerProps) {
             Requested archive: <code>{pendingBackupId}</code>
           </p>
           {pending === 'preview' && <p role="status">Validating this archive…</p>}
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <ToastMessage message={error} tone="error" />}
           {preview && preview.id === pendingBackupId && (
             <>
               <p>

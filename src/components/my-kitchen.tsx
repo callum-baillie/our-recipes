@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useRouter } from 'next/navigation';
 import { KitchenSetupGuide } from './kitchen-setup-guide';
 import { KitchenFacilitiesForm } from './kitchen-facilities-form';
@@ -281,9 +283,7 @@ export function MyKitchen({
         title="My Kitchen"
         description="Your appliances, cookware and cooking setup."
       />
-      <div role="status" aria-live="polite">
-        {message}
-      </div>
+      <ToastMessage message={message} tone="info" />
       {guided ? (
         <KitchenSetupGuide
           step={setupStep}

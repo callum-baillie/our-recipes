@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { useState } from 'react';
 import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 
@@ -52,11 +54,7 @@ export function DiagnosticsExport() {
           {pending ? 'Preparing…' : 'Download diagnostics'}
         </button>
       </SettingsRow>
-      {status ? (
-        <p className="settings-inline-status" role="status">
-          {status}
-        </p>
-      ) : null}
+      {status ? <ToastNotice>{status}</ToastNotice> : null}
     </SettingsPane>
   );
 }

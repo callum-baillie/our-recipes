@@ -1,5 +1,9 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
+
 import { AlertCircle, FileCheck2, ShieldCheck, Sparkles } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 
@@ -152,10 +156,10 @@ function StoredImportPreview({
             variant="image"
           />
         ) : showError ? (
-          <span className="import-preview-overlay error" role="alert">
+          <ToastNotice tone="error">
             <AlertCircle size={24} aria-hidden="true" />
             {errorMessage}
-          </span>
+          </ToastNotice>
         ) : state === 'complete' ? (
           <span className="import-preview-ready">
             <FileCheck2 size={15} aria-hidden="true" /> AI review ready
@@ -535,9 +539,9 @@ export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' 
                 <AsyncSkeleton label="OpenAI is reading the normalized scan" variant="panel" />
               ) : (
                 <>
-                  <p className="form-error" role="alert">
+                  <ToastNotice tone="error">
                     {error ?? 'OpenAI could not create a review draft from this scan.'}
-                  </p>
+                  </ToastNotice>
                   <button
                     className="text-button"
                     type="button"
@@ -590,11 +594,7 @@ export function ImportWizard({ initialMode = 'files' }: { initialMode?: 'files' 
                   </button>
                 </aside>
               )}
-              {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              )}
+              {error && <ToastMessage message={error} tone="error" />}
               <ImportReviewForm
                 key={`${operation.id}-${aiVersion}`}
                 importId={operation.id}

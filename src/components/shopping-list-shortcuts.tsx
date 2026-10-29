@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useState } from 'react';
 import { RotateCcw, ClipboardPaste, Plus } from 'lucide-react';
 import type { ShoppingListDetail } from '@/lib/services/planning-service';
@@ -160,7 +162,7 @@ export function ShoppingListShortcuts({
               </button>
             </>
           )}
-          <p role="status">{message}</p>
+          <ToastMessage message={message} tone="info" />
         </div>
       )}
     </section>

@@ -1,4 +1,14 @@
 import 'server-only';
+import {
+  NutritionIntakeConflictError,
+  NutritionIntakeIntegrityError,
+} from './nutrition-intake-service';
+import { NutritionRecipeIntegrityError } from './nutrition-recipe-calculation-service';
+import {
+  NutritionFoundationIntegrityError,
+  NutritionFoundationNotFoundError,
+} from './nutrition-foundation-service';
+import { completeScannedRecipeLink } from './scanned-meal-service';
 import { createHash, randomUUID } from 'node:crypto';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -201,6 +211,8 @@ export function scannerContext(p: RequestPrincipal, id: string) {
       'pantry_catalog_add',
       'pantry_remove',
       'recipe',
+      'recipe_link',
+      'undo_session',
       'undo',
       'batch_action',
       'stocktake',
@@ -421,7 +433,11 @@ export async function lookupScanner(p: RequestPrincipal, raw: unknown) {
 }
 function commandPermissions(p: RequestPrincipal, command: BoundScannerOperation['command']) {
   permission(p, 'pantry', 'read');
-  if (command.type === 'recipe') {
+  if (command.type === 'recipe_link') {
+    permission(p, 'recipes', 'read');
+    permission(p, 'mealPlans', 'update');
+    permission(p, 'pantry', 'update');
+  } else if (command.type === 'recipe') {
     permission(p, 'recipes', 'read');
     permission(p, 'recipes', 'create');
     permission(p, 'recipes', 'update');
@@ -446,6 +462,11 @@ function commandPermissions(p: RequestPrincipal, command: BoundScannerOperation[
 function domainError(error: unknown): ScannerError | null {
   if (error instanceof ScannerError) return error;
   if (
+    error instanceof NutritionIntakeConflictError ||
+    error instanceof NutritionIntakeIntegrityError ||
+    error instanceof NutritionRecipeIntegrityError ||
+    error instanceof NutritionFoundationIntegrityError ||
+    error instanceof NutritionFoundationNotFoundError ||
     error instanceof PantryConflictError ||
     error instanceof PantryValidationError ||
     error instanceof PantryNotFoundError ||
@@ -589,6 +610,53 @@ function runCommand(
       undoable: true,
     };
   }
+  if (command.type === 'undo_session') {
+    for (const id of command.targetOperationIds) {
+      const target = db.select().from(scannerOperations).where(eq(scannerOperations.id, id)).get();
+      if (
+        !target ||
+        target.stationId !== input.stationId ||
+        target.userId !== p.userId ||
+        target.profileId !== p.profileId ||
+        target.outcome !== 'succeeded' ||
+        target.undoneBy ||
+        !['pantry_add', 'pantry_catalog_add'].includes(target.result.type) ||
+        !target.result.batchId ||
+        !target.result.batchVersion
+      )
+        throw new ScannerError(
+          'scanner_session_clear_review',
+          'This grocery session contains an action that cannot be safely cleared. No items were removed.',
+        );
+      applyPantryBatchAction(
+        target.result.batchId,
+        {
+          type: 'discard',
+          expectedVersion: target.result.batchVersion,
+          reason: 'Undo scanner session addition',
+          note: '',
+        },
+        p.profileId,
+      );
+      db.update(scannerOperations)
+        .set({ undoneBy: input.operationId })
+        .where(eq(scannerOperations.id, id))
+        .run();
+    }
+    return {
+      operationId: input.operationId,
+      type: 'undo_session',
+      message: `Cleared ${command.targetOperationIds.length} unchanged grocery additions.`,
+      undoable: false,
+    };
+  }
+  if (command.type === 'recipe_link')
+    return {
+      operationId: input.operationId,
+      type: 'recipe_link',
+      ...completeScannedRecipeLink(command, p),
+      undoable: false,
+    };
   if (command.type === 'recipe')
     return {
       ...executeScannerOperation(
@@ -1154,6 +1222,7 @@ export function createScannerControl(p: RequestPrincipal, id: string, raw: unkno
   if (
     station.state?.profile === 'add-only' &&
     (input.command.control === 'action' ||
+      input.command.control === 'meal_date' ||
       (input.command.control === 'mode' && !['idle', 'add'].includes(input.command.mode)))
   )
     throw new ScannerError(

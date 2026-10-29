@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useRef, useState } from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import { instacartRequestSchema, instacartMeasurement } from '@/lib/domain/instacart';
@@ -212,11 +214,7 @@ export function InstacartShopping({
           Creating a link shares the list title, selected product names, quantities and supplied
           UPCs with Instacart. Your local list stays unchanged.
         </p>
-        {error ? (
-          <p role="alert" className={styles.error}>
-            {error}
-          </p>
-        ) : null}
+        {error ? <ToastMessage message={error} tone="error" /> : null}
         <div className={styles.actions}>
           <button
             type="button"

@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { createElement } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ToastProvider } from '@/components/toast-provider';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as baseRender,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -11,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mocks.refresh, push: mocks.push, replace: mocks.replace }),
 }));
-vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+
 vi.mock('@/components/food-catalog-picker', () => ({ FoodCatalogPicker: () => null }));
 vi.mock('@/components/recipe-tag-selector', () => ({ RecipeTagSelector: () => null }));
 vi.mock('@/components/decision-assistance', () => ({ DecisionAssistance: () => null }));
@@ -316,6 +324,7 @@ describe('workflow acknowledgement and submitted scope', () => {
       productStock: { [productId]: { knownQuantity: 1500, unit: 'g', uncertain: false } },
     };
     const fetch = vi.fn<typeof globalThis.fetch>(async (_url, options) => {
+      if (String(_url).includes('/scanner/')) return Response.json({ stations: [] });
       if (options?.method === 'PATCH') return Response.json({ product: dashboard.products[0] });
       reads++;
       if (reads > 1 && !retryAllowed)
@@ -367,3 +376,7 @@ describe('workflow acknowledgement and submitted scope', () => {
     expect(name.getAttribute('aria-invalid')).toBe('false');
   });
 });
+
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}

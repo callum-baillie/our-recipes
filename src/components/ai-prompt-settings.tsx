@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { useRef, useState } from 'react';
 import { SettingsMergeReview } from './settings-merge-review';
 import {
@@ -212,12 +215,12 @@ function PromptEditor({ initial }: { initial: Prompt }) {
           )}
         </fieldset>
         {error && (
-          <div role="alert">
+          <ToastNotice tone="error">
             <p>{error}</p>
             <button type="button" disabled={busy} onClick={() => void compareCurrent()}>
               Load current version to compare
             </button>
-          </div>
+          </ToastNotice>
         )}
         {current && (
           <SettingsMergeReview

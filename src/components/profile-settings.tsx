@@ -1,4 +1,8 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 /* eslint-disable @next/next/no-img-element -- Uncommitted avatar URLs need a direct loading failure fallback. */
 
 import { Archive, Plus, RotateCcw, Save, X } from 'lucide-react';
@@ -241,11 +245,7 @@ export function ProfileSettings({
       >
         Refresh members
       </button>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ToastMessage message={error} tone="error" />}
       {profiles.some((profile) => profile.role === 'child' && !profile.archivedAt) ? (
         <SettingsPane
           className="guardian-settings"
@@ -674,9 +674,7 @@ export function ProfileEditor({
                   {action === 'role' ? 'Updating role…' : 'Update role'}
                 </button>
                 {lastAction === 'role' && actionError && (
-                  <p className="form-error" role="alert">
-                    {actionError}
-                  </p>
+                  <ToastNotice tone="error">{actionError}</ToastNotice>
                 )}
               </>
             )}
@@ -885,10 +883,12 @@ export function ProfileEditor({
         {lastActiveMember && !archived && (
           <p>The last active household member cannot be archived.</p>
         )}
-        {actionError && lastAction !== 'role' ? <p role="alert">{actionError}</p> : null}
+        {actionError && lastAction !== 'role' ? (
+          <ToastNotice tone="error">{actionError}</ToastNotice>
+        ) : null}
         {conflict && onLoadCurrent && (
           <section aria-label="Review changed profile">
-            <p role="status">Your profile changed elsewhere. Your edits are retained.</p>
+            <ToastNotice>Your profile changed elsewhere. Your edits are retained.</ToastNotice>
             <button
               type="button"
               className="secondary-button"

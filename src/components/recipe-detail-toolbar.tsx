@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import Link from 'next/link';
 import { ChefHat, Edit3, Heart, Printer, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -140,7 +142,7 @@ export function RecipeDetailToolbar({
           <span className="recipe-toolbar-label">AI enhance</span>
         </button>
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <ToastMessage message={error} tone="error" />}
       <RecipeEnhancementDialog
         open={enhancing}
         onClose={() => setEnhancing(false)}

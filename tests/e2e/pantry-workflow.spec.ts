@@ -2,6 +2,7 @@ import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
+import { addPantryItem } from './helpers/pantry';
 
 const ORIGIN = 'http://127.0.0.1:3100';
 const WEEK_START = '2027-04-01';
@@ -75,29 +76,12 @@ async function addPantryBatch(
     location?: string;
   },
 ) {
-  await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
-  const panel = page.getByRole('dialog', { name: 'Add pantry item' });
-  await expect(panel).toBeVisible();
-  await panel.getByRole('tab', { name: 'Search' }).click();
-  await panel.getByRole('button', { name: 'Enter details manually', exact: true }).click();
-  if (input.existingProduct) {
-    await panel.getByLabel('Existing product').selectOption({ label: input.existingProduct });
-  } else {
-    await panel.getByLabel('Existing product').selectOption('');
-    await panel.getByLabel('New product name').fill(input.productName ?? '');
-  }
-  await panel.getByRole('spinbutton', { name: 'Quantity', exact: true }).fill(input.quantity);
-  await panel.getByRole('combobox', { name: 'Unit', exact: true }).selectOption('g');
-  if (input.location)
-    await panel
-      .getByRole('combobox', { name: 'Location', exact: true })
-      .selectOption({ label: input.location });
-  await panel.getByLabel('Best before').fill(input.expiry);
-  await panel.getByRole('button', { name: 'Add item', exact: true }).focus();
-  await page.keyboard.press('Enter');
-  await expect(
-    page.getByRole('status').filter({ hasText: '1 Pantry batch added.' }).last(),
-  ).toBeVisible();
+  await addPantryItem(page, {
+    name: input.existingProduct ?? input.productName ?? '',
+    quantity: input.quantity,
+    expiry: input.expiry,
+    ...(input.location ? { location: input.location } : {}),
+  });
 }
 
 async function screenshot(page: Page, testInfo: TestInfo, name: string) {
@@ -243,9 +227,9 @@ test('rendered Pantry workflow remains explainable, explicit, persistent, access
   await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
   const pantryPanel = page.getByRole('region', { name: 'What you have on hand' });
   await pantryPanel.getByLabel('Pantry product').selectOption({ label: 'Red lentils' });
-  await expect(
-    pantryPanel.getByRole('status').filter({ hasText: 'Pantry mapping saved.' }),
-  ).toHaveText('Pantry mapping saved.');
+  // The confirmation is a brief notice that the panel's refresh can replace; the saved state is
+  // asserted after the reload below.
+  await expect(pantryPanel.getByLabel('Pantry product')).toHaveValue(/.+/u);
   await page.reload();
   await page.getByRole('button', { name: 'Check ingredients & matches' }).click();
   await expect(pantryPanel.getByText('Pantry ready', { exact: true }).first()).toBeVisible();

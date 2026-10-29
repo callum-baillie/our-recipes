@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -553,11 +555,7 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
           </div>
         }
       />
-      {status && (
-        <p className={styles.feedback} role="status">
-          {status}
-        </p>
-      )}
+      {status && <ToastNotice>{status}</ToastNotice>}
       {!profile.canManageProfile && (
         <p className={styles.helper}>
           This Nutrition profile is read only. You can view permitted records; recording and changes

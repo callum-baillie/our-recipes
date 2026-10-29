@@ -95,9 +95,11 @@ test('browser online is not server recovery and retry opens only a reachable des
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/offline?returnTo=%2Frecipes');
   expect(await page.evaluate(() => navigator.onLine)).toBe(true);
-  await expect(page.locator('.offline-read-only-banner')).toContainText('Kitchen unavailable.');
+  await expect(
+    page.getByText('The Bòrd server responded, but is not ready.', { exact: false }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.getByRole('main').getByRole('status')).toContainText('still unavailable');
+  await expect(page.getByText(/The Bòrd server is still unavailable/)).toBeVisible();
   expect(destinationChecks).toBe(0);
   await page.screenshot({ path: `${directory}/online-server-unavailable-390.png` });
   expect((await appAxe(page).analyze()).violations).toEqual([]);

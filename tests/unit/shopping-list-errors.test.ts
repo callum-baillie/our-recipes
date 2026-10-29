@@ -6,7 +6,10 @@ import { ShoppingListsOverview } from '@/components/shopping-lists-overview';
 import type { ShoppingListSummary } from '@/lib/services/planning-service';
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+vi.mock('@/components/toast-provider', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/toast-provider')>()),
+  useToast: () => ({ showToast: vi.fn() }),
+}));
 function list(id: string, name: string): ShoppingListSummary {
   return {
     id,

@@ -2,6 +2,13 @@ import { appAxe } from './helpers/accessibility';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { completeInitialOnboarding } from './helpers/onboarding';
+import {
+  chooseLocation,
+  expectAdded,
+  openManualAdd,
+  openMoreDetails,
+  submitManualAdd,
+} from './helpers/pantry';
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
   const path = testInfo.outputPath(`${name}.png`);
@@ -13,18 +20,6 @@ async function expectSaved(page: Page, text: string) {
   await expect(page.getByRole('status').filter({ hasText: text }).last()).toBeVisible({
     timeout: 15000,
   });
-}
-
-async function openAddItemDialog(page: Page) {
-  const batchDialog = page.getByRole('button', { name: 'Close batch management' });
-  if (await batchDialog.isVisible()) await batchDialog.click();
-  await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Add pantry item' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('tab', { name: 'Search' }).click();
-  await dialog.getByRole('button', { name: 'Enter details manually', exact: true }).click();
-  await expect(dialog.getByText('Enter details manually', { exact: true }).last()).toBeVisible();
-  return dialog;
 }
 
 async function openDetails(details: ReturnType<Page['locator']>, summaryName: string) {
@@ -97,17 +92,19 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await completeInitialOnboarding(page, 'Inventory management kitchen', 'Morgan');
   await page.goto('/pantry');
 
-  let add = await openAddItemDialog(page);
-  await add.getByLabel('New product name').fill('Management beans');
-  await add.getByLabel('Quantity', { exact: true }).fill('12');
-  await add.locator('select[name="unit"]').selectOption('each');
-  await add.getByLabel('Separate batches').fill('2');
-  await add.getByLabel('Best before').fill('2027-09-30');
-  await add.getByLabel('Date precision').selectOption('estimated');
-  await add.getByLabel('Notes').fill('UI-created inventory proof');
-  await add.getByLabel('Staple product').check();
-  await add.getByRole('button', { name: 'Add item', exact: true }).click();
-  await expectSaved(page, '2 Pantry batches added.');
+  await openManualAdd(page);
+  await page.getByLabel('Name', { exact: true }).fill('Management beans');
+  await page.getByLabel('Management beans amount').fill('12');
+  await page.getByRole('combobox', { name: 'Unit', exact: true }).selectOption('each');
+  await page.getByLabel('Best before', { exact: true }).fill('2027-09-30');
+  const firstDetails = await openMoreDetails(page);
+  await firstDetails.getByLabel('Separate batches').fill('2');
+  await firstDetails.getByLabel('Date precision').selectOption('estimated');
+  await firstDetails.getByLabel('Notes').fill('UI-created inventory proof');
+  await firstDetails.getByLabel('Staple product').check();
+  await submitManualAdd(page);
+  await expectAdded(page, '2 batches');
+  await page.goto('/pantry');
 
   const products = page.locator('details', { hasText: 'Manage products and staples' });
   await openDetails(products, 'Manage products and staples');
@@ -174,20 +171,19 @@ test('Pantry inventory management is complete, persistent, accessible, and respo
   await clickCardAction(cards.first(), 'Undo');
   await expectSaved(page, 'Last action undone.');
 
-  add = await openAddItemDialog(page);
-  await add.getByLabel('Existing product').selectOption({ label: 'Management beans' });
-  await add.getByLabel('Quantity', { exact: true }).fill('');
-  await add.getByLabel('Original quantity').fill('');
-  await add.getByLabel('Or approximate amount').selectOption('quarter');
-  await add
-    .getByRole('combobox', { name: 'Location', exact: true })
-    .selectOption({ label: 'Cold room shelf' });
-  await add.getByLabel('Package count').fill('1');
-  await add.getByLabel('Package unit').selectOption('package');
-  await add.getByLabel('Use by').fill('2027-10-02');
-  await add.getByLabel('Date precision').selectOption('exact');
-  await add.getByRole('button', { name: 'Add item', exact: true }).click();
-  await expectSaved(page, '1 Pantry batch added.');
+  await openManualAdd(page);
+  await page.getByLabel('Name', { exact: true }).fill('Management beans');
+  await page.getByRole('button', { name: 'Not sure of the exact amount?' }).click();
+  await page.getByRole('radio', { name: 'Quarter', exact: true }).click();
+  await chooseLocation(page, 'Cold room shelf');
+  const secondDetails = await openMoreDetails(page);
+  await secondDetails.getByLabel('Package count').fill('1');
+  await secondDetails.getByLabel('Package unit').selectOption('package');
+  await secondDetails.getByLabel('Use by').fill('2027-10-02');
+  await secondDetails.getByLabel('Date precision').selectOption('exact');
+  await submitManualAdd(page);
+  await expectAdded(page);
+  await page.goto('/pantry');
 
   card = cards.first();
   manage = await batchManagement(card);

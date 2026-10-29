@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AsyncSkeleton, ButtonSpinner } from './skeleton';
@@ -407,7 +410,7 @@ export function PrintWorkspace({
                   Clear all selections
                 </button>
               </div>
-              {selectionNotice && <p role="status">{selectionNotice}</p>}
+              {selectionNotice && <ToastNotice>{selectionNotice}</ToastNotice>}
               {selected.length >= 100 && (
                 <p>100-card limit reached. Deselect a recipe to add another.</p>
               )}
@@ -670,7 +673,7 @@ export function PrintWorkspace({
             </details>
           )}
           <div className={styles.prepare}>
-            {(sourceError || routeError) && <p role="status">{sourceError || routeError}</p>}
+            {(sourceError || routeError) && <ToastNotice>{sourceError || routeError}</ToastNotice>}
             {updateAction}
             <a href="#print-output">Go to document & downloads</a>
           </div>
@@ -762,9 +765,9 @@ export function PrintWorkspace({
             Prepared does not confirm that this browser has displayed the PDF pages. Use Open PDF if
             the embedded viewer is blank or cannot print.
           </p>
-          {printStatus && <p role="status">{printStatus}</p>}
+          {printStatus && <ToastNotice>{printStatus}</ToastNotice>}
           {failure?.format === 'pdf' && (
-            <div role="alert" className={styles.error}>
+            <ToastNotice tone="error">
               <p>{failure.message}</p>
               <p>
                 {failure.identity}.{' '}
@@ -781,7 +784,7 @@ export function PrintWorkspace({
               >
                 Try PDF again
               </button>
-            </div>
+            </ToastNotice>
           )}
           <details className={styles.viewer} open>
             <summary>Embedded PDF viewer</summary>
@@ -832,11 +835,11 @@ export function PrintWorkspace({
                 Preparing ZIP · {operation.identity}. The prepared PDF above is unchanged.
               </p>
             )}
-            {zipStatus && <p role="status">{zipStatus}</p>}
+            {zipStatus && <ToastNotice>{zipStatus}</ToastNotice>}
             {failure?.format === 'zip' && (
-              <p role="alert" className={styles.error}>
+              <ToastNotice tone="error">
                 {failure.message} · {failure.identity}. The PDF above is unchanged.
-              </p>
+              </ToastNotice>
             )}
             {kind === 'meal-plan' && (
               <div>

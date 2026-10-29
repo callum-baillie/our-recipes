@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, type ReactNode } from 'react';
+import { ToastNotice } from './toast-provider';
 import {
   NUTRITION_MEALS,
   nutritionEventCandidates,
@@ -18,15 +19,10 @@ export function NutritionFeedback({
 }) {
   if (!value?.message) return <span className="sr-only" role="status" aria-live="polite" />;
   return (
-    <div
-      className={styles.feedback}
-      data-state={value.phase}
-      role={value.phase === 'error' || value.phase === 'uncertain' ? 'alert' : 'status'}
-      aria-live="polite"
-    >
+    <ToastNotice tone={value.phase === 'error' || value.phase === 'uncertain' ? 'error' : 'info'}>
       <p>{value.message}</p>
       {children}
-    </div>
+    </ToastNotice>
   );
 }
 

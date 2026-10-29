@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { Braces, ChevronDown, ChevronLeft, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
@@ -155,11 +157,7 @@ export function JsonLdImportWizard({
               Up to 1 MB. This text is parsed for review and is never stored as an import file.
             </small>
           </label>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <ToastMessage message={error} tone="error" />}
           <button
             className="secondary-button"
             type="button"
@@ -216,11 +214,7 @@ export function JsonLdImportWizard({
           >
             <ChevronLeft size={16} aria-hidden="true" /> Edit pasted JSON-LD
           </button>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <ToastMessage message={error} tone="error" />}
         </div>
       )}
     </section>

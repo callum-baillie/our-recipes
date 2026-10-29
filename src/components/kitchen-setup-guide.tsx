@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import {
   MEASUREMENT_UNIT_LABELS,
   MEASUREMENT_BASIS_LABELS,
@@ -304,7 +306,7 @@ export function KitchenSetupGuide({
               Equipment sharing has unsaved edits. Save or discard this choice before finishing.
             </p>
           )}
-          <p role="status">{message}</p>
+          <ToastMessage message={message} tone="info" />
           <Link href="/account/ai">All authorized AI sharing controls</Link>
           {kitchen.canManage && (
             <label>

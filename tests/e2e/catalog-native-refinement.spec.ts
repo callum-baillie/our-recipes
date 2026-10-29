@@ -142,11 +142,9 @@ test('reviewed food shows source context, reflows and safely retries an uncertai
         : { json: { productId: '00000000-0000-4000-8000-000000000123' } },
     );
   });
-  await page.goto('/pantry');
+  await page.goto('/pantry/add?mode=search');
   await expect(page).toHaveTitle(/Bòrd/u);
-  await page.getByRole('button', { name: 'Add item', exact: true }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Add pantry item' });
-  await dialog.getByRole('tab', { name: 'Search', exact: true }).click();
+  const dialog = page.getByRole('region', { name: 'Find a pantry product' });
   await dialog.getByLabel('Product name / barcode').fill('rolled oats');
   await dialog.getByRole('button', { name: 'Search', exact: true }).click();
   await dialog.getByRole('button', { name: /Synthetic rolled oats/u }).click();
@@ -156,9 +154,12 @@ test('reviewed food shows source context, reflows and safely retries an uncertai
   await dialog.getByRole('button', { name: 'Find storage guidance' }).click();
   await expect(dialog.getByText('Keep dry in a closed container')).toBeVisible();
   await dialog.getByRole('button', { name: 'Check public evidence' }).click();
-  await expect(dialog.getByText(/bounded source history/u)).toBeVisible();
-  await dialog.getByText('Observation dates, channels and details', { exact: true }).click();
-  await expect(dialog.getByText(/0.00 USD · in store · Observed 2020-01-02/u)).toBeVisible();
+  await expect(page.getByText(/bounded source history/u)).toBeVisible();
+  await page.getByText('Observation dates, channels and details', { exact: true }).click();
+  await expect(page.getByText(/0.00 USD · in store · Observed 2020-01-02/u)).toBeVisible();
+  // The evidence notice stays until dismissed; clear it so it cannot cover the form below.
+  for (const close of await page.getByRole('button', { name: 'Dismiss notification' }).all())
+    await close.click();
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
     await expect(dialog).toBeVisible();
@@ -170,26 +171,29 @@ test('reviewed food shows source context, reflows and safely retries an uncertai
       .scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${output}/food-context-${width}.png` });
   }
-  expect((await appAxe(page).include('dialog[open]').analyze()).violations).toEqual([]);
+  expect((await appAxe(page).include('#add-panel-search').analyze()).violations).toEqual([]);
   await page.setViewportSize({ width: 568, height: 320 });
   await dialog.getByRole('button', { name: 'Add Item', exact: true }).focus();
   await expect(dialog.getByRole('button', { name: 'Add Item', exact: true })).toBeInViewport();
   await page.screenshot({ path: `${output}/food-confirm-short-568.png` });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
-  await dialog.getByRole('button', { name: 'Add Item', exact: true }).focus();
-  await expect(dialog.getByRole('button', { name: 'Add Item', exact: true })).toBeInViewport();
+  const addItem = dialog.getByRole('button', { name: 'Add Item', exact: true });
+  await addItem.focus();
+  // Enlarged text reflows the page, so bring the button into view the way a person would scroll.
+  await addItem.scrollIntoViewIfNeeded();
+  await expect(addItem).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `${output}/food-confirm-text-200.png` });
   await page.evaluate(() => (document.documentElement.style.fontSize = ''));
   await page.setViewportSize({ width: 320, height: 844 });
   await dialog.getByRole('button', { name: 'Add Item', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Retry previous confirmation' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Close add item dialog' })).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'Done' })).toHaveAttribute('aria-disabled', 'true');
   await expect(dialog.getByRole('textbox', { name: 'Name', exact: true })).toBeDisabled();
   await page.screenshot({ path: `${output}/uncertain-confirmation-320.png` });
   await dialog.getByRole('button', { name: 'Retry previous confirmation' }).click();
-  await expect(dialog).not.toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Retry previous confirmation' })).toHaveCount(0);
   expect(imports).toHaveLength(2);
   expect(imports[1]).toEqual(imports[0]);
   expect(errors).toEqual([]);

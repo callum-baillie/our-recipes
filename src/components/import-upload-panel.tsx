@@ -1,5 +1,9 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
+
 import {
   ChevronDown,
   AlertCircle,
@@ -170,10 +174,10 @@ function SelectedImagePreview({
       {showLoading ? (
         <AsyncSkeleton className="import-preview-overlay" label={loadingMessage} variant="image" />
       ) : showError ? (
-        <span className="import-preview-overlay error" role="alert">
+        <ToastNotice tone="error">
           <AlertCircle size={23} aria-hidden="true" />
           {error ?? 'This preview needs attention before review.'}
-        </span>
+        </ToastNotice>
       ) : (
         <span className="import-preview-ready">
           <Check size={15} aria-hidden="true" /> Ready
@@ -435,11 +439,7 @@ export function ImportUploadPanel({
         </label>
       ) : null}
 
-      {error ? (
-        <p className="form-error import-form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ToastMessage message={error} tone="error" /> : null}
 
       {phase !== 'idle' ? (
         <button

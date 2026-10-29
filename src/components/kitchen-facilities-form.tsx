@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useState } from 'react';
 import type { KitchenState, KitchenCommand, KitchenConstraints } from '@/lib/domain/kitchen';
 import { createClientUuid } from '@/lib/client/client-uuid';
@@ -165,7 +167,7 @@ export function KitchenFacilitiesForm({
         </div>
       </fieldset>
       {!kitchen.canManage && <p>A parent or administrator can change shared setup facts.</p>}
-      <p role="status">{message}</p>
+      <ToastMessage message={message} tone="info" />
     </section>
   );
 }

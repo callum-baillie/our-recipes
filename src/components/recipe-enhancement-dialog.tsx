@@ -1,5 +1,9 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
+
 import { Check, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -181,11 +185,7 @@ export function RecipeEnhancementDialog({
             ? 'Choose the changes to save as a new revision. Unchecked fields keep their current values.'
             : 'Improve servings, steps, timings, ingredients, categories, tags, and nutrition. You review every change before saving.'}
         </p>
-        {error && (
-          <p className={styles.alert} role="alert">
-            {error}
-          </p>
-        )}
+        {error && <ToastMessage message={error} tone="error" />}
         {pending === 'generate' ? (
           <>
             <AsyncSkeleton variant="rows" label="Enhancing recipe and preparing your comparison" />
@@ -286,15 +286,11 @@ export function RecipeEnhancementDialog({
               </div>
             </div>
             {statusError ? (
-              <p role="alert" className={styles.alert}>
-                {statusError}
-              </p>
+              <ToastNotice tone="error">{statusError}</ToastNotice>
             ) : !readiness ? (
               <AsyncSkeleton variant="select" label="Checking AI availability" />
             ) : !readiness.enabled ? (
-              <p role="status" className={styles.notice}>
-                {readiness.message}
-              </p>
+              <ToastNotice>{readiness.message}</ToastNotice>
             ) : null}
             <label className={styles.consent}>
               <input

@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { createElement } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { ToastProvider } from '@/components/toast-provider';
+import {
+  cleanup,
+  fireEvent,
+  render as baseRender,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultProfileInput } from '@/lib/domain/setup';
 import { defaultProfileGoalContext } from '@/lib/domain/profile-goals';
@@ -27,7 +35,7 @@ async function answerText(label: string, value: string) {
 }
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-vi.mock('@/components/toast-provider', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+
 vi.mock('@/components/passkey-settings', () => ({ PasskeySettings: () => null }));
 vi.mock('@/lib/auth/client', () => ({ authClient: {} }));
 const person = {
@@ -629,3 +637,7 @@ describe('settings and Nutrition unresolved behavioral regressions', () => {
       });
     });
 });
+
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}

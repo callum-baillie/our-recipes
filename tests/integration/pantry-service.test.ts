@@ -23,7 +23,9 @@ import {
   createPantryBatch,
   createPantryLocation,
   createPantryProduct,
+  createPantryProductForBarcode,
   ensureDefaultPantryLocations,
+  getExpiredPantryWasteMetrics,
   getPantryDashboard,
   listPantryEvents,
   listPantryLocations,
@@ -92,6 +94,63 @@ describe('Pantry service', () => {
       profileId,
     );
   }
+
+  it('names an unknown barcode with its first stock, and refuses to name it twice', () => {
+    const input = (name: string) => ({
+      barcode: '4006381333931',
+      product: pantryProductInputSchema.parse({
+        displayName: name,
+        defaultInventoryUnit: 'package',
+        defaultPackageAmount: 1,
+        defaultPackageUnit: 'package',
+      }),
+      batch: (({ productId: _unused, ...rest }) => rest)(
+        pantryBatchInputSchema.parse({
+          productId: '00000000-0000-4000-8000-000000000000',
+          quantityRemaining: 3,
+          originalQuantity: 3,
+          unit: 'package',
+          locationId,
+        }),
+      ),
+    });
+    const saved = createPantryProductForBarcode(input('Baked beans'), profileId);
+    expect(saved.batch).toMatchObject({ quantityRemaining: 3, unit: 'package' });
+    expect(
+      getPantryDashboard().products.find((item) => item.id === saved.product.id)?.identifiers,
+    ).toMatchObject([{ normalizedValue: '04006381333931', verified: true }]);
+
+    expect(() => createPantryProductForBarcode(input('Beans again'), profileId)).toThrow(
+      /already saved as Baked beans/,
+    );
+    // A refused name leaves nothing behind.
+    expect(getPantryDashboard().products).toHaveLength(1);
+    expect(() =>
+      createPantryProductForBarcode({ ...input('Other'), barcode: '4006381333932' }, profileId),
+    ).toThrow(/check digit/i);
+    expect(getPantryDashboard().batches).toHaveLength(1);
+  });
+
+  it('counts a batch discarded as Expired in the waste metrics, but not an ordinary removal', () => {
+    const milk = product('Milk');
+    const removed = batch(milk.id, 1, 'each', '2027-01-05');
+    const expired = batch(milk.id, 2, 'each', '2027-01-05');
+    applyPantryBatchAction(
+      removed.id,
+      { type: 'discard', reason: 'Removed from Pantry', expectedVersion: 1, note: '' },
+      profileId,
+    );
+    expect(getExpiredPantryWasteMetrics().batches).toBe(0);
+    applyPantryBatchAction(
+      expired.id,
+      { type: 'discard', reason: 'Expired', expectedVersion: 1, note: '' },
+      profileId,
+    );
+    expect(getExpiredPantryWasteMetrics()).toMatchObject({
+      batches: 1,
+      quantities: [{ unit: 'each', quantity: 2 }],
+    });
+  });
 
   it('keeps essential stock independent of display filters and converts only compatible known units', () => {
     const lentils = product();

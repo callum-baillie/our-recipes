@@ -24,6 +24,7 @@ export type RecipePrintCard = {
   occasions?: string[];
   image?: string;
   adapted?: boolean;
+  recipeUrl?: string;
 };
 export type ScheduleMeal = {
   id: string;
@@ -43,7 +44,6 @@ export type MealPrintSchedule = { start: string; end: string; meals: ScheduleMea
 const ink = '#26372b';
 const muted = '#5f6b58';
 const rule = '#dfe5d6';
-const wash = '#f2f5ee';
 
 const pageWidth = (paper: PdfExportOptions['paper']) => (paper === 'Letter' ? 612 : 595.28);
 const body = { fontSize: 10, lineHeight: 1.45, minWidowLines: 2, minOrphanLines: 2 };
@@ -250,19 +250,13 @@ function RecipeCard({
           ))}
         </Stack>
       ) : null}
-      {!card.adapted &&
-      (card.servings ?? base) &&
-      (card.servings ?? base)! > 0 &&
-      (card.servings ?? base)! <= 100 ? (
+      {card.recipeUrl ? (
         <Stack direction="horizontal" align="center" gap="md" style={{ marginBottom: 12 }}>
           <View wrap={false} style={{ padding: 6 }}>
-            <QrCode
-              data={`BORD:1:RECIPE:${card.recipeId}:${card.servings ?? base}:${card.revision}`}
-              size={64}
-            />
+            <QrCode data={card.recipeUrl} size={64} />
           </View>
           <Text variant="xs" color="mutedForeground" noMargin>
-            Scan to record cooking immediately · ingredients will be deducted
+            Scan to open this recipe · choose “I made this” to log a planned meal
           </Text>
         </Stack>
       ) : null}

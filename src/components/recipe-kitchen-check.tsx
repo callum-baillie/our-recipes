@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import styles from './cooking-mode.module.css';
 import { useRef, useState } from 'react';
 import Link from 'next/link';
@@ -220,7 +222,7 @@ export function RecipeKitchenCheck({
       <button className="secondary-button" disabled={busy} onClick={() => void check()}>
         Check recorded equipment
       </button>
-      <p role="status">{message}</p>
+      <ToastMessage message={message} tone="info" />
       {plan && (
         <>
           <p>

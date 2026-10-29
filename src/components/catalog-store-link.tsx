@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { useEffect, useState } from 'react';
 import { Link2, Search, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
 import { InlineSkeleton } from '@/components/skeleton';
@@ -425,12 +427,8 @@ export function CatalogStoreLink({
         Your store name, notes and shopping route stay under your control. Directory results don’t
         confirm stock or aisle numbers.
       </p>
-      {error && (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      )}
-      {message && <p role="status">{message}</p>}
+      {error && <ToastMessage message={error} tone="error" />}
+      {message && <ToastMessage message={message} tone="info" />}
     </section>
   );
 }

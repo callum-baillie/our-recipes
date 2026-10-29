@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -211,7 +213,7 @@ export function RecipePantryPanel({
           </li>
         ))}
       </ul>
-      {message && <p role="status">{message}</p>}
+      {message && <ToastMessage message={message} tone="info" />}
     </section>
   );
 }

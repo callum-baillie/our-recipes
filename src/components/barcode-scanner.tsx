@@ -1,8 +1,11 @@
 'use client';
 
+import { ToastNotice } from './toast-provider';
+
 import { ZXING_WASM_SHA256 } from 'barcode-detector/ponyfill';
 import { Camera, CameraOff, Flashlight, FlashlightOff } from 'lucide-react';
 import { useState, useRef } from 'react';
+import { readCameraPreferences } from '@/lib/client/camera-scanner-preferences';
 import { useZxing } from 'react-zxing';
 import { expandScannedBarcode } from '../../shared/retail-barcode';
 
@@ -14,15 +17,33 @@ type ScannerProps = {
   onRapidChange?: (value: boolean) => void;
   disabled?: boolean;
   onSearchRequest?: () => void;
+  /** Tell the host when the camera opens or closes, so it can make room for it. */
+  onActiveChange?: (active: boolean) => void;
+  /** Drop the dialog-style padding so the scanner sits flush in a page layout. */
+  flush?: boolean;
 };
-export function BarcodeScanner({
+export function BarcodeScanner(props: ScannerProps) {
+  return (
+    <div className={props.flush ? styles.flush : undefined}>
+      <BarcodeScannerInner {...props} />
+    </div>
+  );
+}
+
+function BarcodeScannerInner({
   onDetected,
   rapid = false,
   onRapidChange,
   disabled = false,
   onSearchRequest,
+  onActiveChange,
+  flush = false,
 }: ScannerProps) {
-  const [active, setActive] = useState(false);
+  const [active, setActiveState] = useState(false);
+  const setActive = (value: boolean) => {
+    setActiveState(value);
+    onActiveChange?.(value);
+  };
   const [secure] = useState(
     () =>
       typeof window === 'undefined' ||
@@ -92,6 +113,7 @@ function ActiveBarcodeScanner({
   onSearchRequest,
   onStop,
 }: ScannerProps & { onStop: () => void }) {
+  const [preferences] = useState(readCameraPreferences);
   const lastAccepted = useRef(-Infinity);
   const [paused, setPaused] = useState(false);
   const [error, setError] = useState('');
@@ -108,9 +130,10 @@ function ActiveBarcodeScanner({
     wasmUrl,
     trySkew: true,
     timeBetweenDecodingAttempts: 250,
-    constraints: { video: { facingMode: { ideal: 'environment' } }, audio: false },
+    constraints: { video: { facingMode: { ideal: preferences.facingMode } }, audio: false },
     onDecodeResult(result) {
-      if (paused || disabled || performance.now() - lastAccepted.current < 1500) return;
+      if (paused || disabled || performance.now() - lastAccepted.current < preferences.cooldownMs)
+        return;
       let barcode: string;
       try {
         barcode = expandScannedBarcode(result.rawValue, result.format);
@@ -121,7 +144,7 @@ function ActiveBarcodeScanner({
       setError('');
       lastAccepted.current = performance.now();
       if (!rapid) setPaused(true);
-      navigator.vibrate?.(80);
+      if (preferences.vibrate) navigator.vibrate?.(80);
       onDetected(barcode);
     },
     onError(value) {
@@ -200,7 +223,7 @@ function ActiveBarcodeScanner({
         ) : null}
       </div>
       {error ? (
-        <p className={styles.error} role="alert">
+        <ToastNotice tone="error">
           Camera unavailable: {error} Retry camera access or enter the barcode manually.
           <button type="button" onClick={onStop}>
             Try camera again
@@ -210,7 +233,7 @@ function ActiveBarcodeScanner({
               Search / Enter barcode
             </button>
           )}
-        </p>
+        </ToastNotice>
       ) : null}
     </div>
   );

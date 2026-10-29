@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { useState } from 'react';
 import { StickyNote } from 'lucide-react';
 import { ButtonSpinner } from '@/components/skeleton';
@@ -61,7 +63,7 @@ export function ShoppingListNotes({
           {busy ? <ButtonSpinner /> : null}
           {busy ? 'Saving…' : 'Save notes'}
         </button>
-        <p role="status">{message}</p>
+        <ToastMessage message={message} tone="info" />
       </form>
     </details>
   );

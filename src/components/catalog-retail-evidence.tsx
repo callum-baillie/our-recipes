@@ -1,4 +1,8 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
+import { ToastMessage } from './toast-message';
 import { useEffect, useRef, useState } from 'react';
 import { AsyncSkeleton } from '@/components/skeleton';
 import type { CatalogReference } from '@/lib/domain/food-data';
@@ -176,10 +180,10 @@ function ScopedRetailEvidence({ reference }: { reference: CatalogReference }) {
         Review identified product enrichment
       </button>
       {identified ? (
-        <p role="status">{identified}. This read has not changed the shopping list.</p>
+        <ToastNotice>{identified}. This read has not changed the shopping list.</ToastNotice>
       ) : null}
       {evidence && (
-        <div role="status" className={styles.saved}>
+        <ToastNotice>
           <span>
             Availability:{' '}
             {evidence.availability === 'unknown'
@@ -220,9 +224,9 @@ function ScopedRetailEvidence({ reference }: { reference: CatalogReference }) {
               </p>
             </details>
           )}
-        </div>
+        </ToastNotice>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <ToastMessage message={error} tone="error" />}
     </section>
   );
 }

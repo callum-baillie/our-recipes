@@ -1,4 +1,6 @@
 'use client';
+
+import { ToastMessage } from './toast-message';
 import { ZodError } from 'zod';
 import {
   KITCHEN_MEASUREMENT_BASES,
@@ -710,7 +712,7 @@ export function KitchenMealPlanner({
             Check the complete meal
           </button>
         </fieldset>
-        <p role="status">{message}</p>
+        <ToastMessage message={message} tone="info" />
         {plan && (
           <section aria-label="Complete meal equipment review">
             <h2>

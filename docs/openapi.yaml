@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.28
+  version: 1.0.0-rc.29
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
@@ -2272,6 +2272,49 @@ paths:
         '201': { description: Planned meal created }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '403': { $ref: '#/components/responses/UntrustedOrigin' }
+  /meal-plan/{entryId}/made:
+    post:
+      operationId: completePlannedRecipe
+      summary: Mark a planned recipe made and log its assigned household portions
+      description: Session-only. Requires a trusted mutation origin. Missing portions are returned for review; repeated completion does not duplicate intake or pantry deductions.
+      tags: [Meal Plans]
+      parameters:
+        - in: path
+          name: entryId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipeId, mealPlanEntryId]
+              additionalProperties: false
+              properties:
+                recipeId: { type: string, format: uuid }
+                mealPlanEntryId: { type: string, format: uuid }
+                portions:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [profileId, servings]
+                    properties:
+                      profileId: { type: string, format: uuid }
+                      servings: { type: number, exclusiveMinimum: 0, maximum: 100 }
+      responses:
+        '200':
+          description: Meal completion and missing-portion review
+        '400':
+          description: Invalid completion input
+        '401':
+          description: Sign-in required
+        '403':
+          description: Untrusted origin or insufficient permissions
+        '409':
+          description: Meal, allocation or recipe changed
   /meal-plan/{entryId}:
     parameters:
       - name: entryId
@@ -3762,6 +3805,35 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '404': { description: Batch not found }
         '409': { description: Stale batch version }
+  /pantry/barcode-products:
+    post:
+      security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
+      x-api-permissions: ['pantry:create']
+      x-api-key-scope: pantry.create
+      operationId: createPantryProductForBarcode
+      summary: Name a barcode no food catalogue recognises and add its first stock
+      description: >-
+        Saves one product, its verified retail barcode and the first batch together, so later
+        scans of the barcode resolve to this product. 409 when the barcode or name is already saved.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [barcode, product, batch]
+              properties:
+                barcode: { type: string }
+                product: { $ref: '#/components/schemas/PantryProductInput' }
+                batch:
+                  description: A Pantry batch without productId.
+                  type: object
+      responses:
+        '201': { description: The saved product and batch }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { description: Barcode or product name already saved }
   /pantry/batches/bulk:
     get:
       security: [{ SessionCookie: [] }, { ApiKeyBearer: [] }]
@@ -4874,6 +4946,7 @@ components:
       }
     ScannerBoundOperation:
       {
+        '$schema': 'https://json-schema.org/draft/2020-12/schema',
         'type': 'object',
         'properties':
           {
@@ -4901,6 +4974,49 @@ components:
               {
                 'anyOf':
                   [
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'undo_session' },
+                          'targetOperationIds':
+                            {
+                              'minItems': 1,
+                              'maxItems': 50,
+                              'type': 'array',
+                              'items':
+                                {
+                                  'type': 'string',
+                                  'format': 'uuid',
+                                  'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                },
+                            },
+                        },
+                      'required': ['type', 'targetOperationIds'],
+                      'additionalProperties': false,
+                    },
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'type': { 'type': 'string', 'const': 'recipe_link' },
+                          'url': { 'type': 'string', 'maxLength': 512, 'format': 'uri' },
+                          'scannedAt':
+                            {
+                              'type': 'string',
+                              'format': 'date-time',
+                              'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            },
+                          'plannedFor':
+                            {
+                              'type': 'string',
+                              'format': 'date',
+                              'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            },
+                        },
+                      'required': ['type', 'url', 'scannedAt'],
+                      'additionalProperties': false,
+                    },
                     {
                       'oneOf':
                         [
@@ -5678,6 +5794,7 @@ components:
       }
     ScannerSync:
       {
+        '$schema': 'https://json-schema.org/draft/2020-12/schema',
         'type': 'object',
         'properties':
           {
@@ -5704,6 +5821,7 @@ components:
                         'format': 'uuid',
                         'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
                       },
+                    'profile': { 'type': 'string', 'enum': ['add-only', 'extended'] },
                     'revision': { 'type': 'integer', 'minimum': 0, 'maximum': 9007199254740991 },
                     'mode':
                       {
@@ -5727,6 +5845,18 @@ components:
                       {
                         'default': null,
                         'anyOf': [{ 'type': 'string', 'maxLength': 30 }, { 'type': 'null' }],
+                      },
+                    'plannedFor':
+                      {
+                        'anyOf':
+                          [
+                            {
+                              'type': 'string',
+                              'format': 'date',
+                              'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            },
+                            { 'type': 'null' },
+                          ],
                       },
                     'expiresAt':
                       { 'anyOf': [{ 'type': 'number', 'minimum': 0 }, { 'type': 'null' }] },
@@ -5806,6 +5936,50 @@ components:
                           {
                             'anyOf':
                               [
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'undo_session' },
+                                      'targetOperationIds':
+                                        {
+                                          'minItems': 1,
+                                          'maxItems': 50,
+                                          'type': 'array',
+                                          'items':
+                                            {
+                                              'type': 'string',
+                                              'format': 'uuid',
+                                              'pattern': '^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+                                            },
+                                        },
+                                    },
+                                  'required': ['type', 'targetOperationIds'],
+                                  'additionalProperties': false,
+                                },
+                                {
+                                  'type': 'object',
+                                  'properties':
+                                    {
+                                      'type': { 'type': 'string', 'const': 'recipe_link' },
+                                      'url':
+                                        { 'type': 'string', 'maxLength': 512, 'format': 'uri' },
+                                      'scannedAt':
+                                        {
+                                          'type': 'string',
+                                          'format': 'date-time',
+                                          'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                                        },
+                                      'plannedFor':
+                                        {
+                                          'type': 'string',
+                                          'format': 'date',
+                                          'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                        },
+                                    },
+                                  'required': ['type', 'url', 'scannedAt'],
+                                  'additionalProperties': false,
+                                },
                                 {
                                   'oneOf':
                                     [
@@ -6755,6 +6929,7 @@ components:
       }
     ScannerControlRequest:
       {
+        '$schema': 'https://json-schema.org/draft/2020-12/schema',
         'type': 'object',
         'properties':
           {
@@ -6775,6 +6950,27 @@ components:
               {
                 'oneOf':
                   [
+                    {
+                      'type': 'object',
+                      'properties':
+                        {
+                          'control': { 'type': 'string', 'const': 'meal_date' },
+                          'plannedFor':
+                            {
+                              'anyOf':
+                                [
+                                  {
+                                    'type': 'string',
+                                    'format': 'date',
+                                    'pattern': "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                  },
+                                  { 'type': 'null' },
+                                ],
+                            },
+                        },
+                      'required': ['control', 'plannedFor'],
+                      'additionalProperties': false,
+                    },
                     {
                       'type': 'object',
                       'properties':
@@ -6843,6 +7039,7 @@ components:
                                   'mark_empty',
                                   'discard',
                                   'donate',
+                                  'expired',
                                 ],
                             },
                         },

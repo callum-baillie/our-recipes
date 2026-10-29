@@ -1,4 +1,7 @@
 'use client';
+
+import { ToastNotice } from './toast-provider';
+
 import { AppDialog } from './app-dialog';
 import { DialogViewport } from './dialog-viewport';
 import {
@@ -1960,7 +1963,7 @@ export function ShoppingListEditor({
         </div>
       </div>
       {lastChecked ? (
-        <div className={styles.undoNotice} role="status">
+        <ToastNotice>
           <span>{lastChecked.item.item} updated.</span>
           <button
             type="button"
@@ -1969,7 +1972,7 @@ export function ShoppingListEditor({
           >
             <Undo2 size={16} /> Undo
           </button>
-        </div>
+        </ToastNotice>
       ) : null}
       <div className={styles.toolbar}>
         <label className={styles.search} aria-label="Search shopping items">
@@ -2135,7 +2138,7 @@ export function ShoppingListEditor({
       ) : null}
 
       {list.policyReviews.some((review) => review.state === 'needs_review') ? (
-        <section className={styles.restoredNotice} role="status">
+        <ToastNotice>
           <strong>Pantry review needed</strong>{' '}
           {list.policyReviews
             .filter((review) => review.state === 'needs_review')
@@ -2143,10 +2146,10 @@ export function ShoppingListEditor({
             .join(', ')}{' '}
           has approximate or incompatible stock. Update Pantry, or open its row and assume empty for
           this trip.
-        </section>
+        </ToastNotice>
       ) : null}
       {list.policyReviews.some((review) => review.state === 'dismissed') ? (
-        <section className={styles.restoredNotice} role="status">
+        <ToastNotice>
           <strong>Skipped for this trip:</strong>{' '}
           {list.policyReviews
             .filter((review) => review.state === 'dismissed')
@@ -2160,14 +2163,10 @@ export function ShoppingListEditor({
                 Restore {review.productName}
               </button>
             ))}
-        </section>
+        </ToastNotice>
       ) : null}
 
-      {syncError && (
-        <p role="status" className={styles.syncNotice}>
-          {syncError}
-        </p>
-      )}
+      {syncError && <ToastNotice>{syncError}</ToastNotice>}
       {!focusedShopping ? (
         <div className={styles.manageTools}>
           <ShoppingListShortcuts
@@ -2514,7 +2513,7 @@ export function ShoppingListEditor({
                   ))}
                 </select>
               </label>
-              {editError && <p role="alert">{editError}</p>}
+              {editError && <ToastNotice tone="error">{editError}</ToastNotice>}
               {sortMode !== 'position' && (
                 <p>
                   Movement uses List order.{' '}

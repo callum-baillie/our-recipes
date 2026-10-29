@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { ChevronDown, History, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -129,7 +131,7 @@ export function RecipeRevisionHistory({
           </div>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <ToastMessage message={error} tone="error" />}
     </details>
   );
 }

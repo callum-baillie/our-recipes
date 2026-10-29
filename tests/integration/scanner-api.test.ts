@@ -1,3 +1,4 @@
+import { POST as markMealMade } from '@/app/api/v1/meal-plan/[entryId]/made/route';
 import { beforeAll, afterAll, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { resetDatabaseForTests } from '@/lib/db/client';
@@ -228,4 +229,21 @@ it('rejects malformed scan-list timestamp filters', async () => {
     });
     expect(response.status).toBe(400);
   }
+});
+
+it('protects meal completion with session identity and exact trusted origin', async () => {
+  const id = randomUUID();
+  const send = (headers: Record<string, string>, payload: unknown) =>
+    markMealMade(
+      new Request(`${origin}/api/v1/meal-plan/${id}/made`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(payload),
+      }),
+      { params: Promise.resolve({ entryId: id }) },
+    );
+  expect((await send({ cookie, origin: 'https://evil.example' }, {})).status).toBe(403);
+  expect((await send({ cookie, origin: origin + '.evil.example' }, {})).status).toBe(403);
+  expect((await send({ cookie, origin }, { recipeId: 'invalid' })).status).toBe(400);
+  expect((await send({ authorization: `Bearer ${secret}` }, {})).status).toBe(403);
 });

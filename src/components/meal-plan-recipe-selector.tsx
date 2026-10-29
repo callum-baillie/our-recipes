@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { Check, ChefHat, Clock3, Search, X, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import { useDeferredValue, useMemo, useState } from 'react';
@@ -585,11 +587,7 @@ export function MealPlanRecipeSelector({
               navigating away or reloading discards them.
             </small>
           ) : null}
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <ToastMessage message={error} tone="error" /> : null}
           <div>
             {filledCount ? (
               <button

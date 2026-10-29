@@ -1,5 +1,7 @@
 'use client';
 
+import { ToastMessage } from './toast-message';
+
 import { FolderPlus, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useRef, useState } from 'react';
@@ -274,9 +276,7 @@ export function RecipeCollectionButton({
           {loading ? <AsyncSkeleton label="Loading collections" variant="rows" /> : null}
           {error ? (
             <div>
-              <p className="form-error" role="alert">
-                {error}
-              </p>
+              <ToastMessage message={error} tone="error" />
               {!loading && !collectionsLoaded ? (
                 <button
                   className="text-button"

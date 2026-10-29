@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { createElement } from 'react';
-import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
+import { ToastProvider } from '@/components/toast-provider';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as baseRender,
+  screen,
+  within,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MealPlanner } from '@/components/meal-planner';
 import { DEFAULT_MEAL_PLAN_PREFERENCES } from '@/lib/domain/app-preferences';
@@ -317,7 +326,7 @@ describe('planner acknowledged scopes', () => {
       target: { value: 'Another meal' },
     });
     fireEvent.click(types.getByRole('button', { name: 'Add' }));
-    expect(types.getByRole('alert').textContent).toContain('up to 10');
+    expect(screen.getByRole('alert').textContent).toContain('up to 10');
     view.unmount();
     render(createElement(MealPlanner, plannerProps));
     fireEvent.click(screen.getByRole('button', { name: 'Plan settings' }));
@@ -328,7 +337,7 @@ describe('planner acknowledged scopes', () => {
       target: { value: 'BREAKFAST' },
     });
     fireEvent.click(types.getByRole('button', { name: 'Add' }));
-    expect(types.getByRole('alert').textContent).toContain('already exists');
+    expect(screen.getByRole('alert').textContent).toContain('already exists');
   });
 
   it('does not preview unsaved row preferences and freezes their submitted snapshot', async () => {
@@ -371,3 +380,7 @@ describe('planner acknowledged scopes', () => {
     ).toBeGreaterThan(0);
   });
 });
+
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}

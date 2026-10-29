@@ -1,3 +1,4 @@
+import { MealNotifications } from '@/components/meal-notifications';
 import { DialogViewport } from '@/components/dialog-viewport';
 import type { Metadata, Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
@@ -9,6 +10,7 @@ import { auth } from '@/lib/auth/server';
 import { AppFooter } from '@/components/app-footer';
 import { AppHeader } from '@/components/app-header';
 import { PwaRegistration } from '@/components/pwa-registration';
+import { ScannerNotifications } from '@/components/scanner-notifications';
 import { ToastProvider } from '@/components/toast-provider';
 import { ProductPhotosProvider } from '@/components/product-photos';
 import { productPhotosConfigured } from '@/lib/services/product-image-service';
@@ -170,6 +172,14 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         )}
       >
         <ToastProvider>
+          {!isSecuritySurface && authSession ? (
+            <>
+              <ScannerNotifications accountId={authSession.user.id} />
+              <MealNotifications
+                timezone={state.profiles.find((p) => p.id === actor.profileId)?.timezone ?? 'UTC'}
+              />
+            </>
+          ) : null}
           <ProductPhotosProvider enabled={productPhotosConfigured()}>
             <DialogViewport />
             {state.household && !isSecuritySurface && (!authConfigured || authSession) ? (
