@@ -1,12 +1,17 @@
 # Release notes
 
-## 1.0.0-rc.29
+## 1.0.0-rc.30
+
+- Supersede rc.29, whose published image fails to render `/pantry/add` (HTTP 500) in production builds. A helper in the camera scan hook was named `process`, which shadowed Node's global in the release bundle, where Next's minifier injects `process.env` guards; development mode does not, so the problem appeared only in the built server. Do not deploy rc.29. The helper is renamed and the full v1 browser oracle now passes against the built server.
+- Update specs that still expected inline messages after the toast migration (import errors, "Saved for your profile.", the backup confirmation) and the removed Scanner navigation entry.
+
+## 1.0.0-rc.29 (superseded by rc.30)
 
 - Replace the Pantry add dialog with a full-width **Add to pantry** page (`/pantry/add`) with Scan, Search and Manual modes. Scan combines the device camera and any registered handheld scanner in one live "This session" list: both add items immediately, repeat scans raise the quantity, and the camera starts only when the user chooses **Start camera**. Each line has quantity controls, a location and best-before editor and a removal with Undo. Barcodes the food database does not know are grouped into one card that names the product once (`POST /api/v1/pantry/barcode-products`, atomic and idempotent). Search keeps the full nutrition and package review. Manual entry keeps every previous field in a three-step form with a live summary (a sticky bar on phones).
 - Replace "Count stock" and the `/pantry/inventory` page with **View** and **Edit** modes on Pantry. Edit adds quantity +/- buttons, Expired and Delete. Delete is a soft, undoable discard; Expired is counted in the expired-waste metrics. "Manage pantry" and the permanent "Scan sessions" button are gone: a scanner chip appears only when scans await review or a session is live. `/pantry/scans` and `/scanner/session` redirect to the Scan tab.
 - Add a toast system: confirmations dismiss themselves, action toasts stay until used, and toasts with expandable details stay until dismissed. Camera scanner preferences move to Settings, recipe pages gain a "made this" action that records meal completion, and the development server no longer uses Next's persistent dev cache (see `docs/connection-troubleshooting.md`).
 - No schema change (`0082_scanner_stations`, 84 migrations). Back up before upgrading as usual. Scanner companion 0.2.2 is unchanged.
-- Verification: TypeScript, lint, Prettier and OpenAPI coverage pass; 217 test files / 1,335 tests pass (9 skipped). The five Playwright specs that exercised the old dialog were rewritten and pass (`pantry-add-recovery`, `pantry-workflow`, `pantry-inventory-management`, `catalog-native-refinement` first test, `catalog-post-review`). Layout was checked at 1440, 820 and 390 px with no horizontal overflow. Not verified: decoding a real barcode with a physical camera (a fake video device and unit tests covered the add logic), the `a11y` and `mobile-refinements` specs, and the second `catalog-native-refinement` test.
+- Verification: TypeScript, lint, Prettier and OpenAPI coverage pass; 217 test files / 1,335 tests pass (9 skipped). Playwright specs for the old dialog were rewritten. The release-build browser oracle (`pnpm test:v1-release:browser`) was not run for rc.29 and failed in CI; see rc.30. Layout was checked at 1440, 820 and 390 px with no horizontal overflow. Not verified: decoding a real barcode with a physical camera (a fake video device and unit tests covered the add logic).
 
 ## 1.0.0-rc.28
 

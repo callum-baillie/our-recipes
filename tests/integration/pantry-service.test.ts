@@ -104,6 +104,7 @@ describe('Pantry service', () => {
         defaultPackageAmount: 1,
         defaultPackageUnit: 'package',
       }),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       batch: (({ productId: _unused, ...rest }) => rest)(
         pantryBatchInputSchema.parse({
           productId: '00000000-0000-4000-8000-000000000000',

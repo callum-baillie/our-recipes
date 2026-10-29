@@ -246,7 +246,7 @@ export function useCameraScanSession({
     }
   }
 
-  async function process(barcode: string) {
+  async function addScan(barcode: string) {
     const current = map.current.get(barcode);
     if (current?.status === 'unknown') {
       patch(barcode, { count: current.count + 1, time: new Date().toISOString(), motion: 'bump' });
@@ -281,7 +281,7 @@ export function useCameraScanSession({
     const previous = chains.current.get(barcode) ?? Promise.resolve();
     chains.current.set(
       barcode,
-      previous.then(() => process(barcode)).catch(() => undefined),
+      previous.then(() => addScan(barcode)).catch(() => undefined),
     );
   }
 

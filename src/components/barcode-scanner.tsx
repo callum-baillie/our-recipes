@@ -37,7 +37,6 @@ function BarcodeScannerInner({
   disabled = false,
   onSearchRequest,
   onActiveChange,
-  flush = false,
 }: ScannerProps) {
   const [active, setActiveState] = useState(false);
   const setActive = (value: boolean) => {

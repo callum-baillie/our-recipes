@@ -331,9 +331,6 @@ test('a fresh household can complete the supported local release acceptance work
     buffer: Buffer.from('GIF89a'),
   });
   await expect(
-    page.getByRole('main').getByText('Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.'),
-  ).toBeVisible();
-  await expect(
     page
       .getByRole('region', { name: 'Notifications' })
       .getByText('Choose JPEG, PNG, WebP, HEIC, HEIF, or PDF files.'),
@@ -491,11 +488,9 @@ test('a fresh household can complete the supported local release acceptance work
   await expect(
     page
       .getByRole('region', { name: 'Notifications' })
-      .getByText('OpenAI could not read this test image.'),
+      .getByText('OpenAI could not read this test image.')
+      .first(),
   ).toBeVisible();
-  await expect(
-    page.locator('.import-source-preview-frame .import-preview-overlay.error'),
-  ).toContainText('OpenAI could not read this test image.');
   await expect(page.getByRole('button', { name: 'Try OpenAI again' })).toBeVisible();
   await page.unroute('**/api/v1/ai/reviews');
 
@@ -730,9 +725,12 @@ test('a fresh household can complete the supported local release acceptance work
   await page.getByRole('button', { name: 'Rate 5 out of 5 stars', exact: true }).click();
   await page.getByLabel('Personal note').fill('Use extra basil next time.');
   await page.getByRole('button', { name: 'Save rating and note' }).click();
-  await expect(page.locator('.recipe-personal-preference [role="status"]')).toHaveText(
-    'Saved for your profile.',
-  );
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByText('Saved for your profile.')
+      .first(),
+  ).toBeVisible();
   const recipeManagement = page.getByRole('region', { name: 'Recipe management' });
   await recipeManagement.getByText('Revision history', { exact: true }).click();
   await expect(recipeManagement.getByText('2 saved versions', { exact: true })).toBeVisible();
@@ -868,7 +866,7 @@ test('a fresh household can complete the supported local release acceptance work
   }
   await page.goto('/settings/backups');
   await page.getByRole('button', { name: 'Create backup' }).click();
-  await expect(page.locator('.toast').filter({ hasText: 'Backup created.' })).toBeVisible({
+  await expect(page.locator('.toast-success').filter({ hasText: 'Backup created.' })).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByRole('button', { name: 'Review restore' })).toBeVisible({

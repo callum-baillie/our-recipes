@@ -190,7 +190,6 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(mobileNavigation.locator('nav > a')).toHaveText([
     'Recipebook',
     'Pantry',
-    'Scanner',
     'Nutrition',
     'Planner',
     'Lists',
@@ -213,7 +212,6 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
   await expect(primaryNavigation.locator(':scope > a')).toHaveText([
     'Recipebook',
     'Pantry',
-    'Scanner',
     'Nutrition',
     'Planner',
     'Lists',

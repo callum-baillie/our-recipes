@@ -12,16 +12,6 @@ vi.mock('@/components/kitchen-print-dialog', () => ({ KitchenPrintDialog: () => 
 vi.mock('@/components/decision-assistance', () => ({ DecisionAssistance: () => null }));
 vi.mock('@/components/assisted-review-button', () => ({ AssistedReviewButton: () => null }));
 vi.mock('@/components/shopping-list-shortcuts', () => ({ ShoppingListShortcuts: () => null }));
-const batch = {
-  id: 'batch',
-  name: 'Flour',
-  location: 'Cupboard',
-  unit: 'g',
-  quantity: 2,
-  quantityLabel: '2 g',
-  version: 1,
-  expiry: null,
-};
 const emptyDashboard = {
   summary: {
     activeItems: 0,

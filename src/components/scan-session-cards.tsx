@@ -11,7 +11,6 @@ import {
   pantryRequest,
   setBatchBestBefore,
   type BatchInfo,
-  type SavedBatch,
 } from '@/lib/client/pantry-batch';
 import { defaultLocation } from '@/lib/client/pantry-locations';
 import styles from './scan-session-cards.module.css';
@@ -142,7 +141,7 @@ function ItemCard({
             step={item.step}
             label={item.title}
             compact
-            onSaved={async (_saved: SavedBatch | undefined) => {
+            onSaved={async () => {
               await onChanged();
             }}
             onError={(message) => showToast(message, 'error')}
