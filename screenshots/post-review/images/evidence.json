@@ -1,5 +1,5 @@
 {
-  "baseRevision": "18da8cb113c7b82deb20ded7089cb9d3208688a9",
+  "baseRevision": "2620564bde2c11d0dda9d8e1540f98dab6737905",
   "workingTree": "post-review implementation",
   "fixtures": "intercepted owned action and synthetic WebP; no live provider request",
   "states": [
@@ -9,9 +9,18 @@
     "saved recipe links to separate candidate acceptance"
   ],
   "viewports": [
-    [1440, 1000],
-    [390, 844],
-    [320, 568]
+    [
+      1440,
+      1000
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      320,
+      568
+    ]
   ],
   "axeViolations": 0,
   "imageRequests": 1

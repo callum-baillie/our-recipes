@@ -1,6 +1,11 @@
 {
-  "revision": "18da8cb113c7b82deb20ded7089cb9d3208688a9",
-  "capturedAt": "2026-10-22T23:49:06.245Z",
+  "revision": "2620564bde2c11d0dda9d8e1540f98dab6737905",
+  "capturedAt": "2026-10-29T02:43:42.660Z",
   "state": "Synthetic household; real Chromium with controlled AI, uncertain-write and export responses. No paid or live camera calls.",
-  "viewports": ["1440x1000", "390x500", "320x500", "390x844"]
+  "viewports": [
+    "1440x1000",
+    "390x500",
+    "320x500",
+    "390x844"
+  ]
 }

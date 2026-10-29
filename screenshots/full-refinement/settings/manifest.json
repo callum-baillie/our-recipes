@@ -1,7 +1,13 @@
 {
-  "commit": "18da8cb113c7b82deb20ded7089cb9d3208688a9",
+  "commit": "2620564bde2c11d0dda9d8e1540f98dab6737905",
   "changes": "Working refinement branch; current idle and interaction states, not historical before-implementation captures.",
-  "capturedAt": "2026-10-22T23:48:58.001Z",
-  "viewportStates": ["1440x1000", "390x844", "320x844", "390x560", "850x1000"],
+  "capturedAt": "2026-10-29T02:43:36.157Z",
+  "viewportStates": [
+    "1440x1000",
+    "390x844",
+    "320x844",
+    "390x560",
+    "850x1000"
+  ],
   "fixture": "Synthetic workflow fixture; no provider calls or measurement writes."
 }
