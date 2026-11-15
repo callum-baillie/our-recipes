@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.0.0-rc.33
+
+- Fix chat failures after tool calls: remove SDK-only `parsed_arguments` and output-text `parsed` fields before replaying Responses API items. Preserve encrypted reasoning, tool call IDs, and tool result data.
+- Add a streamed multi-request regression test covering both new output and older caller-supplied items.
+
 ## 1.0.0-rc.32
 
 - Fix OpenAI chat request rejection by normalizing strict function-tool schemas to the supported JSON Schema subset. Length bounds and schema metadata remain enforced by Bòrd's local validators; fixed-value booleans are represented as enums.

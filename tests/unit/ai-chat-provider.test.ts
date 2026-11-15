@@ -113,3 +113,49 @@ it('logs a bounded parameter path for request rejection without provider input',
     log.mockRestore();
   }
 });
+
+it('replays streamed tool calls without SDK parsing fields and preserves reasoning and tool results', async () => {
+  const reasoning = { type: 'reasoning', encrypted_content: 'opaque-test-value', summary: [] };
+  const call = {
+    type: 'function_call',
+    call_id: 'call-1',
+    name: 'read_household_profiles',
+    arguments: '{}',
+    parsed_arguments: {},
+  };
+  const message = {
+    type: 'message',
+    role: 'assistant',
+    content: [{ type: 'output_text', text: 'Checking profiles.', annotations: [], parsed: null }],
+  };
+  const stream = vi.fn().mockImplementation(() => ({
+    async *[Symbol.asyncIterator]() {
+      yield { type: 'response.output_text.delta', delta: 'Checking profiles.' };
+    },
+    finalResponse: async () => ({ status: 'completed', output: [reasoning, message, call] }),
+  }));
+  const provider = new OpenAiAssistantProvider('unused', {
+    stream,
+    create: vi.fn(),
+    parse: vi.fn(),
+  });
+  const first = await provider.respond(input);
+  const toolResult = {
+    type: 'function_call_output',
+    call_id: 'call-1',
+    output: '{"parsed_arguments":"household data"}',
+  };
+  await provider.respond({ ...input, messages: [...first.responseItems, toolResult] });
+  // Also normalize older unsanitized items supplied by a caller.
+  await provider.respond({ ...input, messages: [reasoning, message, call, toolResult] });
+  const expected = [
+    reasoning,
+    { ...message, content: [{ type: 'output_text', text: 'Checking profiles.', annotations: [] }] },
+    { type: 'function_call', call_id: 'call-1', name: 'read_household_profiles', arguments: '{}' },
+    toolResult,
+  ];
+  expect(stream.mock.calls[1]?.[0].input).toEqual(expected);
+  expect(stream.mock.calls[2]?.[0].input).toEqual(expected);
+  expect(call.parsed_arguments).toEqual({});
+  expect(message.content[0]?.parsed).toBeNull();
+});

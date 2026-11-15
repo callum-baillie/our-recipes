@@ -147,6 +147,23 @@ function normalizeOpenAiToolSchema(value: unknown): unknown {
   return normalized;
 }
 
+// Responses streams attach SDK-only parsing helpers to output items. Those fields
+// are not accepted as API input when continuing a stateless tool conversation.
+function responseItemForInput(value: unknown): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const item = { ...(value as Record<string, unknown>) };
+  if (item.type === 'function_call') delete item.parsed_arguments;
+  if (item.type === 'message' && Array.isArray(item.content)) {
+    item.content = item.content.map((value: unknown) => {
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+      const content = { ...(value as Record<string, unknown>) };
+      if (content.type === 'output_text') delete content.parsed;
+      return content;
+    });
+  }
+  return item;
+}
+
 function reasoning(effort: AiReasoningEffort | null) {
   return effort ? { reasoning: { effort } } : {};
 }
@@ -174,7 +191,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
           input.instructions,
           input.promptGuidance ?? '',
         ].join('\n'),
-        input: input.messages,
+        input: input.messages.map(responseItemForInput),
         include: ['reasoning.encrypted_content'],
         tools: input.tools.map((tool) => ({
           ...tool,
@@ -234,7 +251,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
           inputTokens: response.usage?.input_tokens ?? null,
           outputTokens: response.usage?.output_tokens ?? null,
         },
-        responseItems: output,
+        responseItems: output.map(responseItemForInput),
       };
     } catch (error) {
       input.signal?.throwIfAborted();
