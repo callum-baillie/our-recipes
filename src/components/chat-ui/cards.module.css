@@ -1,0 +1,422 @@
+/* Shared surface for every assistant card: recipes, meal plans, pantry changes, tasks. */
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-width: 0;
+  overflow: clip;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--field);
+  color: var(--ink);
+  box-shadow: 0 6px 22px rgb(65 52 33 / 7%);
+  animation: cardIn 280ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.card[aria-busy='true'] {
+  border-color: color-mix(in srgb, var(--leaf) 40%, var(--line));
+}
+
+.head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem 0.8rem;
+}
+
+.chip {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--leaf);
+  background: var(--leaf-pale);
+}
+
+.chip svg {
+  width: 21px;
+  height: 21px;
+}
+
+.headCopy {
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.eyebrow {
+  color: var(--leaf);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.22rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 24px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.badge[data-tone='draft'] {
+  color: var(--leaf);
+  border-color: color-mix(in srgb, var(--leaf) 35%, var(--line));
+  background: var(--leaf-pale);
+}
+
+.badge[data-tone='saved'] {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--line));
+  background: color-mix(in srgb, var(--success) 10%, var(--field));
+}
+
+.badge[data-tone='working'] {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 35%, var(--line));
+  background: color-mix(in srgb, var(--info) 10%, var(--field));
+}
+
+.badge[data-tone='attention'] {
+  color: var(--warning-ink);
+  border-color: var(--warning-border);
+  background: var(--warning-surface);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.3s ease-in-out infinite;
+}
+
+.footer {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem 0.9rem;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 45%, var(--field));
+}
+
+.footnote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.button {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+.button svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.button[aria-busy='true']:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.footerActions:has(> :nth-child(3)) > .primary {
+  flex-basis: 100%;
+}
+
+.primary {
+  flex: 1 1 9rem;
+  color: var(--on-primary);
+  background: var(--leaf);
+}
+
+.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--leaf) 88%, var(--ink));
+}
+
+.secondary {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--field);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.quiet {
+  min-height: 36px;
+  padding: 0 0.7rem;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.8rem;
+}
+
+.quiet:hover:not(:disabled) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--line) 40%, transparent);
+}
+
+.callout {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--notice-border);
+  border-radius: 12px;
+  color: var(--notice-ink);
+  background: color-mix(in srgb, var(--intro) 60%, var(--field));
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.callout > svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.12rem;
+}
+
+.callout > div {
+  min-width: 0;
+}
+
+.callout p {
+  margin: 0;
+}
+
+.callout p + p {
+  margin-top: 0.3rem;
+}
+
+.callout[data-tone='warning'] {
+  color: var(--warning-ink);
+  border-color: var(--warning-border);
+  background: var(--warning-surface);
+}
+
+.callout[data-tone='error'] {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+  background: var(--error-surface);
+}
+
+.callout[data-tone='success'] {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--line));
+  background: color-mix(in srgb, var(--success) 9%, var(--field));
+}
+
+.disclosure {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 55%, var(--field));
+}
+
+.disclosure > summary {
+  flex-wrap: wrap;
+  padding-block: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0 0.8rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-left: 0.2rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 180ms ease;
+}
+
+.disclosure[open] > summary::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+.disclosure > summary > span {
+  flex: 1 1 auto;
+}
+
+.disclosure > summary small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.disclosure > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: 12px;
+}
+
+.disclosureBody {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0 0.8rem 0.8rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 420px) {
+  .head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .head > .badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .footerActions > .button {
+    flex: 1 1 100%;
+  }
+}
+
+/* Very narrow or heavily zoomed: trade padding and decoration for room. */
+@media (max-width: 360px) {
+  .head {
+    gap: 0.5rem;
+    padding: 0.75rem 0.7rem 0.6rem;
+  }
+
+  .chip {
+    display: none;
+  }
+
+  .head,
+  .head > .badge {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footer {
+    padding: 0.65rem 0.7rem 0.75rem;
+  }
+
+  .disclosure > summary {
+    padding-inline: 0.6rem;
+  }
+
+  .disclosureBody {
+    padding-inline: 0.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .dot {
+    animation: none;
+  }
+
+  .button,
+  .disclosure > summary::after {
+    transition: none;
+  }
+}

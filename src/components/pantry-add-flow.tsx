@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { FoodCatalogPicker } from './food-catalog-picker';
 import { PantryManualEntry } from './pantry-manual-entry';
@@ -51,6 +52,7 @@ export function PantryAddFlow({
   initialMode: AddMode;
 }) {
   const { showToast } = useToast();
+  const router = useRouter();
   const [mode, setModeState] = useState<AddMode>(initialMode);
   const [lookup, setLookup] = useState('');
   const [added, setAdded] = useState<Array<{ id: number; label: string; count: number }>>([]);
@@ -171,6 +173,15 @@ export function PantryAddFlow({
           canEdit={canEdit}
           visible={mode === 'scan'}
           onSwitchToSearch={() => setMode('search')}
+          onFinish={(added) => {
+            showToast(
+              added > 0
+                ? `Session complete: ${added} ${added === 1 ? 'item' : 'items'} added to your pantry.`
+                : 'Session complete.',
+              'success',
+            );
+            router.push('/pantry');
+          }}
         />
       </div>
 

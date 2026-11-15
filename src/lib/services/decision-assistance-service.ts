@@ -35,6 +35,8 @@ type Result = {
   choice: string;
   confidence: number | null;
   reason: string;
+  model?: string;
+  probabilities?: { value: string; probability: number }[];
 };
 const correctionSchema = z.object({
   choice: z.string(),
@@ -141,6 +143,8 @@ export async function runDecisionAssistance(p: RequestPrincipal, input: Decision
         const choice = valid && answer.type === 'choice' ? answer.choice : 'unknown';
         const result: Result = {
           job,
+          model: DECISIONS_MODEL,
+          probabilities: answer.type === 'choice' ? answer.probabilities : [],
           request: input,
           choice,
           confidence: valid && answer.type === 'choice' ? answer.confidence : null,

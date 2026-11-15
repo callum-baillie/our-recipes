@@ -94,6 +94,7 @@ const cameraBatch = (version: number, quantityRemaining: number) => ({
   bestBeforeDate: null,
 });
 afterEach(() => {
+  finished = [];
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -105,6 +106,7 @@ const locations = [
   { id: 'l2', path: 'Fridge', storageType: 'refrigerator' },
 ];
 const stations = [{ id: 'kitchen', name: 'Kitchen' }];
+let finished: number[] = [];
 function Harness() {
   const camera = useCameraScanSession({
     locations,
@@ -132,6 +134,7 @@ function Harness() {
       canEdit: true,
       visible: false,
       onSwitchToSearch: () => undefined,
+      onFinish: (added: number) => finished.push(added),
     }),
   );
 }
@@ -181,6 +184,21 @@ it('prompts for the first scan, and marks what it showed as reviewed', async () 
   responses = [session([entry('a')])];
   await poll();
   expect(Number(localStorage.getItem('scan-review:account:kitchen'))).toBeGreaterThan(0);
+});
+
+it('offers to finish the session once something has been scanned', async () => {
+  responses = [session([])];
+  mount();
+  await poll();
+  expect(screen.queryByRole('button', { name: 'Finish session' })).toBeNull();
+  responses = [session([entry('a'), entry('b')])];
+  await poll();
+  expect(screen.getByText('2 items added to your pantry')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Finish session' }));
+  expect(finished).toEqual([2]);
+  expect(screen.getByRole('button', { name: 'Finish session' }).hasAttribute('disabled')).toBe(
+    true,
+  );
 });
 
 it('groups repeat scans of an unrecognised barcode and names them as one product', async () => {

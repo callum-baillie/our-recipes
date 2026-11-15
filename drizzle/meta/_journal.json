@@ -589,6 +589,13 @@
       "when": 1793066400000,
       "tag": "0082_scanner_stations",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "6",
+      "when": 1793239200000,
+      "tag": "0083_shopping_trips",
+      "breakpoints": true
     }
   ]
 }

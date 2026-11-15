@@ -1215,10 +1215,15 @@
 }
 
 .dateContext {
-  display: block;
-  font-size: 0.75rem;
   color: var(--muted);
-  margin-top: 0.2rem;
+  display: inline;
+  font-size: inherit;
+  margin-left: 0.35rem;
+}
+
+.dateContext::before {
+  content: '·';
+  margin-right: 0.35rem;
 }
 
 .sidebar > section {

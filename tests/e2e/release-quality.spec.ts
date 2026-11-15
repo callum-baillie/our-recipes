@@ -193,6 +193,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     'Nutrition',
     'Planner',
     'Lists',
+    'Predictions',
     'Settings',
   ]);
   await expect(mobileNavigation.getByRole('link', { name: 'Settings' })).toHaveAttribute(
@@ -215,6 +216,7 @@ test('release-quality matrix keeps the real cookbook flow readable across surfac
     'Nutrition',
     'Planner',
     'Lists',
+    'Predictions',
   ]);
   await expect(page.getByRole('banner').getByLabel('Change color theme')).toHaveCount(0);
   await expect(primaryNavigation.getByRole('link', { name: 'Recipebook' })).toHaveAttribute(

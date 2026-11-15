@@ -29,21 +29,22 @@ export default async function PantryPage() {
         canEdit={Boolean(actor.profileId)}
         initialPreferences={preferences}
       />
-      {expiredWaste && (
-        <section className="settings-card" aria-label="Expired pantry waste">
-          <h2>Expired items</h2>
-          <p>{expiredWaste.batches} batches discarded as expired.</p>
-          {expiredWaste.quantities.length > 0 && (
+      {expiredWaste && expiredWaste.batches > 0 && (
+        <section className="pantry-waste-note" aria-label="Expired pantry waste">
+          <div>
+            <h2>Discarded as expired</h2>
             <p>
-              {expiredWaste.quantities
-                .map((item) => `${Number(item.quantity.toFixed(3))} ${item.unit}`)
-                .join(' · ')}
+              {expiredWaste.batches} {expiredWaste.batches === 1 ? 'batch' : 'batches'}
+              {expiredWaste.quantities.length > 0 &&
+                ` · ${expiredWaste.quantities
+                  .map((item) => `${Number(item.quantity.toFixed(3))} ${item.unit}`)
+                  .join(' · ')}`}
             </p>
-          )}
-          <p>
-            Tracks items explicitly marked expired. Ordinary removals and reversed disposals are
+          </div>
+          <small>
+            Counts items explicitly marked expired. Ordinary removals and reversed disposals are
             excluded.
-          </p>
+          </small>
         </section>
       )}
     </main>

@@ -2915,3 +2915,15 @@ export const kitchenAcceptedPlans = sqliteTable('kitchen_accepted_plans', {
     .notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+export const shoppingTrips = sqliteTable('shopping_trips', {
+  id: text('id').primaryKey(),
+  ownerUserId: text('owner_user_id').notNull(),
+  profileId: text('profile_id')
+    .notNull()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  occurredOn: text('occurred_on').notNull(),
+  size: text('size', { enum: ['top_up', 'large'] }).notNull(),
+  note: text('note').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});

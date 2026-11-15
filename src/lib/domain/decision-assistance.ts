@@ -1,6 +1,27 @@
 import { z } from 'zod';
 
 export const DECISION_TASKS = {
+  pantry_expiry: {
+    label: 'Estimate food freshness window',
+    help: 'Estimate a review window from intake time and storage; never replaces a printed use-by date.',
+  },
+  pantry_location: {
+    label: 'Suggest pantry locations',
+    help: 'Choose among your actual storage locations for recorded food.',
+  },
+  next_shop: {
+    label: 'Predict the next shopping trip',
+    help: 'Assess shopping urgency from stock and your recorded trips.',
+  },
+  meal_success: {
+    label: 'Forecast meal-plan follow-through',
+    help: 'Explore whether next week’s plan is achievable from recorded history.',
+  },
+  goal_success: {
+    label: 'Forecast nutrition goal progress',
+    help: 'Explore goal risk using coverage-qualified nutrition evidence.',
+  },
+
   aisles: {
     label: 'Organize shopping aisles',
     help: 'Place unassigned items in your selected store’s sections.',

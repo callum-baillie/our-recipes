@@ -1,0 +1,96 @@
+/*
+ * Page shell. One width, one gutter and one left edge for the header, every page and the footer,
+ * so the product reads as a single app no matter which route is open. Imported after every other
+ * stylesheet; selectors repeat the body attribute to out-rank the older per-page width rules
+ * (recipe-page, workspace-page, settings-hub, module wrappers) without needing !important.
+ */
+
+:root {
+  --shell-max: 88rem;
+  --shell-gutter: clamp(1rem, 2.5vw, 2rem);
+  --shell-width: min(100% - 2 * var(--shell-gutter), var(--shell-max));
+  /* Overlays and menus that measure against the gutter agree with the shell. */
+  --page-gutter: var(--shell-gutter);
+  /* Focused reading column for forms and conversations that sit inside the shell. */
+  --shell-narrow: 60rem;
+}
+
+/* Header and footer follow the shell so the wordmark lines up with every page title. */
+div.app-header-shell.app-header-shell {
+  padding-inline: 0;
+}
+div.app-header-shell > header.app-header.app-header.app-header {
+  width: var(--shell-width);
+  max-width: none;
+  margin-inline: auto;
+}
+body[data-app-shell='true'] > footer.app-footer {
+  padding-inline: var(--shell-gutter);
+}
+
+/* Every page-level container. */
+body[data-app-shell='true'][data-app-shell][data-app-shell]
+  > :is(
+    main,
+    .settings-workspace,
+    .planner-workspace-shell,
+    [class*='pantry-add-flow-module__'][class*='__page']
+  ) {
+  /* Inner wrappers that still pad themselves with the gutter token add nothing on top of the shell. */
+  --page-gutter: 0px;
+  --settings-page-gutter: 0px;
+  width: var(--shell-width);
+  max-width: none;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+/* Nested wrappers that centre or cap themselves would re-introduce a second box. */
+body[data-app-shell='true'] > main > :is(.recipe-page, .workspace-page, .settings-hub, .home-page) {
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+/* Top-level sections of a page (hero, library, editor, article) share the shell edge, not their own boxes. */
+body[data-app-shell='true'][data-app-shell][data-app-shell]
+  > main
+  > :is(section, article, form, header, div) {
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Conversation-style pages keep a readable column, aligned to the shell's left edge instead of floating.
+   Capture and Import already lay out as intro + card, so they use the full shell like every other page. */
+body[data-app-shell='true'][data-app-shell][data-app-shell]
+  > main.workspace-page[data-width='focused']:not(.import-page):not(:has(.capture-layout))
+  > * {
+  max-width: var(--shell-narrow);
+}
+body[data-app-shell='true'][data-app-shell][data-app-shell] .capture-layout {
+  grid-template-columns: minmax(15rem, 0.34fr) minmax(0, 1fr);
+  gap: clamp(2.5rem, 5vw, 5rem);
+  align-items: start;
+}
+@media (max-width: 800px) {
+  body[data-app-shell='true'][data-app-shell][data-app-shell] .capture-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The planner is a calendar workspace, but it still lives inside the shell's width and gutter. */
+body[data-app-shell='true']
+  .planner-workspace-shell
+  > main
+  > :is(header, [class*='calendarControls']) {
+  padding-inline: 0;
+}
+
+/* Settings and account: the rail hugs the shell edge; the content column keeps its own breathing room. */
+body[data-app-shell='true'][data-app-shell] .settings-workspace > .settings-sidebar {
+  padding-left: 0;
+}
+body[data-app-shell='true'][data-app-shell] .settings-workspace > .settings-content {
+  --page-gutter: clamp(1.25rem, 3vw, 2.5rem);
+  --settings-page-gutter: var(--page-gutter);
+}

@@ -98,30 +98,26 @@ export function RecipeSummaryCard({
                   <Clock3 size={14} aria-hidden="true" /> {duration}
                 </span>
               ) : null}
-              {recipe.normalizedNutrition?.status === 'current' ? (
+              {recipe.normalizedNutrition?.status === 'current' &&
+              recipe.normalizedNutrition.facts.length > 0 ? (
                 <span
                   className="recipe-card-meta recipe-card-nutrition"
                   aria-label="Normalized nutrition per serving"
                 >
-                  {recipe.normalizedNutrition.facts.length
-                    ? recipe.normalizedNutrition.facts.map((fact) => (
-                        <span className="recipe-card-nutrition-fact" key={fact.code}>
-                          <NutritionVisualMarker
-                            nutrientCode={fact.code}
-                            label={fact.label}
-                            compact
-                          />
-                          {Number(fact.amount.toFixed(fact.digits))} {fact.unit}{' '}
-                          {fact.label.toLocaleLowerCase()}
-                        </span>
-                      ))
-                    : 'Selected per-serving values unknown'}
-                  {recipe.normalizedNutrition.completeness === null
-                    ? ' · data completeness unknown'
-                    : ` · ${Math.round(recipe.normalizedNutrition.completeness * 100)}% data complete`}
+                  {recipe.normalizedNutrition.facts.map((fact) => (
+                    <span className="recipe-card-nutrition-fact" key={fact.code}>
+                      <NutritionVisualMarker nutrientCode={fact.code} label={fact.label} compact />
+                      {Number(fact.amount.toFixed(fact.digits))} {fact.unit}{' '}
+                      {fact.label.toLocaleLowerCase()}
+                    </span>
+                  ))}
+                  {recipe.normalizedNutrition.completeness !== null &&
+                  recipe.normalizedNutrition.completeness < 1
+                    ? ` · ${Math.round(recipe.normalizedNutrition.completeness * 100)}% data complete`
+                    : ''}
                 </span>
               ) : null}
-              {recipe.pantryAvailability ? (
+              {recipe.pantryAvailability && recipe.pantryAvailability !== 'unknown' ? (
                 <span className="recipe-card-meta">
                   <PantryAvailabilityPill state={recipe.pantryAvailability} />
                   {recipe.pantryInsight ? ` · ${recipe.pantryInsight}` : ''}

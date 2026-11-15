@@ -154,6 +154,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
           input.promptGuidance ?? '',
         ].join('\n'),
         input: input.messages,
+        include: ['reasoning.encrypted_content'],
         tools: input.tools,
         store: false,
         max_output_tokens: input.maxOutputTokens ?? 4096,
@@ -214,7 +215,23 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     } catch (error) {
       input.signal?.throwIfAborted();
       if (error instanceof AiAssistantProviderResponseError) throw error;
-      throw new AiAssistantProviderResponseError('OpenAI could not complete that chat turn.');
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      const status =
+        error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
+      const detail =
+        status === 429
+          ? 'OpenAI is busy or its quota is exhausted. Check usage and try again later.'
+          : status === 401
+            ? 'The OpenAI credential was rejected. Check the provider key in AI settings.'
+            : status === 400
+              ? 'OpenAI rejected the chat request. Check the configured model and tool compatibility.'
+              : 'OpenAI could not complete that chat turn. Reload to review any drafts before trying again.';
+      // Provider messages may contain household input. Retain only bounded machine diagnostics.
+      console.warn('Bord chat provider failure', {
+        status,
+        code: /^[a-z_]{1,80}$/u.test(code) ? code : 'unknown',
+      });
+      throw new AiAssistantProviderResponseError(detail);
     }
   }
 

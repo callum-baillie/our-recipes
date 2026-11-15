@@ -1,7 +1,5 @@
 .page {
-  width: min(100%, var(--content-standard));
-  margin: 0 auto;
-  padding: clamp(1.5rem, 3vw, 2.5rem) var(--page-gutter) 3rem;
+  padding: clamp(1.5rem, 3vw, 2.5rem) 0 3rem;
 }
 .stack,
 .overviewMain,
@@ -111,8 +109,54 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem 1rem;
-  align-items: end;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   min-width: 0;
+}
+.controlsEnd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-left: auto;
+}
+.viewTabs {
+  display: flex;
+  max-width: 100%;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  overflow-x: auto;
+  background: color-mix(in srgb, var(--primary) 7%, var(--field));
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  scrollbar-width: none;
+}
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  color: var(--muted);
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    color var(--motion-fast, 140ms) ease,
+    background-color var(--motion-fast, 140ms) ease,
+    box-shadow var(--motion-base, 220ms) ease;
+}
+.viewTab:hover {
+  color: var(--ink);
+}
+.viewTab[aria-current='page'] {
+  color: var(--ink);
+  background: var(--field);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 10%),
+    0 0 0 1px var(--line);
 }
 .nutritionControls > label {
   display: grid;
@@ -241,6 +285,10 @@
 }
 .optionalSetup {
   margin-top: 0;
+  padding: 0.5rem clamp(1rem, 2vw, 1.5rem);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
 }
 .recentEntries,
 .diaryList,

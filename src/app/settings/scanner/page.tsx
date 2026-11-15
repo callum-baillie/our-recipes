@@ -7,6 +7,7 @@ import { getPantryDashboard } from '@/lib/services/pantry-service';
 import { listShoppingLists, getShoppingList } from '@/lib/services/planning-service';
 import { CameraScannerSettings } from '@/components/camera-scanner-settings';
 import { ScannerStation } from '@/components/scanner-station';
+import { SettingsPane, SettingsRow } from '@/components/settings-primitives';
 export const dynamic = 'force-dynamic';
 export default async function ScannerPage() {
   const principal = await getAuthenticatedSessionPrincipal(
@@ -43,31 +44,40 @@ export default async function ScannerPage() {
       }))}
     >
       <CameraScannerSettings />
-      <section className="settings-card">
-        <h2>Pantry labels</h2>
-        <p>
-          Attach a label to a batch, then scan a wall action followed by that label to record
-          expiry, freezing, moving or disposal. Each label identifies the exact stock batch.
-        </p>
-        <a className="text-button" href="/api/v1/scanner/cards?kind=locations">
-          Download location labels
-        </a>
-        <details>
-          <summary>Print a batch label</summary>
-          <ul>
-            {pantry.batches
-              .filter((batch) => !['depleted', 'discarded', 'donated'].includes(batch.status))
-              .map((batch) => (
-                <li key={batch.id}>
-                  <a href={`/api/v1/scanner/cards?kind=batch&id=${batch.id}`}>
-                    {batch.product.displayName} · {batch.location.path} ·{' '}
-                    {batch.quantityRemaining ?? 'unknown amount'} {batch.unit}
-                  </a>
-                </li>
-              ))}
-          </ul>
-        </details>
-      </section>
+      <SettingsPane
+        title="Pantry labels"
+        description="Attach a label to a batch, then scan a wall action followed by that label to record expiry, freezing, moving or disposal. Each label identifies the exact stock batch."
+      >
+        <SettingsRow
+          title="Location labels"
+          description="Print one label per storage place to stick on shelves and drawers."
+        >
+          <a className="secondary-button compact" href="/api/v1/scanner/cards?kind=locations">
+            Download location labels
+          </a>
+        </SettingsRow>
+        <SettingsRow
+          align="start"
+          title="Batch labels"
+          description="Pick a batch to print a label for that exact stock."
+        >
+          <details className="settings-disclosure">
+            <summary>Print a batch label</summary>
+            <ul className="settings-link-list">
+              {pantry.batches
+                .filter((batch) => !['depleted', 'discarded', 'donated'].includes(batch.status))
+                .map((batch) => (
+                  <li key={batch.id}>
+                    <a href={`/api/v1/scanner/cards?kind=batch&id=${batch.id}`}>
+                      {batch.product.displayName} · {batch.location.path} ·{' '}
+                      {batch.quantityRemaining ?? 'unknown amount'} {batch.unit}
+                    </a>
+                  </li>
+                ))}
+            </ul>
+          </details>
+        </SettingsRow>
+      </SettingsPane>
     </ScannerStation>
   );
 }

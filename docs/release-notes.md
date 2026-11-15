@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.0.0-rc.31
+
+- Refine AI chat with structured suggested answers plus free text, actionable tool progress, detailed recipe and pantry cards, responsive loading states, and draft meal plans. Each meal can be swapped on its own; saved recipes and pantry stock inform plans when the current profile has sharing enabled. Day-only ranges such as the 11th–22nd resolve to the next occurrence.
+- Improve household and recipe context for assistant turns, distinguish provider failures, and preserve reviewed confirmation before saving proposed meals, recipes, or shopping changes. Tests use deterministic mocks; no paid provider call is required.
+- Add scoped shopping-trip history and a kitchen predictions workspace for reviewed, on-demand decisions. Add prediction history, Pantry workflow improvements, a redesigned Nutrition overview, and scanner settings refinements.
+- Add migration `0083_shopping_trips` (85 migrations total). Existing rows are not rewritten; back up before upgrading as usual.
+- Verification: `pnpm verify` passed: 146 unit files / 822 tests; 79 integration files / 542 passed and 9 skipped; 204 documented OpenAPI operations, generated-client smoke, release build, 3,799-file artifact check, and whitespace check. `pnpm test:v1-release` passed 15 browser specs (19 Chromium scenarios) and 3 recipe-performance tests. Lint reports 3 warnings and OpenAPI has one unused-component warning. No live OpenAI call was made.
+- Tower deployment evidence will be included in the Forgejo release entry.
+
 ## 1.0.0-rc.30
 
 - Supersede rc.29, whose published image fails to render `/pantry/add` (HTTP 500) in production builds. A helper in the camera scan hook was named `process`, which shadowed Node's global in the release bundle, where Next's minifier injects `process.env` guards; development mode does not, so the problem appeared only in the built server. Do not deploy rc.29. The helper is renamed and the full v1 browser oracle now passes against the built server.

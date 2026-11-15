@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { InlineAlert } from './inline-alert';
-import { ButtonSpinner } from './skeleton';
+import { AlertTriangle, Check, Clock3, ListChecks } from 'lucide-react';
+import { ActionButton, Callout, CardFooter, CardHead, Disclosure } from './chat-ui/card-parts';
+import cards from './chat-ui/cards.module.css';
 import styles from './ai-app-action-card.module.css';
 import {
   isUnknownAiOutcome,
@@ -56,94 +57,137 @@ export function AiJobCard({
   const unfinished = job.totalItems - job.completedItems;
   const failed = ['failed', 'cancelled'].includes(job.status) || job.failedItems > 0;
   const unknown = isUnknownAiOutcome(job.errorCode);
+  const percent = job.totalItems ? Math.round((job.completedItems / job.totalItems) * 100) : 0;
+  const status = active ? 'running' : failed ? 'failed' : 'completed';
   return (
-    <section className={styles.card} aria-label={`${job.title} background task`}>
-      <header>
-        <span className={styles.badge}>
-          {active ? 'In progress' : failed ? 'Needs attention' : 'Complete'}
-        </span>
-        <h3>{job.title}</h3>
-      </header>
-      <InlineAlert tone={active ? 'info' : failed ? 'warning' : 'success'}>
-        {active && <ButtonSpinner />} {job.completedItems} of {job.totalItems} completed
-        {job.failedItems ? ` · ${job.failedItems} ${unknown ? 'need attention' : 'failed'}` : ''}.
-        {active
-          ? ` ${job.executionMode === 'batch' ? 'OpenAI Batch may take up to 24 hours. ' : ''}Work continues when you close the browser.`
-          : failed
-            ? ` ${unfinished} unfinished. ${unknown ? UNKNOWN_AI_OUTCOME_MESSAGE : (errors[job.errorCode ?? ''] ?? 'Open details to review the results.')}`
-            : job.kind === 'recipe_images'
-              ? 'Image previews are ready for review. No photo has been added to a recipe.'
-              : 'Draft results are ready to review.'}
-      </InlineAlert>
-      {!!job.items?.length && (
-        <details>
-          <summary>View {job.items.length} results</summary>
-          <ul className={styles.results}>
-            {job.items.map((item) => (
-              <li key={item.id}>
-                <strong>
-                  {item.recipeId ? (
-                    <a
-                      href={`/recipes/${item.recipeId}${item.candidateId ? `?imageCandidate=${item.candidateId}#recipe-photos` : ''}`}
-                    >
-                      {item.label}
-                    </a>
-                  ) : (
-                    item.label
-                  )}
-                </strong>
-                <span>
-                  {item.status === 'succeeded'
-                    ? item.candidateId
-                      ? 'Review image preview'
-                      : 'Draft ready'
-                    : item.status === 'failed'
-                      ? isUnknownAiOutcome(item.errorCode)
-                        ? UNKNOWN_AI_OUTCOME_MESSAGE
-                        : (errors[item.errorCode ?? ''] ?? 'Could not complete this item.')
-                      : active
-                        ? 'Waiting'
-                        : 'Not completed'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {onCommand && (
-        <div className={styles.actions}>
-          {active ? (
-            <button type="button" disabled={busy} onClick={() => onCommand(job.id, 'cancel')}>
-              {busy ? 'Cancelling…' : 'Cancel task'}
-            </button>
-          ) : failed && unfinished > 0 && !unknown ? (
-            <button type="button" disabled={busy} onClick={() => setRetryConfirm(true)}>
-              Retry unfinished items
-            </button>
-          ) : null}
+    <section className={cards.card} aria-label={`${job.title} background task`}>
+      <CardHead
+        icon={ListChecks}
+        eyebrow="Background task"
+        title={job.title}
+        status={status}
+        statusLabel={active ? 'In progress' : failed ? 'Needs attention' : 'Complete'}
+      />
+      <div className={styles.progress}>
+        <div
+          className={styles.track}
+          role="progressbar"
+          aria-label={`${job.title} progress`}
+          aria-valuemin={0}
+          aria-valuemax={job.totalItems}
+          aria-valuenow={job.completedItems}
+          data-active={active}
+          data-tone={failed ? 'warning' : undefined}
+        >
+          <div className={styles.fill} style={{ width: `${Math.max(active ? 4 : 0, percent)}%` }} />
         </div>
-      )}
-      {retryConfirm && !unknown && (
-        <InlineAlert tone="warning">
-          Retrying {unfinished} unfinished items may incur new OpenAI charges. Completed items will
-          be kept.
-          <div className={styles.actions}>
-            <button
-              type="button"
+        <div className={styles.progressMeta}>
+          <span>
+            {job.completedItems} of {job.totalItems} done
+          </span>
+          <span>{percent}%</span>
+        </div>
+      </div>
+      <div className={styles.taskBody}>
+        <Callout tone={active ? 'info' : failed ? 'warning' : 'success'}>
+          {job.completedItems} of {job.totalItems} completed
+          {job.failedItems ? ` · ${job.failedItems} ${unknown ? 'need attention' : 'failed'}` : ''}.
+          {active
+            ? ` ${job.executionMode === 'batch' ? 'OpenAI Batch may take up to 24 hours. ' : ''}Work continues when you close the browser.`
+            : failed
+              ? ` ${unfinished} unfinished. ${unknown ? UNKNOWN_AI_OUTCOME_MESSAGE : (errors[job.errorCode ?? ''] ?? 'Open details to review the results.')}`
+              : job.kind === 'recipe_images'
+                ? 'Image previews are ready for review. No photo has been added to a recipe.'
+                : 'Draft results are ready to review.'}
+        </Callout>
+        {!!job.items?.length && (
+          <Disclosure summary={`View ${job.items.length} results`} defaultOpen={active}>
+            <ul className={styles.taskItems}>
+              {job.items.map((item) => {
+                const state =
+                  item.status === 'succeeded'
+                    ? 'done'
+                    : item.status === 'failed'
+                      ? 'failed'
+                      : 'waiting';
+                return (
+                  <li key={item.id} data-state={state}>
+                    {state === 'done' ? (
+                      <Check aria-hidden="true" />
+                    ) : state === 'failed' ? (
+                      <AlertTriangle aria-hidden="true" />
+                    ) : active ? (
+                      <span className={styles.taskSpinner} aria-hidden="true" />
+                    ) : (
+                      <Clock3 aria-hidden="true" />
+                    )}
+                    <strong>
+                      {item.recipeId ? (
+                        <a
+                          href={`/recipes/${item.recipeId}${item.candidateId ? `?imageCandidate=${item.candidateId}#recipe-photos` : ''}`}
+                        >
+                          {item.label}
+                        </a>
+                      ) : (
+                        item.label
+                      )}
+                    </strong>
+                    <span>
+                      {item.status === 'succeeded'
+                        ? item.candidateId
+                          ? 'Review image preview'
+                          : 'Draft ready'
+                        : item.status === 'failed'
+                          ? isUnknownAiOutcome(item.errorCode)
+                            ? UNKNOWN_AI_OUTCOME_MESSAGE
+                            : (errors[item.errorCode ?? ''] ?? 'Could not complete this item.')
+                          : active
+                            ? 'Waiting'
+                            : 'Not completed'}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Disclosure>
+        )}
+        {retryConfirm && !unknown && (
+          <Callout tone="warning">
+            Retrying {unfinished} unfinished items may incur new OpenAI charges. Completed items
+            will be kept.
+            <div className={styles.editorActions}>
+              <ActionButton
+                tone="primary"
+                disabled={busy}
+                onClick={() => {
+                  onCommand?.(job.id, 'retry');
+                  setRetryConfirm(false);
+                }}
+              >
+                Confirm paid retry
+              </ActionButton>
+              <ActionButton onClick={() => setRetryConfirm(false)}>Keep results</ActionButton>
+            </div>
+          </Callout>
+        )}
+      </div>
+      {onCommand && (active || (failed && unfinished > 0 && !unknown)) ? (
+        <CardFooter>
+          {active ? (
+            <ActionButton
+              pending={busy}
               disabled={busy}
-              onClick={() => {
-                onCommand?.(job.id, 'retry');
-                setRetryConfirm(false);
-              }}
+              onClick={() => onCommand(job.id, 'cancel')}
             >
-              Confirm paid retry
-            </button>
-            <button type="button" onClick={() => setRetryConfirm(false)}>
-              Keep results
-            </button>
-          </div>
-        </InlineAlert>
-      )}
+              {busy ? 'Cancelling…' : 'Cancel task'}
+            </ActionButton>
+          ) : (
+            <ActionButton disabled={busy} onClick={() => setRetryConfirm(true)}>
+              Retry unfinished items
+            </ActionButton>
+          )}
+        </CardFooter>
+      ) : null}
     </section>
   );
 }

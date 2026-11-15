@@ -127,7 +127,11 @@ function operation(p: RequestPrincipal, id: string) {
     requirements.add('shareSharedRecipes');
     requirements.add('sharePantry');
   }
-  if (op.path.startsWith('/shopping-lists') || op.path.startsWith('/supermarket-profiles'))
+  if (
+    op.path.startsWith('/shopping-lists') ||
+    op.path.startsWith('/shopping-trips') ||
+    op.path.startsWith('/supermarket-profiles')
+  )
     requirements.add('shareShoppingLists');
   if (id === 'importReviewedCatalogFood') requirements.add('sharePantry');
   if (/pantry-intake|pantry-controls|pantry-match|catalog-items|pantry-shortages/u.test(op.path))
@@ -192,6 +196,12 @@ function parseAction(p: RequestPrincipal, action: Action) {
       .from(nutritionProfiles)
       .where(eq(nutritionProfiles.id, parameters.profileId))
       .get();
+    if (
+      op.path.endsWith('/goals') &&
+      (!target?.householdProfileId ||
+        !getAiDataPolicy(target.householdProfileId).shareNutritionGoals)
+    )
+      throw new DecisionError('The receiving person must permit nutrition goal sharing.', 403);
     if (!target?.householdProfileId || !getAiDataPolicy(target.householdProfileId).shareRawDiary)
       throw new DecisionError(
         'The receiving person must permit raw diary sharing for this nutrition operation. Use the protected Nutrition workspace to continue without sharing it with AI.',

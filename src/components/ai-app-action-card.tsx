@@ -1,13 +1,23 @@
 'use client';
-import { actionReviewLines } from '../../shared/mobile-domain/app-action-review';
 import { reviewValues } from '../../shared/mobile-domain/proposal-review';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, ImagePlus, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  Clock3,
+  ClipboardCheck,
+  ImagePlus,
+  Pencil,
+  Plus,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
-import { InlineAlert } from './inline-alert';
-import { ButtonSpinner } from './skeleton';
+import { ActionButton, Callout, CardFooter, CardHead, Disclosure } from './chat-ui/card-parts';
+import cards from './chat-ui/cards.module.css';
 import styles from './ai-app-action-card.module.css';
 
 export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
@@ -101,62 +111,98 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
   if (replacement)
     return (
       <>
-        <InlineAlert>Earlier review superseded by your edited proposal.</InlineAlert>
+        <Callout>Earlier review superseded by your edited proposal.</Callout>
         <AiAppActionCard key={replacement.id} proposal={replacement} />
       </>
     );
   function row(action: AppActionReview['actions'][number], index: number) {
     const image = action.path.endsWith('/images/generate');
-    const Icon = image ? ImagePlus : action.method === 'DELETE' ? Trash2 : Pencil;
+    const kind: { Icon: LucideIcon; label: string; tone: string } = image
+      ? { Icon: ImagePlus, label: 'Image', tone: 'image' }
+      : action.method === 'DELETE'
+        ? { Icon: Trash2, label: 'Remove', tone: 'remove' }
+        : action.method === 'POST'
+          ? { Icon: Plus, label: 'Add', tone: 'add' }
+          : { Icon: Pencil, label: 'Update', tone: 'update' };
+    const { Icon } = kind;
     return (
-      <li key={index} className={styles.row}>
-        <Icon size={17} aria-hidden="true" />
-        <div>
-          <strong>
-            {action.review?.subject.href ? (
-              <Link className="inline-link" href={action.review.subject.href}>
-                {action.review.subject.label}
-              </Link>
-            ) : action.review ? (
-              action.review.subject.label
-            ) : action.parameters.recipeId && action.recordLabel ? (
-              <Link
-                className="inline-link"
-                href={`/recipes/${encodeURIComponent(action.parameters.recipeId)}`}
-              >
-                {action.recordLabel}
-              </Link>
-            ) : (
-              (action.recordLabel ?? 'Saved action')
-            )}
-          </strong>
+      <li key={index} className={styles.row} data-tone={kind.tone}>
+        <span className={styles.rowIcon} aria-hidden="true">
+          <Icon />
+        </span>
+        <div className={styles.rowBody}>
+          <div className={styles.rowTitle}>
+            <strong>
+              {action.review?.subject.href ? (
+                <Link className="inline-link" href={action.review.subject.href}>
+                  {action.review.subject.label}
+                </Link>
+              ) : action.review ? (
+                action.review.subject.label
+              ) : action.parameters.recipeId && action.recordLabel ? (
+                <Link
+                  className="inline-link"
+                  href={`/recipes/${encodeURIComponent(action.parameters.recipeId)}`}
+                >
+                  {action.recordLabel}
+                </Link>
+              ) : (
+                (action.recordLabel ?? 'Saved action')
+              )}
+            </strong>
+            <span className={styles.rowKind}>{kind.label}</span>
+          </div>
           {image && !action.recordLabel ? (
-            <span>Recipe title unavailable in this saved proposal.</span>
+            <span className={styles.rowEffect}>
+              Recipe title unavailable in this saved proposal.
+            </span>
           ) : null}
-          <span>{action.review?.effect ?? action.changeLabel ?? action.summary}</span>
+          <span className={styles.rowEffect}>
+            {action.review?.effect ?? action.changeLabel ?? action.summary}
+          </span>
           {action.review ? (
             <>
               <dl className={styles.reviewFacts}>
-                {actionReviewLines(action.review).map((line, lineIndex) => (
-                  <div key={lineIndex}>
+                {action.review.context.map((line, lineIndex) => (
+                  <div key={`c${lineIndex}`}>
                     <dt>{line.label}</dt>
                     <dd>{line.value}</dd>
                   </div>
                 ))}
+                {action.review.changes.map((change, changeIndex) => (
+                  <div key={`d${changeIndex}`} data-change>
+                    <dt>{change.label}</dt>
+                    <dd>
+                      {change.before === undefined ? (
+                        change.after
+                      ) : (
+                        <>
+                          <s>{change.before}</s>
+                          <ArrowRight aria-hidden="true" />
+                          <b>{change.after}</b>
+                          <span className={styles.srOnly}>
+                            {` (was ${change.before}, now ${change.after})`}
+                          </span>
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                ))}
               </dl>
               {action.review.caveats.map((caveat, caveatIndex) => (
-                <p key={caveatIndex}>{caveat}</p>
+                <p className={styles.caveat} key={caveatIndex}>
+                  <AlertTriangle aria-hidden="true" /> {caveat}
+                </p>
               ))}
             </>
           ) : !image ? (
-            <p>
-              Target details are unavailable in this older proposal. Ask chat to prepare a fresh
-              review before applying it.
+            <p className={styles.caveat}>
+              <AlertTriangle aria-hidden="true" /> Target details are unavailable in this older
+              proposal. Ask chat to prepare a fresh review before applying it.
             </p>
           ) : null}
           {!image && action.body != null && (
-            <details>
-              <summary>Full submitted changes</summary>
+            <Disclosure summary="Full submitted changes">
               <dl className={styles.reviewFacts}>
                 {reviewValues(action.body).map((line, lineIndex) => (
                   <div key={lineIndex}>
@@ -165,10 +211,10 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
                   </div>
                 ))}
               </dl>
-            </details>
+            </Disclosure>
           )}
           {!!action.bindings?.length && (
-            <span>
+            <span className={styles.rowEffect}>
               {action.bindings
                 .map(
                   (binding) =>
@@ -181,60 +227,32 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
       </li>
     );
   }
+  const headStatus = status === 'pending' ? 'pending' : status;
+  const label = images ? 'images' : 'changes';
   return (
     <section
-      className={styles.card}
+      className={cards.card}
       aria-label="Review proposed app changes"
       aria-busy={pending !== null}
     >
-      <header>
-        <span className={styles.badge} data-status={status}>
-          {status === 'pending'
-            ? 'Review changes'
-            : status === 'queued'
-              ? 'Background task'
-              : status}
-        </span>
-        <h3>{proposal.title}</h3>
-        <small>
-          {proposal.actions.length} requested {images ? 'images' : 'changes'}
-          {images && status === 'pending' ? ' · Paid generation' : ''}
-        </small>
-      </header>
+      <CardHead
+        icon={ClipboardCheck}
+        eyebrow={status === 'queued' ? 'Background task' : 'Review changes'}
+        title={proposal.title}
+        subtitle={`${proposal.actions.length} requested ${label}${images && status === 'pending' ? ' · Paid generation' : ''}`}
+        status={headStatus}
+        statusLabel={status === 'pending' ? 'Needs review' : undefined}
+      />
       <ul className={styles.rows}>{proposal.actions.slice(0, 4).map(row)}</ul>
       {proposal.actions.length > 4 && (
-        <details>
-          <summary>
-            <ChevronRight size={16} aria-hidden="true" /> Show {proposal.actions.length - 4} more{' '}
-            {images ? 'recipes' : 'changes'}
-          </summary>
-          <ul className={styles.rows}>
-            {proposal.actions.slice(4).map((action, index) => row(action, index + 4))}
-          </ul>
-        </details>
-      )}
-      {status === 'pending' && !editing && (
-        <div className={styles.actions}>
-          <button
-            type="button"
-            disabled={pending !== null || editBusy || needsFreshReview}
-            onClick={() => void decide('apply')}
+        <div className={styles.more}>
+          <Disclosure
+            summary={`Show ${proposal.actions.length - 4} more ${images ? 'recipes' : 'changes'}`}
           >
-            {pending === 'apply' && <ButtonSpinner />}
-            {pending === 'apply'
-              ? 'Starting…'
-              : images
-                ? `Generate ${proposal.actions.length === 1 ? 'image' : `${proposal.actions.length} images`}`
-                : 'Confirm changes'}
-          </button>
-          {!images && (
-            <button type="button" disabled={pending !== null} onClick={() => setEditing(true)}>
-              Edit proposed values
-            </button>
-          )}
-          <button type="button" disabled={pending !== null} onClick={() => void decide('dismiss')}>
-            {pending === 'dismiss' ? 'Dismissing…' : 'Dismiss'}
-          </button>
+            <ul className={styles.rows}>
+              {proposal.actions.slice(4).map((action, index) => row(action, index + 4))}
+            </ul>
+          </Disclosure>
         </div>
       )}
       {editing && status === 'pending' && (
@@ -294,75 +312,114 @@ export function AiAppActionCard({ proposal }: { proposal: AppActionReview }) {
               Nested quantities and structured content remain in Details. Ask the assistant for a
               revised review to change those.
             </p>
-            <div className={styles.actions}>
-              <button type="submit">Prepare edited review</button>
-              <button type="button" onClick={() => setEditing(false)}>
-                Back to review
-              </button>
+            <div className={styles.editorActions}>
+              <ActionButton type="submit" tone="primary" pending={editBusy}>
+                {editBusy ? 'Preparing…' : 'Prepare edited review'}
+              </ActionButton>
+              <ActionButton onClick={() => setEditing(false)}>Back to review</ActionButton>
             </div>
           </fieldset>
         </form>
       )}
-      {status === 'running' && (
-        <InlineAlert tone="warning">
-          This request started. Reload the conversation to check acknowledged results before
-          starting another operation.
-        </InlineAlert>
+      {status === 'pending' && !editing && (
+        <CardFooter>
+          <ActionButton
+            tone="primary"
+            icon={Check}
+            pending={pending === 'apply'}
+            disabled={pending !== null || editBusy || needsFreshReview}
+            onClick={() => void decide('apply')}
+          >
+            {pending === 'apply'
+              ? 'Starting…'
+              : images
+                ? `Generate ${proposal.actions.length === 1 ? 'image' : `${proposal.actions.length} images`}`
+                : 'Confirm changes'}
+          </ActionButton>
+          {!images && (
+            <ActionButton disabled={pending !== null} onClick={() => setEditing(true)}>
+              Edit proposed values
+            </ActionButton>
+          )}
+          <ActionButton
+            tone="quiet"
+            pending={pending === 'dismiss'}
+            disabled={pending !== null}
+            onClick={() => void decide('dismiss')}
+          >
+            {pending === 'dismiss' ? 'Dismissing…' : 'Dismiss'}
+          </ActionButton>
+        </CardFooter>
       )}
-      {status === 'superseded' && (
-        <InlineAlert>Superseded by a newer review. Use the current proposal.</InlineAlert>
-      )}
-      {status === 'queued' && (
-        <InlineAlert>
-          Queued. You can close the browser; the server will save the results. Follow progress in
-          background tasks.
-        </InlineAlert>
-      )}
-      {status === 'partial' && (
-        <InlineAlert tone="warning">
-          {completed} completed · {failed} failed · {notAttempted} not attempted
-          {waiting ? ` · ${waiting} waiting` : ''}
-          {unknown ? ` · ${unknown} outcome unknown` : ''}. Inspect the results and source records
-          before starting another request.
-        </InlineAlert>
-      )}
-      {status === 'applied' && (
-        <InlineAlert tone="success">
-          {proposal.actions.length} {images ? 'images saved' : 'changes saved'}.
-        </InlineAlert>
-      )}
-      {!!results.length && status !== 'queued' && (
-        <details>
-          <summary>
-            <ChevronRight size={16} aria-hidden="true" /> View results ({results.length})
-          </summary>
-          <ul className={styles.results}>
-            {results.map((result, index) => (
-              <li key={index}>
-                <strong>
-                  {result.ok
-                    ? 'Completed'
-                    : result.state === 'pending'
-                      ? 'Waiting'
-                      : result.state === 'not-attempted'
-                        ? 'Not attempted'
-                        : result.state === 'outcome-unknown'
-                          ? 'Outcome unknown'
-                          : 'Failed'}
-                  : {result.summary}
-                </strong>
-                <span>{result.message}</span>
-                {result.href && (
-                  <Link className="inline-link" href={result.href}>
-                    Open affected record
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {error && <InlineAlert tone="error">{error}</InlineAlert>}
+      <div className={styles.notices}>
+        {status === 'running' && (
+          <Callout tone="warning">
+            This request started. Reload the conversation to check acknowledged results before
+            starting another operation.
+          </Callout>
+        )}
+        {status === 'superseded' && (
+          <Callout>Superseded by a newer review. Use the current proposal.</Callout>
+        )}
+        {status === 'queued' && (
+          <Callout>
+            Queued. You can close the browser; the server will save the results. Follow progress in
+            background tasks.
+          </Callout>
+        )}
+        {status === 'partial' && (
+          <Callout tone="warning">
+            {completed} completed · {failed} failed · {notAttempted} not attempted
+            {waiting ? ` · ${waiting} waiting` : ''}
+            {unknown ? ` · ${unknown} outcome unknown` : ''}. Inspect the results and source records
+            before starting another request.
+          </Callout>
+        )}
+        {status === 'applied' && (
+          <Callout tone="success">
+            {proposal.actions.length} {images ? 'images saved' : 'changes saved'}.
+          </Callout>
+        )}
+        {!!results.length && status !== 'queued' && (
+          <Disclosure summary={`View results (${results.length})`}>
+            <ul className={styles.results}>
+              {results.map((result, index) => {
+                const state = result.ok
+                  ? 'Completed'
+                  : result.state === 'pending'
+                    ? 'Waiting'
+                    : result.state === 'not-attempted'
+                      ? 'Not attempted'
+                      : result.state === 'outcome-unknown'
+                        ? 'Outcome unknown'
+                        : 'Failed';
+                const Icon = result.ok
+                  ? Check
+                  : result.state === 'pending' || result.state === 'not-attempted'
+                    ? Clock3
+                    : AlertTriangle;
+                return (
+                  <li key={index} data-ok={result.ok}>
+                    <Icon aria-hidden="true" />
+                    <div>
+                      <strong>
+                        {state}: {result.summary}
+                      </strong>
+                      <span>{result.message}</span>
+                      {result.href && (
+                        <Link className="inline-link" href={result.href}>
+                          Open affected record
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Disclosure>
+        )}
+        {error && <Callout tone="error">{error}</Callout>}
+      </div>
     </section>
   );
 }

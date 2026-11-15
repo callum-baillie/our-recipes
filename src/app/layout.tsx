@@ -34,6 +34,7 @@ import './settings-layout.css';
 import './auth-pages.css';
 import './ui-polish.css';
 import './recipe-detail.css';
+import './shell.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,7 +137,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const usesNormalPageShell =
     !isSecuritySurface &&
     pathname !== '/print' &&
-    pathname !== '/planner' &&
     !/^\/recipes\/[^/]+\/cook(?:\/|$)/u.test(pathname);
   const authConfigured = isAuthenticationConfigured();
   const authSession = authConfigured

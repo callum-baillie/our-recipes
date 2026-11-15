@@ -1,3 +1,5 @@
+import { nutritionGoalVersionInputSchema } from '@/lib/domain/nutrition-profile';
+import { shoppingTripSchema } from '@/lib/domain/shopping-trips';
 import { cookingPreferencesUpdateSchema } from '@/lib/domain/cooking-preferences';
 import { cookingEpisodeCommandSchema } from '@/lib/domain/cooking-episode';
 import { cookingSessionRecipeChangeSchema } from '@/lib/domain/cooking-session-recipe';
@@ -101,6 +103,55 @@ export type AppOperation = {
   effect: 'read' | 'write' | 'paid';
 };
 export const APP_OPERATIONS: AppOperation[] = [
+  {
+    id: 'readNutritionGoals',
+    path: '/nutrition/profiles/{profileId}/goals',
+    method: 'GET',
+    effect: 'read',
+    summary:
+      'Read authorized versioned nutrition goals. Requires the receiving person’s goal and raw-diary sharing permissions.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'saveNutritionGoal',
+    path: '/nutrition/profiles/{profileId}/goals',
+    method: 'POST',
+    effect: 'write',
+    summary:
+      'Propose an explicitly requested nutrition goal version for review. Never change a goal merely because a forecast predicts failure; retain the prior version and include supersedesGoalVersionId when revising.',
+    parameters: [],
+    body: null,
+    validator: z
+      .object({
+        goal: nutritionGoalVersionInputSchema,
+        seriesId: z.string().uuid().optional(),
+        supersedesGoalVersionId: z.string().uuid().nullable().optional(),
+      })
+      .strict(),
+  },
+
+  {
+    id: 'listShoppingTrips',
+    path: '/shopping-trips',
+    method: 'GET',
+    effect: 'read',
+    summary:
+      'Read the current account and profile’s last 100 reported shopping trips. Missing trips are unknown.',
+    parameters: [],
+    body: null,
+  },
+  {
+    id: 'recordShoppingTrip',
+    path: '/shopping-trips',
+    method: 'POST',
+    effect: 'write',
+    summary:
+      'Record a user-reported completed large shop or top-up with date and note. Only record facts explicitly supplied by the user; checking list items is not a confirmed trip.',
+    parameters: [],
+    body: null,
+    validator: shoppingTripSchema,
+  },
   {
     id: 'readCookingPreferences',
     path: '/account/cooking-preferences',
@@ -2348,6 +2399,10 @@ export const APP_OPERATIONS: AppOperation[] = [
   },
 ];
 export const APP_ROUTE_LOADERS = {
+  readNutritionGoals: () => import('@/app/api/v1/nutrition/profiles/[profileId]/goals/route'),
+  saveNutritionGoal: () => import('@/app/api/v1/nutrition/profiles/[profileId]/goals/route'),
+  listShoppingTrips: () => import('@/app/api/v1/shopping-trips/route'),
+  recordShoppingTrip: () => import('@/app/api/v1/shopping-trips/route'),
   readCookingPreferences: () => import('@/app/api/v1/account/cooking-preferences/route'),
   updateCookingPreferences: () => import('@/app/api/v1/account/cooking-preferences/route'),
   readCookingEpisode: () => import('@/app/api/v1/cook-sessions/[sessionId]/context/route'),

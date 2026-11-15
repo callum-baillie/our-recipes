@@ -358,5 +358,15 @@
     "method": "GET",
     "path": "/food-data/images/{gtin}",
     "reason": "First-party server-side proxy for barcode-matched product photos; the food API key never reaches the browser."
+  },
+  {
+    "method": "GET",
+    "path": "/shopping-trips",
+    "reason": "First-party account-scoped reported shopping history for predictions and reviewed chat actions."
+  },
+  {
+    "method": "POST",
+    "path": "/shopping-trips",
+    "reason": "First-party account-scoped reported shopping history for predictions and reviewed chat actions."
   }
 ]

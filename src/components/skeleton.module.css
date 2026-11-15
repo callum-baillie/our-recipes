@@ -127,6 +127,15 @@
   overflow-anchor: none;
 }
 
+/* Inside the app shell the page container already sets width and gutter. */
+:global(body[data-app-shell='true']) .page {
+  padding-inline: 0;
+}
+:global(body[data-app-shell='true']) .page .pageInner {
+  width: 100%;
+  padding-top: var(--workspace-top-space, 2rem);
+}
+
 .pageInner {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

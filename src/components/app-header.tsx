@@ -67,6 +67,7 @@ const primaryLinks = [
   { href: '/nutrition', label: 'Nutrition' },
   { href: '/planner', label: 'Planner' },
   { href: '/lists', label: 'Lists' },
+  { href: '/predictions', label: 'Predictions' },
 ] as const;
 
 export function AppHeader({

@@ -33,7 +33,7 @@ import {
   NutritionAdvancedChartPanels,
   NutritionWeightTrendPanel,
 } from './nutrition-advanced-chart-panels';
-import { NutritionVisualMarker } from './nutrition-visual-marker';
+import { NutritionOverview } from './nutrition-overview';
 import { nutritionLocalDateKey } from '@/lib/domain/nutrition-view';
 import {
   isNutritionDate,
@@ -41,11 +41,7 @@ import {
   displayNutritionWeight,
   nutritionPortion,
 } from '@/lib/domain/nutrition-ui';
-import {
-  nutritionGoalComparison,
-  type NutritionChartDatasets,
-  type ChartGoal,
-} from '@/lib/domain/nutrition-chart-datasets';
+import { type NutritionChartDatasets, type ChartGoal } from '@/lib/domain/nutrition-chart-datasets';
 import type { AiSummaryCardData } from './ai-summary-cards';
 import type { AdvancedNutritionCharts } from '@/lib/domain/nutrition-advanced-charts';
 import type { NutritionWeightTrend } from '@/lib/domain/nutrition-weight-trend';
@@ -331,6 +327,24 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .slice(0, 4);
   const units = profile.measurementSystem === 'imperial';
+  const weightObservations = props.weightTrend?.observations ?? [];
+  const glanceWeight =
+    props.weightTrend && weightObservations.length
+      ? {
+          unit: props.weightTrend.unit,
+          latest: weightObservations.at(-1)!.displayWeight,
+          change:
+            weightObservations.length > 1
+              ? Math.round(
+                  (weightObservations.at(-1)!.displayWeight -
+                    weightObservations[0]!.displayWeight) *
+                    10,
+                ) / 10
+              : null,
+          series: weightObservations.map((item) => item.displayWeight),
+          target: props.weightTrend.target?.displayWeight ?? null,
+        }
+      : null;
   const savedDirection =
     props.goalSetup?.nutritionGoalType && props.goalSetup.nutritionGoalType !== 'none'
       ? `Saved weight direction: ${props.goalSetup.nutritionGoalType}${props.goalSetup.currentWeightKilograms != null ? ` · ${displayNutritionWeight(props.goalSetup.currentWeightKilograms, units)}` : ''}${props.goalSetup.targetWeightKilograms != null ? ` to ${displayNutritionWeight(props.goalSetup.targetWeightKilograms, units)}` : ''}. Separate from daily nutrient goals.`
@@ -522,36 +536,30 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
         }
         toolbarLeft={
           <div className={styles.nutritionControls}>
-            <label>
-              View
-              <select
-                aria-label="Nutrition view"
-                value={props.view}
-                onChange={(event) => router.push(`/nutrition?view=${event.target.value}`)}
+            <nav className={styles.viewTabs} aria-label="Nutrition views">
+              {VIEWS.map((view) => (
+                <Link
+                  key={view}
+                  href={view === 'overview' ? '/nutrition' : `/nutrition?view=${view}`}
+                  aria-current={props.view === view ? 'page' : undefined}
+                  className={styles.viewTab}
+                >
+                  {VIEW_LABELS[view]}
+                </Link>
+              ))}
+            </nav>
+            <div className={styles.controlsEnd}>
+              {props.view === 'diary' ? dateControls : null}
+              <button
+                type="button"
+                className={styles.profileDetails}
+                onClick={() => setProfileOpen(true)}
+                aria-haspopup="dialog"
               >
-                {VIEWS.map((view) => (
-                  <option key={view} value={view}>
-                    {VIEW_LABELS[view]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              className={styles.profileDetails}
-              onClick={() => setProfileOpen(true)}
-              aria-haspopup="dialog"
-            >
-              <UserCircle size={18} />
-              {profile.displayName} · profile details
-            </button>
-            {props.view === 'diary' ? (
-              dateControls
-            ) : (
-              <Link className={styles.dateLink} href={`/nutrition?view=diary&date=${today}`}>
-                Open today’s diary · {readableDate(today)}
-              </Link>
-            )}
+                <UserCircle size={18} />
+                Profile details
+              </button>
+            </div>
           </div>
         }
       />
@@ -563,384 +571,314 @@ export function NutritionDashboard(props: NutritionDashboardProps) {
         </p>
       )}
       {props.view === 'overview' && (
-        <div className={styles.overviewColumns}>
-          <div className={styles.overviewMain}>
-            <section className={styles.panel} aria-labelledby="daily-intake-heading">
-              <header className={styles.sectionHeading}>
-                <div>
-                  <h2 id="daily-intake-heading">Today’s recorded food</h2>
-                  <p>
-                    {profile.displayName} · {readableDate(today)}
-                  </p>
-                </div>
-                {profile.canManageGoals && (
-                  <button className="text-button" type="button" onClick={() => setGoalsOpen(true)}>
-                    Edit goals
-                  </button>
-                )}
-              </header>
-              {consumedToday.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <h3>No food recorded today</h3>
-                  <p>
-                    Log food to see known amounts. Skipped records and planned meals do not add
-                    nutrients; a goal is optional.
-                  </p>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={!profile.canManageProfile}
-                    onClick={() => openRecord()}
-                  >
-                    <Plus size={18} aria-hidden="true" />
-                    Log food
-                  </button>
-                </div>
-              ) : (
-                <div className={styles.dailyMetrics}>
-                  {coreNutrients.map(([code, label, unit]) => {
-                    const amount = summary.todayTotals[code];
-                    const comparison = nutritionGoalComparison(goals, today, code, amount ?? null);
-                    const known = consumedToday.filter((entry) =>
-                      entry.values.some((value) => value.nutrientCode === code),
-                    ).length;
-                    return (
-                      <article key={code}>
-                        <div className={styles.metricLabel}>
-                          <NutritionVisualMarker nutrientCode={code} compact />
-                          <h3>{label}</h3>
-                        </div>
-                        <strong className={styles.metricValue}>
-                          {number(amount, code === 'energy_kcal' ? 0 : 1)} <small>{unit}</small>
-                        </strong>
-                        <span>
-                          {known} of {consumedToday.length} recorded foods have data
-                        </span>
-                        <p>{comparison.description}</p>
-                        {comparison.visualPercent !== null &&
-                        comparison.goal &&
-                        (comparison.goal.kind === 'target' ||
-                          comparison.goal.kind === 'minimum') ? (
-                          <progress
-                            value={comparison.visualPercent}
-                            max={100}
-                            aria-label={`${label} relative to configured ${comparison.goal.kind}`}
-                          />
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
+        <div className={styles.stack}>
+          <NutritionOverview
+            profileName={profile.displayName}
+            today={today}
+            totals={summary.todayTotals}
+            planned={plannedToday}
+            showPlanned={showPlanned}
+            trend={summary.trend}
+            goals={goals}
+            entriesToday={consumedToday}
+            labels={Object.fromEntries(
+              props.definitions.map((item) => [item.code, item.displayName]),
+            )}
+            units={Object.fromEntries(
+              props.definitions.map((item) => [item.code, item.canonicalUnit]),
+            )}
+            weight={glanceWeight}
+            completeness={consumedToday.length ? summary.averageCompleteness : null}
+            hasEstimates={summary.hasEstimatedValues && consumedToday.length > 0}
+            canRecord={profile.canManageProfile}
+            canManageGoals={profile.canManageGoals}
+            onLog={() => openRecord()}
+            onEditGoals={() => setGoalsOpen(true)}
+            onLogWeight={() => openRecord('weight')}
+          />
+          <details className={`${styles.panel} ${styles.exactData}`}>
+            <summary className="recipe-disclosure-summary">
+              View exact nutrition data
+              <ChevronDown size={18} />
+            </summary>
+            <NutritionChartPanels
+              datasets={{
+                ...props.chartDatasets,
+                calorie: { ...props.chartDatasets.calorie, showPlannedNutrition: showPlanned },
+              }}
+              mode="overview"
+              nutrientLabels={Object.fromEntries(
+                props.definitions.map((item) => [item.code, item.displayName]),
               )}
-              <details className={styles.exactData}>
-                <summary className="recipe-disclosure-summary">
-                  View exact nutrition data
-                  <ChevronDown size={18} />
-                </summary>
-                <NutritionChartPanels
-                  datasets={{
-                    ...props.chartDatasets,
-                    calorie: { ...props.chartDatasets.calorie, showPlannedNutrition: showPlanned },
-                  }}
-                  mode="overview"
-                  nutrientLabels={Object.fromEntries(
-                    props.definitions.map((item) => [item.code, item.displayName]),
+            />
+          </details>
+          <div className={styles.overviewColumns}>
+            <div className={styles.overviewMain}>
+              {consumedToday.length === 0 && (
+                <section className={styles.panel}>
+                  <header className={styles.sectionHeading}>
+                    <h2>Recent diary history</h2>
+                    <Link className="inline-link" href={`/nutrition?view=diary&date=${today}`}>
+                      View diary
+                    </Link>
+                  </header>
+                  {recent.length ? (
+                    <ol className={styles.recentEntries}>
+                      {recent.map((entry) => {
+                        const date = nutritionLocalDateKey(new Date(entry.occurredAt), zone);
+                        const confirmed = entry.state === 'eaten' || entry.state === 'corrected';
+                        return (
+                          <li key={entry.id}>
+                            <Link href={`/nutrition?view=diary&date=${date}`}>
+                              <strong>
+                                {entry.sourceNameSnapshot || `${entry.mealSlot} ${entry.state}`}
+                              </strong>
+                              <span>
+                                {entry.state} · {nutritionPortion(entry)} · {readableDate(date)}
+                              </span>
+                              <small>
+                                {confirmed
+                                  ? entry.values.find(
+                                      (value) => value.nutrientCode === 'energy_kcal',
+                                    )
+                                    ? `${number(entry.values.find((value) => value.nutrientCode === 'energy_kcal')!.amount, 0)} kcal`
+                                    : 'Calories unknown'
+                                  : 'Not counted as consumed food'}
+                              </small>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  ) : (
+                    <p className={styles.helper}>No diary history yet.</p>
                   )}
-                />
-              </details>
-            </section>
-            <section className={styles.panel}>
-              <header className={styles.sectionHeading}>
-                <h2>Recent diary history</h2>
-                <Link className="inline-link" href={`/nutrition?view=diary&date=${today}`}>
-                  View diary
-                </Link>
-              </header>
-              {recent.length ? (
-                <ol className={styles.recentEntries}>
-                  {recent.map((entry) => {
-                    const date = nutritionLocalDateKey(new Date(entry.occurredAt), zone);
-                    const confirmed = entry.state === 'eaten' || entry.state === 'corrected';
-                    return (
-                      <li key={entry.id}>
-                        <Link href={`/nutrition?view=diary&date=${date}`}>
-                          <strong>
-                            {entry.sourceNameSnapshot || `${entry.mealSlot} ${entry.state}`}
-                          </strong>
-                          <span>
-                            {entry.state} · {nutritionPortion(entry)} · {readableDate(date)}
-                          </span>
-                          <small>
-                            {confirmed
-                              ? entry.values.find((value) => value.nutrientCode === 'energy_kcal')
-                                ? `${number(entry.values.find((value) => value.nutrientCode === 'energy_kcal')!.amount, 0)} kcal`
-                                : 'Calories unknown'
-                              : 'Not counted as consumed food'}
-                          </small>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : (
-                <p className={styles.helper}>No diary history yet.</p>
+                </section>
               )}
-            </section>
-            <section className={styles.panel} id="planned-portions">
-              <header className={styles.sectionHeading}>
-                <div>
-                  <h2>Upcoming meals and personal portions</h2>
-                  <p>
-                    {profile.displayName} · {readableDate(projection.range.start)} –{' '}
-                    {readableDate(projection.range.end)}
-                  </p>
-                </div>
-                <Link className="inline-link" href="/planner">
-                  View full plan
-                </Link>
-              </header>
-              {showPlanned &&
-              Object.values(projection.totalsByDate).some((day) =>
-                Object.values(day).some(Number.isFinite),
-              ) ? (
-                <>
-                  <h3>Today’s planned estimates · {readableDate(today)}</h3>
-                  <p className={styles.helper}>
-                    Separate from consumed food. Averages below use only dates with a known value
-                    for each nutrient.
-                  </p>
-                  <div className={styles.plannedMetrics}>
-                    {coreNutrients.map(([code, label, unit]) => {
-                      const average = nutritionKnownAverage(projection.totalsByDate, code);
-                      return (
-                        <div key={code}>
-                          <strong>{label}</strong>
-                          <span>
-                            Today: {number(plannedToday[code])} {unit}
-                          </span>
-                          <small>
-                            {average.days
-                              ? `${number(average.value)} ${unit} average · ${average.days} ${average.days === 1 ? 'day' : 'days'} with data`
-                              : 'No known values in this range'}
-                          </small>
-                        </div>
-                      );
-                    })}
+              <section className={styles.panel} id="planned-portions">
+                <header className={styles.sectionHeading}>
+                  <div>
+                    <h2>Upcoming meals and personal portions</h2>
+                    <p>
+                      {profile.displayName} · {readableDate(projection.range.start)} –{' '}
+                      {readableDate(projection.range.end)}
+                    </p>
                   </div>
-                </>
-              ) : showPlanned ? (
+                  <Link className="inline-link" href="/planner">
+                    View full plan
+                  </Link>
+                </header>
+                {showPlanned &&
+                Object.values(projection.totalsByDate).some((day) =>
+                  Object.values(day).some(Number.isFinite),
+                ) ? (
+                  <>
+                    <h3>Today’s planned estimates · {readableDate(today)}</h3>
+                    <p className={styles.helper}>
+                      Separate from consumed food. Averages below use only dates with a known value
+                      for each nutrient.
+                    </p>
+                    <div className={styles.plannedMetrics}>
+                      {coreNutrients.map(([code, label, unit]) => {
+                        const average = nutritionKnownAverage(projection.totalsByDate, code);
+                        return (
+                          <div key={code}>
+                            <strong>{label}</strong>
+                            <span>
+                              Today: {number(plannedToday[code])} {unit}
+                            </span>
+                            <small>
+                              {average.days
+                                ? `${number(average.value)} ${unit} average · ${average.days} ${average.days === 1 ? 'day' : 'days'} with data`
+                                : 'No known values in this range'}
+                            </small>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : showPlanned ? (
+                  <p className={styles.helper}>
+                    No personal planned nutrition is available in this range. Assign a portion and
+                    review recipe nutrition below.
+                  </p>
+                ) : (
+                  <p className={styles.helper}>
+                    Planned nutrient previews are hidden by this profile’s preference. Portion
+                    management remains available.
+                  </p>
+                )}
+                <details
+                  open={portionsOpen}
+                  onToggle={(event) => setPortionsOpen(event.currentTarget.open)}
+                >
+                  <summary className="recipe-disclosure-summary">
+                    Manage planned portions
+                    <ChevronDown size={18} />
+                  </summary>
+                  <NutritionMealPlanning
+                    activeProfileId={profile.id}
+                    activeProfileName={profile.displayName}
+                    canManageProfile={profile.canManageProfile}
+                    today={today}
+                    consumedToday={summary.todayTotals}
+                    projection={projection}
+                    showNutritionPreview={false}
+                    embedded
+                  />
+                </details>
+              </section>
+              <section className={`${styles.panel} ${styles.recipeIdeas}`}>
+                <h2>Recipe ideas and contextual review</h2>
                 <p className={styles.helper}>
-                  No personal planned nutrition is available in this range. Assign a portion and
-                  review recipe nutrition below.
+                  Uses permitted goal, recorded-food and explicit-plan evidence. Ideas do not
+                  schedule meals or record consumption.
                 </p>
-              ) : (
-                <p className={styles.helper}>
-                  Planned nutrient previews are hidden by this profile’s preference. Portion
-                  management remains available.
-                </p>
-              )}
-              <details
-                open={portionsOpen}
-                onToggle={(event) => setPortionsOpen(event.currentTarget.open)}
-              >
-                <summary className="recipe-disclosure-summary">
-                  Manage planned portions
-                  <ChevronDown size={18} />
-                </summary>
-                <NutritionMealPlanning
-                  activeProfileId={profile.id}
-                  activeProfileName={profile.displayName}
-                  canManageProfile={profile.canManageProfile}
-                  today={today}
-                  consumedToday={summary.todayTotals}
-                  projection={projection}
-                  showNutritionPreview={false}
-                  embedded
-                />
-              </details>
-            </section>
-            <section className={`${styles.panel} ${styles.recipeIdeas}`}>
-              <h2>Recipe ideas and contextual review</h2>
-              <p className={styles.helper}>
-                Uses permitted goal, recorded-food and explicit-plan evidence. Ideas do not schedule
-                meals or record consumption.
-              </p>
-              {(props.recommendations ?? []).length ? (
-                <ol>
-                  {(props.recommendations ?? []).map((recommendation) => (
-                    <li key={recommendation.key}>
-                      <h3>
-                        <Link href={`/recipes/${recommendation.recipeId}`}>
-                          {recommendation.recipeTitle}
-                        </Link>
-                      </h3>
-                      <p>{recommendation.explanation}</p>
-                      <details>
-                        <summary className="recipe-disclosure-summary">
-                          Evidence and actions
-                          <ChevronDown size={18} />
-                        </summary>
-                        <p>
-                          {recommendation.kind === 'planned_gap'
-                            ? 'Planned gap'
-                            : 'Recorded-average gap'}{' '}
-                          · {recommendation.completeness * 100}% completeness. Pantry availability
-                          is not consumption.
-                        </p>
-                        {recommendation.shortages.map((item, index) => (
-                          <form
-                            key={`${item.productId}:${item.unit}`}
-                            onSubmit={(event) => void addShortage(event, recommendation, index)}
-                          >
-                            <p>
-                              Confirmed shortage: {item.quantity} {item.unit} {item.productName}
-                            </p>
-                            {props.shoppingLists?.length ? (
-                              <>
-                                <label>
-                                  Grocery list
-                                  <select name="listId">
-                                    {props.shoppingLists.map((list) => (
-                                      <option key={list.id} value={list.id}>
-                                        {list.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <button type="submit" disabled={request.pending}>
-                                  Confirm one grocery item
-                                </button>
-                              </>
-                            ) : (
-                              <Link href="/lists">Create a grocery list</Link>
-                            )}
-                          </form>
-                        ))}
-                        <div className={styles.buttonRow}>
-                          {(['helpful', 'not_helpful', 'dismissed'] as const).map((state) => (
-                            <button
-                              key={state}
-                              type="button"
-                              disabled={request.pending}
-                              onClick={() => void feedback(recommendation, state)}
+                {(props.recommendations ?? []).length ? (
+                  <ol>
+                    {(props.recommendations ?? []).map((recommendation) => (
+                      <li key={recommendation.key}>
+                        <h3>
+                          <Link href={`/recipes/${recommendation.recipeId}`}>
+                            {recommendation.recipeTitle}
+                          </Link>
+                        </h3>
+                        <p>{recommendation.explanation}</p>
+                        <details>
+                          <summary className="recipe-disclosure-summary">
+                            Evidence and actions
+                            <ChevronDown size={18} />
+                          </summary>
+                          <p>
+                            {recommendation.kind === 'planned_gap'
+                              ? 'Planned gap'
+                              : 'Recorded-average gap'}{' '}
+                            · {recommendation.completeness * 100}% completeness. Pantry availability
+                            is not consumption.
+                          </p>
+                          {recommendation.shortages.map((item, index) => (
+                            <form
+                              key={`${item.productId}:${item.unit}`}
+                              onSubmit={(event) => void addShortage(event, recommendation, index)}
                             >
-                              {state === 'helpful'
-                                ? 'Helpful'
-                                : state === 'not_helpful'
-                                  ? 'Not helpful'
-                                  : 'Dismiss this evidence version'}
-                            </button>
+                              <p>
+                                Confirmed shortage: {item.quantity} {item.unit} {item.productName}
+                              </p>
+                              {props.shoppingLists?.length ? (
+                                <>
+                                  <label>
+                                    Grocery list
+                                    <select name="listId">
+                                      {props.shoppingLists.map((list) => (
+                                        <option key={list.id} value={list.id}>
+                                          {list.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <button type="submit" disabled={request.pending}>
+                                    Confirm one grocery item
+                                  </button>
+                                </>
+                              ) : (
+                                <Link href="/lists">Create a grocery list</Link>
+                              )}
+                            </form>
                           ))}
-                        </div>
-                        <NutritionFeedback
-                          value={request.feedback[`recommendation:${recommendation.key}`]}
-                        />
-                      </details>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className={styles.helper}>No recipe recommendation has enough evidence yet.</p>
-              )}
-              <DecisionAssistance
-                headingLevel={3}
-                embedded
-                initialTask="insights"
-                tasks={['insights']}
-                title="Review nutrition insights"
-                description="Review evidence-supported suggestions. Remembering an assessment does not log food or schedule a meal."
-              />
-            </section>
-            {summary.currentEntries.length ||
-            props.goals.length ||
-            (props.weightTrend?.observations.length ?? 0) > 0 ? (
+                          <div className={styles.buttonRow}>
+                            {(['helpful', 'not_helpful', 'dismissed'] as const).map((state) => (
+                              <button
+                                key={state}
+                                type="button"
+                                disabled={request.pending}
+                                onClick={() => void feedback(recommendation, state)}
+                              >
+                                {state === 'helpful'
+                                  ? 'Helpful'
+                                  : state === 'not_helpful'
+                                    ? 'Not helpful'
+                                    : 'Dismiss this evidence version'}
+                              </button>
+                            ))}
+                          </div>
+                          <NutritionFeedback
+                            value={request.feedback[`recommendation:${recommendation.key}`]}
+                          />
+                        </details>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className={styles.helper}>No recipe recommendation has enough evidence yet.</p>
+                )}
+                <DecisionAssistance
+                  headingLevel={3}
+                  embedded
+                  initialTask="insights"
+                  tasks={['insights']}
+                  title="Review nutrition insights"
+                  description="Review evidence-supported suggestions. Remembering an assessment does not log food or schedule a meal."
+                />
+              </section>
+              {summary.currentEntries.length ||
+              props.goals.length ||
+              (props.weightTrend?.observations.length ?? 0) > 0 ? (
+                <details className={styles.panel}>
+                  <summary className="recipe-disclosure-summary">
+                    Saved nutrition insights
+                    <ChevronDown size={18} />
+                  </summary>
+                  <NutritionInsights key={profile.id} initialSummary={props.initialAiSummary} />
+                </details>
+              ) : null}
+              {optionalSetup}
               <details className={styles.panel}>
                 <summary className="recipe-disclosure-summary">
-                  Saved nutrition insights
+                  How totals and coverage are counted
                   <ChevronDown size={18} />
                 </summary>
-                <NutritionInsights key={profile.id} initialSummary={props.initialAiSummary} />
-              </details>
-            ) : null}
-            {optionalSetup}
-            <details className={styles.panel}>
-              <summary className="recipe-disclosure-summary">
-                How totals and coverage are counted
-                <ChevronDown size={18} />
-              </summary>
-              <p>
-                Only the latest eaten or corrected food contributes. Planned, served, skipped,
-                deleted and Pantry records are separate. A partial known sum does not describe
-                unknown nutrients. Coverage and confidence describe recorded data, not health.
-              </p>
-              <Link className="inline-link" href="/nutrition?view=trends">
-                View recorded trends
-              </Link>
-            </details>
-          </div>
-          <aside className={styles.overviewRail}>
-            <section className={styles.panel}>
-              <h2>Recording coverage</h2>
-              <p className={styles.helper}>
-                {profile.displayName} · {readableDate(today)}
-              </p>
-              {consumedToday.length ? (
-                <dl className={styles.coverageList}>
-                  <div>
-                    <dt>Average nutrient-data completeness</dt>
-                    <dd>
-                      {summary.averageCompleteness === null
-                        ? 'Unknown'
-                        : `${Math.round(summary.averageCompleteness * 100)}%`}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Average source confidence</dt>
-                    <dd>
-                      {summary.averageConfidence === null
-                        ? 'Unknown'
-                        : `${Math.round(summary.averageConfidence * 100)}%`}
-                    </dd>
-                  </div>
-                </dl>
-              ) : (
-                <p className={styles.helper}>
-                  No consumed food recorded for this day; coverage is unavailable.
+                <p>
+                  Only the latest eaten or corrected food contributes. Planned, served, skipped,
+                  deleted and Pantry records are separate. A partial known sum does not describe
+                  unknown nutrients. Coverage and confidence describe recorded data, not health.
                 </p>
+                <Link className="inline-link" href="/nutrition?view=trends">
+                  View recorded trends
+                </Link>
+              </details>
+            </div>
+            <aside className={styles.overviewRail}>
+              {profile.canViewMeasurements && (
+                <NutritionScaleSettings
+                  key={profile.id}
+                  profileId={profile.id}
+                  latest={props.latestWeighIn ?? null}
+                  imperial={units}
+                  enabled={Boolean(profile.weightTrackingEnabled)}
+                  canManage={profile.canManageProfile}
+                  onRecord={() => openRecord('weight')}
+                />
               )}
-              {summary.hasEstimatedValues && <p className={styles.helper}>Includes estimates.</p>}
-              <Link className="inline-link" href="/nutrition?view=nutrients">
-                View nutrient details
-              </Link>
-            </section>
-            {profile.canViewMeasurements && (
-              <NutritionScaleSettings
-                key={profile.id}
-                profileId={profile.id}
-                latest={props.latestWeighIn ?? null}
-                imperial={units}
-                enabled={Boolean(profile.weightTrackingEnabled)}
-                canManage={profile.canManageProfile}
-                onRecord={() => openRecord('weight')}
-              />
-            )}
-            <section className={styles.panel}>
-              <h2>Household profiles</h2>
-              <p>
-                {props.householdComparison.members.length} authorised{' '}
-                {props.householdComparison.members.length === 1 ? 'profile' : 'profiles'} in this
-                comparison.
-              </p>
-              <p className={styles.helper}>
-                Activity period: {props.householdComparison.range.start} –{' '}
-                {props.householdComparison.range.end}. Personal recording coverage above is not a
-                household average.
-              </p>
-              <Link className="inline-link" href="/nutrition?view=household">
-                View permitted household activity
-              </Link>
-            </section>
-          </aside>
+              {props.householdComparison.members.length > 1 && (
+                <section className={styles.panel}>
+                  <h2>Household profiles</h2>
+                  <p>
+                    {props.householdComparison.members.length} authorised{' '}
+                    {props.householdComparison.members.length === 1 ? 'profile' : 'profiles'} in
+                    this comparison.
+                  </p>
+                  <p className={styles.helper}>
+                    Activity period: {props.householdComparison.range.start} –{' '}
+                    {props.householdComparison.range.end}. Personal recording coverage above is not
+                    a household average.
+                  </p>
+                  <Link className="inline-link" href="/nutrition?view=household">
+                    View permitted household activity
+                  </Link>
+                </section>
+              )}
+            </aside>
+          </div>
         </div>
       )}
       {props.view === 'diary' && (

@@ -1,3 +1,5 @@
+import { reviseMealPlanDraft } from '@/lib/services/ai-meal-plan-draft-service';
+import { getAiActionProposal } from '@/lib/services/ai-action-service';
 import { randomUUID } from 'node:crypto';
 import { acceptRecipeImageCandidate } from '@/lib/services/recipe-image-candidate-service';
 import { effectivePlanEntries } from '@/lib/domain/planner-workflow';
@@ -186,6 +188,81 @@ describe('AI assistant services', () => {
     setAiBatchClientForTests(null);
     resetDatabaseForTests();
     vi.unstubAllEnvs();
+  });
+
+  it('replaces only the selected draft meal and supersedes old previews without saving recipes', async () => {
+    const profile = setupProfile();
+    const thread = createAiChatThread(profile.id);
+    const first = {
+      plannedFor: '2026-07-20',
+      meal: 'dinner',
+      existingRecipeId: null,
+      newRecipeKey: 'first',
+      title: recipe.title,
+      servings: 4,
+      note: '',
+    };
+    const second = {
+      ...first,
+      plannedFor: '2026-07-21',
+      newRecipeKey: 'second',
+      title: 'Keep this dinner',
+    };
+    provider.mealPlanCandidate = aiMealPlanCandidateSchema.parse({
+      newRecipes: [
+        { key: 'first', recipe },
+        { key: 'second', recipe: { ...recipe, title: 'Keep this dinner' } },
+      ],
+      entries: [first, second],
+      warnings: [],
+      assumptions: [],
+    });
+    const draft = await generateAiMealPlanProposal({
+      actorProfileId: profile.id,
+      threadId: thread.id,
+      request: {
+        startDate: '2026-07-20',
+        endDate: '2026-07-21',
+        mealSlots: ['dinner'],
+        servings: 4,
+        sourceMode: 'new',
+        selectedProfileIds: [profile.id],
+      },
+    });
+    provider.mealPlanCandidate = aiMealPlanCandidateSchema.parse({
+      newRecipes: [{ key: 'replacement', recipe: { ...recipe, title: 'Replacement dinner' } }],
+      entries: [{ ...first, newRecipeKey: 'replacement', title: 'Replacement dinner' }],
+      warnings: [],
+      assumptions: [],
+    });
+    const revised = await reviseMealPlanDraft({
+      profileId: profile.id,
+      threadId: thread.id,
+      args: {
+        actionId: draft.proposal.id,
+        plannedFor: first.plannedFor,
+        meal: first.meal,
+        instructions: 'Something else',
+      },
+    });
+    const candidate = (revised.preview as { candidate: typeof draft.candidate }).candidate;
+    expect(candidate.entries[1]).toEqual(draft.candidate.entries[1]);
+    expect(candidate.entries[0].title).toBe('Replacement dinner');
+    expect(getAiActionProposal(draft.proposal.id, profile.id).action.status).toBe('cancelled');
+    expect(listRecipes()).toHaveLength(0);
+    expect(listPlannedMeals('2026-07-20', '2026-07-21')).toHaveLength(0);
+    await expect(
+      reviseMealPlanDraft({
+        profileId: profile.id,
+        threadId: thread.id,
+        args: {
+          actionId: draft.proposal.id,
+          plannedFor: first.plannedFor,
+          meal: first.meal,
+          instructions: '',
+        },
+      }),
+    ).rejects.toThrow('pending draft');
   });
 
   it('keeps a short preference-focused proposal response', () => {

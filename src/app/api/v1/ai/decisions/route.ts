@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { predictionHistory } from '@/lib/services/prediction-history-service';
 import { withAiExecutionContext } from '@/lib/services/ai-execution-context';
 import { decisionRequestSchema, decisionFeedbackSchema } from '@/lib/domain/decision-assistance';
 import {
@@ -14,9 +16,20 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
-    return Response.json(decisionWorkspace(await decisionPrincipal(request)), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    const p = await decisionPrincipal(request);
+    const query = z
+      .object({
+        history: z.enum(['true']).optional(),
+        offset: z.coerce.number().int().min(0).max(10000).default(0),
+      })
+      .strict()
+      .parse(Object.fromEntries(new URL(request.url).searchParams));
+    return Response.json(
+      query.history ? predictionHistory(p, query.offset) : decisionWorkspace(p),
+      {
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
   } catch (error) {
     return decisionErrorResponse(error);
   }

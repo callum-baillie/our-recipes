@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Camera, Radio, ScanBarcode, WifiOff } from 'lucide-react';
+import { Camera, CheckCircle2, Radio, ScanBarcode, TriangleAlert, WifiOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { PhotoCredit } from './product-image';
@@ -34,6 +34,7 @@ export function PantryScanWorkspace({
   canEdit,
   visible,
   onSwitchToSearch,
+  onFinish,
 }: {
   camera: Camera;
   handheld: Handheld;
@@ -43,8 +44,11 @@ export function PantryScanWorkspace({
   /** Only the visible workspace may hold the camera. */
   visible: boolean;
   onSwitchToSearch: () => void;
+  /** Ends the session: everything scanned is already in the pantry, so this only leaves. */
+  onFinish: (added: number) => void;
 }) {
   const [open, setOpen] = useState('');
+  const [finishing, setFinishing] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
 
   const items = [...camera.items, ...handheld.items].sort(
@@ -56,6 +60,13 @@ export function PantryScanWorkspace({
   ];
   const total = camera.count + handheld.liveCount;
   const hasAny = items.length > 0 || unnamed.length > 0 || handheld.meals.length > 0;
+
+  function finish() {
+    setFinishing(true);
+    camera.clear();
+    if (handheld.enabled) handheld.startNew();
+    onFinish(total);
+  }
 
   return (
     <div className={styles.workspace} data-handheld-open={handheld.enabled || undefined}>
@@ -241,6 +252,34 @@ export function PantryScanWorkspace({
           </>
         )}
         {items.some((item) => item.gtin) && <PhotoCredit className={styles.credit} />}
+        {hasAny && (
+          <div className={styles.finishBar} role="group" aria-label="Finish scanning">
+            <div className={styles.finishCopy}>
+              <strong>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                {total} {total === 1 ? 'item' : 'items'} added to your pantry
+              </strong>
+              {unnamed.length > 0 ? (
+                <span data-warning>
+                  <TriangleAlert size={14} aria-hidden="true" />
+                  {unnamed.length} {unnamed.length === 1 ? 'barcode needs' : 'barcodes need'} a name
+                  to be added
+                </span>
+              ) : (
+                <span>Everything scanned is already saved. Adjust anything above first.</span>
+              )}
+            </div>
+            <button
+              type="button"
+              className={styles.finishButton}
+              onClick={finish}
+              disabled={finishing}
+              aria-busy={finishing}
+            >
+              Finish session
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

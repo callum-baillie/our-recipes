@@ -307,6 +307,36 @@ function formatExpiryDate(batch: Batch): string {
   }).format(new Date(`${batch.expiry.date}T00:00:00`));
 }
 
+/** One readable line for a card: what kind of date it is, when, and how soon. */
+function expirySummary(batch: Batch): { label: string; relative: string | null } {
+  if (!batch.expiry.date) return { label: 'No date recorded', relative: null };
+  const kind = {
+    use_by: 'Use by',
+    best_before: 'Best before',
+    sell_by: 'Sell by',
+    opened_shelf_life: 'Use within',
+    unknown: 'Date',
+  }[batch.expiry.kind];
+  const date = new Date(`${batch.expiry.date}T00:00:00`);
+  const days = Math.round((date.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
+  const relative =
+    batchExpiryIsLoose(batch) || Math.abs(days) > 90
+      ? null
+      : days === 0
+        ? 'today'
+        : days === 1
+          ? 'tomorrow'
+          : days === -1
+            ? 'yesterday'
+            : days > 0
+              ? `in ${days} days`
+              : `${-days} days ago`;
+  return { label: `${kind} ${formatExpiryDate(batch)}`, relative };
+}
+function batchExpiryIsLoose(batch: Batch) {
+  return batch.expiryPrecision === 'month_only';
+}
+
 function batchStateLabel(batch: Batch, isLowStock: boolean): string {
   if (isLowStock) return 'Low stock';
   if (batch.expiry.state === 'expired') return 'Date passed';
@@ -1333,33 +1363,36 @@ export function PantryManager({
         </ToastNotice>
       ) : null}
       {error ? <ToastMessage message={error} tone="error" /> : null}
-      <section className={styles.summary} aria-label="Pantry summary">
-        {summaryCards(dashboard)
-          .filter((card) => card.value > 0 || card.label === 'On hand')
-          .map(({ detail, icon: Icon, label, tone, value }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => {
-                clearPantryFilters();
-                if (label === 'Expiring soon') setExpiry('soon');
-                else if (label === 'Low stock') setView('low_stock');
-                else if (label === 'Opened') setView('opened');
-                else if (label === 'Recent changes') setView('recent');
-              }}
-              aria-label={`Show ${label.toLowerCase()}: ${value} ${detail}`}
-            >
-              <span className={`${styles.summaryIcon} ${styles[tone]}`} aria-hidden="true">
-                <Icon size={26} />
-              </span>
-              <span className={styles.summaryCopy}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-                <small>{detail}</small>
-              </span>
-            </button>
-          ))}
-      </section>
+      {/* Counts only appear once there is something to count. */}
+      {summaryCards(dashboard).some((card) => card.value > 0) && (
+        <section className={styles.summary} aria-label="Pantry summary">
+          {summaryCards(dashboard)
+            .filter((card) => card.value > 0)
+            .map(({ detail, icon: Icon, label, tone, value }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  clearPantryFilters();
+                  if (label === 'Expiring soon') setExpiry('soon');
+                  else if (label === 'Low stock') setView('low_stock');
+                  else if (label === 'Opened') setView('opened');
+                  else if (label === 'Recent changes') setView('recent');
+                }}
+                aria-label={`Show ${label.toLowerCase()}: ${value} ${detail}`}
+              >
+                <span className={`${styles.summaryIcon} ${styles[tone]}`} aria-hidden="true">
+                  <Icon size={26} />
+                </span>
+                <span className={styles.summaryCopy}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                  <small>{detail}</small>
+                </span>
+              </button>
+            ))}
+        </section>
+      )}
 
       <div className={styles.mobileToolbar}>
         <SearchFacetBar
@@ -1760,17 +1793,21 @@ export function PantryManager({
                             </div>
                           </div>
                           <p className={styles.quantity}>{batch.quantityLabel}</p>
-                          <p className={styles.location}>
-                            <MapPin size={15} aria-hidden="true" /> {batch.location.path}
-                          </p>
+                          {batch.location.path !== groupLabel && (
+                            <p className={styles.location}>
+                              <MapPin size={15} aria-hidden="true" /> {batch.location.path}
+                            </p>
+                          )}
                           <time
                             className={`${styles.expiryDate} ${styles[batch.expiry.state]}`}
                             title={expiryLabel(batch)}
                             dateTime={batch.expiry.date ?? undefined}
                           >
-                            {formatExpiryDate(batch)}
-                            {batch.expiry.date && (
-                              <small className={styles.dateContext}>{expiryLabel(batch)}</small>
+                            {expirySummary(batch).label}
+                            {expirySummary(batch).relative && (
+                              <small className={styles.dateContext}>
+                                {expirySummary(batch).relative}
+                              </small>
                             )}
                           </time>
                           <span

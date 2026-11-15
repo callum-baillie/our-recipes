@@ -1,4 +1,5 @@
 import 'server-only';
+import { buildPredictionJobs } from './prediction-jobs-service';
 import { eq } from 'drizzle-orm';
 import { getDatabase } from '@/lib/db/client';
 import { recipeIngredientProductMappings } from '@/lib/db/schema';
@@ -87,6 +88,14 @@ export async function buildDecisionJobs(
   p: RequestPrincipal,
   input: DecisionRequest,
 ): Promise<{ jobs: DecisionJob[]; notice: string; nextOffset: number | null }> {
+  const prediction = await buildPredictionJobs(p, input);
+  if (prediction)
+    return {
+      jobs: prediction.slice(input.offset, input.offset + 20),
+      nextOffset: prediction.length > input.offset + 20 ? input.offset + 20 : null,
+      notice:
+        'Exploratory forecasts, not measured outcomes. Missing records remain unknown. Review source evidence before acting.',
+    };
   const policy = getAiDataPolicy(p.profileId);
   const jobs: DecisionJob[] = [];
   const requireSharing = (condition: boolean, label: string) => {

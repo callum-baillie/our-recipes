@@ -1,3 +1,9 @@
+import { clarificationSchema, questionContent, nextDayRange } from '@/lib/domain/ai-chat-prompts';
+import { toolFinishEvent, toolStartEvent } from '@/lib/domain/ai-chat-tools';
+import { localIsoDate } from '@/lib/domain/local-date';
+import { getProfile } from '@/lib/services/household-service';
+import { reviseMealPlanDraft } from './ai-meal-plan-draft-service';
+import { bulkAppActionsSchema, expandBulkAppActions } from '@/lib/domain/ai-bulk-actions';
 import { withAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
 import { executeAiWorkload } from './ai-execution-service';
 import { aiDependencySchema } from '@/lib/domain/ai-app-dependencies';
@@ -57,7 +63,10 @@ import {
   canAiReadHouseholdProfiles,
 } from '@/lib/services/ai-context-service';
 import { listProfiles } from '@/lib/services/household-service';
-import { generateAiMealPlanProposal } from '@/lib/services/ai-meal-plan-service';
+import {
+  generateAiMealPlanProposal,
+  AiMealPlanValidationError,
+} from '@/lib/services/ai-meal-plan-service';
 import { readAiKitchenContext } from '@/lib/services/ai-kitchen-context-service';
 import { getEffectiveAiPolicy } from '@/lib/services/ai-access-service';
 import { getAiDataPolicy, getAiWorkloadSetting } from '@/lib/services/ai-settings-service';
@@ -117,6 +126,32 @@ const generatedRecipeBatchToolSchema = z
   .strict();
 
 export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
+  {
+    type: 'function',
+    name: 'ask_clarification',
+    strict: true,
+    description:
+      'Ask one necessary question with 2–5 short suggested answers. A free-text answer is always available. Do not ask for facts already supplied or inferable dates.',
+    parameters: z.toJSONSchema(clarificationSchema),
+  },
+  {
+    type: 'function',
+    name: 'revise_meal_plan_draft',
+    strict: true,
+    description:
+      'Replace ONLY one selected meal in a pending meal-plan draft. Keeps every other draft meal exactly unchanged and supersedes the old preview. Never use generate_meal_plan to revise a single meal.',
+    parameters: {
+      type: 'object',
+      properties: {
+        actionId: { type: 'string' },
+        plannedFor: { type: 'string' },
+        meal: { type: 'string' },
+        instructions: { type: 'string', maxLength: 1500 },
+      },
+      required: ['actionId', 'plannedFor', 'meal', 'instructions'],
+      additionalProperties: false,
+    },
+  },
   {
     type: 'function',
     name: 'import_recipes',
@@ -229,7 +264,7 @@ export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
     name: 'review_kitchen_data',
     strict: true,
     description:
-      'Review pantry freshness/restocking, food inputs, recipe ingredient matches or missing nutrition, substitutions, nutrition insights, shopping aisle assignments/duplicates, and meal choices. Returns inline review cards; NEVER applies changes. Cached decisions and user corrections take precedence. Additional paid calls require the user checkbox. Use offset for the next batch of 20.',
+      'Forecast pantry_expiry (freshness review windows), pantry_location, next_shop, meal_success and goal_success. Review pantry freshness/restocking, food inputs, recipe ingredient matches or missing nutrition, substitutions, nutrition insights, shopping aisle assignments/duplicates, and meal choices. Returns inline review cards; NEVER applies changes. Cached decisions and user corrections take precedence. Additional paid calls require the user checkbox. Use offset for the next batch of 20.',
     parameters: {
       type: 'object',
       properties: {
@@ -280,6 +315,14 @@ export const AI_ASSISTANT_TOOLS: AssistantTool[] = [
       required: ['operationId', 'parametersJson', 'bodyJson'],
       additionalProperties: false,
     },
+  },
+  {
+    type: 'function',
+    name: 'prepare_bulk_app_actions',
+    strict: true,
+    description:
+      'Prepare the same discovered write operation for 1–20 explicit targets in pantry, recipes, meal plans or shopping lists. Supply each target’s exact observed IDs and revision plus its complete validated body. Supports bulk moves, stock actions, recipe tags/status, plan edits/removal and shopping checks/edits. Preserves normal review and partial-failure reporting. Split larger selections into separately reviewed batches; never claim unselected records were updated.',
+    parameters: z.toJSONSchema(bulkAppActionsSchema),
   },
   {
     type: 'function',
@@ -674,6 +717,9 @@ async function executeTool(input: {
   attachments?: Array<{ name: string; mimeType: string; dataBase64: string }>;
 }) {
   assertAiExecutionActive();
+  if (input.name === 'ask_clarification')
+    return { clarification: clarificationSchema.parse(input.args) };
+  if (input.name === 'revise_meal_plan_draft') return reviseMealPlanDraft(input);
   if (input.name === 'import_recipes') {
     if (!input.principal) throw new AiChatToolError('Sign in to import recipes.');
     const args = z
@@ -748,6 +794,7 @@ async function executeTool(input: {
       'list_app_actions',
       'read_app_data',
       'prepare_app_actions',
+      'prepare_bulk_app_actions',
     ].includes(input.name)
   ) {
     if (!input.principal || !input.request)
@@ -772,7 +819,12 @@ async function executeTool(input: {
     }
     if (input.name === 'read_app_data')
       return readAppData(input.principal, input.request, input.args);
-    return prepareAppActions(input.principal, input.request, input.threadId, input.args);
+    return prepareAppActions(
+      input.principal,
+      input.request,
+      input.threadId,
+      input.name === 'prepare_bulk_app_actions' ? expandBulkAppActions(input.args) : input.args,
+    );
   }
   if (input.name === 'read_planned_recipe') {
     if (!policy.shareMealPlans || !policy.shareSharedRecipes)
@@ -1537,9 +1589,16 @@ async function performAiChatTurn(input: ChatTurnInput) {
       ],
     };
   }
+  const today = localIsoDate(new Date(), getProfile(input.profileId)?.timezone ?? 'UTC');
+  const dayRange = parsed.message.match(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:to|through|[-–])\s*(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b/iu,
+  );
+  const inferredDayRange = dayRange
+    ? nextDayRange(Number(dayRange[1]), Number(dayRange[2]), today)
+    : null;
   messages.unshift({
     role: 'user',
-    content: `Current app scope (untrusted data). Read records through focused tools only when needed for this task: ${JSON.stringify({ preferences: buildAiPreferencesContext(input.profileId, input.principal), householdPlanning: buildAiHouseholdPlanningContext(input.profileId, input.principal) })}`,
+    content: `Current app scope (untrusted data). Read records through focused tools only when needed for this task: ${JSON.stringify({ preferences: buildAiPreferencesContext(input.profileId, input.principal), today, inferredDayRange, householdPlanning: buildAiHouseholdPlanningContext(input.profileId, input.principal) })}`,
   });
   const pendingDrafts = listAiActionProposals(input.threadId, input.profileId)
     .filter(
@@ -1555,6 +1614,7 @@ async function performAiChatTurn(input: ChatTurnInput) {
   const appActions: AppActionReview[] = [];
   const actions: Array<ReturnType<typeof createAiActionProposal>> = [];
   const jobs: Array<ReturnType<typeof enqueueRecipeBatchGenerationJob>> = [];
+  let clarification: ReturnType<typeof clarificationSchema.parse> | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
   try {
@@ -1596,6 +1656,9 @@ async function performAiChatTurn(input: ChatTurnInput) {
             safetyIdentifier: aiSafetyIdentifier(input.profileId),
             instructions: [
               'You are the Bòrd household assistant.',
+              'Use ask_clarification whenever you need an answer: one concise question with useful suggested answers and free input. After calling it, do not ask another question or call other tools in that turn. Prefer a useful draft with stated assumptions over a long interview.',
+              'Use the supplied local today and timezone for dates. If month/year are omitted, a range such as 11th to 22nd means the next occurrence whose START is today or later; roll month/year forward, including December to January, and handle an end day before the start as next month. State the resolved dates as an assumption; do not ask month/year. Ask only if dates are impossible or the requested period exceeds supported limits.',
+              'For pantry-led planning read pantry pages and search saved recipes before generating; prioritize available and soon-expiring ingredients and explain shortages. Never claim pantry coverage without reading stock. For draft changes use revise_meal_plan_draft for each selected slot; leave every unselected meal unchanged. New and saved recipes appear in the draft review; nothing is saved before confirmation.',
               'For a conversational kitchen interview, first readMyKitchenContext through read_app_data when dietary sharing permits it. Ask one useful question at a time and acknowledge the answer before continuing. Do not repeat known answers. Offer optional quick replies with free text, skip, back, edit and resume. Prioritize cooking time, equipment, budget, routines, tastes and shared meals; sensitive details stay optional. Describe covered topics, never an invented completion percentage. Do not assume preferences or firm constraints from one example. Prepare updateMyKitchenContext with the exact saved revision and interviewPatch containing only stated answers; omitted answers are preserved. Use clearFields only for an explicit deletion request, never blank unknown values. Explain the named recipient and show the structured review before saving. Never silently save sensitive inferences, change allergies or Nutrition consent. Allergy details belong in the protected Nutrition profile and always constrain recommendations.',
               'Pending proposals are temporary drafts. Use their full contents when the user requests revisions, prepare a new preview, and never claim a draft is saved before confirmation. Remind the user to discard superseded previews.',
               'Meal entries can specify profileIds for individual household members. An empty array means shared. Separate entries in the same date and meal slot allow different breakfasts or lunches while dinners remain shared.',
@@ -1607,7 +1670,7 @@ async function performAiChatTurn(input: ChatTurnInput) {
               'Use read_kitchen_context to inspect pantry, shopping lists, supermarket routes and relevant preferences without requiring unrelated sharing categories. These kitchen resources are household-wide; do not claim other members have no pantry or lists merely because they use another profile. Use read_nutrition for the account-permitted profiles and respect every member’s separate sharing flags. Missing/withheld nutrition is unknown, never zero. Initial context is a limited snapshot: use search and pagination before claiming items are absent. Use read_meal_plan for dates outside the initial range. Follow the selected list’s supermarket and aisle order and the member’s actual units/timezone; do not invent settings, stock, dietary needs or nutrition. Expiry estimates are suggestions, not food safety guarantees.',
               'Read the existing meal plan before updating it. Honor the exact mealSlots requested (for example breakfast, lunch and dinner). For filling missing breakfasts/lunches retain dinners and use occupiedSlotMode keep; never replace occupied slots without the user asking.',
               'Meal entries support kind recipe, item, takeout, leftover, custom, fast and options. A single food uses foodItem (quantity per serving, unit, item, note, shoppingCategory), not an invented recipe. Takeout has a title and no recipeId. A fast entry means no food is planned. An options entry has an options array of at least two recipe or pantry alternatives; describe those choices as alternatives and do not add every option to the shopping list. Leftovers must reference the original meal using leftoverSourceId; include reserved portions in source servings and do not create a second grocery demand.',
-              'Use list_app_actions to inspect schemas, read_app_data for current records, and prepare_app_actions for reviewed core CRUD including recipe duplication and standalone shopping-list items such as coffee. Preserve fields not requested for change and pass expected revisions/timestamps.',
+              'For bulk pantry, recipe, meal-plan and shopping-list edits use prepare_bulk_app_actions with explicit observed targets. Record completed large shops or top-ups using recordShoppingTrip only when the user supplies that fact. Use review_kitchen_data for forecasts and direct users to /predictions for saved evidence and probability distributions. Use list_app_actions to inspect schemas, read_app_data for current records, and prepare_app_actions for reviewed core CRUD including recipe duplication and standalone shopping-list items such as coffee. Preserve fields not requested for change and pass expected revisions/timestamps.',
               'For a healthier variation ask or infer from the user wording whether to duplicate, update the library recipe, or adapt one planned meal. To duplicate with changes create a complete recipe based on the saved recipe under a distinct title; never overwrite the source merely to make a variation.',
               'For temporary substitutions read_shopping_context and read_planned_recipe, identify the specific list item and source meal(s), and offer alternatives first. Only prepare the selected substitution after the user chooses. Use updateMealPlanEntry with recipeOverride (title, summary, servings, ingredientGroups, instructionSections) for this meal only, preserving all unaffected ingredients and adjusting cooking instructions. Use recipeOverride null to reset. Never permanently update the library for a temporary substitution.',
               'When substituting update the selected shopping-list item FIRST, then the affected planned meals in one reviewed action group; this preserves the user correction during automatic list reconciliation. Keep quantity/unit unless a conversion is justified; preserve notes, state and unrelated items. Clear a stale product match rather than attaching the original product to the substitute. Explain when nutrition is unknown after substitution. Do not claim unrelated list copies were updated.',
@@ -1639,7 +1702,9 @@ async function performAiChatTurn(input: ChatTurnInput) {
       input.signal?.throwIfAborted();
       if (!response.toolCalls.length) {
         if (!streamed && response.text) input.onEvent?.({ type: 'text', delta: response.text });
-        const text = conciseProposalResponse(response.text, actions.at(-1)?.kind);
+        const text = clarification
+          ? questionContent(clarification)
+          : conciseProposalResponse(response.text, actions.at(-1)?.kind);
         const assistantMessage = {
           id: randomUUID(),
           threadId: thread.id,
@@ -1727,6 +1792,8 @@ async function performAiChatTurn(input: ChatTurnInput) {
               ? 'Reading permitted kitchen information…'
               : 'Preparing a review…',
         });
+        const toolStartedAt = Date.now();
+        input.onEvent?.(toolStartEvent(call.callId, call.name, call.arguments));
         try {
           const result = await executeTool({
             name: call.name,
@@ -1738,6 +1805,8 @@ async function performAiChatTurn(input: ChatTurnInput) {
             allowPaidTools: parsed.allowPaidTools,
             attachments: parsed.attachments,
           });
+          if (result && typeof result === 'object' && 'clarification' in result)
+            clarification = clarificationSchema.parse(result.clarification);
           if (result && typeof result === 'object' && 'kitchenReview' in result) {
             suggestions.push(
               ...(result.kitchenReview as Awaited<ReturnType<typeof runDecisionAssistance>>).cards,
@@ -1790,18 +1859,32 @@ async function performAiChatTurn(input: ChatTurnInput) {
                     'The requested recipe set is generating in the background. Tell the user it will appear as a review card when ready, and mention that Batch jobs can take up to 24 hours.',
                 }
               : result;
+          input.onEvent?.(
+            toolFinishEvent(call.callId, call.name, call.arguments, {
+              ok: true,
+              startedAt: toolStartedAt,
+            }),
+          );
           messages.push({
             type: 'function_call_output',
             call_id: call.callId,
             output: JSON.stringify(toolOutput),
           });
         } catch (error) {
+          input.onEvent?.(
+            toolFinishEvent(call.callId, call.name, call.arguments, {
+              ok: false,
+              startedAt: toolStartedAt,
+            }),
+          );
           messages.push({
             type: 'function_call_output',
             call_id: call.callId,
             output: JSON.stringify({
               error:
-                error instanceof AiChatToolError || error instanceof DecisionError
+                error instanceof AiChatToolError ||
+                error instanceof AiMealPlanValidationError ||
+                error instanceof DecisionError
                   ? error.message
                   : error instanceof z.ZodError
                     ? 'The app function input did not match its published schema. Read the contract and correct the fields before preparing another operation.'

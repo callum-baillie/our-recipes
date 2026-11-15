@@ -12,16 +12,16 @@
 }
 
 .ready {
-  color: #3f6b35;
-  background: #edf5e9;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--field));
 }
 
 .partial {
-  color: #8a4b22;
-  background: #fff2df;
+  color: var(--warning-ink);
+  background: var(--warning-surface);
 }
 
 .unknown {
-  color: #655f59;
-  background: #f4f1ed;
+  color: var(--muted);
+  background: var(--surface-hover, var(--paper));
 }

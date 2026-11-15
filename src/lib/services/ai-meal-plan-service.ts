@@ -220,6 +220,7 @@ export async function generateAiMealPlanProposal(input: {
   threadId?: string | null;
   request: unknown;
   approvedOptions?: AiApprovedExecution;
+  excludedRecipeIds?: string[];
 }) {
   const request = aiMealPlanGenerationRequestSchema.parse(input.request);
   const availableProfileIds = new Set(
@@ -251,6 +252,9 @@ export async function generateAiMealPlanProposal(input: {
   );
   const context = {
     ...sharedContext,
+    recipes: sharedContext.recipes.filter(
+      (recipe) => !input.excludedRecipeIds?.includes(recipe.id),
+    ),
     mealPlan: sharedContext.mealPlan.filter(
       (meal) => !['cancelled', 'skipped'].includes(meal.status),
     ),
@@ -416,6 +420,8 @@ export async function generateAiMealPlanProposal(input: {
       throw new AiMealPlanValidationError('OpenAI returned more than one meal for the same slot.');
     }
     seenSlots.add(key);
+    if (entry.existingRecipeId && input.excludedRecipeIds?.includes(entry.existingRecipeId))
+      throw new AiMealPlanValidationError('The replacement repeated the rejected recipe.');
     const existing = entry.existingRecipeId ? getRecipe(entry.existingRecipeId) : null;
     const generated = entry.newRecipeKey ? generatedKeys.has(entry.newRecipeKey) : false;
     if (Boolean(existing) === generated) {

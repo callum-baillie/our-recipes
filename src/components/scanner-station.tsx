@@ -374,33 +374,35 @@ export function ScannerStation({
         }
       />
       {children}
-      <label>
-        Station
-        <select
-          value={stationId}
-          disabled={!!pending || busy}
-          onChange={(e) => {
-            refreshRequest.current?.abort();
-            refreshRequest.current = null;
-            setStationId(e.target.value);
-            setDetail(null);
-            setLookup(null);
-            setSupersedes(null);
-            setControlAttempt(null);
-            setConnectionError('');
-            setError('');
-            setMessage('');
-            setCountDraft(null);
-          }}
-        >
-          <option value="">Choose station</option>
-          {stations.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <section className={styles.stationPicker} aria-label="Scanner station">
+        <label>
+          Station
+          <select
+            value={stationId}
+            disabled={!!pending || busy}
+            onChange={(e) => {
+              refreshRequest.current?.abort();
+              refreshRequest.current = null;
+              setStationId(e.target.value);
+              setDetail(null);
+              setLookup(null);
+              setSupersedes(null);
+              setControlAttempt(null);
+              setConnectionError('');
+              setError('');
+              setMessage('');
+              setCountDraft(null);
+            }}
+          >
+            <option value="">Choose station</option>
+            {stations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
       {!stations.length && (
         <p className={styles.empty}>Register a station below to connect your scanner companion.</p>
       )}
@@ -1118,97 +1120,112 @@ export function ScannerStation({
             </form>
             <Link href="/nutrition">Review personal nutrition separately</Link>
           </section>
-          <section>
-            <h2>Needs review</h2>
-            {detail.operations
-              .filter(
-                (o) =>
-                  o.status === 'needs_review' &&
-                  !detail.operations.some(
-                    (n) =>
-                      n.status === 'succeeded' &&
-                      n.request?.supersedesOperationId ===
-                        (o.request?.supersedesOperationId ?? o.id),
-                  ),
-              )
-              .map((o) => (
-                <article key={o.id}>
-                  <p>
-                    {o.result.message} · {o.id}
-                  </p>
-                  <button
-                    className={styles.button}
-                    disabled={disabled}
-                    onClick={() =>
-                      chooseReview(o.request?.supersedesOperationId ?? o.id, o.request?.command)
-                    }
-                  >
-                    Review correction
-                  </button>
+          {(detail.operations.some(
+            (o) =>
+              o.status === 'needs_review' &&
+              !detail.operations.some(
+                (n) =>
+                  n.status === 'succeeded' &&
+                  n.request?.supersedesOperationId === (o.request?.supersedesOperationId ?? o.id),
+              ),
+          ) ||
+            uniqueReviews.length > 0) && (
+            <section>
+              <h2>Needs review</h2>
+              {detail.operations
+                .filter(
+                  (o) =>
+                    o.status === 'needs_review' &&
+                    !detail.operations.some(
+                      (n) =>
+                        n.status === 'succeeded' &&
+                        n.request?.supersedesOperationId ===
+                          (o.request?.supersedesOperationId ?? o.id),
+                    ),
+                )
+                .map((o) => (
+                  <article key={o.id}>
+                    <p>
+                      {o.result.message} · {o.id}
+                    </p>
+                    <button
+                      className={styles.button}
+                      disabled={disabled}
+                      onClick={() =>
+                        chooseReview(o.request?.supersedesOperationId ?? o.id, o.request?.command)
+                      }
+                    >
+                      Review correction
+                    </button>
+                  </article>
+                ))}
+              {uniqueReviews.map((e) => (
+                <article key={e.operationId}>
+                  <p>{e.message}</p>
+                  {e.submission === 'not_submitted' ? (
+                    <button
+                      className={styles.button}
+                      disabled={disabled}
+                      onClick={() => chooseReview(e.operationId!, e.command, e.barcode, e.batchId)}
+                    >
+                      Review unsubmitted scan
+                    </button>
+                  ) : (
+                    <p>
+                      Delivery may be uncertain. Reconcile the bridge queue before issuing another
+                      action.
+                    </p>
+                  )}
                 </article>
               ))}
-            {uniqueReviews.map((e) => (
-              <article key={e.operationId}>
-                <p>{e.message}</p>
-                {e.submission === 'not_submitted' ? (
-                  <button
-                    className={styles.button}
-                    disabled={disabled}
-                    onClick={() => chooseReview(e.operationId!, e.command, e.barcode, e.batchId)}
-                  >
-                    Review unsubmitted scan
-                  </button>
-                ) : (
-                  <p>
-                    Delivery may be uncertain. Reconcile the bridge queue before issuing another
-                    action.
-                  </p>
-                )}
-              </article>
-            ))}
-          </section>
-          <section>
-            <h2>Recent transactions</h2>
-            {detail.operations.map((o) => (
-              <article key={o.id}>
-                <strong>{o.status === 'succeeded' ? 'SAVED' : 'NEEDS REVIEW'}</strong>
-                <p>{o.result.message}</p>
-                <small>{o.id}</small>
-                {o.status === 'succeeded' && o.result.undoable && !o.undoneBy && (
-                  <button
-                    className={styles.button}
-                    disabled={disabled}
-                    onClick={() =>
-                      void task(() => submit({ type: 'undo', targetOperationId: o.id }))
-                    }
-                  >
-                    Undo this transaction
-                  </button>
-                )}
-                {o.undoneBy && <p>Reversed by {o.undoneBy}</p>}
-              </article>
-            ))}
-          </section>
-          <section>
-            <h2>Live station activity</h2>
-            {detail.events.slice(0, 20).map((e, i) => (
-              <p key={`${e.operationId}-${i}`}>
-                <strong>{e.status.toUpperCase()}</strong> · {e.message}
-                {(e.barcode || e.batchId) && (
-                  <button
-                    className={styles.button}
-                    onClick={() => {
-                      setBarcode(e.barcode ?? '');
-                      setBatchId(e.batchId ?? '');
-                      setLookup(null);
-                    }}
-                  >
-                    Look up details
-                  </button>
-                )}
-              </p>
-            ))}
-          </section>
+            </section>
+          )}
+          {detail.operations.length > 0 && (
+            <section>
+              <h2>Recent transactions</h2>
+              {detail.operations.map((o) => (
+                <article key={o.id}>
+                  <strong>{o.status === 'succeeded' ? 'SAVED' : 'NEEDS REVIEW'}</strong>
+                  <p>{o.result.message}</p>
+                  <small>{o.id}</small>
+                  {o.status === 'succeeded' && o.result.undoable && !o.undoneBy && (
+                    <button
+                      className={styles.button}
+                      disabled={disabled}
+                      onClick={() =>
+                        void task(() => submit({ type: 'undo', targetOperationId: o.id }))
+                      }
+                    >
+                      Undo this transaction
+                    </button>
+                  )}
+                  {o.undoneBy && <p>Reversed by {o.undoneBy}</p>}
+                </article>
+              ))}
+            </section>
+          )}
+          {detail.events.length > 0 && (
+            <section>
+              <h2>Live station activity</h2>
+              {detail.events.slice(0, 20).map((e, i) => (
+                <p key={`${e.operationId}-${i}`}>
+                  <strong>{e.status.toUpperCase()}</strong> · {e.message}
+                  {(e.barcode || e.batchId) && (
+                    <button
+                      className={styles.button}
+                      onClick={() => {
+                        setBarcode(e.barcode ?? '');
+                        setBatchId(e.batchId ?? '');
+                        setLookup(null);
+                      }}
+                    >
+                      Look up details
+                    </button>
+                  )}
+                </p>
+              ))}
+            </section>
+          )}
         </>
       )}
       {canRegister && (

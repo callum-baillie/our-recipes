@@ -1,0 +1,619 @@
+.overview {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.card {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.4rem);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-sm, none);
+}
+.card h3 {
+  margin: 0;
+  font-family: var(--font-display, Georgia), serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.sectionTitle span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ---- Hero: ring, macros and the week side by side ----------------------------------- */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: clamp(1.25rem, 2.5vw, 2.25rem);
+  align-items: stretch;
+  padding: clamp(1.1rem, 2.2vw, 1.75rem);
+}
+.heroRing,
+.heroMacros {
+  min-width: 0;
+}
+.heroRing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding-right: clamp(1.25rem, 2.5vw, 2.25rem);
+  border-right: 1px solid var(--line);
+}
+.heroMacros {
+  padding-right: clamp(1.25rem, 2.5vw, 2.25rem);
+  border-right: 1px solid var(--line);
+}
+
+.ringWrap {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: 100%;
+}
+.ring {
+  width: min(100%, 11.5rem);
+  aspect-ratio: 1;
+  transform: rotate(-90deg);
+}
+.ring circle {
+  fill: none;
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+.ringTrack {
+  stroke: color-mix(in srgb, var(--primary) 14%, var(--line));
+}
+.ringPlanned {
+  stroke: color-mix(in srgb, var(--primary) 32%, transparent);
+}
+.ringValue {
+  stroke: var(--primary);
+  transition: stroke var(--motion-base, 220ms) ease;
+}
+.ringOver {
+  stroke: var(--accent);
+}
+.ringCenter {
+  position: absolute;
+  top: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  width: min(100%, 11.5rem);
+  aspect-ratio: 1;
+  text-align: center;
+}
+.ringCenter strong {
+  font-family: var(--font-display, Georgia), serif;
+  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ringCenter span {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.ringCaption {
+  margin: 0.7rem 0 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 650;
+  text-align: center;
+}
+.ringCaption[data-over] {
+  color: var(--accent-text);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.logButton,
+.ghostButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  border-radius: var(--btn-radius, 0.6rem);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.logButton {
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+.ghostButton {
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+}
+.logButton:disabled,
+.ghostButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.linkButton {
+  min-height: 0;
+  padding: 0;
+  color: var(--leaf);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.plannedNote {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.plannedSwatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  background: color-mix(in srgb, var(--primary) 32%, transparent);
+  border-radius: 50%;
+}
+
+/* ---- Macro meters -------------------------------------------------------------------- */
+.macroList,
+.tiles {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.macroList {
+  gap: 1.1rem;
+}
+.macroTop,
+.tileTop {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.macroName,
+.tileName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.macroValue {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.macroValue strong {
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+.meter {
+  height: 0.5rem;
+  margin-top: 0.5rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  border-radius: 999px;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  min-width: 0.3rem;
+  background: var(--primary);
+  border-radius: inherit;
+  transform-origin: left;
+}
+.macroNote,
+.tileNote {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+/* ---- Week chart ---------------------------------------------------------------------- */
+.week {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.weekHead {
+  margin-bottom: 0.4rem;
+}
+.weekHead p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.bars {
+  position: relative;
+  display: flex;
+  flex: 1;
+  gap: clamp(0.35rem, 1vw, 0.7rem);
+  align-items: stretch;
+  min-height: 11rem;
+  padding-top: 1.1rem;
+}
+.plot {
+  position: absolute;
+  inset: 2.1rem 0 1.4rem;
+  pointer-events: none;
+}
+.targetLine {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 0;
+  border-top: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.targetLine small {
+  position: absolute;
+  right: 0;
+  bottom: 0.2rem;
+  padding: 0 0.3rem;
+  color: var(--accent-text);
+  background: var(--field);
+  border-radius: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.barColumn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.barValue {
+  height: 1rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+.barTrack {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 2.6rem;
+}
+.bar {
+  display: block;
+  width: 100%;
+  background: color-mix(in srgb, var(--primary) 38%, var(--field));
+  border-radius: 0.4rem 0.4rem 0.2rem 0.2rem;
+  transform-origin: bottom;
+  transition: background-color var(--motion-fast, 140ms) ease;
+}
+.barColumn[data-today] .bar {
+  background: var(--primary);
+}
+.barColumn[data-empty] .bar {
+  background: transparent;
+  border-bottom: 2px dotted var(--line-strong);
+  border-radius: 0;
+}
+.barColumn:hover .bar {
+  background: var(--primary);
+}
+.barDay {
+  height: 1.4rem;
+  padding-top: 0.4rem;
+  line-height: 1;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+.barColumn[data-today] .barDay {
+  color: var(--ink);
+}
+
+/* ---- Lower grid ---------------------------------------------------------------------- */
+.glanceGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+.weightCard {
+  grid-column: 2;
+}
+
+.tiles {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
+  gap: 0.75rem;
+}
+.tiles > li {
+  padding: 0.85rem 0.9rem;
+  background: color-mix(in srgb, var(--primary) 4%, var(--field));
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+.tileStatus {
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--on-primary);
+  background: transparent;
+  border-radius: 50%;
+}
+.tileStatus:empty {
+  display: none;
+}
+.tiles > li[data-status='good'] .tileStatus {
+  background: var(--success);
+  color: var(--page);
+}
+.tiles > li[data-status='over'] .tileStatus {
+  background: var(--danger);
+  color: var(--page);
+}
+.tiles > li[data-status='near'] .tileStatus,
+.tiles > li[data-status='low'] .tileStatus {
+  background: var(--warning);
+  color: var(--page);
+}
+.tiles > li[data-status='over'] .meter > span {
+  background: var(--danger);
+}
+.tiles > li[data-status='near'] .meter > span {
+  background: var(--warning);
+}
+.tiles > li[data-status='good'] .meter > span {
+  background: var(--success);
+}
+.tileValue {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.tileValue strong {
+  color: var(--ink);
+  font-size: 1.25rem;
+}
+
+.meals {
+  display: grid;
+  gap: 0.9rem;
+}
+.mealHead {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 0.3rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.mealGroup ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mealGroup li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+}
+.mealGroup li + li {
+  border-top: 1px dashed var(--line);
+}
+.mealGroup li small {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.dataQuality {
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.quietEmpty {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+.quietEmpty p {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* ---- Weight -------------------------------------------------------------------------- */
+.weightValue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0;
+}
+.weightValue strong {
+  font-family: var(--font-display, Georgia), serif;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.weightValue span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.weightValue em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 650;
+}
+.spark {
+  display: block;
+  width: 100%;
+  height: 3.2rem;
+  margin: 0.6rem 0 0.2rem;
+  overflow: visible;
+}
+.sparkLine {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.sparkTarget {
+  stroke: color-mix(in srgb, var(--accent) 70%, transparent);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.sparkDot {
+  fill: var(--primary);
+}
+
+/* ---- Entrance motion: values draw in once, then stay still ---------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .ringValue {
+    animation: ring-draw 900ms var(--ease-out, ease-out) both;
+  }
+  .bar {
+    animation: bar-rise 640ms var(--ease-out, ease-out) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  .meter > span {
+    animation: meter-fill 700ms var(--ease-out, ease-out) both;
+    animation-delay: calc(var(--i, 0) * 70ms + 120ms);
+  }
+  .sparkLine {
+    stroke-dasharray: 1;
+    animation: spark-draw 900ms var(--ease-out, ease-out) both;
+  }
+  .tiles > li,
+  .macroList > li {
+    animation: tile-in 420ms var(--ease-out, ease-out) both;
+    animation-delay: calc(var(--i, 0) * 50ms);
+  }
+}
+@keyframes ring-draw {
+  from {
+    stroke-dasharray: 0 var(--ring-full);
+  }
+  to {
+    stroke-dasharray: var(--ring-length) var(--ring-full);
+  }
+}
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes meter-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes spark-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tile-in {
+  from {
+    transform: translateY(0.4rem);
+  }
+}
+
+/* ---- Responsive ---------------------------------------------------------------------- */
+@media (max-width: 1180px) {
+  .hero {
+    grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr);
+  }
+  .heroMacros {
+    padding-right: 0;
+    border-right: 0;
+  }
+  .week {
+    grid-column: 1 / -1;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+  }
+  .glanceGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .weightCard {
+    grid-column: auto;
+  }
+}
+@media (max-width: 700px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .heroRing {
+    padding: 0 0 1.25rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .heroMacros {
+    padding: 0;
+  }
+  .bars {
+    min-height: 9.5rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .barColumn:not([data-today]) .barValue {
+    visibility: hidden;
+  }
+  .targetLine small {
+    bottom: auto;
+    top: 0.2rem;
+  }
+}
