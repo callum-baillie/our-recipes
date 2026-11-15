@@ -5,7 +5,7 @@ import { getProfile } from '@/lib/services/household-service';
 import { reviseMealPlanDraft } from './ai-meal-plan-draft-service';
 import { bulkAppActionsSchema, expandBulkAppActions } from '@/lib/domain/ai-bulk-actions';
 import { withAiExecutionContext, assertAiExecutionActive } from './ai-execution-context';
-import { executeAiWorkload } from './ai-execution-service';
+import { executeAiWorkload, AiExecutionLimitError } from './ai-execution-service';
 import { aiDependencySchema } from '@/lib/domain/ai-app-dependencies';
 import 'server-only';
 import { importAiRecipeSet } from './ai-bulk-import-service';
@@ -50,7 +50,11 @@ import { aiChatMessageInputSchema } from '@/lib/domain/ai-assistant';
 import { manualConsumptionRequestSchema } from '@/lib/domain/nutrition-food-diary';
 import { mealPlanEntrySchema, mealPlanEntryUpdateSchema } from '@/lib/domain/planning';
 import { recipeInputSchema } from '@/lib/domain/recipe';
-import { type AssistantTool, getAiAssistantProvider } from '@/lib/providers/ai-assistant-provider';
+import {
+  AiAssistantProviderResponseError,
+  type AssistantTool,
+  getAiAssistantProvider,
+} from '@/lib/providers/ai-assistant-provider';
 import { createAiActionProposal, listAiActionProposals } from '@/lib/services/ai-action-service';
 import { enqueueRecipeBatchGenerationJob } from '@/lib/services/ai-job-service';
 import {
@@ -1617,6 +1621,72 @@ async function performAiChatTurn(input: ChatTurnInput) {
   let clarification: ReturnType<typeof clarificationSchema.parse> | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
+  const finish = (responseText: string) => {
+    const text = clarification
+      ? questionContent(clarification)
+      : conciseProposalResponse(responseText, actions.at(-1)?.kind);
+    const assistantMessage = {
+      id: randomUUID(),
+      threadId: thread.id,
+      role: 'assistant' as const,
+      content: text,
+      model: setting.model,
+      promptGuidance: setting.promptGuidance,
+      requestTimeoutSeconds: setting.requestTimeoutSeconds,
+      actionId: actions.at(-1)?.id ?? null,
+      createdAt: new Date(),
+    };
+    assertAiExecutionActive();
+    const result = { message: assistantMessage, actions, jobs, suggestions, appActions };
+    getDatabase().transaction(
+      () => {
+        const receipt = getDatabase()
+          .select()
+          .from(aiChatTurns)
+          .where(eq(aiChatTurns.id, parsed.operationId!))
+          .get();
+        if (receipt?.status !== 'running' || !receipt.leaseToken)
+          throw new AiChatToolError(
+            'This request was interrupted. Review its saved outcomes before continuing.',
+          );
+        getDatabase().insert(aiChatMessages).values(assistantMessage).run();
+        getDatabase()
+          .update(aiChatThreads)
+          .set({ updatedAt: assistantMessage.createdAt })
+          .where(eq(aiChatThreads.id, thread.id))
+          .run();
+        getDatabase()
+          .update(aiOperationAudits)
+          .set({
+            status: 'succeeded',
+            inputTokens,
+            outputTokens,
+            actionId: actions.at(-1)?.id ?? null,
+            completedAt: new Date(),
+          })
+          .where(eq(aiOperationAudits.id, auditId))
+          .run();
+        getDatabase()
+          .update(aiChatTurns)
+          .set({
+            status: 'completed',
+            resultJson: JSON.stringify(result),
+            leaseToken: null,
+            leaseExpiresAt: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(aiChatTurns.id, parsed.operationId!),
+              eq(aiChatTurns.leaseToken, receipt.leaseToken),
+            ),
+          )
+          .run();
+      },
+      { behavior: 'immediate' },
+    );
+    return result;
+  };
   try {
     for (let round = 0; round < runtimePolicy.toolRoundLimit; round += 1) {
       input.signal?.throwIfAborted();
@@ -1656,7 +1726,7 @@ async function performAiChatTurn(input: ChatTurnInput) {
             safetyIdentifier: aiSafetyIdentifier(input.profileId),
             instructions: [
               'You are the Bòrd household assistant.',
-              'Use ask_clarification whenever you need an answer: one concise question with useful suggested answers and free input. After calling it, do not ask another question or call other tools in that turn. Prefer a useful draft with stated assumptions over a long interview.',
+              'For a meal plan for two named people, assume shared meals and no desserts unless requested; state those assumptions in the draft. Avoid asking about optional extras. Once a necessary clarification is answered, proceed with the requested draft using those answers. Use ask_clarification whenever you need an answer: one concise question with useful suggested answers and free input. After calling it, do not ask another question or call other tools in that turn. Prefer a useful draft with stated assumptions over a long interview.',
               'Use the supplied local today and timezone for dates. If month/year are omitted, a range such as 11th to 22nd means the next occurrence whose START is today or later; roll month/year forward, including December to January, and handle an end day before the start as next month. State the resolved dates as an assumption; do not ask month/year. Ask only if dates are impossible or the requested period exceeds supported limits.',
               'For pantry-led planning read pantry pages and search saved recipes before generating; prioritize available and soon-expiring ingredients and explain shortages. Never claim pantry coverage without reading stock. For draft changes use revise_meal_plan_draft for each selected slot; leave every unselected meal unchanged. New and saved recipes appear in the draft review; nothing is saved before confirmation.',
               'For a conversational kitchen interview, first readMyKitchenContext through read_app_data when dietary sharing permits it. Ask one useful question at a time and acknowledge the answer before continuing. Do not repeat known answers. Offer optional quick replies with free text, skip, back, edit and resume. Prioritize cooking time, equipment, budget, routines, tastes and shared meals; sensitive details stay optional. Describe covered topics, never an invented completion percentage. Do not assume preferences or firm constraints from one example. Prepare updateMyKitchenContext with the exact saved revision and interviewPatch containing only stated answers; omitted answers are preserved. Use clearFields only for an explicit deletion request, never blank unknown values. Explain the named recipient and show the structured review before saving. Never silently save sensitive inferences, change allergies or Nutrition consent. Allergy details belong in the protected Nutrition profile and always constrain recommendations.',
@@ -1702,70 +1772,7 @@ async function performAiChatTurn(input: ChatTurnInput) {
       input.signal?.throwIfAborted();
       if (!response.toolCalls.length) {
         if (!streamed && response.text) input.onEvent?.({ type: 'text', delta: response.text });
-        const text = clarification
-          ? questionContent(clarification)
-          : conciseProposalResponse(response.text, actions.at(-1)?.kind);
-        const assistantMessage = {
-          id: randomUUID(),
-          threadId: thread.id,
-          role: 'assistant' as const,
-          content: text,
-          model: setting.model,
-          promptGuidance: setting.promptGuidance,
-          requestTimeoutSeconds: setting.requestTimeoutSeconds,
-          actionId: actions.at(-1)?.id ?? null,
-          createdAt: new Date(),
-        };
-        assertAiExecutionActive();
-        const result = { message: assistantMessage, actions, jobs, suggestions, appActions };
-        getDatabase().transaction(
-          () => {
-            const receipt = getDatabase()
-              .select()
-              .from(aiChatTurns)
-              .where(eq(aiChatTurns.id, parsed.operationId!))
-              .get();
-            if (receipt?.status !== 'running' || !receipt.leaseToken)
-              throw new AiChatToolError(
-                'This request was interrupted. Review its saved outcomes before continuing.',
-              );
-            getDatabase().insert(aiChatMessages).values(assistantMessage).run();
-            getDatabase()
-              .update(aiChatThreads)
-              .set({ updatedAt: assistantMessage.createdAt })
-              .where(eq(aiChatThreads.id, thread.id))
-              .run();
-            getDatabase()
-              .update(aiOperationAudits)
-              .set({
-                status: 'succeeded',
-                inputTokens,
-                outputTokens,
-                actionId: actions.at(-1)?.id ?? null,
-                completedAt: new Date(),
-              })
-              .where(eq(aiOperationAudits.id, auditId))
-              .run();
-            getDatabase()
-              .update(aiChatTurns)
-              .set({
-                status: 'completed',
-                resultJson: JSON.stringify(result),
-                leaseToken: null,
-                leaseExpiresAt: null,
-                updatedAt: new Date(),
-              })
-              .where(
-                and(
-                  eq(aiChatTurns.id, parsed.operationId!),
-                  eq(aiChatTurns.leaseToken, receipt.leaseToken),
-                ),
-              )
-              .run();
-          },
-          { behavior: 'immediate' },
-        );
-        return result;
+        return finish(response.text);
       }
       messages.push(...response.responseItems);
       for (const call of response.toolCalls) {
@@ -1870,13 +1877,30 @@ async function performAiChatTurn(input: ChatTurnInput) {
             call_id: call.callId,
             output: JSON.stringify(toolOutput),
           });
+          if (clarification) return finish('');
         } catch (error) {
+          input.signal?.throwIfAborted();
+          console.warn('Bord chat tool failure', {
+            tool: call.name,
+            errorType: error instanceof Error ? error.constructor.name : 'unknown',
+          });
           input.onEvent?.(
             toolFinishEvent(call.callId, call.name, call.arguments, {
               ok: false,
               startedAt: toolStartedAt,
+              summary:
+                error instanceof AiExecutionLimitError ||
+                error instanceof AiAssistantProviderResponseError ||
+                error instanceof AiMealPlanValidationError
+                  ? error.message
+                  : undefined,
             }),
           );
+          if (
+            error instanceof AiExecutionLimitError ||
+            error instanceof AiAssistantProviderResponseError
+          )
+            throw error;
           messages.push({
             type: 'function_call_output',
             call_id: call.callId,
@@ -1887,7 +1911,7 @@ async function performAiChatTurn(input: ChatTurnInput) {
                 error instanceof DecisionError
                   ? error.message
                   : error instanceof z.ZodError
-                    ? 'The app function input did not match its published schema. Read the contract and correct the fields before preparing another operation.'
+                    ? `The app function input did not match its schema. Correct these fields and retry: ${JSON.stringify(error.issues.slice(0, 8).map((issue) => ({ path: issue.path.join('.'), code: issue.code })))}`
                     : 'The app function could not finish. Review the affected task or records before retrying an uncertain operation.',
             }),
           });
@@ -1896,13 +1920,22 @@ async function performAiChatTurn(input: ChatTurnInput) {
     }
     throw new AiChatToolError('The assistant used too many app functions in one turn.');
   } catch (error) {
+    console.warn('Bord chat turn failure', {
+      errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      rateLimited: error instanceof AiExecutionLimitError,
+    });
     getDatabase()
       .update(aiOperationAudits)
       .set({
         status: 'failed',
         inputTokens,
         outputTokens,
-        errorCode: error instanceof AiChatToolError ? 'tool_error' : 'provider_error',
+        errorCode:
+          error instanceof AiExecutionLimitError
+            ? 'rate_limited'
+            : error instanceof AiChatToolError
+              ? 'tool_error'
+              : 'provider_error',
         completedAt: new Date(),
       })
       .where(eq(aiOperationAudits.id, auditId))

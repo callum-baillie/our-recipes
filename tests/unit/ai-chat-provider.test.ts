@@ -24,7 +24,11 @@ it('requests encrypted reasoning for stateless tool continuations and carries th
   const provider = new OpenAiAssistantProvider('unused', { create, parse: vi.fn() });
   const result = await provider.respond(input);
   expect(create).toHaveBeenCalledWith(
-    expect.objectContaining({ store: false, include: ['reasoning.encrypted_content'] }),
+    expect.objectContaining({
+      store: false,
+      include: ['reasoning.encrypted_content'],
+      parallel_tool_calls: false,
+    }),
     expect.anything(),
   );
   expect(result.responseItems[0]).toEqual(reasoning);
@@ -158,4 +162,97 @@ it('replays streamed tool calls without SDK parsing fields and preserves reasoni
   expect(stream.mock.calls[2]?.[0].input).toEqual(expected);
   expect(call.parsed_arguments).toEqual({});
   expect(message.content[0]?.parsed).toBeNull();
+});
+
+it('inspects incomplete structured responses before parsing truncated JSON', async () => {
+  const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const provider = new OpenAiAssistantProvider('unused', {
+      create: vi.fn().mockResolvedValue({
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_output_tokens' },
+        output_text: '{"entries":[',
+      }),
+      parse: vi.fn(),
+    });
+    await expect(provider.generateMealPlan({ ...input, context: {} })).rejects.toThrow(
+      'configured response limit',
+    );
+  } finally {
+    log.mockRestore();
+  }
+});
+it('handles structured refusals explicitly', async () => {
+  const provider = new OpenAiAssistantProvider('unused', {
+    create: vi.fn().mockResolvedValue({
+      status: 'completed',
+      output: [
+        { type: 'message', content: [{ type: 'refusal', refusal: 'private refusal detail' }] },
+      ],
+    }),
+    parse: vi.fn(),
+  });
+  await expect(provider.generateMealPlan({ ...input, context: {} })).rejects.toThrow('declined');
+});
+it('validates completed structured output using the local meal-plan contract', async () => {
+  const candidate = {
+    newRecipes: [],
+    entries: [
+      {
+        plannedFor: '2026-11-15',
+        meal: 'dinner',
+        existingRecipeId: '9d90474a-7c56-449f-a050-dc0841287eef',
+        newRecipeKey: null,
+        title: 'Saved dinner',
+        servings: 2,
+        note: '',
+      },
+    ],
+    warnings: [],
+    assumptions: [],
+  };
+  const create = vi.fn().mockResolvedValue({
+    status: 'completed',
+    output: [
+      { type: 'message', content: [{ type: 'output_text', text: JSON.stringify(candidate) }] },
+    ],
+  });
+  const provider = new OpenAiAssistantProvider('unused', { create, parse: vi.fn() });
+  const result = await provider.generateMealPlan({ ...input, context: {}, maxOutputTokens: 16384 });
+  expect(result.entries).toHaveLength(1);
+  expect(create).toHaveBeenCalledWith(
+    expect.objectContaining({ max_output_tokens: 16384, store: false }),
+    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+  );
+});
+
+it('rejects incomplete streamed tool calls before dispatch', async () => {
+  const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const stream = vi.fn(() => ({
+      async *[Symbol.asyncIterator]() {
+        yield { type: 'response.output_text.delta', delta: 'Preparing' };
+      },
+      finalResponse: async () => ({
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_output_tokens' },
+        output: [
+          {
+            type: 'function_call',
+            call_id: 'incomplete',
+            name: 'generate_meal_plan',
+            arguments: '{',
+          },
+        ],
+      }),
+    }));
+    const provider = new OpenAiAssistantProvider('unused', {
+      stream,
+      create: vi.fn(),
+      parse: vi.fn(),
+    });
+    await expect(provider.respond(input)).rejects.toThrow('configured response limit');
+  } finally {
+    log.mockRestore();
+  }
 });

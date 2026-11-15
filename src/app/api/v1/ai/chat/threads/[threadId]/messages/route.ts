@@ -1,3 +1,4 @@
+import { AiExecutionLimitError } from '@/lib/services/ai-execution-service';
 import { getEffectiveAiPolicy } from '@/lib/services/ai-access-service';
 import {
   decisionErrorResponse,
@@ -83,6 +84,7 @@ export async function POST(request: Request, context: { params: Promise<{ thread
                   error instanceof AiChatForbiddenError ||
                   error instanceof AiChatToolError ||
                   error instanceof AiChatRateLimitError ||
+                  error instanceof AiExecutionLimitError ||
                   error instanceof AiAssistantProviderResponseError ||
                   error instanceof AiAssistantProviderUnavailableError
                     ? error.message

@@ -105,6 +105,7 @@ type ResponsesClient = {
   }> & {
     finalResponse(): Promise<{
       status?: string;
+      incomplete_details?: { reason?: string } | null;
       output?: Array<Record<string, unknown>>;
       output_text?: string;
       usage?: { input_tokens?: number; output_tokens?: number };
@@ -114,6 +115,8 @@ type ResponsesClient = {
     request: unknown,
     options?: { signal?: AbortSignal; timeout?: number },
   ): Promise<{
+    status?: string;
+    incomplete_details?: { reason?: string } | null;
     output?: Array<Record<string, unknown>>;
     output_text?: string;
     usage?: { input_tokens?: number; output_tokens?: number };
@@ -164,6 +167,38 @@ function responseItemForInput(value: unknown): unknown {
   return item;
 }
 
+function logStructuredFailure(workload: string, error: unknown) {
+  const e = error as {
+    status?: unknown;
+    code?: unknown;
+    param?: unknown;
+    issues?: Array<{ code: string; path: PropertyKey[] }>;
+  } | null;
+  const safe = (value: unknown) =>
+    typeof value === 'string' && /^[A-Za-z0-9_.\[\]-]{1,160}$/u.test(value) ? value : undefined;
+  console.warn('Bord structured provider failure', {
+    workload,
+    errorType: error instanceof Error ? error.constructor.name : 'unknown',
+    status: typeof e?.status === 'number' ? e.status : undefined,
+    code: safe(e?.code),
+    param: safe(e?.param),
+    validation: e?.issues
+      ?.slice(0, 8)
+      .map((issue) => ({ code: issue.code, path: issue.path.map(String).join('.') })),
+  });
+}
+
+function structuredFailureMessage(error: unknown, fallback: string) {
+  const status = (error as { status?: number } | null)?.status;
+  if (status === 429)
+    return 'OpenAI is rate limited or its quota is exhausted. Check provider usage and try again later.';
+  if (status === 401)
+    return 'The OpenAI credential was rejected. Check the provider key in AI settings.';
+  if (status === 400)
+    return 'OpenAI rejected the drafting request. Review the configured model and response schema; the server log contains the rejected parameter.';
+  return fallback;
+}
+
 function reasoning(effort: AiReasoningEffort | null) {
   return effort ? { reasoning: { effort } } : {};
 }
@@ -175,10 +210,52 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
     this.responses =
       client ??
       (
-        new OpenAI({ apiKey, maxRetries: 0, timeout: 120_000 }) as unknown as {
+        new OpenAI({ apiKey, maxRetries: 2, timeout: 120_000 }) as unknown as {
           responses: ResponsesClient;
         }
       ).responses;
+  }
+
+  private async structured(request: unknown, options: { signal?: AbortSignal; timeout?: number }) {
+    const deadline = AbortSignal.timeout(options.timeout ?? 180_000);
+    const signal = options.signal ? AbortSignal.any([options.signal, deadline]) : deadline;
+    // Read the terminal state before parsing JSON: SDK parse helpers can otherwise
+    // turn a truncated response into an unhelpful SyntaxError.
+    const response = await this.responses.create(request, { ...options, signal });
+    signal.throwIfAborted();
+    if (response.status === 'incomplete') {
+      const reason = response.incomplete_details?.reason;
+      console.warn('Bord structured response incomplete', { reason, usage: response.usage });
+      throw new AiAssistantProviderResponseError(
+        reason === 'max_output_tokens'
+          ? 'The draft exceeded the configured response limit. Try fewer meals or raise Maximum response tokens in AI settings.'
+          : 'The provider could not finish the draft. Try a smaller request.',
+      );
+    }
+    if (response.status && response.status !== 'completed')
+      throw new AiAssistantProviderResponseError(
+        'The provider did not complete the draft. Please try again.',
+      );
+    const content = (response.output ?? []).flatMap((item) =>
+      Array.isArray(item.content) ? (item.content as Record<string, unknown>[]) : [],
+    );
+    if (content.some((item) => item.type === 'refusal'))
+      throw new AiAssistantProviderResponseError(
+        'The provider declined this drafting request. Try rephrasing it.',
+      );
+    const text =
+      response.output_text ??
+      content
+        .filter((item) => item.type === 'output_text')
+        .map((item) => String(item.text ?? ''))
+        .join('');
+    try {
+      return { output_parsed: JSON.parse(text) as unknown };
+    } catch {
+      throw new AiAssistantProviderResponseError(
+        'The provider returned an unreadable draft. Please try again.',
+      );
+    }
   }
 
   async respond(input: Parameters<AiAssistantProvider['respond']>[0]) {
@@ -198,6 +275,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
           parameters: normalizeOpenAiToolSchema(tool.parameters) as Record<string, unknown>,
         })),
         store: false,
+        parallel_tool_calls: false,
         max_output_tokens: input.maxOutputTokens ?? 4096,
         safety_identifier: input.safetyIdentifier,
         ...reasoning(input.reasoningEffort),
@@ -218,8 +296,14 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         }
         const final = await stream.finalResponse();
         if (final.status && final.status !== 'completed') {
+          console.warn('Bord chat response incomplete', {
+            status: final.status,
+            reason: final.incomplete_details?.reason,
+          });
           throw new AiAssistantProviderResponseError(
-            'The response ended before completion. Review the conversation before trying again.',
+            final.incomplete_details?.reason === 'max_output_tokens'
+              ? 'The assistant reached the configured response limit. Try a smaller request or raise Maximum response tokens in AI settings.'
+              : 'The response ended before completion. Review the conversation before trying again.',
           );
         }
         response = final;
@@ -282,7 +366,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
   async generateMealPlan(input: Parameters<AiAssistantProvider['generateMealPlan']>[0]) {
     try {
       input.signal?.throwIfAborted();
-      const response = await this.responses.parse(
+      const response = await this.structured(
         {
           model: input.model,
           instructions: [
@@ -306,16 +390,23 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
       );
       input.signal?.throwIfAborted();
       return aiMealPlanCandidateSchema.parse(response.output_parsed);
-    } catch {
+    } catch (error) {
       input.signal?.throwIfAborted();
-      throw new AiAssistantProviderResponseError('OpenAI could not create a valid meal plan.');
+      if (error instanceof AiAssistantProviderResponseError) throw error;
+      logStructuredFailure('meal_plan_generation', error);
+      throw new AiAssistantProviderResponseError(
+        structuredFailureMessage(
+          error,
+          'OpenAI could not create a valid meal plan. Try fewer meals or review AI settings.',
+        ),
+      );
     }
   }
 
   async generateRecipe(input: Parameters<AiAssistantProvider['generateRecipe']>[0]) {
     try {
       input.signal?.throwIfAborted();
-      const response = await this.responses.parse(
+      const response = await this.structured(
         {
           model: input.model,
           instructions: [
@@ -339,9 +430,13 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
       );
       input.signal?.throwIfAborted();
       return recipeInputSchema.parse(response.output_parsed);
-    } catch {
+    } catch (error) {
       input.signal?.throwIfAborted();
-      throw new AiAssistantProviderResponseError('OpenAI could not create a valid recipe.');
+      if (error instanceof AiAssistantProviderResponseError) throw error;
+      logStructuredFailure('recipe_generation', error);
+      throw new AiAssistantProviderResponseError(
+        structuredFailureMessage(error, 'OpenAI could not create a valid recipe.'),
+      );
     }
   }
 
@@ -360,7 +455,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
   async generateSummaryBundle(input: Parameters<AiAssistantProvider['generateSummaryBundle']>[0]) {
     try {
       input.signal?.throwIfAborted();
-      const response = await this.responses.parse(
+      const response = await this.structured(
         {
           model: input.model,
           instructions: [
@@ -384,9 +479,13 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
       );
       input.signal?.throwIfAborted();
       return aiSummaryBundleOutputSchema.parse(response.output_parsed);
-    } catch {
+    } catch (error) {
       input.signal?.throwIfAborted();
-      throw new AiAssistantProviderResponseError('OpenAI could not create a valid summary.');
+      if (error instanceof AiAssistantProviderResponseError) throw error;
+      logStructuredFailure('summary_generation', error);
+      throw new AiAssistantProviderResponseError(
+        structuredFailureMessage(error, 'OpenAI could not create a valid summary.'),
+      );
     }
   }
 }

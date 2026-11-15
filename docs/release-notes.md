@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.0-rc.34
+
+- Complete clarification turns immediately, preserve their answers for draft generation, and execute function calls sequentially. Assume shared dinners and no optional desserts when those choices were not requested.
+- Surface account request limits without another provider call, preserve their cause in audit records, and show actionable tool failure details. Improve schema feedback so the assistant can correct invalid tool arguments.
+- Inspect structured response completion and refusals before parsing JSON for meal plans, recipes and summaries. Add bounded diagnostics without raw household content, and use bounded SDK retries for transient provider failures.
+- Tower operational settings: 16,384 maximum output tokens, 40 provider requests per ten minutes, and a 300-second turn deadline. Each internal provider request counts toward the account limit.
+
 ## 1.0.0-rc.33
 
 - Fix chat failures after tool calls: remove SDK-only `parsed_arguments` and output-text `parsed` fields before replaying Responses API items. Preserve encrypted reasoning, tool call IDs, and tool result data.

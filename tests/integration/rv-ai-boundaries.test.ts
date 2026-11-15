@@ -261,6 +261,14 @@ beforeEach(() => {
       create: async (request, options) => {
         serialized.push(JSON.parse(JSON.stringify(request)));
         requestOptions.push(options);
+        if ((request as { text?: { format?: unknown } }).text?.format) {
+          const fixture = await parse(request, options);
+          return {
+            status: 'completed',
+            output_text: JSON.stringify(fixture.output_parsed),
+            output: [],
+          };
+        }
         return create(request, options);
       },
       parse: async (request, options) => {

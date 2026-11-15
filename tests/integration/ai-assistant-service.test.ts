@@ -190,6 +190,134 @@ describe('AI assistant services', () => {
     vi.unstubAllEnvs();
   });
 
+  it('finishes a clarification immediately and carries its answer into an eight-day draft', async () => {
+    const profile = setupProfile();
+    const thread = createAiChatThread(profile.id);
+    const prompt =
+      'i want to make a meal plan for this week from dinner tonight (11/15/2026) until dinner on sunday 11/22/2026. I want to avoid carbs and focus more on vegetables and protein. the meal plan will be for callum and julia';
+    provider.responseQueue.push({
+      text: '',
+      responseItems: [],
+      usage: { inputTokens: 1, outputTokens: 1 },
+      toolCalls: [
+        {
+          callId: 'question',
+          name: 'ask_clarification',
+          arguments: {
+            question: 'Share dinners?',
+            answers: ['Shared dinners; occasional low-carb dessert', 'Separate dinners'],
+          },
+        },
+      ],
+    });
+    const question = await runAiChatTurn({
+      profileId: profile.id,
+      threadId: thread.id,
+      message: { message: prompt },
+    });
+    expect(question.message.content).toContain('bord-question:');
+    expect(provider.respondRequests).toHaveLength(1);
+    const meals = Array.from({ length: 8 }, (_, i) => ({
+      plannedFor: `2026-11-${15 + i}`,
+      meal: 'dinner',
+      existingRecipeId: null,
+      newRecipeKey: `meal-${i}`,
+      title: `Protein dinner ${i}`,
+      servings: 2,
+      note: '',
+    }));
+    provider.mealPlanCandidate = {
+      entries: meals,
+      newRecipes: meals.map((m) => ({
+        key: m.newRecipeKey,
+        recipe: { ...recipe, title: m.title },
+      })),
+      warnings: [],
+      assumptions: [],
+    };
+    provider.responseQueue.push({
+      text: '',
+      responseItems: [],
+      usage: { inputTokens: 1, outputTokens: 1 },
+      toolCalls: [
+        {
+          callId: 'plan',
+          name: 'generate_meal_plan',
+          arguments: {
+            startDate: '2026-11-15',
+            endDate: '2026-11-22',
+            servings: 2,
+            mealSlots: ['dinner'],
+            sourceMode: 'new',
+            mode: 'ai',
+            occupiedSlotMode: 'review',
+            selectedProfileIds: [profile.id],
+            options: { followNutrition: false },
+            instructions: 'Shared dinners; occasional low-carb dessert',
+          },
+        },
+      ],
+    });
+    const draft = await runAiChatTurn({
+      profileId: profile.id,
+      threadId: thread.id,
+      message: { message: 'Shared dinners; occasional low-carb dessert' },
+    });
+    expect(draft.actions).toHaveLength(1);
+    expect(draft.actions[0]?.kind).toBe('meal_plan_generate');
+    expect(JSON.stringify(draft.actions[0]?.preview)).toContain('2026-11-22');
+    expect(JSON.stringify(provider.respondRequests[1]?.messages)).toContain(prompt);
+    expect(JSON.stringify(provider.respondRequests[1]?.messages)).toContain(
+      'Shared dinners; occasional low-carb dessert',
+    );
+    expect(listRecipes()).toHaveLength(0);
+    expect(listPlannedMeals('2026-11-15', '2026-11-22')).toHaveLength(0);
+  });
+
+  it('surfaces an exhausted provider budget during drafting without another model call', async () => {
+    const profile = setupProfile();
+    const thread = createAiChatThread(profile.id);
+    getDatabase()
+      .insert(aiRuntimeSettings)
+      .values({
+        id: 'global',
+        settings: JSON.stringify({ generationsPerTenMinutes: 1 }),
+        version: 1,
+      })
+      .run();
+    provider.responseQueue.push({
+      text: '',
+      responseItems: [],
+      usage: { inputTokens: 1, outputTokens: 1 },
+      toolCalls: [
+        {
+          callId: 'plan',
+          name: 'generate_meal_plan',
+          arguments: {
+            startDate: '2026-07-20',
+            endDate: '2026-07-20',
+            servings: 2,
+            mealSlots: ['dinner'],
+            sourceMode: 'new',
+            selectedProfileIds: [profile.id],
+            options: { followNutrition: false },
+          },
+        },
+      ],
+    });
+    const generate = vi.spyOn(provider, 'generateMealPlan');
+    await expect(
+      runAiChatTurn({
+        profileId: profile.id,
+        threadId: thread.id,
+        message: { message: 'Draft dinner' },
+      }),
+    ).rejects.toThrow('account AI request limit');
+    expect(generate).not.toHaveBeenCalled();
+    expect(provider.respondRequests).toHaveLength(1);
+    expect(getDatabase().select().from(aiOperationAudits).get()?.errorCode).toBe('rate_limited');
+  });
+
   it('replaces only the selected draft meal and supersedes old previews without saving recipes', async () => {
     const profile = setupProfile();
     const thread = createAiChatThread(profile.id);

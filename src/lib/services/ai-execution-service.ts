@@ -19,6 +19,14 @@ import {
   getGlobalAiPolicy,
 } from './ai-access-service';
 
+export class AiExecutionLimitError extends Error {
+  constructor() {
+    super(
+      'The account AI request limit has been reached. Wait up to ten minutes before retrying, or ask an administrator to raise Generations per 10 minutes in AI settings. A tool-assisted chat can use several provider requests.',
+    );
+  }
+}
+
 type Setting = ReturnType<typeof getAiWorkloadSetting>;
 type Approved = Partial<Setting> & { personalInstructions?: string };
 
@@ -142,9 +150,7 @@ export async function executeAiWorkload<T>(
         )
         .get()?.total ?? 0;
     if (recent + requestUnits > getEffectiveAiPolicy(profileId).generationsPerTenMinutes)
-      throw new Error(
-        'The account AI request limit has been reached. Wait before starting another request.',
-      );
+      throw new AiExecutionLimitError();
     getDatabase()
       .insert(aiExecutionTraces)
       .values({
