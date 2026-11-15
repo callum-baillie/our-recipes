@@ -2,6 +2,9 @@
 
 ## 1.0.0-rc.35
 
+- Verified on Tower with the exact November 15–22 prompt: eight dinners for two people, followed by a selected-meal replacement that left the other seven entries unchanged. The final draft is pending review; no meals or recipes were saved.
+- Verification: 225 unit/integration files passed (1,375 tests passed, 9 skipped), static checks passed, both release image builds and container smoke checks passed, and Tower reports rc35 healthy with current migrations. Separate native CI still has a pre-existing missing-zod dependency-resolution failure.
+
 - Keep chat meal planning on the AI selection route so dietary instructions are interpreted; prevent fallback to deterministic recipebook ranking. Constrain generated saved-recipe references to the supplied library IDs.
 - Remove a conflicting shared instruction that required snack and dessert interviews before every meal plan. Use stated assumptions for optional extras and proceed after a clarification answer. Includes all rc34 agent reliability repairs.
 

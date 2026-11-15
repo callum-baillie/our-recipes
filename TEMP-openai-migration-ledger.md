@@ -62,3 +62,15 @@ Implementation complete: terminal clarification, sequential tool calls, explicit
 ## Live findings and rc35 follow-up
 
 The first rc34 live follow-up completed its question in one provider request, confirming terminal clarification handling. It revealed a conflicting shared grounding instruction that demanded snack/dessert interviews for dinner-only requests. A later plan call failed recipe-reference validation, then the agent switched to deterministic recipebook ranking and proposed high-carbohydrate saved recipes. That test draft was cancelled, never confirmed. Rc35 removes the mandatory interview, pins chat planning to the AI route so dietary instructions are interpreted, constrains saved IDs in the provider schema to supplied evidence, and improves reference-repair feedback. Fresh exact-prompt live verification remains required.
+
+## Final verification (rc35)
+
+- Full suite: 225 files passed; 1375 tests passed, 9 skipped. TypeScript and touched-file ESLint/Prettier checks passed.
+- Both architecture builds and container smoke checks passed: https://github.com/callum-baillie/our-recipes/actions/runs/43776467086
+- Tower rc35: healthy, zero restarts; schema 0083_shopping_trips current. Pre-upgrade rc34 backup created, downloaded and validated (25 files).
+- The exact user prompt in a fresh conversation completed household lookup, existing-plan read and eight-dinner drafting without extra interview questions or tool failures.
+- The initial candidate transparently flagged one saved potato dish as a weaker dietary fit. A targeted follow-up replaced November 15 with chicken, zucchini and bell pepper. Per-entry SHA-256 comparisons confirmed all seven unselected entries were unchanged. The final pending candidate has eight new protein-and-vegetable recipes and two selected people.
+- The thread read endpoint returns the final pending draft after completion. No plan confirmation occurred: saved recipe count is 19 and saved plan entries for November 15–22 remain zero. All rc35 traces completed and the new container logs have no provider/tool failures.
+- Separate native CI remains blocked by an existing missing-zod module-resolution issue. This is not a claim of native/mobile verification.
+
+All three approved stages are complete. Live checks cover the exact prompt, original clarification continuation (which exposed and led to removal of the conflicting interview/fallback paths), and selected-meal revision. Review and confirmation of the pending household draft belongs to the user. The provider/model/storage architecture is preserved; no broader privacy, residency or universal-reliability claim is made.
