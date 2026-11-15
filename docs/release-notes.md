@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.0-rc.32
+
+- Fix OpenAI chat request rejection by normalizing strict function-tool schemas to the supported JSON Schema subset. Length bounds and schema metadata remain enforced by Bòrd's local validators; fixed-value booleans are represented as enums.
+- Add a bounded provider parameter path to chat failure logs so future compatibility errors can be identified without logging prompt or household content.
+- Verification: focused mocked provider tests pass (4 tests); TypeScript, ESLint and Prettier checks pass. No live OpenAI request was made.
+
 ## 1.0.0-rc.31
 
 - Refine AI chat with structured suggested answers plus free text, actionable tool progress, detailed recipe and pantry cards, responsive loading states, and draft meal plans. Each meal can be swapped on its own; saved recipes and pantry stock inform plans when the current profile has sharing enabled. Day-only ranges such as the 11th–22nd resolve to the next occurrence.

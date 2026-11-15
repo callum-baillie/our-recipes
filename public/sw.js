@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.0-rc.31';
+const APP_VERSION = '1.0.0-rc.32';
 const CACHE_PREFIX = 'bord-read-';
 const LEGACY_CACHE_PREFIX = 'our-recipes-read-';
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;

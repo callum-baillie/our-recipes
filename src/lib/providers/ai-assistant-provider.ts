@@ -126,6 +126,27 @@ type ResponsesClient = {
   }>;
 };
 
+function normalizeOpenAiToolSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeOpenAiToolSchema);
+  if (value === null || typeof value !== 'object') return value;
+
+  const normalized: Record<string, unknown> = {};
+  let hasConst = false;
+  let constValue: unknown;
+  for (const [key, entry] of Object.entries(value)) {
+    // These are useful to local validators but are outside OpenAI's strict tool-schema subset.
+    if (key === '$schema' || key === 'minLength' || key === 'maxLength') continue;
+    if (key === 'const') {
+      hasConst = true;
+      constValue = entry;
+      continue;
+    }
+    normalized[key] = normalizeOpenAiToolSchema(entry);
+  }
+  if (hasConst) normalized.enum = [constValue];
+  return normalized;
+}
+
 function reasoning(effort: AiReasoningEffort | null) {
   return effort ? { reasoning: { effort } } : {};
 }
@@ -155,7 +176,10 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         ].join('\n'),
         input: input.messages,
         include: ['reasoning.encrypted_content'],
-        tools: input.tools,
+        tools: input.tools.map((tool) => ({
+          ...tool,
+          parameters: normalizeOpenAiToolSchema(tool.parameters) as Record<string, unknown>,
+        })),
         store: false,
         max_output_tokens: input.maxOutputTokens ?? 4096,
         safety_identifier: input.safetyIdentifier,
@@ -216,6 +240,8 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
       input.signal?.throwIfAborted();
       if (error instanceof AiAssistantProviderResponseError) throw error;
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      const param =
+        error && typeof error === 'object' && 'param' in error ? String(error.param) : '';
       const status =
         error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
       const detail =
@@ -230,6 +256,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
       console.warn('Bord chat provider failure', {
         status,
         code: /^[a-z_]{1,80}$/u.test(code) ? code : 'unknown',
+        param: /^[A-Za-z0-9_.\[\]-]{1,160}$/u.test(param) ? param : 'unknown',
       });
       throw new AiAssistantProviderResponseError(detail);
     }
