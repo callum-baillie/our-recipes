@@ -256,3 +256,70 @@ it('rejects incomplete streamed tool calls before dispatch', async () => {
     log.mockRestore();
   }
 });
+
+it('uses the same draft-first grounding for chat and meal-plan generation', async () => {
+  const create = vi.fn().mockResolvedValue({
+    status: 'completed',
+    output_text: JSON.stringify({
+      newRecipes: [],
+      entries: [
+        {
+          plannedFor: '2026-11-15',
+          meal: 'dinner',
+          existingRecipeId: '9d90474a-7c56-449f-a050-dc0841287eef',
+          newRecipeKey: null,
+          title: 'Dinner',
+          servings: 2,
+          note: '',
+        },
+      ],
+      warnings: [],
+      assumptions: [],
+    }),
+  });
+  const provider = new OpenAiAssistantProvider('unused', { create, parse: vi.fn() });
+  await provider.respond(input);
+  await provider.generateMealPlan({ ...input, context: {} });
+  for (const [request] of create.mock.calls) {
+    expect(request.instructions).toContain(
+      'Do not add snack or dessert interviews to a dinner-only request.',
+    );
+    expect(request.instructions).toContain(
+      'Once a clarification is answered, proceed with the draft',
+    );
+    expect(request.instructions).not.toContain(
+      'Before a meal plan, ask concise follow-up questions',
+    );
+  }
+});
+
+it('constrains generated meal-plan saved references to the supplied library IDs', async () => {
+  const known = '9d90474a-7c56-449f-a050-dc0841287eef';
+  const create = vi
+    .fn()
+    .mockResolvedValue({
+      status: 'completed',
+      output_text: JSON.stringify({
+        newRecipes: [],
+        entries: [
+          {
+            plannedFor: '2026-11-15',
+            meal: 'dinner',
+            existingRecipeId: known,
+            newRecipeKey: null,
+            title: 'Dinner',
+            servings: 2,
+            note: '',
+          },
+        ],
+        warnings: [],
+        assumptions: [],
+      }),
+    });
+  const provider = new OpenAiAssistantProvider('unused', { create, parse: vi.fn() });
+  await provider.generateMealPlan({ ...input, context: { context: { recipes: [{ id: known }] } } });
+  expect(
+    create.mock.calls[0]?.[0].text.format.schema.properties.entries.items.properties
+      .existingRecipeId,
+  ).toEqual({ type: ['string', 'null'], enum: [known, null] });
+});

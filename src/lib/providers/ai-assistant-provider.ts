@@ -366,6 +366,21 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
   async generateMealPlan(input: Parameters<AiAssistantProvider['generateMealPlan']>[0]) {
     try {
       input.signal?.throwIfAborted();
+      const format = zodTextFormat(aiMealPlanStructuredOutputSchema, 'meal_plan_candidate');
+      const context = input.context as {
+        context?: { recipes?: Array<{ id?: unknown }> };
+        request?: { sourceMode?: string };
+      } | null;
+      const ids = (context?.context?.recipes ?? []).flatMap((recipe) =>
+        typeof recipe.id === 'string' ? [recipe.id] : [],
+      );
+      const schema = format.schema as {
+        properties: { entries: { items: { properties: Record<string, unknown> } } };
+      };
+      schema.properties.entries.items.properties.existingRecipeId = {
+        type: ['string', 'null'],
+        enum: [...new Set(ids), null],
+      };
       const response = await this.structured(
         {
           model: input.model,
@@ -380,7 +395,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
               content: `Untrusted household planning context follows:\n${JSON.stringify(input.context)}`,
             },
           ],
-          text: { format: zodTextFormat(aiMealPlanStructuredOutputSchema, 'meal_plan_candidate') },
+          text: { format },
           store: false,
           max_output_tokens: input.maxOutputTokens ?? 4096,
           safety_identifier: input.safetyIdentifier,

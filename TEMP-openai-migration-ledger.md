@@ -58,3 +58,7 @@ Tower rc33: latest failed clarification follow-up had 10 provider requests in th
 ## Validation
 
 Implementation complete: terminal clarification, sequential tool calls, explicit provider-budget error propagation, raw structured-response terminal-state/refusal checks, bounded SDK retries and safe diagnostics. Focused regression: 73 tests across five files passed; TypeScript, touched-file ESLint/Prettier and whitespace checks passed. Full stable suite, release image smoke and exact live workflow pending. Tower limits verified: 40 requests/ten minutes, 16384 output tokens, 300-second deadline.
+
+## Live findings and rc35 follow-up
+
+The first rc34 live follow-up completed its question in one provider request, confirming terminal clarification handling. It revealed a conflicting shared grounding instruction that demanded snack/dessert interviews for dinner-only requests. A later plan call failed recipe-reference validation, then the agent switched to deterministic recipebook ranking and proposed high-carbohydrate saved recipes. That test draft was cancelled, never confirmed. Rc35 removes the mandatory interview, pins chat planning to the AI route so dietary instructions are interpreted, constrains saved IDs in the provider schema to supplied evidence, and improves reference-repair feedback. Fresh exact-prompt live verification remains required.

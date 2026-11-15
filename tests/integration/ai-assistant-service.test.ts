@@ -226,6 +226,7 @@ describe('AI assistant services', () => {
       servings: 2,
       note: '',
     }));
+    const generatePlan = vi.spyOn(provider, 'generateMealPlan');
     provider.mealPlanCandidate = {
       entries: meals,
       newRecipes: meals.map((m) => ({
@@ -249,7 +250,7 @@ describe('AI assistant services', () => {
             servings: 2,
             mealSlots: ['dinner'],
             sourceMode: 'new',
-            mode: 'ai',
+            mode: 'recipebook',
             occupiedSlotMode: 'review',
             selectedProfileIds: [profile.id],
             options: { followNutrition: false },
@@ -263,6 +264,11 @@ describe('AI assistant services', () => {
       threadId: thread.id,
       message: { message: 'Shared dinners; occasional low-carb dessert' },
     });
+    expect(generatePlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ request: expect.objectContaining({ mode: 'ai' }) }),
+      }),
+    );
     expect(draft.actions).toHaveLength(1);
     expect(draft.actions[0]?.kind).toBe('meal_plan_generate');
     expect(JSON.stringify(draft.actions[0]?.preview)).toContain('2026-11-22');

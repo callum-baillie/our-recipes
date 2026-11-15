@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.0.0-rc.35
+
+- Keep chat meal planning on the AI selection route so dietary instructions are interpreted; prevent fallback to deterministic recipebook ranking. Constrain generated saved-recipe references to the supplied library IDs.
+- Remove a conflicting shared instruction that required snack and dessert interviews before every meal plan. Use stated assumptions for optional extras and proceed after a clarification answer. Includes all rc34 agent reliability repairs.
+
 ## 1.0.0-rc.34
 
 - Complete clarification turns immediately, preserve their answers for draft generation, and execute function calls sequentially. Assume shared dinners and no optional desserts when those choices were not requested.

@@ -360,6 +360,7 @@ export async function generateAiMealPlanProposal(input: {
                 request.sourceMode === 'mix'
                   ? 'When at least two open slots exist, include at least one existing and one new recipe.'
                   : '',
+                'Every entry must set exactly one of existingRecipeId or newRecipeKey, with the other null. Every newRecipeKey must exactly match a newRecipes key. Do not invent saved IDs.',
                 'Respect supplied dietary preferences, allergies, and exclusions, but never claim allergen or medical safety.',
                 'For every new recipe, make each ingredient a specific purchasable item. Choose practical type, form, variety, and size qualifiers when they affect what to buy; for example, use "large flour tortillas" rather than "tortillas". Keep preparation-only wording in the note.',
                 'For every ingredient in every new recipe, assign the most appropriate shoppingCategory from the recipe schema. Use Other only when no listed store category fits.',
@@ -425,7 +426,9 @@ export async function generateAiMealPlanProposal(input: {
     const existing = entry.existingRecipeId ? getRecipe(entry.existingRecipeId) : null;
     const generated = entry.newRecipeKey ? generatedKeys.has(entry.newRecipeKey) : false;
     if (Boolean(existing) === generated) {
-      throw new AiMealPlanValidationError('Every generated meal must reference one valid recipe.');
+      throw new AiMealPlanValidationError(
+        `Meal ${entry.plannedFor} ${entry.meal} has an invalid recipe reference. Set exactly one of existingRecipeId (an exact supplied recipe UUID) or newRecipeKey (an exact key present in newRecipes); set the other to null. Retry with the same dietary instructions and AI mode.`,
+      );
     }
   }
   for (const fixed of request.fixedMeals) {
