@@ -7,6 +7,7 @@
 - Add persistent, friendly chat error details and Copy error controls to error notifications, including safe diagnostic reference numbers and a manual-copy fallback.
 - Add migration `0084_ai_recovery_requests` (86 migrations total). Back up before upgrading; existing permissions and sharing choices are preserved.
 - Verification: 227 unit/integration files passed (1,403 tests passed, 9 skipped), TypeScript passed, changed files passed formatting and lint checks, and the OpenAPI contract smoke passed for 206 documented operations. Full lint reports three existing PDF warnings. Tests use deterministic providers; no live OpenAI request was made for this change. Image and Tower deployment evidence are recorded in the release entry.
+- Deployed to Tower after both architecture builds and container smoke tests passed. Health reports rc36, schema `0084_ai_recovery_requests`, current migrations, and a healthy container with zero restarts. Authenticated approval and Account AI endpoints returned 200; signed-out access and an untrusted approval origin were rejected. Pre-upgrade backup `54ed605d-12bc-4b46-82e1-372d69c95c79` was downloaded and all 25 file checksums verified. A formatting-only follow-up fixes the unchanged provider test that blocked tag CI; native CI retains its existing shared-module zod resolution failure.
 
 ## 1.0.0-rc.35
 

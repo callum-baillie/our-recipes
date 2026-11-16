@@ -62,6 +62,7 @@ test('delayed controls and assistant keyboard layout remain usable', async ({ pa
   await page.route('**/api/v1/ai/app-actions?*', (route) =>
     route.fulfill({ json: { proposals: [] } }),
   );
+  await page.route('**/api/v1/ai/recovery*', (route) => route.fulfill({ json: { requests: [] } }));
   await page.getByRole('button', { name: 'Open AI assistant', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Kitchen assistant' });
   await expect(dialog.getByRole('status', { name: 'Loading your conversation…' })).toBeVisible();
