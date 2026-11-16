@@ -295,27 +295,25 @@ it('uses the same draft-first grounding for chat and meal-plan generation', asyn
 
 it('constrains generated meal-plan saved references to the supplied library IDs', async () => {
   const known = '9d90474a-7c56-449f-a050-dc0841287eef';
-  const create = vi
-    .fn()
-    .mockResolvedValue({
-      status: 'completed',
-      output_text: JSON.stringify({
-        newRecipes: [],
-        entries: [
-          {
-            plannedFor: '2026-11-15',
-            meal: 'dinner',
-            existingRecipeId: known,
-            newRecipeKey: null,
-            title: 'Dinner',
-            servings: 2,
-            note: '',
-          },
-        ],
-        warnings: [],
-        assumptions: [],
-      }),
-    });
+  const create = vi.fn().mockResolvedValue({
+    status: 'completed',
+    output_text: JSON.stringify({
+      newRecipes: [],
+      entries: [
+        {
+          plannedFor: '2026-11-15',
+          meal: 'dinner',
+          existingRecipeId: known,
+          newRecipeKey: null,
+          title: 'Dinner',
+          servings: 2,
+          note: '',
+        },
+      ],
+      warnings: [],
+      assumptions: [],
+    }),
+  });
   const provider = new OpenAiAssistantProvider('unused', { create, parse: vi.fn() });
   await provider.generateMealPlan({ ...input, context: { context: { recipes: [{ id: known }] } } });
   expect(
