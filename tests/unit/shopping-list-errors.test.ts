@@ -69,7 +69,7 @@ describe('shopping list lifecycle error ownership', () => {
       fireEvent.click(within(affected).getByLabelText('More actions for Dinner groceries'));
       const buttonName = action === 'archive' ? 'Archive' : 'Duplicate';
       fireEvent.click(within(affected).getByRole('button', { name: buttonName, hidden: true }));
-      expect(await within(affected).findByRole('alert')).toHaveProperty('textContent', reason);
+      expect((await within(affected).findByRole('alert')).textContent).toContain(reason);
       expect(within(other).queryByRole('alert')).toBeNull();
       expect(draft.getAttribute('aria-invalid')).toBe('false');
       expect((draft as HTMLInputElement).value).toBe('Unrelated new list draft');

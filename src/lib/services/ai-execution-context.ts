@@ -1,6 +1,7 @@
 import 'server-only';
 import { AsyncLocalStorage } from 'node:async_hooks';
 export type AiExecutionContext = {
+  recoveryGrants?: import('./ai-recovery-service').AiGrantedRecovery[];
   signal?: AbortSignal;
   assertOwned?: () => void;
   deadlineAt?: number;
@@ -31,4 +32,15 @@ export function assertAiExecutionActive() {
 
 export function currentAiExecutionContext() {
   return execution.getStore();
+}
+
+const activeTurnControllers = new Map<string, AbortController>();
+export function registerAiTurnController(turnId: string, controller: AbortController) {
+  activeTurnControllers.set(turnId, controller);
+  return () => {
+    if (activeTurnControllers.get(turnId) === controller) activeTurnControllers.delete(turnId);
+  };
+}
+export function abortAiTurn(turnId: string, reason: Error) {
+  activeTurnControllers.get(turnId)?.abort(reason);
 }

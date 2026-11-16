@@ -175,8 +175,7 @@ describe('AI settings reconciliation and action feedback', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Review draft' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Apply fixture draft' }));
     const review = screen.getByLabelText('Generated draft review');
-    expect(await within(review).findByRole('alert')).toHaveProperty(
-      'textContent',
+    expect((await within(review).findByRole('alert')).textContent).toContain(
       'Meals changed. Review current entries.',
     );
     expect(screen.getByRole('dialog', { hidden: true }).textContent).not.toContain('Meals changed');

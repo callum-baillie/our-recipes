@@ -1,4 +1,8 @@
 'use client';
+import type { AiChatProblem, AiRecoveryCard } from '@/lib/domain/ai-recovery';
+import { AiRecoveryRequestCard } from './chat-ui/recovery-card';
+import { ChatProblemPanel } from './chat-ui/problem-panel';
+import { useToast } from './toast-provider';
 import { chatQuestion } from '@/lib/domain/ai-chat-prompts';
 import type { ChatToolEvent } from '@/lib/domain/ai-chat-tools';
 import { QuestionPrompt } from './agent-questionnaire';
@@ -7,7 +11,6 @@ import { DraftSkeleton, ThinkingRow } from './chat-ui/chat-states';
 import { AssistantMessage } from './assistant-message';
 import { SuggestionCard } from '@/components/decision-assistance';
 import { AiJobCard, isActiveJob, type AiJob } from './ai-job-card';
-import { InlineAlert } from './inline-alert';
 import { AiAppActionCard } from '@/components/ai-app-action-card';
 import type { DecisionCard } from '@/lib/domain/decision-assistance';
 import type { AppActionReview } from '@/lib/services/ai-app-action-service';
@@ -122,6 +125,7 @@ export function AiAssistantDrawer({
     message: string;
     attachments: Attachment[];
     allowPaidTools: boolean;
+    recoveryRequestIds: string[];
   } | null>(null);
   const [recoveryRequired, setRecoveryRequired] = useState(false);
   const [unreviewedTurns, setUnreviewedTurns] = useState<TurnState[]>([]);
@@ -141,6 +145,100 @@ export function AiAssistantDrawer({
   const [allowPaidTools, setAllowPaidTools] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statusError, setStatusError] = useState(false);
+  const { showToast } = useToast();
+  const [problem, setProblem] = useState<AiChatProblem | null>(null);
+  const [approvalRequests, setApprovalRequests] = useState<AiRecoveryCard[]>([]);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const approvalLoadId = useRef(0);
+  const approvalThread = useRef(threadId);
+  useEffect(() => {
+    approvalThread.current = threadId;
+    approvalLoadId.current += 1;
+  }, [threadId]);
+  const loadApprovals = useCallback(async () => {
+    const loadId = ++approvalLoadId.current;
+    const response = await fetch(
+      `/api/v1/ai/recovery${threadId ? `?threadId=${encodeURIComponent(threadId)}` : ''}`,
+      { cache: 'no-store' },
+    );
+    if (response.ok) {
+      const body = await response.json();
+      if (
+        loadId === approvalLoadId.current &&
+        approvalThread.current === threadId &&
+        Array.isArray(body.requests)
+      )
+        setApprovalRequests(body.requests);
+    }
+  }, [threadId]);
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    const load = async () => {
+      if (active) await loadApprovals().catch(() => {});
+    };
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [open, loadApprovals]);
+  async function resolveApproval(
+    id: string,
+    decision: 'once' | 'permanent' | 'decline' | 'revoke',
+  ) {
+    setApprovalBusy(true);
+    try {
+      const response = await fetch(`/api/v1/ai/recovery/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      if (!response.ok) throw new Error(await errorMessage(response));
+      await loadApprovals();
+      const inThisThread = approvalRequests.find((r) => r.id === id)?.threadId === threadId;
+      showToast(
+        !inThisThread && (decision === 'once' || decision === 'permanent')
+          ? 'Approval saved. The requester can continue in their conversation.'
+          : decision === 'revoke'
+            ? 'One-time access revoked. Permanent settings were not changed.'
+            : decision === 'decline'
+              ? 'Request declined. Your settings were not changed.'
+              : decision === 'once'
+                ? 'One-time approval ready. Choose Continue request when all approvals are ready.'
+                : 'Setting updated. Choose Continue request to resume.',
+        'success',
+      );
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'The approval could not be completed. Refresh to check its status.',
+        'error',
+      );
+    } finally {
+      setApprovalBusy(false);
+    }
+  }
+  async function continueApproved(request: AiRecoveryCard) {
+    if (request.threadId !== threadId || busy || generating) return;
+    if (approvalRequests.some((r) => r.threadId === threadId && r.status === 'pending')) {
+      showToast('Finish the remaining approval requests before continuing.', 'info');
+      return;
+    }
+    const ids = approvalRequests
+      .filter((r) => r.threadId === threadId && r.canContinue)
+      .map((r) => r.id);
+    setRecoveryRequired(false);
+    await sendTurn(
+      false,
+      'Continue with my earlier request using the approved access and limits.',
+      ids,
+    );
+    await loadApprovals();
+  }
+
   const messagesRef = useRef<HTMLDivElement>(null);
   const messageContentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -571,7 +669,7 @@ export function AiAssistantDrawer({
     await sendTurn();
   }
 
-  async function sendTurn(retry = false, reply?: string) {
+  async function sendTurn(retry = false, reply?: string, recoveryRequestIds: string[] = []) {
     const message = (reply ?? draft).trim();
     if (
       turnInFlight.current ||
@@ -583,7 +681,14 @@ export function AiAssistantDrawer({
       return;
     const attempt = retry
       ? submittedTurn.current
-      : { operationId: createClientUuid(), threadId, message, attachments, allowPaidTools };
+      : {
+          operationId: createClientUuid(),
+          threadId,
+          message,
+          attachments,
+          allowPaidTools,
+          recoveryRequestIds,
+        };
     if (!attempt) return;
     submittedTurn.current = attempt;
     setHasSubmittedTurn(true);
@@ -607,6 +712,7 @@ export function AiAssistantDrawer({
     stickToBottom.current = true;
     readingScroll.current = null;
     setStatusError(false);
+    setProblem(null);
     turnInFlight.current = true;
     setGenerating(true);
     setBusy(true);
@@ -615,6 +721,7 @@ export function AiAssistantDrawer({
     let assistantText = '';
     let completed = false;
     let sequence = 0;
+    let failureProblem: AiChatProblem | null = null;
     let lastActionId: string | null = null;
     const showText = () => {
       setMessages((current) => [
@@ -633,6 +740,7 @@ export function AiAssistantDrawer({
           message: attempt.message,
           allowPaidTools: attempt.allowPaidTools,
           attachments: attempt.attachments,
+          recoveryRequestIds: attempt.recoveryRequestIds,
         }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
@@ -650,6 +758,8 @@ export function AiAssistantDrawer({
         job?: AiJob;
         card?: DecisionCard;
         proposal?: AppActionReview;
+        problem?: AiChatProblem;
+        request?: AiRecoveryCard;
       }>(response.body, abort.signal)) {
         if (event.sequence !== undefined) {
           if (event.sequence <= sequence) continue;
@@ -659,8 +769,23 @@ export function AiAssistantDrawer({
             );
           sequence = event.sequence;
         }
-        if (event.type === 'error')
+        if (event.type === 'recovery_request' && event.request)
+          setApprovalRequests((current) => [
+            ...current.filter((r) => r.id !== event.request!.id),
+            event.request!,
+          ]);
+        if (event.type === 'error') {
+          failureProblem = event.problem ?? null;
+          setProblem(failureProblem);
+          if (failureProblem?.recoveryRequests.length)
+            setApprovalRequests((current) => [
+              ...current.filter(
+                (r) => !failureProblem!.recoveryRequests.some((n) => n.id === r.id),
+              ),
+              ...failureProblem!.recoveryRequests,
+            ]);
           throw new Error(event.message ?? 'The response could not finish.');
+        }
         if (event.type === 'text_reset') {
           assistantText = '';
           setMessages((current) => current.filter((item) => item.id !== partialId));
@@ -740,6 +865,13 @@ export function AiAssistantDrawer({
       setHasSubmittedTurn(false);
       setStatus('Response ready.');
     } catch (error) {
+      if (!abort.signal.aborted)
+        showToast(
+          error instanceof Error ? error.message : 'The response could not finish.',
+          'error',
+          { details: failureProblem?.details },
+        );
+      void loadApprovals().catch(() => {});
       setRecoveryRequired(true);
       setStatusError(true);
       setStatus(
@@ -1200,6 +1332,17 @@ export function AiAssistantDrawer({
                     onCommand={(jobId, command) => void commandJob(jobId, command)}
                   />
                 ))}
+                {approvalRequests
+                  .filter((r) => r.threadId === threadId || r.canApprove || r.canRevoke)
+                  .map((request) => (
+                    <AiRecoveryRequestCard
+                      key={request.id}
+                      request={request}
+                      busy={approvalBusy || busy}
+                      onResolve={(id, decision) => void resolveApproval(id, decision)}
+                      onContinue={(r) => void continueApproved(r)}
+                    />
+                  ))}
                 <div ref={bottomRef} />
               </div>
             </div>
@@ -1395,7 +1538,11 @@ export function AiAssistantDrawer({
               ) : null}
               {status && !unreviewedTurns.length ? (
                 statusError ? (
-                  <InlineAlert tone="error">{status}</InlineAlert>
+                  <ChatProblemPanel
+                    problem={problem}
+                    message={status}
+                    canManageSettings={canManageAiSettings}
+                  />
                 ) : (
                   <p className={styles.turnStatus} role="status">
                     {status}

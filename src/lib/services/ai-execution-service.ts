@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertAiRecoveryGrants } from './ai-recovery-service';
 import {
   currentAiExecutionContext,
   withAiExecutionContext,
@@ -20,7 +21,10 @@ import {
 } from './ai-access-service';
 
 export class AiExecutionLimitError extends Error {
-  constructor() {
+  constructor(
+    readonly used?: number,
+    readonly limit?: number,
+  ) {
     super(
       'The account AI request limit has been reached. Wait up to ten minutes before retrying, or ask an administrator to raise Generations per 10 minutes in AI settings. A tool-assisted chat can use several provider requests.',
     );
@@ -52,6 +56,7 @@ export function resolveAiExecutionOptions(
   approved?: Approved,
 ) {
   assertAiExecutionActive();
+  assertAiRecoveryGrants();
   if (approved?.workload && approved.workload !== workload)
     throw new Error('The reviewed workload changed. Review a new request.');
   assertProfileAiEnabled(profileId);
@@ -150,7 +155,10 @@ export async function executeAiWorkload<T>(
         )
         .get()?.total ?? 0;
     if (recent + requestUnits > getEffectiveAiPolicy(profileId).generationsPerTenMinutes)
-      throw new AiExecutionLimitError();
+      throw new AiExecutionLimitError(
+        recent,
+        getEffectiveAiPolicy(profileId).generationsPerTenMinutes,
+      );
     getDatabase()
       .insert(aiExecutionTraces)
       .values({

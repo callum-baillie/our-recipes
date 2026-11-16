@@ -28,6 +28,12 @@ type Description = { kind: ChatToolKind; running: string; done: string; failed?:
 export function describeChatTool(name: string, args: unknown): Description {
   const query = phrase((args as { query?: unknown } | null)?.query);
   switch (name) {
+    case 'request_ai_access':
+      return {
+        kind: 'ask',
+        running: 'Preparing a permission request',
+        done: 'Permission request ready for review',
+      };
     case 'read_household_profiles':
       return {
         kind: 'read',

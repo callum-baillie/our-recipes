@@ -5,13 +5,15 @@ import { useToast } from './toast-provider';
 export function ToastMessage({
   message,
   tone = 'info',
+  details,
 }: {
   message: string;
+  details?: string;
   tone?: 'info' | 'error' | 'success';
 }) {
   const { showToast } = useToast();
   useEffect(() => {
-    if (message) return showToast(message, tone, { key: `feedback:${tone}:${message}` });
-  }, [message, tone, showToast]);
+    if (message) return showToast(message, tone, { key: `feedback:${tone}:${message}`, details });
+  }, [message, tone, details, showToast]);
   return null;
 }

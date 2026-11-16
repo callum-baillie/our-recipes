@@ -1,4 +1,5 @@
 import 'server-only';
+import { currentAiExecutionContext } from './ai-execution-context';
 
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -168,7 +169,7 @@ export function getAiDataPolicy(profileId: string): AiDataPolicy {
     .where(eq(aiProfileSettings.profileId, profileId))
     .get();
   if (!row) throw new AiSettingsValidationError('AI profile settings are unavailable.');
-  return aiDataPolicySchema.parse({
+  const policy = aiDataPolicySchema.parse({
     shareSharedRecipes: row.shareSharedRecipes,
     shareMealPlans: row.shareMealPlans,
     shareDietaryPreferences: row.shareDietaryPreferences,
@@ -192,6 +193,12 @@ export function getAiDataPolicy(profileId: string): AiDataPolicy {
     summaryRecipesEnabled: row.summaryRecipesEnabled,
     version: row.version,
   });
+  for (const grant of currentAiExecutionContext()?.recoveryGrants ?? []) {
+    if (grant.payload.kind === 'sharing' && grant.payload.targetProfileId === profileId) {
+      for (const category of grant.payload.categories) policy[category] = true;
+    }
+  }
+  return policy;
 }
 
 export function getAiSettings(profileId: string) {

@@ -1,3 +1,4 @@
+import { AiApprovalInbox } from '@/components/ai-approval-inbox';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
@@ -48,6 +49,7 @@ export default async function AiSettingsPage() {
         <a href="#ai-defaults">My AI defaults</a>
         <a href="#ai-privacy">Privacy and summaries</a>
       </nav>
+      <AiApprovalInbox />
       <AiRuntimeSettingsForm
         global={data.global}
         workloads={data.workloads}

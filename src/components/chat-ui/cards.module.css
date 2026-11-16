@@ -420,3 +420,15 @@
     transition: none;
   }
 }
+
+.body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.body p {
+  margin: 0;
+}

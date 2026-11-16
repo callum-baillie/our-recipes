@@ -1,4 +1,5 @@
 import 'server-only';
+import { currentAiExecutionContext } from './ai-execution-context';
 import { eq } from 'drizzle-orm';
 import { ensureDatabase, getDatabase } from '@/lib/db/client';
 import { aiRuntimeSettings, aiUserSettings, profileAuthLinks, user } from '@/lib/db/schema';
@@ -52,8 +53,15 @@ export function getEffectiveAiPolicy(profileId: string) {
   const global = getGlobalAiPolicy().settings;
   const userId = aiUserIdForProfile(profileId);
   const personal = userId ? getUserAiPolicy(userId) : null;
+  const overrides: Partial<typeof global> = {};
+  for (const grant of currentAiExecutionContext()?.recoveryGrants ?? []) {
+    if (grant.actorProfileId !== profileId || grant.payload.kind !== 'limit') continue;
+    const { setting, value } = grant.payload;
+    overrides[setting] = Math.max(global[setting], overrides[setting] ?? 0, value);
+  }
   return {
     ...global,
+    ...overrides,
     ...(personal?.preferences.processing ?? {}),
     enabled: global.enabled && (personal?.enabled ?? process.env.NODE_ENV === 'test'),
     workloads: global.allowPersonalModelOverrides ? (personal?.preferences.workloads ?? []) : [],

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bord API
-  version: 1.0.0-rc.35
+  version: 1.0.0-rc.36
   description: >-
     Authenticated self-hosted household API. Browser sessions provide access to the Bord app.
     Admin-created bearer API keys may access only the documented Recipes, Meal Plans, Grocery
@@ -4681,6 +4681,46 @@ paths:
         '401': { description: Signed out }
         '403': { description: Account or trusted origin denied }
         '404': { description: Conversation not found }
+  /ai/recovery:
+    get:
+      operationId: listMyAiRecoveryRequests
+      summary: List my assistant approval requests and requests I may review
+      description: Session-only. Includes owned conversation requests and approvals assigned to the data owner or an authorized administrator. Returns consent scope and household display labels, never private measurements or underlying records.
+      parameters:
+        - { in: query, name: threadId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          {
+            description: Latest bounded approval request cards with server-computed action permissions,
+          }
+        '400': { description: Invalid conversation identifier }
+        '401': { description: Sign in required }
+        '403': { description: Own-account session required }
+  /ai/recovery/{requestId}:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: resolveMyAiRecoveryRequest
+      summary: Approve, decline, or revoke a scoped assistant permission request
+      description: Requires exact trusted origin and a signed-in owner or authorized admin. Approval never executes the original task. Once grants are bound to one conversation and reply; permanent choices update only the reviewed settings. Revocation stops further use of a one-time grant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [once, permanent, decline, revoke] }
+      responses:
+        '200': { description: Updated approval card }
+        '400': { description: Invalid bounded decision }
+        '401': { description: Sign in required }
+        '403':
+          {
+            description: 'Wrong owner, non-admin limit approval, expired request, or untrusted origin',
+          }
   /ai/chat/threads/{threadId}/messages:
     parameters:
       - { in: path, name: threadId, required: true, schema: { type: string, format: uuid } }
@@ -4701,6 +4741,11 @@ paths:
                 operationId: { type: string, format: uuid }
                 message: { type: string, maxLength: 8000 }
                 allowPaidTools: { type: boolean, default: false }
+                recoveryRequestIds:
+                  type: array
+                  maxItems: 20
+                  items: { type: string, format: uuid }
+                  description: Approved request IDs for this reply. The server checks requester, conversation, expiry, settings versions and single-use ownership.
                 attachments: { type: array, maxItems: 20, items: { type: object } }
       responses:
         '200':

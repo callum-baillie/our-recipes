@@ -1,3 +1,4 @@
+import { AiConsentRequiredError } from '@/lib/services/ai-recovery-service';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -306,7 +307,7 @@ describe('RV04 actual provider privacy boundary', () => {
       sharing(member.id, { shareIdentity: false });
       return tool('read_household_profiles');
     });
-    await expect(runAiChatTurn(message())).rejects.toThrow(/sharing or household access changed/);
+    await expect(runAiChatTurn(message())).rejects.toBeInstanceOf(AiConsentRequiredError);
     expect(serialized).toHaveLength(2);
     expect(JSON.stringify(serialized[0].input)).toContain('Private Member Marker');
     expect(JSON.stringify(serialized[1].input)).toContain('function_call_output');
@@ -320,7 +321,7 @@ describe('RV04 actual provider privacy boundary', () => {
       sharing(profileId, { shareSharedRecipes: false });
       return tool('search_recipes', { query: 'soup' });
     });
-    await expect(runAiChatTurn(message())).rejects.toThrow(/sharing or household access changed/);
+    await expect(runAiChatTurn(message())).rejects.toBeInstanceOf(AiConsentRequiredError);
     expect(serialized).toHaveLength(2);
     expect(JSON.stringify(serialized[1].input)).toContain(draft.title);
   });
@@ -370,8 +371,8 @@ describe('RV04 actual provider privacy boundary', () => {
     await runAiChatTurn(input);
     const count = getDatabase().select().from(aiChatMessages).all().length;
     sharing(profileId, { sharePantry: false });
-    await expect(runAiChatTurn(message(input.threadId))).rejects.toThrow(
-      /Start a new conversation/,
+    await expect(runAiChatTurn(message(input.threadId))).rejects.toBeInstanceOf(
+      AiConsentRequiredError,
     );
     expect(serialized).toHaveLength(1);
     expect(getDatabase().select().from(aiChatMessages).all()).toHaveLength(count);
@@ -395,8 +396,8 @@ describe('RV04 actual provider privacy boundary', () => {
       input.message.operationId,
     );
     sharing(profileId, { shareIdentity: false });
-    await expect(runAiChatTurn(message(input.threadId))).rejects.toThrow(
-      /Start a new conversation/,
+    await expect(runAiChatTurn(message(input.threadId))).rejects.toBeInstanceOf(
+      AiConsentRequiredError,
     );
     expect(serialized).toHaveLength(1);
   });
@@ -423,7 +424,7 @@ describe('RV04 additive privacy migration', () => {
       await getSqliteDatabase().backup(path);
       const old = new Database(path);
       old.exec(
-        'DROP TABLE shopping_trips; DROP TABLE scanner_station_controls; DROP TABLE scanner_station_events; DROP TABLE scanner_operations; DROP TABLE scanner_stations; ALTER TABLE ai_chat_threads DROP COLUMN privacy_scope_json; DELETE FROM __drizzle_migrations WHERE created_at >= 1792713600000;',
+        'DROP TABLE shopping_trips; DROP TABLE scanner_station_controls; DROP TABLE scanner_station_events; DROP TABLE scanner_operations; DROP TABLE scanner_stations; DROP TABLE ai_recovery_requests; ALTER TABLE ai_chat_threads DROP COLUMN privacy_scope_json; DELETE FROM __drizzle_migrations WHERE created_at >= 1792713600000;',
       );
       old.close();
       resetDatabaseForTests();
@@ -481,7 +482,9 @@ describe('RV05 scheduled approved configuration', () => {
       'completed',
     );
     sharing(member.id, { shareIdentity: false });
-    await expect(runAiChatTurn(message(job.threadId!))).rejects.toThrow(/Start a new conversation/);
+    await expect(runAiChatTurn(message(job.threadId!))).rejects.toBeInstanceOf(
+      AiConsentRequiredError,
+    );
     expect(serialized).toHaveLength(1);
   });
   it('refuses scheduled materialized scope contraction before generation starts', async () => {

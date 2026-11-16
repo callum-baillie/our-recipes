@@ -126,7 +126,7 @@ describe('meal assignment requests', () => {
     await act(async () =>
       resolve(Response.json({ error: { message: 'Choose another recipe.' } }, { status: 400 })),
     );
-    expect(screen.getByRole('alert').textContent).toBe('Choose another recipe.');
+    expect(screen.getByRole('alert').textContent).toContain('Choose another recipe.');
     expect((screen.getByRole('button', { name: 'Add 1 meal' }) as HTMLButtonElement).disabled).toBe(
       false,
     );

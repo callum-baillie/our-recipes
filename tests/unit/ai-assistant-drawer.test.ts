@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
+import { ToastProvider } from '@/components/toast-provider';
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as baseRender,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +17,9 @@ vi.mock('next/image', () => ({
 }));
 
 import { AiAssistantDrawer } from '@/components/ai-assistant-drawer';
+function render(ui: Parameters<typeof baseRender>[0]) {
+  return baseRender(ui, { wrapper: ToastProvider });
+}
 
 const recipeAction = {
   id: 'action-1',

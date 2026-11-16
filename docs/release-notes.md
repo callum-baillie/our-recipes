@@ -1,5 +1,13 @@
 # Release notes
 
+## 1.0.0-rc.36
+
+- Add server-authorized assistant permission requests with one-reply and permanent choices, an account approval inbox, expiring single-use grants, and revocation. Another account's private sharing requires that account owner's consent; administrators can manage operational limits and unowned household profiles.
+- Add actionable request-limit, output-limit, timeout and tool-limit recovery cards. One-time overrides remain confined to the approved reply; permanent choices use versioned settings. One-time data cannot be replayed into a later AI turn without renewed approval.
+- Add persistent, friendly chat error details and Copy error controls to error notifications, including safe diagnostic reference numbers and a manual-copy fallback.
+- Add migration `0084_ai_recovery_requests` (86 migrations total). Back up before upgrading; existing permissions and sharing choices are preserved.
+- Verification: 227 unit/integration files passed (1,403 tests passed, 9 skipped), TypeScript passed, changed files passed formatting and lint checks, and the OpenAPI contract smoke passed for 206 documented operations. Full lint reports three existing PDF warnings. Tests use deterministic providers; no live OpenAI request was made for this change. Image and Tower deployment evidence are recorded in the release entry.
+
 ## 1.0.0-rc.35
 
 - Verified on Tower with the exact November 15–22 prompt: eight dinners for two people, followed by a selected-meal replacement that left the other seven entries unchanged. The final draft is pending review; no meals or recipes were saved.

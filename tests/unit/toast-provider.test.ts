@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createElement, useState } from 'react';
+import { createElement, useState, type ComponentProps } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ToastNotice, ToastProvider, useToast } from '@/components/toast-provider';
@@ -114,4 +114,76 @@ it('keeps a notice with expandable details until it is dismissed', () => {
   expect(document.querySelector('.toast')?.getAttribute('data-actionable')).toBe('true');
   fireEvent.click(screen.getByLabelText('Dismiss notification'));
   expect(screen.queryByText('Dates')).toBeNull();
+});
+
+it('copies an error with safe technical details and keeps it available for review', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  function ErrorControl() {
+    const { showToast } = useToast();
+    return createElement(
+      'button',
+      {
+        onClick: () =>
+          showToast('Limit reached', 'error', {
+            details: 'Code: account_request_limit\nReference: safe-id',
+          }),
+      },
+      'Fail',
+    );
+  }
+  render(createElement(ToastProvider, null, createElement(ErrorControl)));
+  fireEvent.click(screen.getByText('Fail'));
+  fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
+  await act(async () => {});
+  expect(writeText).toHaveBeenCalledWith(
+    'Limit reached\n\nCode: account_request_limit\nReference: safe-id',
+  );
+  expect(screen.getByRole('button', { name: 'Error copied' })).toBeTruthy();
+  fireEvent.click(screen.getByLabelText('Dismiss notification'));
+  expect(screen.queryByText('Limit reached')).toBeNull();
+});
+it('offers manual copy when the Clipboard API is unavailable', async () => {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: vi.fn().mockRejectedValue(new Error('Unavailable')) },
+  });
+  render(
+    createElement(
+      ToastProvider,
+      null,
+      createElement(
+        ToastNotice,
+        { tone: 'error' } as ComponentProps<typeof ToastNotice>,
+        'Something failed',
+      ),
+    ),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
+  await act(async () => {});
+  expect((screen.getByLabelText('Error details to copy') as HTMLTextAreaElement).value).toBe(
+    'Something failed',
+  );
+});
+
+it('keeps error copy controls inside an ARIA modal and forwards Escape to its dismiss handler', async () => {
+  const onKeyDown = vi.fn();
+  render(
+    createElement(
+      ToastProvider,
+      null,
+      createElement('div', { role: 'dialog', 'aria-modal': true, onKeyDown }, 'Chat'),
+      createElement(
+        ToastNotice,
+        { tone: 'error' } as ComponentProps<typeof ToastNotice>,
+        'Request failed',
+      ),
+    ),
+  );
+  await act(async () => {});
+  const copy = screen.getByRole('button', { name: 'Copy error details' });
+  expect(screen.getByRole('dialog').contains(copy)).toBe(true);
+  fireEvent.keyDown(copy, { key: 'Escape' });
+  expect(onKeyDown).toHaveBeenCalledOnce();
+  expect(onKeyDown.mock.calls[0][0].key).toBe('Escape');
 });

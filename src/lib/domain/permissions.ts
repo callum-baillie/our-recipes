@@ -140,6 +140,7 @@ export function authorizeAppRequest(input: {
 
   // An administrator may grant a child account chat access; this never grants shared CRUD.
   if (
+    /^\/api\/v1\/ai\/recovery(?:\/[^/]+)?$/u.test(pathname) ||
     pathname === '/api/v1/ai/imports' ||
     /^\/api\/v1\/ai\/jobs\/[^/]+$/u.test(pathname) ||
     /^\/api\/v1\/ai\/chat\/threads(?:\/[^/]+(?:\/messages)?)?$/u.test(pathname)

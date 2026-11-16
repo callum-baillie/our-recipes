@@ -2927,3 +2927,33 @@ export const shoppingTrips = sqliteTable('shopping_trips', {
   note: text('note').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
+
+/** Human approvals are scoped to a requester, conversation and one consumed turn. */
+export const aiRecoveryRequests = sqliteTable(
+  'ai_recovery_requests',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('thread_id')
+      .notNull()
+      .references(() => aiChatThreads.id, { onDelete: 'cascade' }),
+    requesterUserId: text('requester_user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    actorProfileId: text('actor_profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    payload: text('payload').notNull(),
+    status: text('status', { enum: ['pending', 'approved', 'declined', 'used'] })
+      .notNull()
+      .default('pending'),
+    approvedMode: text('approved_mode', { enum: ['once', 'permanent'] }),
+    approvedByUserId: text('approved_by_user_id').references(() => user.id, {
+      onDelete: 'cascade',
+    }),
+    baselineVersion: integer('baseline_version'),
+    turnId: text('turn_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  },
+  (t) => [index('ai_recovery_request_scope').on(t.requesterUserId, t.threadId, t.status)],
+);

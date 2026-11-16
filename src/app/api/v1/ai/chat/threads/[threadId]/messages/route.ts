@@ -1,5 +1,4 @@
-import { AiExecutionLimitError } from '@/lib/services/ai-execution-service';
-import { getEffectiveAiPolicy } from '@/lib/services/ai-access-service';
+import { aiChatProblem } from '@/lib/services/ai-chat-problem';
 import {
   decisionErrorResponse,
   boundedDecisionJson,
@@ -40,11 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ thread
     };
     validateAiChatTurn(input);
     const abort = new AbortController();
-    const signal = AbortSignal.any([
-      request.signal,
-      abort.signal,
-      AbortSignal.timeout(getEffectiveAiPolicy(profileId).requestTimeoutSeconds * 1000),
-    ]);
+    const signal = AbortSignal.any([request.signal, abort.signal, AbortSignal.timeout(300_000)]);
     const encoder = new TextEncoder();
     let sequence = 0;
     let closed = false;
@@ -78,18 +73,8 @@ export async function POST(request: Request, context: { params: Promise<{ thread
               });
             })
             .catch((error: unknown) => {
-              emit({
-                type: 'error',
-                message:
-                  error instanceof AiChatForbiddenError ||
-                  error instanceof AiChatToolError ||
-                  error instanceof AiChatRateLimitError ||
-                  error instanceof AiExecutionLimitError ||
-                  error instanceof AiAssistantProviderResponseError ||
-                  error instanceof AiAssistantProviderUnavailableError
-                    ? error.message
-                    : 'The response could not finish. Reload the conversation to review any saved previews or tasks before trying again.',
-              });
+              const problem = aiChatProblem(error, { principal, threadId: input.threadId });
+              emit({ type: 'error', message: problem.message, problem });
             })
             .finally(() => {
               closed = true;

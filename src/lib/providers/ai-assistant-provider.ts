@@ -92,8 +92,22 @@ export interface AiAssistantProvider {
   }): Promise<AiSummaryBundleOutput>;
 }
 
-export class AiAssistantProviderUnavailableError extends Error {}
-export class AiAssistantProviderResponseError extends Error {}
+export class AiAssistantProviderUnavailableError extends Error {
+  get publicMessage() {
+    return this.message;
+  }
+}
+export class AiAssistantProviderResponseError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+  get publicMessage() {
+    return this.message;
+  }
+}
 
 type ResponsesClient = {
   stream?(
@@ -230,6 +244,7 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
         reason === 'max_output_tokens'
           ? 'The draft exceeded the configured response limit. Try fewer meals or raise Maximum response tokens in AI settings.'
           : 'The provider could not finish the draft. Try a smaller request.',
+        reason === 'max_output_tokens' ? 'output_limit' : 'incomplete',
       );
     }
     if (response.status && response.status !== 'completed')
@@ -304,6 +319,9 @@ export class OpenAiAssistantProvider implements AiAssistantProvider {
             final.incomplete_details?.reason === 'max_output_tokens'
               ? 'The assistant reached the configured response limit. Try a smaller request or raise Maximum response tokens in AI settings.'
               : 'The response ended before completion. Review the conversation before trying again.',
+            final.incomplete_details?.reason === 'max_output_tokens'
+              ? 'output_limit'
+              : 'incomplete',
           );
         }
         response = final;

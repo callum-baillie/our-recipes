@@ -1,4 +1,5 @@
 'use client';
+import { ErrorDetails } from './error-details';
 
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 import {
@@ -19,6 +20,7 @@ type ToastTone = 'success' | 'error' | 'info';
 
 export type ToastOptions = {
   key?: string;
+  details?: string;
   actions?: Array<{ label: string; onClick: () => void | Promise<void> }>;
   /** Buttons normally keep a notification until used; this lets a short offer such as Undo lapse. */
   autoDismissMs?: number;
@@ -67,8 +69,10 @@ function noticeContent(children: ReactNode): {
 export function ToastNotice({
   children,
   tone = 'info',
+  details,
 }: {
   children: ReactNode;
+  details?: string;
   tone?: ToastTone | 'warning';
 }) {
   const content = noticeContent(children);
@@ -77,7 +81,8 @@ export function ToastNotice({
       key={`${tone}:${content.text}`}
       tone={tone === 'warning' ? 'info' : tone}
       sticky={content.actionable}
-      interactive={content.interactive}
+      interactive={content.interactive || tone === 'error'}
+      errorDetails={details}
     >
       {children}
     </NoticeContent>
@@ -89,8 +94,10 @@ function NoticeContent({
   tone,
   sticky,
   interactive,
+  errorDetails,
 }: {
   children: ReactNode;
+  errorDetails?: string;
   tone: ToastTone;
   sticky: boolean;
   /** Holds controls (such as expandable details) that must stay usable until dismissed. */
@@ -116,7 +123,12 @@ function NoticeContent({
       }}
     >
       <ToastIcon tone={tone} />
-      <div>{children}</div>
+      <div>
+        {children}
+        {tone === 'error' ? (
+          <ErrorDetails message={noticeContent(children).text} details={errorDetails} />
+        ) : null}
+      </div>
       {!sticky && (
         <button
           type="button"
@@ -140,7 +152,7 @@ function ToastIcon({ tone }: { tone: ToastTone }) {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [region, setRegion] = useState<HTMLElement | null>(null);
-  const [modal, setModal] = useState<HTMLDialogElement | null>(null);
+  const [modal, setModal] = useState<HTMLElement | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -149,7 +161,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     // Native modal dialogs make the rest of the document inert. Keep notification
     // actions inside the active dialog so they remain keyboard and pointer accessible.
     const update = () => {
-      const dialogs = document.querySelectorAll<HTMLDialogElement>('dialog[open]');
+      const dialogs = document.querySelectorAll<HTMLElement>(
+        'dialog[open], [role="dialog"][aria-modal="true"]',
+      );
       const active = dialogs.item(dialogs.length - 1);
       setModal((current) => (current === active ? current : active));
     };
@@ -158,7 +172,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['open'],
+      attributeFilter: ['open', 'aria-modal', 'hidden', 'aria-hidden'],
     });
     queueMicrotask(update);
     return () => observer.disconnect();
@@ -187,7 +201,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         const ordinary = current.filter((t) => !t.actions?.length).slice(-2);
         return [...sticky, ...ordinary, { id, message, tone, ...options }];
       });
-      if (options.actions?.length && !options.autoDismissMs) return () => dismiss(id);
+      if ((options.actions?.length || tone === 'error') && !options.autoDismissMs)
+        return () => dismiss(id);
       timers.current.set(
         id,
         setTimeout(() => dismiss(id), options.autoDismissMs ?? (tone === 'error' ? 7000 : 4500)),
@@ -217,6 +232,35 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       role="region"
       aria-label="Notifications"
       aria-live="polite"
+      onKeyDown={(event) => {
+        if (!modal || modal instanceof HTMLDialogElement) return;
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          modal.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          return;
+        }
+        if (event.key !== 'Tab') return;
+        const controls = [
+          ...modal.querySelectorAll<HTMLElement>('a[href],button,input,select,textarea,[tabindex]'),
+        ].filter(
+          (el) =>
+            el.tabIndex >= 0 &&
+            !el.matches(':disabled') &&
+            !el.closest('[hidden],[inert]') &&
+            el.getClientRects().length > 0,
+        );
+        const first = controls[0],
+          last = controls.at(-1);
+        if (
+          first &&
+          last &&
+          ((event.shiftKey && document.activeElement === first) ||
+            (!event.shiftKey && document.activeElement === last))
+        ) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
+      }}
     >
       {toasts.map((toast) => (
         <div
@@ -226,7 +270,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           role={toast.tone === 'error' ? 'alert' : 'status'}
         >
           <ToastIcon tone={toast.tone} />
-          <span>{toast.message}</span>
+          <div>
+            {toast.message}
+            {toast.tone === 'error' ? (
+              <ErrorDetails message={toast.message} details={toast.details} />
+            ) : null}
+          </div>
           {toast.actions?.map((action) => (
             <button
               type="button"

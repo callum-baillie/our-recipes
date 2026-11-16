@@ -1,4 +1,5 @@
 'use client';
+import { ErrorDetails } from '../error-details';
 import {
   AlertCircle,
   BookOpen,
@@ -133,6 +134,11 @@ export function ChatToolCalls({ calls, active }: { calls: ChatToolCall[]; active
                   <span className={styles.meta}>{duration(call.durationMs)}</span>
                 ) : null}
                 <StatusIcon state={call.state} />
+                {call.state === 'error' ? (
+                  <div className={styles.errorDetails}>
+                    <ErrorDetails message={call.title} details={call.summary} />
+                  </div>
+                ) : null}
               </li>
             );
           })}
