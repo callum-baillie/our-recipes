@@ -81,6 +81,22 @@ function compactProposalMessage(message: Message, action?: AiDrawerAction): stri
   return 'I prepared that change for you. Review it below when you’re ready.';
 }
 
+const AUTO_IMAGES_KEY = 'bord:chat:auto-recipe-images';
+function readAutoImages() {
+  try {
+    return window.localStorage.getItem(AUTO_IMAGES_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+function writeAutoImages(value: boolean) {
+  try {
+    window.localStorage.setItem(AUTO_IMAGES_KEY, value ? 'on' : 'off');
+  } catch {
+    /* The preference simply will not persist. */
+  }
+}
+
 const STARTERS = [
   { icon: CalendarDays, label: 'Plan this week’s dinners', prompt: 'Plan dinners for this week.' },
   {
@@ -143,6 +159,13 @@ export function AiAssistantDrawer({
   const [suggestions, setSuggestions] = useState<DecisionCard[]>([]);
   const [appActions, setAppActions] = useState<AppActionReview[]>([]);
   const [allowPaidTools, setAllowPaidTools] = useState(false);
+  // A per-browser convenience, on by default. The server still requires image generation to be
+  // enabled and configured, and every photo is an explicit, recorded request.
+  const [autoImages, setAutoImages] = useState(readAutoImages);
+  // Only drafts created during this visit start a photo on their own; older drafts never spend.
+  // Meals marked as kept while reviewing a drafted plan; they survive a swapped meal's new draft.
+  const [keptMeals, setKeptMeals] = useState<ReadonlySet<string>>(new Set());
+  const [liveActionIds, setLiveActionIds] = useState<ReadonlySet<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statusError, setStatusError] = useState(false);
   const { showToast } = useToast();
@@ -355,6 +378,7 @@ export function AiAssistantDrawer({
         ...current,
       ]);
       setMessages([]);
+      setKeptMeals(new Set());
       setToolCalls([]);
       setDraft(initialDraft ?? '');
       setAttachments([]);
@@ -608,6 +632,7 @@ export function AiAssistantDrawer({
       };
       const saved = drafts.current.get(id);
       setThreadId(id);
+      setKeptMeals(new Set());
       setToolCalls([]);
       setMessages(body.messages);
       setActions(body.actions ?? []);
@@ -755,6 +780,8 @@ export function AiAssistantDrawer({
         actionId?: string;
         kind?: string;
         preview?: unknown;
+        imageDelivery?: AiDrawerAction['imageDelivery'];
+        sourceDigest?: string | null;
         job?: AiJob;
         card?: DecisionCard;
         proposal?: AppActionReview;
@@ -823,6 +850,7 @@ export function AiAssistantDrawer({
           ]);
         if (event.type === 'action' && event.actionId) {
           lastActionId = event.actionId;
+          setLiveActionIds((current) => new Set(current).add(event.actionId!));
           setActions((current) =>
             current.some((action) => action.id === event.actionId)
               ? current
@@ -837,6 +865,8 @@ export function AiAssistantDrawer({
                     id: event.actionId!,
                     kind: event.kind ?? 'change',
                     preview: event.preview,
+                    imageDelivery: event.imageDelivery ?? null,
+                    sourceDigest: event.sourceDigest ?? null,
                     status: 'pending',
                   },
                 ],
@@ -893,6 +923,7 @@ export function AiAssistantDrawer({
     actionId: string,
     decision: 'confirm' | 'cancel',
     conflictResolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+    options?: { generateImages?: boolean },
   ) {
     setStatusError(false);
     setBusy(true);
@@ -902,7 +933,11 @@ export function AiAssistantDrawer({
       const response = await fetch(`/api/v1/ai/actions/${actionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, conflictResolutions }),
+        body: JSON.stringify({
+          decision,
+          conflictResolutions,
+          ...(options?.generateImages ? { generateImages: true } : {}),
+        }),
       });
       if (!response.ok) throw new Error(await errorMessage(response));
       const body = (await response.json()) as {
@@ -923,6 +958,8 @@ export function AiAssistantDrawer({
       setStatus(
         decision === 'confirm' ? 'Saved successfully.' : 'Preview cancelled. Nothing was saved.',
       );
+      // A confirmed draft may have queued a photo job; show it without waiting for the poll.
+      if (decision === 'confirm') window.dispatchEvent(new Event('bord:ai-jobs-changed'));
     } catch (error) {
       setStatusError(true);
       setStatus(error instanceof Error ? error.message : 'Could not update that proposal.');
@@ -982,7 +1019,18 @@ export function AiAssistantDrawer({
       onRevise={reviseMeal}
       busy={busy}
       pendingDecision={pendingDecision?.actionId === action.id ? pendingDecision.decision : null}
-      onDecide={(actionId, decision, resolutions) => void decide(actionId, decision, resolutions)}
+      autoImage={autoImages && liveActionIds.has(action.id)}
+      keptMeals={keptMeals}
+      onKeptMealsChange={setKeptMeals}
+      onRefine={(actionId) => {
+        setDraft(
+          (current) => `${current.trim() ? `${current}\n\n` : ''}Change draft ${actionId}: `,
+        );
+        textareaRef.current?.focus();
+      }}
+      onDecide={(actionId, decision, resolutions, options) =>
+        void decide(actionId, decision, resolutions, options)
+      }
     />
   );
 
@@ -1156,6 +1204,23 @@ export function AiAssistantDrawer({
                         <small>
                           Applies to this conversation. Image generation requires its own
                           confirmation.
+                        </small>
+                      </span>
+                    </label>
+                    <label className={styles.paidTools}>
+                      <input
+                        type="checkbox"
+                        checked={autoImages}
+                        onChange={(event) => {
+                          setAutoImages(event.target.checked);
+                          writeAutoImages(event.target.checked);
+                        }}
+                      />
+                      <span>
+                        <strong>Create a photo for new recipe drafts</strong>
+                        <small>
+                          On by default. Each photo is a paid image request and only runs when image
+                          generation is enabled for your account. Meal plans ask before saving.
                         </small>
                       </span>
                     </label>

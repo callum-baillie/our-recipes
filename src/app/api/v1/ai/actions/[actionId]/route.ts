@@ -35,6 +35,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ actio
         profileId,
         parsed.data.decision,
         parsed.data.conflictResolutions,
+        { generateImages: parsed.data.generateImages },
       ),
     });
   } catch (error) {

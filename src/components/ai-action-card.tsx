@@ -3,25 +3,37 @@
 import {
   ArrowUpRight,
   CalendarDays,
+  Camera,
   Check,
   ChefHat,
+  ChevronDown,
   Clock3,
-  ImagePlus,
+  ImageOff,
   Layers3,
+  MessageSquarePlus,
   RefreshCw,
   ShoppingBasket,
+  Sparkles,
   Users,
   X,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { SwipeRow } from './chat-ui/swipe-row';
+import { ButtonSpinner } from './skeleton';
 
-import { AsyncSkeleton } from '@/components/skeleton';
 import { ActionButton, Callout, CardFooter, CardHead, Disclosure } from './chat-ui/card-parts';
 import cards from './chat-ui/cards.module.css';
 
 import styles from './ai-action-card.module.css';
+
+export type AiImageDelivery = {
+  available: boolean;
+  reason: string | null;
+  count: number;
+  mode: 'direct' | 'batch';
+};
 
 export type AiDrawerAction = {
   id: string;
@@ -30,13 +42,16 @@ export type AiDrawerAction = {
   status: string;
   result?: unknown;
   sourceDigest?: string | null;
+  /** What image generation can do for this draft; absent on older saved drafts. */
+  imageDelivery?: AiImageDelivery | null;
 };
 
 type Resolution = Array<{ entryId: string; resolution: 'keep' | 'replace' }>;
-type DecideHandler = (
+export type DecideHandler = (
   actionId: string,
   decision: 'confirm' | 'cancel',
   resolutions?: Resolution,
+  options?: { generateImages?: boolean },
 ) => void;
 
 function object(value: unknown): Record<string, unknown> | null {
@@ -54,7 +69,7 @@ function text(value: unknown): string {
 }
 
 function number(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return typeof value === 'number' && Number.isFinite(value) ? value : Number(value) || 0;
 }
 
 function formatIngredient(value: unknown): string {
@@ -71,6 +86,10 @@ function countIngredients(recipe: Record<string, unknown>) {
     (count, group) => count + list(object(group)?.ingredients).length,
     0,
   );
+}
+
+function plural(count: number, one: string, many = `${one}s`) {
+  return `${count} ${count === 1 ? one : many}`;
 }
 
 function RecipeFacts({ recipe }: { recipe: Record<string, unknown> }) {
@@ -137,16 +156,112 @@ function Method({ recipe }: { recipe: Record<string, unknown> }) {
   );
 }
 
+/** Share of calories from protein, carbohydrate and fat, when the draft states all three. */
+function macroSplit(recipe: Record<string, unknown>) {
+  const protein = number(recipe.nutritionProteinGrams) * 4;
+  const carbs = number(recipe.nutritionCarbohydrateGrams) * 4;
+  const fat = number(recipe.nutritionFatGrams) * 9;
+  const total = protein + carbs + fat;
+  if (!total) return null;
+  return [
+    { key: 'protein', label: 'Protein', percent: Math.round((protein / total) * 100) },
+    { key: 'carbs', label: 'Carbs', percent: Math.round((carbs / total) * 100) },
+    { key: 'fat', label: 'Fat', percent: Math.round((fat / total) * 100) },
+  ];
+}
+
+function PaidPhotoSwitch({
+  delivery,
+  checked,
+  onChange,
+  disabled,
+  recipes,
+}: {
+  delivery: AiImageDelivery | null | undefined;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled: boolean;
+  recipes: number;
+}) {
+  if (!delivery || !recipes) return null;
+  if (!delivery.available)
+    return (
+      <p className={styles.photoOff}>
+        <ImageOff aria-hidden="true" /> No photos for {plural(recipes, 'new recipe')}:{' '}
+        {delivery.reason ?? 'image generation is unavailable.'}
+      </p>
+    );
+  return (
+    <div className={styles.photoOption}>
+      <label>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span className={styles.switchTrack} aria-hidden="true" />
+        <span className={styles.photoCopy}>
+          <strong>
+            <Camera aria-hidden="true" /> Create photos for {plural(recipes, 'new recipe')}
+          </strong>
+          <small>Paid image requests, started only when you confirm.</small>
+        </span>
+      </label>
+      {checked && delivery.mode === 'batch' ? (
+        <Callout tone="info">
+          <p>
+            <strong>This runs as a batch.</strong> Photos can take a while — check back later. Your
+            plan is saved straight away and the photos appear on the recipes as they finish.
+          </p>
+        </Callout>
+      ) : null}
+    </div>
+  );
+}
+
+function ImageOutcome({ result }: { result: Record<string, unknown> | null }) {
+  const state = text(result?.imageGeneration);
+  if (!state || state === 'requires_separate_review' || state === 'none') return null;
+  const count = number(result?.imageCount);
+  const note = text(result?.imageNote);
+  if (state === 'queued')
+    return (
+      <Callout tone="info">
+        <p>
+          <strong>
+            {count ? `Photos for ${plural(count, 'recipe')}` : 'Recipe photos'} are being created.
+          </strong>{' '}
+          {text(result?.imageExecutionMode) === 'batch'
+            ? 'This is a batch process and may take a while — check back later. Progress shows in the task below and under Background tasks.'
+            : 'Progress shows in the task below.'}
+        </p>
+      </Callout>
+    );
+  return (
+    <Callout tone="warning">
+      <p>
+        <strong>Saved without photos.</strong> {note || 'Image generation could not be started.'}
+      </p>
+    </Callout>
+  );
+}
+
 function RecipeProposalCard({
   action,
   busy,
   pendingDecision,
   onDecide,
+  onRefine,
+  autoImage = false,
 }: {
   action: AiDrawerAction;
   busy: boolean;
   pendingDecision: 'confirm' | 'cancel' | null;
   onDecide: DecideHandler;
+  onRefine?: (actionId: string) => void;
+  autoImage?: boolean;
 }) {
   const preview = object(action.preview) ?? {};
   const recipe = object(action.kind === 'recipe_update' ? preview.after : preview.recipe);
@@ -155,6 +270,9 @@ function RecipeProposalCard({
   const [imageError, setImageError] = useState('');
   const [imageOperation, setImageOperation] = useState<string | null>(null);
   const image = object(object(localAction?.preview)?.image ?? preview.image);
+  const autoStarted = useRef(false);
+  const [autoRequested, setAutoRequested] = useState(false);
+  const delivery = action.imageDelivery ?? null;
   async function requestImage(fresh = false) {
     if (!action.sourceDigest || imagePending) return;
     const operationId = fresh
@@ -187,6 +305,26 @@ function RecipeProposalCard({
     }
   }
   const [imageFailed, setImageFailed] = useState(false);
+  const wantsAutoImage =
+    autoImage &&
+    action.kind === 'recipe_create' &&
+    action.status === 'pending' &&
+    Boolean(action.sourceDigest) &&
+    delivery?.available === true &&
+    !text(image?.operationId);
+  useEffect(() => {
+    if (!wantsAutoImage) return;
+    // The guard lives in the timer so a development double-mount cannot cancel the one request.
+    const start = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      // One automatic request per draft; a failed or interrupted one is never repeated unasked.
+      autoStarted.current = true;
+      setAutoRequested(true);
+      void requestImage();
+    }, 0);
+    return () => window.clearTimeout(start);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsAutoImage]);
   if (!recipe) return null;
 
   const nutrition = [
@@ -197,8 +335,13 @@ function RecipeProposalCard({
     ['Fiber', text(recipe.nutritionFiberGrams), 'g'],
     ['Sodium', text(recipe.nutritionSodiumMilligrams), 'mg'],
   ].filter(([, value]) => value !== '');
-  const imageReady = text(image?.status) === 'ready' && !imageFailed;
-  const imageGenerating = imagePending || ['requested', 'generating'].includes(text(image?.status));
+  const split = macroSplit(recipe);
+  const imageStatus = text(image?.status);
+  const imageReady = imageStatus === 'ready' && !imageFailed;
+  const imageAwaiting = !imagePending && imageStatus === 'requested';
+  const imageEnded =
+    !imagePending &&
+    (['failed', 'cancelled'].includes(imageStatus) || (imageFailed && !imageReady));
   const result = object(action.result);
   const recipeId = text(result?.recipeId);
   const savedImageId = text(result?.imageId);
@@ -212,12 +355,24 @@ function RecipeProposalCard({
   const ingredientCount = countIngredients(recipe);
   const isCreate = action.kind === 'recipe_create';
   const title = text(recipe.title) || 'Untitled recipe';
+  const pending = action.status === 'pending';
+  const showHero = imageReady || imagePending || imageAwaiting || imageEnded;
+  // Without a photo yet: either the draft will make one itself, or the person can ask.
+  const offerManual =
+    isCreate &&
+    pending &&
+    Boolean(action.sourceDigest) &&
+    !autoRequested &&
+    !imageReady &&
+    !imageEnded &&
+    !imageAwaiting;
+  const photoBlocked = delivery && !delivery.available && !imageReady;
 
   return (
     <article
       className={cards.card}
       aria-label={`Recipe proposal: ${title}`}
-      aria-busy={pendingDecision !== null}
+      aria-busy={pendingDecision !== null || imagePending}
     >
       <CardHead
         icon={ChefHat}
@@ -227,25 +382,53 @@ function RecipeProposalCard({
         status={action.status}
       />
 
-      {imageReady || imageGenerating ? (
-        <div className={styles.hero}>
+      {showHero ? (
+        <div
+          className={styles.hero}
+          data-state={imageReady ? 'ready' : imagePending ? 'busy' : 'idle'}
+        >
           {imageReady ? (
-            <Image
-              src={imageSource}
-              alt={text(image?.altText) || `AI-generated preview of ${title}`}
-              fill
-              sizes="(max-width: 540px) 100vw, 420px"
-              unoptimized
-              onError={() => setImageFailed(true)}
-            />
-          ) : (
-            <div className={styles.imageFallback}>
-              <AsyncSkeleton label="Generating preview image" variant="image" />
-              <span>
-                {imagePending
-                  ? 'Preparing an image preview…'
-                  : 'Image request awaiting its recorded result'}
+            <>
+              <Image
+                src={imageSource}
+                alt={text(image?.altText) || `AI-generated preview of ${title}`}
+                fill
+                sizes="(max-width: 540px) 100vw, 420px"
+                unoptimized
+                onError={() => setImageFailed(true)}
+              />
+              <span className={styles.heroTag}>
+                <Sparkles aria-hidden="true" /> AI photo
               </span>
+            </>
+          ) : imagePending ? (
+            <div className={styles.photoBusy} role="status" aria-label="Creating a photo">
+              <span className={styles.photoOrb} aria-hidden="true">
+                <Camera />
+              </span>
+              <strong>Creating a photo…</strong>
+              <small>Usually under a minute. You can review the recipe meanwhile.</small>
+            </div>
+          ) : (
+            <div className={styles.photoIdle}>
+              <ImageOff aria-hidden="true" />
+              <strong>
+                {imageAwaiting ? 'Waiting for the photo result' : 'The photo could not be created'}
+              </strong>
+              <small>
+                {imageAwaiting
+                  ? 'The request was sent but its outcome was not recorded. Check it before trying again.'
+                  : 'A new request is a new paid image request.'}
+              </small>
+              {pending && action.sourceDigest ? (
+                <ActionButton
+                  icon={RefreshCw}
+                  disabled={busy}
+                  onClick={() => void requestImage(!imageAwaiting)}
+                >
+                  {imageAwaiting ? 'Check this image request' : 'Try again (paid)'}
+                </ActionButton>
+              ) : null}
             </div>
           )}
         </div>
@@ -260,9 +443,24 @@ function RecipeProposalCard({
               <h4>Per serving</h4>
               <span>Estimated</span>
             </div>
+            {split ? (
+              <div
+                className={styles.macroBar}
+                role="img"
+                aria-label={`Share of calories: ${split.map((part) => `${part.label} ${part.percent}%`).join(', ')}`}
+              >
+                {split.map((part) => (
+                  <i
+                    key={part.key}
+                    data-macro={part.key}
+                    style={{ flexGrow: part.percent || 0.4 }}
+                  />
+                ))}
+              </div>
+            ) : null}
             <div className={styles.nutritionGrid}>
               {nutrition.map(([label, value, unit]) => (
-                <div key={label}>
+                <div key={label} data-macro={label.toLowerCase()}>
                   <strong>
                     {value}
                     <small>{unit}</small>
@@ -276,7 +474,7 @@ function RecipeProposalCard({
 
         <Disclosure
           summary="Ingredients"
-          count={`${ingredientCount} ${ingredientCount === 1 ? 'item' : 'items'}`}
+          count={plural(ingredientCount, 'item')}
           defaultOpen={ingredientCount <= 8}
         >
           <Ingredients recipe={recipe} />
@@ -287,14 +485,17 @@ function RecipeProposalCard({
           </Disclosure>
         ) : null}
 
-        {isCreate && action.status === 'pending' && action.sourceDigest && !imageReady ? (
+        {photoBlocked && isCreate && pending ? (
+          <p className={styles.photoOff}>
+            <ImageOff aria-hidden="true" /> No photo:{' '}
+            {delivery?.reason ?? 'image generation is unavailable.'}
+          </p>
+        ) : null}
+        {offerManual && !photoBlocked ? (
           <section className={styles.imageAsk}>
-            <p>
-              Optional image: a separate paid request sends this reviewed recipe to the image
-              provider. Saving the recipe does not select an image.
-            </p>
+            <p>Photos are a separate paid request. Saving the recipe does not select an image.</p>
             <ActionButton
-              icon={ImagePlus}
+              icon={Camera}
               disabled={busy || imagePending}
               pending={imagePending}
               onClick={() => void requestImage()}
@@ -305,26 +506,12 @@ function RecipeProposalCard({
                   ? 'Check this image request'
                   : 'Generate an image preview (paid)'}
             </ActionButton>
-            {imageError ? <Callout tone="error">{imageError}</Callout> : null}
-            {['failed', 'cancelled'].includes(text(image?.status)) ? (
-              <>
-                <p>
-                  The previous request ended without an available preview. A new request may incur
-                  another charge.
-                </p>
-                <ActionButton
-                  disabled={busy || imagePending}
-                  onClick={() => void requestImage(true)}
-                >
-                  Start a new paid image request
-                </ActionButton>
-              </>
-            ) : null}
           </section>
         ) : null}
+        {imageError ? <Callout tone="error">{imageError}</Callout> : null}
       </div>
 
-      {action.status === 'pending' ? (
+      {pending ? (
         <CardFooter>
           <ActionButton
             tone="primary"
@@ -341,7 +528,17 @@ function RecipeProposalCard({
                 ? 'Add to My Recipes'
                 : 'Save recipe changes'}
           </ActionButton>
+          {onRefine ? (
+            <ActionButton
+              icon={MessageSquarePlus}
+              disabled={busy || imagePending}
+              onClick={() => onRefine(action.id)}
+            >
+              Ask for changes
+            </ActionButton>
+          ) : null}
           <ActionButton
+            tone="quiet"
             pending={pendingDecision === 'cancel'}
             onClick={() => onDecide(action.id, 'cancel')}
             disabled={busy || imagePending}
@@ -388,9 +585,11 @@ function mealRank(meal: string) {
 
 function describeDay(date: string) {
   const parsed = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return { weekday: date, label: '' };
+  if (Number.isNaN(parsed.getTime())) return { weekday: date, short: date, day: '', label: '' };
   return {
     weekday: parsed.toLocaleDateString(undefined, { weekday: 'long' }),
+    short: parsed.toLocaleDateString(undefined, { weekday: 'short' }),
+    day: String(parsed.getDate()),
     label: parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
   };
 }
@@ -402,14 +601,25 @@ function describeRange(dates: string[]) {
   return dates.length === 1 ? fmt(dates[0]) : `${fmt(dates[0])} – ${fmt(dates.at(-1)!)}`;
 }
 
+/** Identity of a drafted meal. A replaced meal gets a new title, so it comes back unreviewed. */
+export const mealKey = (plannedFor: string, meal: string, title: string) =>
+  `${plannedFor}|${meal}|${title}`;
+
+const SWAP_UNDO_MS = 3000;
+
 function GenericProposalCard({
   action,
   busy,
   pendingDecision,
   onDecide,
   onRevise,
+  keptMeals,
+  onKeptMealsChange,
 }: {
   onRevise?: (actionId: string, plannedFor: string, meal: string) => void;
+  /** Meals the person has marked as kept; lifted so they survive a replaced draft. */
+  keptMeals?: ReadonlySet<string>;
+  onKeptMealsChange?: (next: Set<string>) => void;
   action: AiDrawerAction;
   busy: boolean;
   pendingDecision: 'confirm' | 'cancel' | null;
@@ -417,6 +627,11 @@ function GenericProposalCard({
 }) {
   const [resolutions, setResolutions] = useState<Record<string, 'keep' | 'replace'>>({});
   const [revising, setRevising] = useState<string | null>(null);
+  const [localKept, setLocalKept] = useState<ReadonlySet<string>>(new Set());
+  const [swap, setSwap] = useState<string | null>(null);
+  const swapTimer = useRef<number | null>(null);
+  const [photos, setPhotos] = useState(true);
+  const [openDays, setOpenDays] = useState<Set<string> | null>(null);
   const preview = object(action.preview) ?? {};
   const candidate = object(preview.candidate);
   const entries = (
@@ -446,24 +661,73 @@ function GenericProposalCard({
   };
   const dates = [...new Set(entries.map((entry) => text(entry.plannedFor)))].filter(Boolean).sort();
   const savedCount = entries.filter((entry) => text(entry.existingRecipeId)).length;
-  const draftCount = entries.length - savedCount;
+  const draftCount = newRecipes.length;
   const members = Array.isArray(preview.selectedProfileIds) ? preview.selectedProfileIds.length : 0;
   const assumptions = list(candidate?.assumptions).map(text).filter(Boolean);
   const warnings = list(candidate?.warnings).map(text).filter(Boolean);
-  const shoppingListId = text(object(action.result)?.shoppingListId);
+  const result = object(action.result);
+  const shoppingListId = text(result?.shoppingListId);
   const pending = action.status === 'pending';
   const title = entries.length
-    ? `${entries.length} meal${entries.length === 1 ? '' : 's'} · ${describeRange(dates)}`
+    ? `${plural(entries.length, 'meal')} · ${describeRange(dates)}`
     : (labels[action.kind] ?? 'Proposed change');
   const subtitle = entries.length
-    ? [
-        members ? `For ${members} household member${members === 1 ? '' : 's'}` : '',
-        savedCount ? `${savedCount} from your recipes` : '',
-        draftCount ? `${draftCount} new` : '',
-      ]
-        .filter(Boolean)
-        .join(' · ')
+    ? members
+      ? `For ${plural(members, 'household member')}`
+      : undefined
     : text(preview.operation) || 'This change is ready for your review.';
+  const delivery = action.kind === 'meal_plan_generate' ? (action.imageDelivery ?? null) : null;
+  const wantsPhotos = Boolean(pending && delivery?.available && photos && draftCount > 0);
+  // Long plans open one day at a time so the card stays scannable.
+  const expanded = openDays ?? new Set(dates.length <= 3 ? dates : dates.slice(0, 1));
+  const allOpen = dates.every((date) => expanded.has(date));
+  const kept = keptMeals ?? localKept;
+  const setKept = onKeptMealsChange ?? setLocalKept;
+  const keyOf = (entry: Record<string, unknown>) =>
+    mealKey(text(entry.plannedFor), text(entry.meal), text(entry.title) || 'Planned meal');
+  const keptCount = entries.filter((entry) => kept.has(keyOf(entry))).length;
+  const reviewable = Boolean(pending && entries.length);
+  const toggleKept = (keys: string[], on: boolean) => {
+    const next = new Set(kept);
+    for (const key of keys) {
+      if (on) next.add(key);
+      else next.delete(key);
+    }
+    setKept(next);
+  };
+  const dayEntries = (date: string) =>
+    entries
+      .filter((entry) => text(entry.plannedFor) === date)
+      .sort((a, b) => mealRank(text(a.meal)) - mealRank(text(b.meal)));
+  const setDayOpen = (date: string, open: boolean) => {
+    const next = new Set(expanded);
+    if (open) next.add(date);
+    else next.delete(date);
+    setOpenDays(next);
+  };
+  // A swap is sent after a short undo window, so a stray swipe never costs an AI request.
+  const startSwap = (key: string, identity: string, date: string, meal: string) => {
+    if (!onRevise || busy || swap) return;
+    toggleKept([identity], false);
+    setSwap(key);
+    swapTimer.current = window.setTimeout(() => {
+      swapTimer.current = null;
+      setSwap(null);
+      setRevising(key);
+      onRevise(action.id, date, meal);
+    }, SWAP_UNDO_MS);
+  };
+  const undoSwap = () => {
+    if (swapTimer.current !== null) window.clearTimeout(swapTimer.current);
+    swapTimer.current = null;
+    setSwap(null);
+  };
+  useEffect(
+    () => () => {
+      if (swapTimer.current !== null) window.clearTimeout(swapTimer.current);
+    },
+    [],
+  );
 
   return (
     <article
@@ -481,84 +745,282 @@ function GenericProposalCard({
 
       {entries.length ? (
         <div className={styles.body}>
+          <dl className={styles.stats} aria-label="Plan summary">
+            <div>
+              <dt>Days</dt>
+              <dd>{dates.length}</dd>
+            </div>
+            <div>
+              <dt>Meals</dt>
+              <dd>{entries.length}</dd>
+            </div>
+            <div>
+              <dt>Your recipes</dt>
+              <dd>{savedCount}</dd>
+            </div>
+            <div>
+              <dt>New</dt>
+              <dd>{draftCount}</dd>
+            </div>
+          </dl>
+
           {pending ? (
-            <p className={styles.lead}>
-              This is a draft. Skip any meal that is not for you and I will swap only that one.
-            </p>
+            <PaidPhotoSwitch
+              delivery={delivery}
+              checked={photos}
+              onChange={setPhotos}
+              disabled={busy}
+              recipes={draftCount}
+            />
           ) : null}
+
+          {reviewable ? (
+            <section className={styles.review} aria-label="Review progress">
+              <div className={styles.reviewTop}>
+                <strong>
+                  {keptCount} of {entries.length} kept
+                </strong>
+                <ActionButton
+                  tone="quiet"
+                  disabled={busy || swap !== null}
+                  onClick={() => toggleKept(entries.map(keyOf), keptCount !== entries.length)}
+                >
+                  {keptCount === entries.length ? 'Clear all' : 'Keep all'}
+                </ActionButton>
+              </div>
+              <div
+                className={styles.reviewTrack}
+                role="progressbar"
+                aria-label="Meals kept"
+                aria-valuemin={0}
+                aria-valuemax={entries.length}
+                aria-valuenow={keptCount}
+              >
+                <i style={{ width: `${(keptCount / entries.length) * 100}%` }} />
+              </div>
+              <p className={styles.lead}>
+                This is a draft — nothing is saved yet. Tap ✓ Keep or ✗ Change on a meal, or swipe
+                it right to keep and left to change. Swipe a whole day right to keep all of its
+                meals.
+              </p>
+            </section>
+          ) : null}
+
+          {dates.length > 1 ? (
+            <div className={styles.dayTools}>
+              <ActionButton
+                tone="quiet"
+                onClick={() => setOpenDays(allOpen ? new Set() : new Set(dates))}
+              >
+                {allOpen ? 'Collapse all days' : 'Expand all days'}
+              </ActionButton>
+            </div>
+          ) : null}
+
           {dates.map((date) => {
             const day = describeDay(date);
-            const meals = entries
-              .filter((entry) => text(entry.plannedFor) === date)
-              .sort((a, b) => mealRank(text(a.meal)) - mealRank(text(b.meal)));
+            const meals = dayEntries(date);
+            const isOpen = expanded.has(date);
+            const dayKeys = meals.map(keyOf);
+            const dayKept = dayKeys.length > 0 && dayKeys.every((key) => kept.has(key));
+            const panelId = `plan-${action.id}-${date}`;
             return (
-              <section key={date} className={styles.day} aria-label={`${day.weekday} ${day.label}`}>
-                <h4 className={styles.dayHead}>
-                  <span>{day.weekday}</span>
-                  <small>{day.label}</small>
-                </h4>
-                <ul className={styles.meals}>
+              <section
+                key={date}
+                className={styles.day}
+                data-state={dayKept ? 'kept' : undefined}
+                aria-label={`${day.weekday} ${day.label}`}
+              >
+                <SwipeRow
+                  className={styles.dayHeadWrap}
+                  contentClassName={styles.dayHeadRow}
+                  disabled={!reviewable || busy || swap !== null}
+                  ignore="a,input,select,textarea,[data-no-swipe]"
+                  rightLabel="Keep day"
+                  leftLabel="Clear day"
+                  onSwipeRight={
+                    reviewable
+                      ? () => {
+                          toggleKept(dayKeys, true);
+                          setDayOpen(date, false);
+                        }
+                      : undefined
+                  }
+                  onSwipeLeft={reviewable ? () => toggleKept(dayKeys, false) : undefined}
+                >
+                  <button
+                    type="button"
+                    className={styles.dayToggle}
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={() => setDayOpen(date, !isOpen)}
+                  >
+                    <span className={styles.dayDate} aria-hidden="true">
+                      <small>{day.short}</small>
+                      <b>{day.day}</b>
+                    </span>
+                    <span className={styles.dayCopy}>
+                      <strong>
+                        {day.weekday} <small>{day.label}</small>
+                      </strong>
+                      <span>
+                        {meals.map((meal) => text(meal.title) || 'Planned meal').join(' · ')}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={styles.dayChevron}
+                      aria-hidden="true"
+                      data-open={isOpen}
+                    />
+                  </button>
+                  {reviewable ? (
+                    <button
+                      type="button"
+                      className={styles.dayKeep}
+                      data-no-swipe
+                      aria-pressed={dayKept}
+                      aria-label={`Keep every meal on ${day.weekday} ${day.label}`}
+                      disabled={busy || swap !== null}
+                      onClick={() => {
+                        toggleKept(dayKeys, !dayKept);
+                        if (!dayKept) setDayOpen(date, false);
+                      }}
+                    >
+                      <Check aria-hidden="true" />
+                      <span>{dayKept ? 'Kept' : 'Keep day'}</span>
+                    </button>
+                  ) : null}
+                </SwipeRow>
+                <ul className={styles.meals} id={panelId} hidden={!isOpen}>
                   {meals.map((meal, index) => {
                     const key = `${date}:${text(meal.meal)}:${index}`;
+                    const identity = keyOf(meal);
+                    const isKept = kept.has(identity);
                     const recipeEntry = newRecipes.find(
                       (item) => item.key !== undefined && item.key === meal.newRecipeKey,
                     );
                     const recipe = object(recipeEntry?.recipe);
                     const savedId = text(meal.existingRecipeId);
                     const mealName = text(meal.meal);
-                    const title = text(meal.title) || 'Planned meal';
+                    const mealTitle = text(meal.title) || 'Planned meal';
                     const replacing = busy && revising === key;
+                    const undoing = swap === key;
+                    const kcal = recipe ? text(recipe.nutritionCalories) : '';
+                    const minutes = recipe
+                      ? number(recipe.prepMinutes) +
+                        number(recipe.cookMinutes) +
+                        number(recipe.restMinutes)
+                      : 0;
+                    const mealState = replacing || undoing ? 'changing' : isKept ? 'kept' : 'open';
                     return (
-                      <li key={key} className={styles.meal} data-meal={mealName.toLowerCase()}>
-                        <span className={styles.mealTag}>{mealName}</span>
-                        <div className={styles.mealMain}>
-                          <div className={styles.mealTitleRow}>
-                            {savedId ? (
-                              <Link
-                                className={styles.mealTitle}
-                                href={`/recipes/${encodeURIComponent(savedId)}`}
+                      <li key={key} className={styles.mealItem}>
+                        <SwipeRow
+                          className={styles.meal}
+                          contentClassName={styles.mealRow}
+                          state={mealState}
+                          disabled={!reviewable || busy || swap !== null}
+                          rightLabel="Keep"
+                          leftLabel="Change"
+                          onSwipeRight={reviewable ? () => toggleKept([identity], true) : undefined}
+                          onSwipeLeft={
+                            reviewable && onRevise
+                              ? () => startSwap(key, identity, text(meal.plannedFor), mealName)
+                              : undefined
+                          }
+                        >
+                          <span className={styles.mealTag} data-meal={mealName.toLowerCase()}>
+                            {mealName}
+                          </span>
+                          <div className={styles.mealMain}>
+                            <div className={styles.mealTitleRow}>
+                              {savedId ? (
+                                <Link
+                                  className={styles.mealTitle}
+                                  href={`/recipes/${encodeURIComponent(savedId)}`}
+                                >
+                                  {mealTitle}
+                                  <ArrowUpRight aria-hidden="true" />
+                                </Link>
+                              ) : (
+                                <strong className={styles.mealTitle}>{mealTitle}</strong>
+                              )}
+                              <span
+                                className={styles.source}
+                                data-source={savedId ? 'saved' : 'new'}
                               >
-                                {title}
-                                <ArrowUpRight aria-hidden="true" />
-                              </Link>
-                            ) : (
-                              <strong className={styles.mealTitle}>{title}</strong>
-                            )}
-                            <span className={styles.source} data-source={savedId ? 'saved' : 'new'}>
-                              {savedId ? 'Saved recipe' : 'New draft'}
-                            </span>
+                                {savedId ? 'Saved recipe' : 'New draft'}
+                              </span>
+                            </div>
+                            <p className={styles.mealMeta}>
+                              {[
+                                text(meal.servings) ? `${text(meal.servings)} servings` : '',
+                                minutes ? `${minutes} min` : '',
+                                kcal ? `${kcal} kcal` : '',
+                                text(meal.note),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                            {recipe ? (
+                              <Disclosure
+                                summary="View recipe"
+                                count={plural(countIngredients(recipe), 'ingredient')}
+                              >
+                                {text(recipe.summary) ? <p>{text(recipe.summary)}</p> : null}
+                                <Ingredients recipe={recipe} />
+                                <Method recipe={recipe} />
+                              </Disclosure>
+                            ) : null}
+                            {reviewable ? (
+                              undoing ? (
+                                <div className={styles.undoBar} role="status">
+                                  <span>Finding a replacement…</span>
+                                  <ActionButton
+                                    tone="quiet"
+                                    className={styles.undoButton}
+                                    onClick={undoSwap}
+                                  >
+                                    Undo
+                                  </ActionButton>
+                                </div>
+                              ) : replacing ? (
+                                <div className={styles.undoBar} role="status">
+                                  <span>
+                                    <ButtonSpinner /> Finding another {mealName}…
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className={styles.mealActions} data-no-swipe>
+                                  <ActionButton
+                                    tone="quiet"
+                                    icon={Check}
+                                    className={styles.keepBtn}
+                                    aria-pressed={isKept}
+                                    aria-label={`Keep ${mealName} on ${day.weekday} ${day.label}: ${mealTitle}`}
+                                    disabled={busy || swap !== null}
+                                    onClick={() => toggleKept([identity], !isKept)}
+                                  >
+                                    {isKept ? 'Kept' : 'Keep'}
+                                  </ActionButton>
+                                  {onRevise ? (
+                                    <ActionButton
+                                      tone="quiet"
+                                      icon={X}
+                                      className={styles.changeBtn}
+                                      aria-label={`Not for me, replace ${mealName} on ${day.weekday} ${day.label}: ${mealTitle}`}
+                                      disabled={busy || swap !== null}
+                                      onClick={() =>
+                                        startSwap(key, identity, text(meal.plannedFor), mealName)
+                                      }
+                                    >
+                                      Change
+                                    </ActionButton>
+                                  ) : null}
+                                </div>
+                              )
+                            ) : null}
                           </div>
-                          <p className={styles.mealMeta}>
-                            {text(meal.servings)} servings
-                            {text(meal.note) ? ` · ${text(meal.note)}` : ''}
-                          </p>
-                          {recipe ? (
-                            <Disclosure
-                              summary="View recipe"
-                              count={`${countIngredients(recipe)} ingredients`}
-                            >
-                              {text(recipe.summary) ? <p>{text(recipe.summary)}</p> : null}
-                              <Ingredients recipe={recipe} />
-                              <Method recipe={recipe} />
-                            </Disclosure>
-                          ) : null}
-                          {pending && onRevise ? (
-                            <ActionButton
-                              tone="quiet"
-                              icon={RefreshCw}
-                              pending={replacing}
-                              disabled={busy}
-                              aria-label={`Not for me, replace ${mealName} on ${day.weekday} ${day.label}: ${title}`}
-                              className={styles.swap}
-                              onClick={() => {
-                                setRevising(key);
-                                onRevise(action.id, text(meal.plannedFor), text(meal.meal));
-                              }}
-                            >
-                              {replacing ? 'Finding another…' : 'Not for me · swap'}
-                            </ActionButton>
-                          ) : null}
-                        </div>
+                        </SwipeRow>
                       </li>
                     );
                   })}
@@ -627,12 +1089,15 @@ function GenericProposalCard({
         </section>
       ) : null}
 
-      {action.kind === 'meal_plan_generate' && shoppingListId ? (
+      {!pending && action.status === 'confirmed' && isPlan ? (
         <div className={styles.body}>
-          <Link className={styles.listLink} href={`/lists/${encodeURIComponent(shoppingListId)}`}>
-            <ShoppingBasket aria-hidden="true" /> Open this plan’s shopping list
-            <ArrowUpRight aria-hidden="true" />
-          </Link>
+          <ImageOutcome result={result} />
+          {action.kind === 'meal_plan_generate' && shoppingListId ? (
+            <Link className={styles.listLink} href={`/lists/${encodeURIComponent(shoppingListId)}`}>
+              <ShoppingBasket aria-hidden="true" /> Open this plan’s shopping list
+              <ArrowUpRight aria-hidden="true" />
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
@@ -640,9 +1105,9 @@ function GenericProposalCard({
         <CardFooter
           note={
             unresolvedCount
-              ? `Choose what happens to ${unresolvedCount} occupied ${unresolvedCount === 1 ? 'slot' : 'slots'} to continue.`
+              ? `Choose what happens to ${plural(unresolvedCount, 'occupied slot')} to continue.`
               : isPlan
-                ? 'Saving also creates a shopping list that accounts for your pantry. Meals not listed stay unchanged.'
+                ? `Saving also creates a shopping list that accounts for your pantry. Meals not listed stay unchanged.${wantsPhotos ? ' Photos are created after saving.' : ''}`
                 : undefined
           }
         >
@@ -658,11 +1123,18 @@ function GenericProposalCard({
                   entryId,
                   resolution,
                 })),
+                { generateImages: wantsPhotos },
               )
             }
             disabled={busy || unresolvedCount > 0}
           >
-            {pendingDecision === 'confirm' ? 'Saving…' : isPlan ? 'Confirm plan' : 'Confirm'}
+            {pendingDecision === 'confirm'
+              ? 'Saving…'
+              : isPlan
+                ? wantsPhotos
+                  ? 'Confirm plan + photos'
+                  : 'Confirm plan'
+                : 'Confirm'}
           </ActionButton>
           <ActionButton
             pending={pendingDecision === 'cancel'}
@@ -701,9 +1173,13 @@ function RecipeBatchProposalCard({
   pendingDecision: 'confirm' | 'cancel' | null;
   onDecide: DecideHandler;
 }) {
+  const [photos, setPhotos] = useState(true);
   const preview = object(action.preview) ?? {};
   const recipes = list(preview.recipes).map(object).filter(Boolean);
   const name = (recipe: Record<string, unknown> | null) => text(recipe?.title) || 'Untitled recipe';
+  const pending = action.status === 'pending';
+  const delivery = action.imageDelivery ?? null;
+  const wantsPhotos = Boolean(pending && delivery?.available && photos);
   return (
     <article className={cards.card} aria-label="Recipe batch proposal" aria-busy={busy}>
       <CardHead
@@ -734,17 +1210,34 @@ function RecipeBatchProposalCard({
             </ol>
           </Disclosure>
         ) : null}
+        {pending ? (
+          <PaidPhotoSwitch
+            delivery={delivery}
+            checked={photos}
+            onChange={setPhotos}
+            disabled={busy}
+            recipes={recipes.length}
+          />
+        ) : action.status === 'confirmed' ? (
+          <ImageOutcome result={object(action.result)} />
+        ) : null}
       </div>
-      {action.status === 'pending' ? (
+      {pending ? (
         <CardFooter>
           <ActionButton
             tone="primary"
             icon={Check}
             pending={pendingDecision === 'confirm'}
-            onClick={() => onDecide(action.id, 'confirm')}
+            onClick={() =>
+              onDecide(action.id, 'confirm', undefined, { generateImages: wantsPhotos })
+            }
             disabled={busy}
           >
-            {pendingDecision === 'confirm' ? 'Adding…' : 'Add all to My Recipes'}
+            {pendingDecision === 'confirm'
+              ? 'Adding…'
+              : wantsPhotos
+                ? 'Add all + create photos'
+                : 'Add all to My Recipes'}
           </ActionButton>
           <ActionButton
             pending={pendingDecision === 'cancel'}
@@ -768,8 +1261,13 @@ function RecipeBatchProposalCard({
 
 export function AiActionCard(props: {
   onRevise?: (actionId: string, plannedFor: string, meal: string) => void;
+  onRefine?: (actionId: string) => void;
+  keptMeals?: ReadonlySet<string>;
+  onKeptMealsChange?: (next: Set<string>) => void;
   action: AiDrawerAction;
   busy: boolean;
+  /** Start the draft's photo automatically (live drafts only; older drafts never spend). */
+  autoImage?: boolean;
   pendingDecision?: 'confirm' | 'cancel' | null;
   onDecide: DecideHandler;
 }) {

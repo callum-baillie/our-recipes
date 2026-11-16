@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { AlertTriangle, Check, Clock3, ListChecks } from 'lucide-react';
+import { AlertTriangle, Check, Clock3, Hourglass, ListChecks } from 'lucide-react';
 import { ActionButton, Callout, CardFooter, CardHead, Disclosure } from './chat-ui/card-parts';
 import cards from './chat-ui/cards.module.css';
 import styles from './ai-app-action-card.module.css';
@@ -62,8 +62,8 @@ export function AiJobCard({
   return (
     <section className={cards.card} aria-label={`${job.title} background task`}>
       <CardHead
-        icon={ListChecks}
-        eyebrow="Background task"
+        icon={job.executionMode === 'batch' ? Hourglass : ListChecks}
+        eyebrow={job.executionMode === 'batch' ? 'Batch process' : 'Background task'}
         title={job.title}
         status={status}
         statusLabel={active ? 'In progress' : failed ? 'Needs attention' : 'Complete'}
@@ -89,11 +89,20 @@ export function AiJobCard({
         </div>
       </div>
       <div className={styles.taskBody}>
+        {active && job.executionMode === 'batch' ? (
+          <Callout tone="info">
+            <p>
+              <strong>This is a batch process and may take a while.</strong> Results can take up to
+              24 hours. You do not need to keep this chat open — check back later; finished items
+              appear here and under Background tasks.
+            </p>
+          </Callout>
+        ) : null}
         <Callout tone={active ? 'info' : failed ? 'warning' : 'success'}>
           {job.completedItems} of {job.totalItems} completed
           {job.failedItems ? ` · ${job.failedItems} ${unknown ? 'need attention' : 'failed'}` : ''}.
           {active
-            ? ` ${job.executionMode === 'batch' ? 'OpenAI Batch may take up to 24 hours. ' : ''}Work continues when you close the browser.`
+            ? ' Work continues when you close the browser.'
             : failed
               ? ` ${unfinished} unfinished. ${unknown ? UNKNOWN_AI_OUTCOME_MESSAGE : (errors[job.errorCode ?? ''] ?? 'Open details to review the results.')}`
               : job.kind === 'recipe_images'

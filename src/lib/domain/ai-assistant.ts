@@ -211,6 +211,11 @@ export const aiActionKindSchema = z.enum([
 export const aiActionDecisionSchema = z
   .object({
     decision: z.enum(['confirm', 'cancel']),
+    /**
+     * Explicit permission, given at the moment of confirming, to queue paid image generation for
+     * the new recipes this draft saves. Defaults to false; the server re-checks every gate.
+     */
+    generateImages: z.boolean().default(false),
     conflictResolutions: z
       .array(
         z

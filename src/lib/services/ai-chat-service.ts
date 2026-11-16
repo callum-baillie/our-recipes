@@ -1998,6 +1998,8 @@ async function performAiChatTurn(input: ChatTurnInput) {
               actionId: result.id,
               kind: result.kind,
               preview: result.preview,
+              imageDelivery: (result as { imageDelivery?: unknown }).imageDelivery ?? null,
+              sourceDigest: (result as { sourceDigest?: unknown }).sourceDigest ?? null,
             });
           }
           if (isJob) {

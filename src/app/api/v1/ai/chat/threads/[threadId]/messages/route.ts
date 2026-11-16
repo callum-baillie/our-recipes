@@ -61,6 +61,8 @@ export async function POST(request: Request, context: { params: Promise<{ thread
                   actionId: action.id,
                   kind: action.kind,
                   preview: action.preview,
+                  imageDelivery: action.imageDelivery,
+                  sourceDigest: action.sourceDigest,
                 });
               for (const job of result.jobs) emit({ type: 'job', job });
               for (const card of result.suggestions) emit({ type: 'suggestion', card });

@@ -21,3 +21,20 @@ The conversation surface is built from small native pieces in `src/components/ch
 - **Empty state** offers starter prompts; the composer is one surface with a stop button in its action rail; "Jump to latest" floats over the conversation.
 
 Verification used a mocked stream and mocked thread endpoints only; no provider call was made.
+
+## Recipe and meal-plan cards, photos and batch notices
+
+- **Recipe draft**: facts chips, a calories/macros bar, numbered method steps, an optional photo area and an "Ask for changes" action that puts the draft id in the composer.
+- **Photos by default**: a recipe draft created during the current visit starts one photo request automatically (the existing explicit `/api/v1/ai/actions/:id/image` request with `confirm: true`, operation id and source digest). This is a per-browser preference (Assistant settings → "Create a photo for new recipe drafts", on by default). It never repeats a failed or interrupted request, never runs for drafts that were already in the thread when it opened, and does nothing unless the server reports image generation as available.
+- **Meal plans and recipe sets**: a labelled "Create photos for N new recipes" switch (on when available). Confirming sends `generateImages: true` in the existing decision call; the server queues one `recipe_images` job for the newly saved recipes only after the plan is saved. A plain confirmation still never starts a paid image job.
+- **Availability**: `ai-image-delivery.ts` reports `{available, reason, count, mode}` for each draft from the same gates the paid operations enforce (provider configured, image workload enabled, recipe sharing allowed). Unavailable reasons are shown instead of a switch.
+- **Batch notices**: when the task execution mode makes the image job a provider batch (`auto` at or above the batch threshold, or `batch`), the plan card says it runs as a batch, may take a while, and to check back later; after saving, the card repeats this and the task card is labelled "Batch process" with the same message. A failed or unavailable image request never undoes the saved plan; the card says it saved without photos and why.
+- **Plan layout**: summary stats, collapsible days (long plans open one day at a time, with expand/collapse all), per-meal time/kcal for new recipes.
+
+Verification used mocked image endpoints and a deterministic test provider; no live image or text request was made.
+
+## Reviewing a drafted meal plan (keep / change, swipe)
+
+- Every meal in a pending draft has **✓ Keep** and **✗ Change** buttons; each day has **Keep day**. The same actions are available as swipes (`chat-ui/swipe-row.tsx`): a meal right = keep, left = change; a day header right = keep every meal that day (and fold it), left = clear that day's kept marks. The buttons are the accessible path; swiping never replaces them. Vertical scrolling is left to the browser and a drag only starts after a clear sideways move, so links, buttons and scrolling keep working.
+- **Change** reuses the scoped replacement request (`revise_meal_plan_draft`), so only that meal is replaced. It is sent after a 3-second **Undo** window so a stray swipe never costs an AI request. Other change buttons are disabled while one is pending or running.
+- Progress ("N of M kept", "Keep all" / "Clear all") is local review state, not a saved decision: **Confirm plan** still saves the whole draft whatever has been kept. Kept meals are remembered per thread by date, slot and title, so they stay kept when a swapped meal produces a new draft; the replaced meal returns unreviewed. Scheduled-task drafts (no change handler) get Keep only.

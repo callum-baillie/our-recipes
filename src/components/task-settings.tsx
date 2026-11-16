@@ -240,6 +240,7 @@ export function TaskSettings({
     id: string,
     decision: 'confirm' | 'cancel',
     conflictResolutions?: Array<{ entryId: string; resolution: 'keep' | 'replace' }>,
+    options?: { generateImages?: boolean },
   ) {
     if (lock.current) return;
     lock.current = true;
@@ -250,7 +251,11 @@ export function TaskSettings({
       const response = await fetch(`/api/v1/ai/actions/${id}?personal=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, ...(conflictResolutions ? { conflictResolutions } : {}) }),
+        body: JSON.stringify({
+          decision,
+          ...(conflictResolutions ? { conflictResolutions } : {}),
+          ...(options?.generateImages ? { generateImages: true } : {}),
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message ?? 'Draft could not be updated.');

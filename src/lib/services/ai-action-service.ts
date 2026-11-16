@@ -55,6 +55,8 @@ import {
   updateRecipeWithIntegrations,
 } from '@/lib/services/recipe-service';
 import { removeRecipeImage } from '@/lib/storage/recipe-image-storage';
+import { enqueueRecipeImageJob } from './ai-job-service';
+import { describeImageDelivery, IMAGE_BATCH_NOTICE } from './ai-image-delivery';
 
 const ACTION_LIFETIME_MS = 24 * 60 * 60 * 1_000;
 
@@ -129,6 +131,10 @@ function publicAction(row: typeof aiActionProposals.$inferSelect) {
         ? digest(recipeInputSchema.parse(JSON.parse(row.payload).recipe))
         : null,
     preview: JSON.parse(row.preview) as unknown,
+    imageDelivery:
+      row.status === 'pending'
+        ? describeImageDelivery(row.profileId, row.kind, JSON.parse(row.payload))
+        : null,
     result: row.result ? (JSON.parse(row.result) as unknown) : null,
     expiresAt: row.expiresAt,
     createdAt: row.createdAt,
@@ -612,11 +618,51 @@ async function removeDetachedPreview(storageKey: string | null): Promise<void> {
   if (storageKey) await removeRecipeImage(storageKey).catch(() => undefined);
 }
 
+function queueDraftImages(
+  row: typeof aiActionProposals.$inferSelect,
+  images: Array<AiImageGenerationInput & { recipeId: string }>,
+) {
+  if (!images.length) return { imageJobId: null, imageGeneration: 'none' as const };
+  const delivery = describeImageDelivery(row.profileId, row.kind, JSON.parse(row.payload));
+  if (delivery && !delivery.available)
+    return {
+      imageJobId: null,
+      imageGeneration: 'unavailable' as const,
+      imageNote: delivery.reason,
+    };
+  try {
+    // The recipes are already saved; an image problem must never undo or fail that save.
+    const job = enqueueRecipeImageJob({
+      profileId: row.profileId,
+      threadId: row.threadId,
+      actionId: row.id,
+      images,
+    });
+    return {
+      imageJobId: job?.id ?? null,
+      imageGeneration: 'queued' as const,
+      imageCount: images.length,
+      imageExecutionMode: job?.executionMode ?? 'direct',
+      imageNote: job?.executionMode === 'batch' ? IMAGE_BATCH_NOTICE : null,
+    };
+  } catch (error) {
+    return {
+      imageJobId: null,
+      imageGeneration: 'failed' as const,
+      imageNote:
+        error instanceof Error && error.message
+          ? error.message
+          : 'The recipes were saved, but image generation could not be queued.',
+    };
+  }
+}
+
 export async function decideAiAction(
   actionId: string,
   profileId: string,
   decision: 'confirm' | 'cancel',
   conflictResolutions: Array<{ entryId: string; resolution: 'keep' | 'replace' }> = [],
+  options: { generateImages?: boolean } = {},
 ) {
   const { row, action } = getAiActionProposal(actionId, profileId);
   if (row.status !== 'pending') return action;
@@ -668,13 +714,16 @@ export async function decideAiAction(
         : execute(row, conflictResolutions);
     let storedResult = result;
     if (row.kind === 'meal_plan_generate' || row.kind === 'recipe_batch_create') {
-      const { imageInputs: _images, ...saved } = result as {
-        imageInputs?: unknown;
+      const { imageInputs, ...saved } = result as {
+        imageInputs?: Array<AiImageGenerationInput & { recipeId: string }>;
         [key: string]: unknown;
       };
-      void _images;
-      // Text approval never grants permission for a second paid image operation.
-      storedResult = { ...saved, imageJobId: null, imageGeneration: 'requires_separate_review' };
+      // Text approval alone never grants a paid image operation. Only an explicit request made
+      // with this confirmation (the card's image option) queues one, and only through the same
+      // gates the image job enforces.
+      storedResult = options.generateImages
+        ? { ...saved, ...queueDraftImages(row, imageInputs ?? []) }
+        : { ...saved, imageJobId: null, imageGeneration: 'requires_separate_review' };
     }
     const updated = getDatabase()
       .update(aiActionProposals)

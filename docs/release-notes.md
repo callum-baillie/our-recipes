@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.0-rc.38
+
+- Refine AI meal-plan and recipe proposal cards with richer recipe details, serving and nutrition context, clear saved-versus-draft labels, and per-meal review controls. Keep or change an individual meal, keep a full day, or swipe a meal/day on touch; confirm still saves the reviewed plan as one draft.
+- Add default recipe-photo generation to new recipe and meal-plan drafts, with an explicit review control and progress/results in the cards. Batch tasks explain that processing can take time and tell people where to check for results.
+- Add a safe image-delivery service and focused coverage for photo handling and meal review interactions. No schema change (`0084_ai_recovery_requests`, 86 migrations). No live OpenAI request was made for these changes; release and deployment evidence is recorded in the Forgejo release entry.
+
 ## 1.0.0-rc.37
 
 - Keep Copy error readable in narrow notifications, make technical details interactive, and preserve an accessible dismiss button. Includes the approved AI recovery and diagnostic improvements from rc36.

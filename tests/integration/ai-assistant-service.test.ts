@@ -781,6 +781,127 @@ describe('AI assistant services', () => {
     ]);
   });
 
+  describe('recipe photos for confirmed drafts', () => {
+    const planRequest = {
+      startDate: '2026-07-20',
+      endDate: '2026-07-20',
+      mealSlots: ['dinner'] as ['dinner'],
+      servings: 4,
+      sourceMode: 'new' as const,
+      occupiedSlotMode: 'keep' as const,
+      instructions: '',
+    };
+    const imageJobs = () =>
+      getDatabase()
+        .select()
+        .from(aiJobs)
+        .all()
+        .filter((job) => job.kind === 'recipe_images');
+
+    beforeEach(async () => {
+      const bytes = await sharp({
+        create: { width: 32, height: 32, channels: 3, background: '#d8b88a' },
+      })
+        .png()
+        .toBuffer();
+      // Deterministic provider: configured, and never reaches the network.
+      setAiProviderForTests({
+        name: 'OpenAI',
+        getStatus: () => ({
+          provider: 'OpenAI',
+          state: 'configured',
+          enabled: true,
+          message: 'Deterministic test provider.',
+          supportedOperationKinds: ['image-generation'],
+        }),
+        generateRecipeImage: async () => ({ bytes, altText: 'A deterministic preview' }),
+      } as unknown as AiProvider);
+    });
+
+    it('describes what photos a draft can offer before anything is requested', async () => {
+      const profile = setupProfile();
+      const generated = await generateAiMealPlanProposal({
+        actorProfileId: profile.id,
+        request: planRequest,
+      });
+      expect(getAiActionProposal(generated.proposal.id, profile.id).action.imageDelivery).toEqual({
+        available: true,
+        reason: null,
+        count: 1,
+        mode: 'direct',
+      });
+      expect(imageJobs()).toHaveLength(0);
+    });
+
+    it('queues photos for newly saved recipes only when the confirmation asks for them', async () => {
+      const profile = setupProfile();
+      const generated = await generateAiMealPlanProposal({
+        actorProfileId: profile.id,
+        request: planRequest,
+      });
+      const decided = await decideAiAction(generated.proposal.id, profile.id, 'confirm', [], {
+        generateImages: true,
+      });
+      expect(decided.result).toMatchObject({
+        imageGeneration: 'queued',
+        imageCount: 1,
+        imageExecutionMode: 'direct',
+      });
+      expect(listRecipes()).toHaveLength(1);
+      expect(imageJobs()).toHaveLength(1);
+    });
+
+    it('does not start a paid image job from a plain confirmation', async () => {
+      const profile = setupProfile();
+      const generated = await generateAiMealPlanProposal({
+        actorProfileId: profile.id,
+        request: planRequest,
+      });
+      const decided = await decideAiAction(generated.proposal.id, profile.id, 'confirm');
+      expect(decided.result).toMatchObject({
+        imageJobId: null,
+        imageGeneration: 'requires_separate_review',
+      });
+      expect(imageJobs()).toHaveLength(0);
+    });
+
+    it('still saves the plan and explains why when image generation is turned off', async () => {
+      const profile = setupProfile();
+      const imageSetting = getAiSettings(profile.id).workloads.find(
+        (item) => item.workload === 'image_generation',
+      )!;
+      updateAiSettings(profile.id, { workloads: [{ ...imageSetting, enabled: false }] });
+      const generated = await generateAiMealPlanProposal({
+        actorProfileId: profile.id,
+        request: planRequest,
+      });
+      expect(
+        getAiActionProposal(generated.proposal.id, profile.id).action.imageDelivery,
+      ).toMatchObject({ available: false, reason: expect.stringContaining('turned off') });
+      const decided = await decideAiAction(generated.proposal.id, profile.id, 'confirm', [], {
+        generateImages: true,
+      });
+      expect(decided.status).toBe('confirmed');
+      expect(decided.result).toMatchObject({
+        imageJobId: null,
+        imageGeneration: 'unavailable',
+        imageNote: expect.stringContaining('turned off'),
+      });
+      expect(listRecipes()).toHaveLength(1);
+      expect(imageJobs()).toHaveLength(0);
+    });
+
+    it('accepts the explicit photo option only as a boolean that defaults to false', () => {
+      expect(aiActionDecisionSchema.parse({ decision: 'confirm' }).generateImages).toBe(false);
+      expect(
+        aiActionDecisionSchema.parse({ decision: 'confirm', generateImages: true }).generateImages,
+      ).toBe(true);
+      expect(() =>
+        aiActionDecisionSchema.parse({ decision: 'confirm', generateImages: 'yes' }),
+      ).toThrow();
+    });
+  });
+
   it('builds a recipebook proposal without calling the AI provider', async () => {
     const profile = setupProfile();
     createRecipe(recipe, profile.id);
