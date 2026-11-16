@@ -32,13 +32,13 @@ test('administrator guidance validates variables, retains conflicts and stays re
   });
   await save.click();
   await expect(
-    editor.getByText('Controlled prompt version conflict. Compare the current guidance.'),
-  ).toBeVisible();
+    page.getByRole('region', { name: 'Notifications' }).getByRole('alert'),
+  ).toContainText('Controlled prompt version conflict. Compare the current guidance.');
   await expect(guidance).toHaveValue(
     'For {{task}}, answer briefly and preserve evidence limitations.',
   );
   mkdirSync(directory, { recursive: true });
-  const recovery = editor.getByRole('button', {
+  const recovery = page.getByRole('button', {
     name: 'Load current version to compare',
     exact: true,
   });
@@ -147,9 +147,18 @@ test('progressive chat owns pending, preserves the next draft and reconciles an 
       true,
     ),
   );
+  await expect(dialog.getByRole('alert', { name: 'Assistant error' })).toContainText(
+    'Controlled connection interruption. Review the conversation.',
+  );
   await expect(
-    dialog.getByText('Controlled connection interruption. Review the conversation.'),
-  ).toBeVisible();
+    dialog
+      .getByRole('region', { name: 'Notifications' })
+      .getByRole('button', { name: 'Copy error details' }),
+  ).toBeEnabled();
+  const copyError = dialog
+    .getByRole('region', { name: 'Notifications' })
+    .getByRole('button', { name: 'Copy error details' });
+  expect(await copyError.evaluate((button) => button.scrollWidth <= button.clientWidth)).toBe(true);
   await expect(dialog.getByRole('button', { name: 'Send message' })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Check the same request' }).click();
   const attempts = await page.evaluate(

@@ -9531,6 +9531,11 @@ small[role='alert'] {
   align-items: center;
   gap: 0.4rem;
   min-height: 36px;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: normal;
   padding: 0.35rem 0.65rem;
   border: 1px solid currentColor;
   border-radius: 0.5rem;
@@ -9573,4 +9578,26 @@ small[role='alert'] {
 .chat-problem p {
   margin: 0;
   line-height: 1.5;
+}
+
+/* Keep the text column usable when system text size increases. */
+.toast[data-dismissible='true'] {
+  position: relative;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  padding-right: 52px;
+}
+.toast[data-dismissible='true'] button.toast-dismiss {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .toast-region {
+    max-height: calc(100dvh - max(5rem, calc(env(safe-area-inset-top) + 4rem)) - 0.75rem);
+  }
 }

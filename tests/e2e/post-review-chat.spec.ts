@@ -181,7 +181,9 @@ test('text commands and interruption recovery stay readable in constrained chat 
     );
   });
   await page.setViewportSize({ width: 390, height: 500 });
-  await expect(dialog.getByRole('alert')).toContainText('Controlled provider failure.');
+  await expect(dialog.getByRole('alert', { name: 'Assistant error' })).toContainText(
+    'Controlled provider failure.',
+  );
   const retry = dialog.getByRole('button', { name: 'Check the same request', exact: true });
   await retry.focus();
   await expect(retry).toBeInViewport();

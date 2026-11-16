@@ -275,7 +275,9 @@ test('copied destination uses the verified global switch and keeps account autho
     });
   });
   await copy.getByRole('button', { name: 'Copy confirmed entries' }).click();
-  await expect(copy.getByText(/1 entry copied to Copy fixture child/)).toBeVisible();
+  await expect(
+    copy.getByRole('paragraph').filter({ hasText: /1 entry copied to Copy fixture child/ }),
+  ).toBeVisible();
   await capture(page, 'copy-result-authorized-destination-mobile');
   await copy.getByRole('button', { name: /Open Copy fixture child’s diary/ }).click();
   const verification = page.getByRole('dialog', { name: 'Switch to Copy fixture child' });

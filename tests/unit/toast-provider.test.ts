@@ -134,6 +134,8 @@ it('copies an error with safe technical details and keeps it available for revie
   }
   render(createElement(ToastProvider, null, createElement(ErrorControl)));
   fireEvent.click(screen.getByText('Fail'));
+  expect(screen.getByRole('alert').getAttribute('data-actionable')).toBe('true');
+  expect(screen.getByRole('alert').getAttribute('data-dismissible')).toBe('true');
   fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
   await act(async () => {});
   expect(writeText).toHaveBeenCalledWith(

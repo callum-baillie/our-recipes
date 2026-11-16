@@ -266,7 +266,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           className={`toast toast-${toast.tone}`}
           key={toast.id}
-          data-actionable={Boolean(toast.actions?.length)}
+          data-actionable={Boolean(toast.actions?.length) || toast.tone === 'error'}
+          data-dismissible={(!toast.actions?.length && toast.tone === 'error') || undefined}
           role={toast.tone === 'error' ? 'alert' : 'status'}
         >
           <ToastIcon tone={toast.tone} />
@@ -290,6 +291,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           {!toast.actions?.length && (
             <button
               type="button"
+              className="toast-dismiss"
               onClick={() => dismiss(toast.id)}
               aria-label="Dismiss notification"
             >

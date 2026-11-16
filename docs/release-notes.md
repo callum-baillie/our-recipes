@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.0.0-rc.37
+
+- Keep Copy error readable in narrow notifications, make technical details interactive, and preserve an accessible dismiss button. Includes the approved AI recovery and diagnostic improvements from rc36.
+- Align browser fixtures with the approval endpoint and distinguish persistent error panels from their notifications. No schema change (`0084_ai_recovery_requests`, 86 migrations).
+- Verification: release build and 3,807-file artifact check passed; 18 focused toast/chat tests passed. Production browser checks pass for chat interruption/retry, error copy, account authorization and uncertain-write recovery. The complete v1 browser oracle passed in CI on rc36; rc37 changes notification layout and test fixtures only. The broader post-review run retains a Settings enlarged-font width failure, and native CI retains its shared-module zod resolution failure. No paid OpenAI request was made. Fresh rc36 backup `6d0f7c6c-0a48-4604-9737-a0d26dec55d8` was downloaded and all 25 checksums verified before the follow-up deployment.
+
 ## 1.0.0-rc.36
 
 - Add server-authorized assistant permission requests with one-reply and permanent choices, an account approval inbox, expiring single-use grants, and revocation. Another account's private sharing requires that account owner's consent; administrators can manage operational limits and unowned household profiles.

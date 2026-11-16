@@ -139,7 +139,11 @@ test('refinement workflows preserve draft identity, request scope and recovery a
       .toBe(1);
     expect(submittedIngredient).toMatchObject({ item: 'Oat drink', pantryProductId: product.id });
     await expect(
-      page.getByText('Controlled version conflict', { exact: true }).first(),
+      page
+        .getByRole('region', { name: 'Notifications' })
+        .getByRole('alert')
+        .filter({ hasText: 'Controlled version conflict' })
+        .first(),
     ).toBeVisible();
   } catch (error) {
     const diagnostics = await ingredient.evaluate((element) => ({
@@ -311,7 +315,13 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await listName.press('Enter');
   await expect(listName).toBeDisabled();
   finishRename();
-  await expect(page.getByText('Controlled list conflict', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Notifications' })
+      .getByRole('alert')
+      .filter({ hasText: 'Controlled list conflict' })
+      .first(),
+  ).toBeVisible();
   await expect(listName).toHaveValue('Weekend draft');
   await page.screenshot({ path: `${evidenceDirectory}/mobile-list-name-error.png` });
 
@@ -332,8 +342,16 @@ test('refinement workflows preserve draft identity, request scope and recovery a
   await expect(
     picker.getByText(/We could not confirm whether these meals were added/),
   ).toBeVisible();
+  const dismissNotice = page
+    .getByRole('region', { name: 'Notifications' })
+    .getByRole('button', { name: 'Dismiss notification' });
+  while (await dismissNotice.count()) await dismissNotice.first().click();
   await picker.getByRole('button', { name: 'Clear selections' }).click();
-  await picker.getByRole('button', { name: new RegExp(`${input.title}.*Select`) }).click();
+  // The unresolved calendar action retains its review notification. Verify keyboard
+  // selection also cannot bypass the prohibition on submitting an uncertain request.
+  const retainedChoice = picker.getByRole('button', { name: new RegExp(`${input.title}.*Select`) });
+  await retainedChoice.focus();
+  await retainedChoice.press('Enter');
   await expect(picker.getByRole('button', { name: 'Add 1 meal' })).toBeDisabled();
   expect(additions).toBe(1);
   await page.screenshot({ path: `${evidenceDirectory}/uncertain-meal-selection-retained.png` });
